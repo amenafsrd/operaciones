@@ -4571,18 +4571,43 @@ function segCalcularTiempos_(ots, fecha, justif, almuerzos) {
       const prev = lista[i - 1];
       if (prev && prev.fin !== null && it.ini >= prev.fin) {
         let gap = it.ini - prev.fin;
-        /* Si a la móvil se le marcó almuerzo justo al terminar la OT anterior, esa hora no cuenta */
+        let desdeG = prev.fin;
+        /* Almuerzo marcado dentro de este hueco: del fin de la OT anterior a la hora del almuerzo cuenta aparte;
+           luego se le dan MIN_ALMUERZO minutos y solo el resto cuenta como traslado */
         const idm = txt_(it.o.ID_Movil);
-        const alm = almuerzos[idm] && almuerzos[idm] === segMinTxt_(prev.fin);
-        if (alm) gap = Math.max(0, gap - SEG.MIN_ALMUERZO);
+        const aL = almuerzos[idm] ? segMin_(almuerzos[idm]) : null;
+        const alm = aL !== null && aL >= prev.fin && aL <= it.ini;
+        if (alm) {
+          desdeG = Math.min(aL + SEG.MIN_ALMUERZO, it.ini);
+          gap = it.ini - desdeG;
+        }
         if (gap > SEG.MIN_TRASLADO) {
           const e = base(it, 'Traslado', 'TRASL');
-          e.inicio = segMinTxt_(prev.fin);
+          e.inicio = segMinTxt_(desdeG);
           e.fin = segMinTxt_(it.ini);
           e.anterior = txt_(prev.o.N_Orden);
           e.minutos = Math.round(gap); e.estandar = SEG.MIN_TRASLADO; e.exceso = Math.round(gap - SEG.MIN_TRASLADO);
-          if (alm) e.conAlmuerzo = true;
+          if (alm) { e.conAlmuerzo = true; e.despuesAlmuerzo = true; }
           excesos.push(e);
+        }
+      }
+
+      /* Tiempo sin actividad entre el fin de esta OT y la hora en que salió a almorzar (aunque aún no haya iniciado otra) */
+      if (it.fin !== null && it.est === 'FINALIZADA') {
+        const idm2 = txt_(it.o.ID_Movil);
+        const aL2 = almuerzos[idm2] ? segMin_(almuerzos[idm2]) : null;
+        const sig = lista[i + 1];
+        if (aL2 !== null && aL2 >= it.fin && (!sig || sig.ini >= aL2)) {
+          const pre = aL2 - it.fin;
+          if (pre > SEG.MIN_TRASLADO) {
+            const e = base(it, 'Sin actividad', 'ESPERA');
+            e.inicio = segMinTxt_(it.fin);
+            e.fin = segMinTxt_(aL2);
+            e.anterior = txt_(it.o.N_Orden);
+            e.minutos = Math.round(pre); e.estandar = SEG.MIN_TRASLADO; e.exceso = Math.round(pre - SEG.MIN_TRASLADO);
+            e.antesAlmuerzo = true;
+            excesos.push(e);
+          }
         }
       }
     });
@@ -4830,11 +4855,11 @@ function obtenerSeguimientoWeb(token, fecha) {
 
     const base = {
       idMovil: r.idMovil, movil: r.movil, tecnico: r.tecnico, zona: r.zona,
-      ultimaOt: ultimaOt, pendientes: r.pendPlataforma || r.pendientes
+      ultimaOt: ultimaOt, ultimaFin: ultimaFin !== null ? segMinTxt_(ultimaFin) : '', pendientes: r.pendPlataforma || r.pendientes
     };
 
     /* Almuerzo marcado: se le da 1 hora desde que finalizó */
-    if (r.almuerzoDesde && segMin_(r.almuerzoDesde) !== null) {
+    if (r.almuerzoDesde && segMin_(r.almuerzoDesde) !== null && ahora >= segMin_(r.almuerzoDesde)) {
       const hasta = segMin_(r.almuerzoDesde) + SEG.MIN_ALMUERZO;
       r.almuerzoHasta = segMinTxt_(hasta);
       if (ahora < hasta) {
@@ -5031,7 +5056,7 @@ function guardarSeguimientoWeb(token, fecha, filas) {
   });
 }
 
-/* Marca (o quita) el almuerzo de una móvil: 1 hora desde que finalizó su última OT */
+/* Marca (o quita) el almuerzo de una móvil: se da 1 hora desde la hora de inicio que se indique */
 function guardarAlmuerzoWeb(token, fecha, idMovil, desde) {
 
   const ses = requerirSesion_(token, 'operador');
@@ -7215,6 +7240,35 @@ function obtenerNotificacionesWeb(token) {
         const nn = /^\d+$/.test(num) && num.length < 7 ? ('000000' + num).slice(-6) : num;
         eventos.push({ id: 'cot|' + num + '|' + f, tipo: 'cotizacion', icono: '✅', titulo: 'Cotización ' + nn + ' aceptada', detalle: (txt_(c.Cliente) || '') + (txt_(c.Proyecto) ? ' · ' + txt_(c.Proyecto) : '') + ' · por ' + txt_(h.Usuario), fecha: f, vista: 'cotizaciones', propio: txt_(h.Usuario) === ses.usuario });
       });
+    } catch (e) { /* idem */ }
+  }
+
+  /* Corte pendiente: dentro del horario de cortes, si pasó más de MIN_CORTE desde el último corte subido (o desde el inicio del horario) */
+  if (tiene('seguimiento')) {
+    try {
+      const fHoy = segHoyISO_();
+      const ahoraM = segMin_(segHoraAhora_());
+      const dM = segMin_(SEG.CORTES_DESDE), hM = segMin_(SEG.CORTES_HASTA);
+      if (ahoraM !== null && dM !== null && hM !== null && ahoraM >= dM && ahoraM <= hM) {
+        let ultimo = '';
+        segLeer_('CORTES', fHoy, fHoy).forEach(c => {
+          const fh = segHoraLog_(c.Fecha_Hora);
+          if (fh.slice(0, 10) !== fHoy) return;
+          const hh = fh.slice(11, 16);
+          if (hh > ultimo) ultimo = hh;
+        });
+        const refM = ultimo ? segMin_(ultimo) : dM;
+        const mins = ahoraM - refM;
+        if (mins > SEG.MIN_CORTE) {
+          const txtT = mins >= 60 ? Math.floor(mins / 60) + ' h ' + (mins % 60) + ' min' : mins + ' min';
+          eventos.push({
+            id: 'corte|' + fHoy + '|' + (ultimo || 'sin') + '|' + Math.floor(mins / 60),
+            tipo: 'seguimiento', icono: '📥', titulo: 'Falta subir el corte de seguimiento',
+            detalle: ultimo ? ('El último corte se subió a las ' + ultimo + ' y ya pasaron ' + txtT + '.') : ('Hoy todavía no se ha subido ningún corte (van ' + txtT + ' desde las ' + SEG.CORTES_DESDE + ').'),
+            fecha: fHoy + ' ' + segHoraAhora_() + ':00', vista: 'seguimiento', propio: false
+          });
+        }
+      }
     } catch (e) { /* idem */ }
   }
 

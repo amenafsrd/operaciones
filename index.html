@@ -1302,7 +1302,7 @@
               <div class="field" style="min-width:150px"><label>Tipo</label>
                 <select id="segTiemposTipo" onchange="renderTiempos()">
                   <option value="">Todos</option><option value="Ejecución">Ejecución</option>
-                  <option value="Traslado">Traslado</option><option value="En curso">En curso</option></select></div>
+                  <option value="Traslado">Traslado</option><option value="Sin actividad">Sin actividad</option><option value="En curso">En curso</option></select></div>
               <div class="field" style="min-width:170px"><label>Justificación</label>
                 <select id="segTiemposFiltro" onchange="renderTiempos()">
                   <option value="todos">Todos</option>
@@ -6082,11 +6082,26 @@ async function segAlmuerzo(idMovil, desde) {
   try {
     if (segDirty() && !(await segGuardar(true))) return;
     await api('guardarAlmuerzoWeb', segDatos.fecha, idMovil, desde);
-    toast(desde ? 'Almuerzo marcado: 1 hora desde que finalizó.' : 'Almuerzo quitado.');
+    toast(desde ? 'Almuerzo marcado desde las ' + desde + ' (' + segDatos.minAlmuerzo + ' min).' : 'Almuerzo quitado.');
     await cargarSeg();
   } catch (e) {
     mostrarError(e, 'No se pudo guardar el almuerzo.');
   }
+}
+
+/* Pregunta a qué hora inició el almuerzo: desde el fin de su última OT hasta esa hora cuenta como tiempo sin actividad */
+function segAlmuerzoPedir(idMovil, ultimaFin, actual) {
+  const n = new Date(Date.now() - 6 * 3600000);
+  const ahora = ('0' + n.getUTCHours()).slice(-2) + ':' + ('0' + n.getUTCMinutes()).slice(-2);
+  const v = prompt('¿A qué hora inició el almuerzo? (HH:MM)\n' +
+    (ultimaFin ? 'Su última OT terminó a las ' + ultimaFin + '. De esa hora hasta el inicio del almuerzo cuenta como tiempo sin actividad; luego se le dan ' + segDatos.minAlmuerzo + ' min.' : ''),
+    actual || ahora);
+  if (v === null) return;
+  const m = String(v).trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (!m || +m[1] > 23 || +m[2] > 59) { toast('Hora no válida. Usa el formato HH:MM.'); return; }
+  const hh = ('0' + m[1]).slice(-2) + ':' + m[2];
+  if (ultimaFin && hh < ultimaFin) { toast('El almuerzo no puede iniciar antes de que terminara su última OT (' + ultimaFin + ').'); return; }
+  segAlmuerzo(idMovil, hh);
 }
 
 function renderAlertas() {
@@ -6101,9 +6116,9 @@ function renderAlertas() {
   let html = segCorteHtml();
 
   if (d.almuerzos.length) {
-    html += '<div class="segAviso" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center"><b>🍽️ En almuerzo (' + d.minAlmuerzo + ' min desde que finalizaron):</b> ' +
+    html += '<div class="segAviso" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center"><b>🍽️ En almuerzo (' + d.minAlmuerzo + ' min desde la hora de inicio):</b> ' +
       d.almuerzos.map(a => '<span class="segChip">M' + esc(a.movil) + ' ' + esc(a.tecnico) + ' · hasta las ' + esc(a.hasta) + ' (faltan ' + a.restan + ' min)' +
-        (ed ? ' <a href="#" style="margin-left:6px;color:#b71c1c;text-decoration:none" title="Quitar almuerzo" onclick="segAlmuerzo(\'' + escJs(a.idMovil) + '\',\'\');return false">✖</a>' : '') + '</span>').join('') +
+        (ed ? ' <a href="#" style="margin-left:6px;text-decoration:none" title="Cambiar la hora de inicio" onclick="segAlmuerzoPedir(\'' + escJs(a.idMovil) + '\',\'' + esc(a.ultimaFin || '') + '\',\'' + esc(a.desde) + '\');return false">✏️</a><a href="#" style="margin-left:6px;color:#b71c1c;text-decoration:none" title="Quitar almuerzo" onclick="segAlmuerzo(\'' + escJs(a.idMovil) + '\',\'\');return false">✖</a>' : '') + '</span>').join('') +
       '</div>';
   }
 
@@ -6125,7 +6140,7 @@ function renderAlertas() {
           : 'No ha iniciado ninguna OT hoy (referencia ' + esc(a.desde) + ')') + '</td>' +
       '<td><b class="' + (a.nivel === 'alto' ? 'segNeg' : '') + '" style="' + (a.nivel === 'alto' ? '' : 'color:#b8860b') + '">' + (a.nivel === 'alto' ? '🔴 ' : '🟠 ') + h(a.minutos) + '</b></td>' +
       '<td>' + a.pendientes + '</td>' +
-      (ed ? '<td>' + (a.puedeAlmuerzo ? '<button class="btnMini" onclick="segAlmuerzo(\'' + escJs(a.idMovil) + '\',\'' + esc(a.desde) + '\')">🍽️ En almuerzo (1 h)</button> ' : '') + '</td>' : '') +
+      (ed ? '<td>' + (a.puedeAlmuerzo ? '<button class="btnMini" onclick="segAlmuerzoPedir(\'' + escJs(a.idMovil) + '\',\'' + esc(a.desde) + '\')">🍽️ En almuerzo...</button> ' : '') + '</td>' : '') +
       '</tr>').join('') + '</tbody></table></div></div>';
   el.innerHTML = html;
 }
@@ -6180,16 +6195,18 @@ function renderTiempos() {
     return;
   }
 
-  const clsT = { 'Ejecución': 'e', 'Traslado': 't', 'En curso': 'c', 'Sin iniciar': 'c' };
-  const txtT = { 'Ejecución': '⏱️ Ejecución', 'Traslado': '🚐 Traslado', 'En curso': '🔄 En curso', 'Sin iniciar': '⏳ Sin iniciar' };
+  const clsT = { 'Ejecución': 'e', 'Traslado': 't', 'En curso': 'c', 'Sin iniciar': 'c', 'Sin actividad': 't' };
+  const txtT = { 'Ejecución': '⏱️ Ejecución', 'Traslado': '🚐 Traslado', 'En curso': '🔄 En curso', 'Sin iniciar': '⏳ Sin iniciar', 'Sin actividad': '⏳ Sin actividad' };
 
   $('segTiemposContenido').innerHTML = '<table class="table" style="min-width:1000px"><thead><tr>' +
     '<th>Móvil</th><th>Técnico</th><th>Tipo</th><th>OT</th><th>Detalle</th><th>Tiempo</th><th>Estándar</th><th>Exceso</th><th>Justificación</th></tr></thead><tbody>' +
     l.map(e => {
       const detalle = e.tipo === 'Sin iniciar'
         ? (e.despuesAlmuerzo ? 'Terminó su almuerzo a las ' : (e.anterior ? 'Terminó la OT ' + esc(e.anterior) + ' a las ' : 'Sin iniciar OT desde las ')) + esc(e.inicio) + ' y todavía no inicia otra <i>(sigue corriendo)</i>'
+        : e.tipo === 'Sin actividad'
+        ? 'Terminó la OT ' + esc(e.anterior) + ' a las ' + esc(e.inicio) + ' y salió a almorzar a las ' + esc(e.fin)
         : e.tipo === 'Traslado'
-        ? 'Terminó la OT ' + esc(e.anterior) + ' a las ' + esc(e.inicio) + ' y empezó esta a las ' + esc(e.fin) + (e.conAlmuerzo ? ' <i>(ya descontada 1 h de almuerzo)</i>' : '')
+        ? (e.despuesAlmuerzo ? 'Terminó su almuerzo a las ' + esc(e.inicio) : 'Terminó la OT ' + esc(e.anterior) + ' a las ' + esc(e.inicio)) + ' y empezó esta a las ' + esc(e.fin) + (e.conAlmuerzo ? ' <i>(ya descontado el almuerzo)</i>' : '')
         : esc(e.tipoOt) + ' · ' + esc(e.trabajo) + '<br>Inició ' + esc(e.inicio) + (e.fin ? ' · terminó ' + esc(e.fin) : ' · sigue abierta');
       return '<tr><td><b>' + esc(e.movil) + '</b></td><td class="left">' + esc(e.tecnico) + '</td>' +
         '<td><span class="segBadge ' + clsT[e.tipo] + '">' + txtT[e.tipo] + '</span></td>' +
@@ -6735,6 +6752,7 @@ async function segImportarArchivo(inp) {
 
     segResultadoHtml = htmlResultadoCorte(r);
     await cargarSeg();
+    notifCargar();
     toast('Corte "' + corte + '" importado: ' + r.nuevas + ' OT nuevas, ' + r.totalDia + ' en el día.');
 
   } catch (e) {
@@ -8907,10 +8925,21 @@ function notifToggle(ev) {
 function notifRender() {
   const leidas = notifLeidas();
   const al = bodDatos ? bodAlertasLista(true).map(x => ({ clave: x.m.clave, material: x.m.material, unidad: x.m.unidad, disponible: x.disp, pct: x.pct, completo: x.m.completo, minimo: x.m.minimo })) : (notifDatos.alertas || []);
-  const ev = notifDatos.eventos || [];
+  const evTodos = notifDatos.eventos || [];
+  const pend = evTodos.filter(e => e.tipo === 'seguimiento');
+  const ev = evTodos.filter(e => e.tipo !== 'seguimiento');
+  const item = e => {
+    const leida = leidas.indexOf(e.id) !== -1;
+    return '<div class="nfItem" style="' + (leida ? 'opacity:.55' : (e.tipo === 'seguimiento' ? 'background:#fff6ee' : 'background:#f3f7ff')) + ';cursor:pointer" onclick="notifAbrir(\'' + escJs(e.id) + '\',\'' + escJs(e.vista) + '\')"><span style="font-size:18px">' + e.icono + '</span>' +
+      '<div style="flex:1"><b style="font-size:13px">' + esc(e.titulo) + '</b><div style="font-size:12px;color:#666">' + esc(e.detalle) + '</div><div style="font-size:11px;color:#999">' + esc(notifHora(e.fecha)) + '</div></div>' +
+      (leida ? '' : '<span style="width:8px;height:8px;border-radius:50%;background:#1f6feb;flex:0 0 auto"></span>') + '</div>';
+  };
   let h = '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid #eee"><b>🔔 Notificaciones</b>' +
-    (ev.some(e => leidas.indexOf(e.id) === -1) ? '<a style="font-size:12px;cursor:pointer;color:#1f6feb" onclick="notifMarcarTodo()">Marcar todo como leído</a>' : '') + '</div>';
-  if (!al.length && !ev.length) h += '<div style="padding:22px 14px;text-align:center;color:#888;font-size:13px">No hay notificaciones nuevas.</div>';
+    (evTodos.some(e => leidas.indexOf(e.id) === -1) ? '<a style="font-size:12px;cursor:pointer;color:#1f6feb" onclick="notifMarcarTodo()">Marcar todo como leído</a>' : '') + '</div>';
+  if (!al.length && !evTodos.length) h += '<div style="padding:22px 14px;text-align:center;color:#888;font-size:13px">No hay notificaciones nuevas.</div>';
+  if (pend.length) {
+    h += '<div style="padding:8px 14px 2px;font-size:12px;font-weight:700;color:#b45309">⏰ PENDIENTE</div>' + pend.map(item).join('');
+  }
   if (al.length) {
     h += '<div style="padding:8px 14px 2px;font-size:12px;font-weight:700;color:#e65100">⚠️ ALERTAS DE BODEGA (' + al.length + ')' +
       (puedeEditar() && al.length > 1 ? ' <a style="font-weight:400;cursor:pointer;color:#1f6feb;margin-left:6px" onclick="aceptarAlertasBodega(null)">Aceptar todas</a>' : '') + '</div>';
@@ -8921,13 +8950,7 @@ function notifRender() {
     });
   }
   if (ev.length) {
-    h += '<div style="padding:8px 14px 2px;font-size:12px;font-weight:700;color:#555">NOVEDADES</div>';
-    ev.forEach(e => {
-      const leida = leidas.indexOf(e.id) !== -1;
-      h += '<div class="nfItem" style="' + (leida ? 'opacity:.55' : 'background:#f3f7ff') + ';cursor:pointer" onclick="notifAbrir(\'' + escJs(e.id) + '\',\'' + escJs(e.vista) + '\')"><span style="font-size:18px">' + e.icono + '</span>' +
-        '<div style="flex:1"><b style="font-size:13px">' + esc(e.titulo) + '</b><div style="font-size:12px;color:#666">' + esc(e.detalle) + '</div><div style="font-size:11px;color:#999">' + esc(notifHora(e.fecha)) + '</div></div>' +
-        (leida ? '' : '<span style="width:8px;height:8px;border-radius:50%;background:#1f6feb;flex:0 0 auto"></span>') + '</div>';
-    });
+    h += '<div style="padding:8px 14px 2px;font-size:12px;font-weight:700;color:#555">NOVEDADES</div>' + ev.map(item).join('');
   }
   $('notifPanel').innerHTML = h;
 }
@@ -11569,6 +11592,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 6 · 12-oct 13:30</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 7 · 12-oct 14:00</div>
 </body>
 </html>
