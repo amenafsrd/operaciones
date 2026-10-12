@@ -5382,7 +5382,6 @@ function importarFinalizadasWeb(token, fecha, corte, filas, archivo) {
   if (!Array.isArray(filas) || !filas.length) throw new Error('El archivo no trae filas.');
   if (filas.length > 3000) throw new Error('El archivo trae demasiadas filas (máximo 3000).');
   archivo = txt_(archivo).slice(0, 120);
-  mapa = mapa || {};
 
   return conBloqueo_(() => {
 

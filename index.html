@@ -6302,6 +6302,61 @@ function segFraccionAHora(v) {
   return p(Math.floor(s / 3600)) + ':' + p(Math.floor(s % 3600 / 60)) + ':' + p(s % 60);
 }
 
+/* Lector de respaldo para .xlsx cuyo XML SheetJS no entiende (p. ej. «<is >» con espacio). Devuelve una lista de hojas (filas de celdas). */
+async function xlsxManual_(buf) {
+  const u8 = new Uint8Array(buf), dv = new DataView(buf);
+  let e = -1;
+  for (let i = u8.length - 22; i >= Math.max(0, u8.length - 70000); i--) { if (dv.getUint32(i, true) === 0x06054b50) { e = i; break; } }
+  if (e < 0) throw new Error('Archivo no válido.');
+  const n = dv.getUint16(e + 10, true); let p = dv.getUint32(e + 16, true);
+  const dec = new TextDecoder('utf-8'), ent = {};
+  for (let k = 0; k < n; k++) {
+    if (dv.getUint32(p, true) !== 0x02014b50) break;
+    const met = dv.getUint16(p + 10, true), csz = dv.getUint32(p + 20, true), nl = dv.getUint16(p + 28, true), el = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true), off = dv.getUint32(p + 42, true);
+    ent[dec.decode(u8.subarray(p + 46, p + 46 + nl))] = { met: met, csz: csz, off: off };
+    p += 46 + nl + el + cl;
+  }
+  const leer = async nombre => {
+    const x = ent[nombre]; if (!x) return null;
+    const ln = dv.getUint16(x.off + 26, true), le = dv.getUint16(x.off + 28, true);
+    const ini = x.off + 30 + ln + le, dat = u8.subarray(ini, ini + x.csz);
+    if (x.met === 0) return dec.decode(dat);
+    const ds = new DecompressionStream('deflate-raw');
+    const w = ds.writable.getWriter(); w.write(dat); w.close();
+    return dec.decode(await new Response(ds.readable).arrayBuffer());
+  };
+  const un = s => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&#(\d+);/g, (m, d) => String.fromCharCode(+d)).replace(/&amp;/g, '&');
+  const textos = x => { let t = ''; x.replace(/<t(?:\s[^>]*)?>([\s\S]*?)<\/t\s*>/g, (m, a) => { t += un(a); return m; }); return t; };
+  const ss = [];
+  const sx = await leer('xl/sharedStrings.xml');
+  if (sx) sx.replace(/<si(?:\s[^>]*)?>([\s\S]*?)<\/si\s*>/g, (m, a) => { ss.push(textos(a)); return m; });
+  const col = r => { let c = 0; for (const ch of r.replace(/\d+/g, '')) c = c * 26 + ch.charCodeAt(0) - 64; return c - 1; };
+  const hojas = [];
+  for (const nombre of Object.keys(ent).filter(k => /^xl\/worksheets\/[^/]+\.xml$/.test(k)).sort()) {
+    const xml = await leer(nombre), filas = [];
+    xml.replace(/<c(\s[^>]*?)?(?:\/>|>([\s\S]*?)<\/c\s*>)/g, (m, attr, cuerpo) => {
+      attr = attr || '';
+      const r = (attr.match(/\sr="([A-Z]+)(\d+)"/) || attr.match(/^r="([A-Z]+)(\d+)"/)); if (!r) return m;
+      const t = (attr.match(/\st="([^"]*)"/) || [])[1] || '';
+      let v = '';
+      if (cuerpo) {
+        if (t === 'inlineStr') v = textos(cuerpo);
+        else {
+          const vv = cuerpo.match(/<v(?:\s[^>]*)?>([\s\S]*?)<\/v\s*>/);
+          if (vv) { v = un(vv[1]); if (t === 's') v = ss[+v] || ''; else if (t === 'b') v = v === '1'; else if (t === 'str' || t === 'e') v = v; else if (v !== '' && !isNaN(+v)) v = +v; }
+        }
+      }
+      const fi = +r[2] - 1, ci = col(r[1]);
+      while (filas.length <= fi) filas.push([]);
+      const fila = filas[fi]; while (fila.length <= ci) fila.push('');
+      fila[ci] = v;
+      return m;
+    });
+    hojas.push(filas.map(f => f || []));
+  }
+  return hojas;
+}
+
 async function segLeerExcel(file, clavesEnc) {
 
   await cargarLib('xlsx', SEG_URL_XLSX);
@@ -6311,7 +6366,12 @@ async function segLeerExcel(file, clavesEnc) {
 
   /* Busca el encabezado en todas las hojas (las primeras 40 filas): primero el nombre exacto, luego cualquier columna que diga «orden» / «OT» */
   let m = null, h = -1, renombrar = -1;
-  const hojas = wb.SheetNames.map(n => XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: true, defval: '' }));
+  let hojas = wb.SheetNames.map(n => XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: true, defval: '' }));
+  /* Algunos reportes traen un XML que SheetJS no interpreta (celdas vacías): se leen con el lector de respaldo */
+  const hayTexto = hs => hs.some(mm => mm.slice(0, 40).some(f => f.some(v => typeof v === 'string' && v.trim())));
+  if (!hayTexto(hojas)) {
+    try { const alt = await xlsxManual_(buf); if (hayTexto(alt)) hojas = alt; } catch (e) { console.warn('Lector de respaldo:', e); }
+  }
   const esOrden = t => /orden/.test(t) || /(^|_)(ot|n_?ot)(_|$)/.test(t);
 
   for (const mm of hojas) {
