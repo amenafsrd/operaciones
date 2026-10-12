@@ -375,6 +375,39 @@
     ::selection { background: #a3161633; }
     #app > section { max-width: 1500px; margin: 0 auto; padding: 20px; }
     @media (max-width: 900px) { #app > section { padding: 12px; } }
+    /* =====================  VISTA COMPACTA (menos scroll)  ===================== */
+    .top { position: sticky; top: 0; z-index: 40; padding: 6px 20px; }
+    .top .sub { display: none; }
+    #hLogo { height: 28px !important; }
+    .top .brand { font-size: 17px; }
+    .nav button { padding: 7px 12px; }
+    .wrap, #app > section { padding: 12px 18px; }
+    .toolbar { padding: 10px 12px; margin-bottom: 10px; gap: 8px; }
+    .field input, .field select { padding: 6px 9px; }
+    .btn { padding: 7px 13px; }
+    .cards, .segCards { gap: 8px; margin-bottom: 10px; }
+    .card { padding: 9px 12px; }
+    .card .n, .segCards .card .n { font-size: 20px; }
+    .card .t { margin-top: 1px; font-size: 11.5px; }
+    .panelHead { padding: 9px 14px; }
+    .panelHead h2 { font-size: 16px; }
+    .table th { padding: 6px 6px; }
+    .table td { padding: 4px 6px; }
+    .segAviso { padding: 8px 12px; margin-bottom: 10px; }
+    .subtabs { margin-bottom: 8px; }
+    .subtabs button { padding: 6px 12px; }
+    .segLista > summary { padding: 8px 12px; }
+    .unsaved { padding: 7px 12px; margin-bottom: 8px; }
+    /* tablas con scroll propio y encabezado fijo: la página ya no se alarga */
+    .tableWrap { max-height: calc(100vh - 230px); min-height: 220px; overflow: auto; }
+    .tableWrap .table thead th { position: sticky; top: 0; z-index: 2; }
+    .segLista .tableWrap, .hist .tableWrap { max-height: 60vh; }
+    .top { flex-wrap: nowrap; gap: 10px; }
+    .nav { flex-wrap: nowrap; }
+    .nav button { padding: 7px 9px; white-space: nowrap; }
+    @media (max-width: 1700px) { #userLabel { display: none; } }
+    @media (max-width: 1100px) { .top { flex-wrap: wrap; } .nav { flex-wrap: wrap; } }
+    @media (max-width: 900px) { .top { position: static; } .tableWrap { max-height: none; } }
 </style>
 </head>
 
@@ -11314,6 +11347,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión cortes-6am · 12-oct 10:10</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión compacta · 12-oct 10:45</div>
 </body>
 </html>
