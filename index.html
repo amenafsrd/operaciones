@@ -2138,7 +2138,7 @@
         <summary style="cursor:pointer;font-weight:700">🚐 Viáticos y movilización <span id="ceViaResumen" style="font-weight:400;color:#666"></span></summary>
         <div style="font-size:12px;color:#777;margin:6px 0">Calcula hospedaje, comidas, combustible y otros gastos del equipo. Los precios se escriben en colones (₡) y se pasan solos a la moneda de la cotización. Se suman a los materiales y de ese monto se calculan la mano de obra y la utilidad; en la cotización todo sale en una sola línea.</div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
-          <label style="margin:0">Personas del proyecto</label><input type="number" id="ceViaPers" value="4" min="1" step="1" style="width:70px;padding:7px;border:1px solid #ccc;border-radius:6px">
+          <label style="margin:0">Personas del proyecto</label><input type="number" id="ceViaPers" value="1" min="1" step="1" style="width:70px;padding:7px;border:1px solid #ccc;border-radius:6px">
           <label style="margin:0">Días</label><input type="number" id="ceViaDias" value="1" min="1" step="1" style="width:70px;padding:7px;border:1px solid #ccc;border-radius:6px">
           <button class="btn secondary" onclick="ceViaPlantilla()">📋 Cargar viáticos estándar</button>
           <span style="font-size:12px;color:#777">Llena hospedaje, desayuno, almuerzo, cena, hidratación y combustible con las personas y días indicados.</span>
@@ -2151,8 +2151,8 @@
         <div id="ceViaSuma" style="font-size:14px;margin-top:10px"></div>
       </details>
 
-      <div id="ceResBox" style="margin-top:12px;border:1px solid #cfe0ff;border-radius:10px;padding:10px 12px;background:#f3f7ff">
-        <div style="font-weight:700;margin-bottom:2px">💰 Margen de utilidad y mano de obra</div>
+      <details id="ceResBox" style="margin-top:12px;border:1px solid #cfe0ff;border-radius:10px;padding:10px 12px;background:#f3f7ff">
+        <summary style="cursor:pointer;font-weight:700">💰 Margen de utilidad y mano de obra <span id="ceResResumen" style="font-weight:400;color:#666"></span></summary>
         <div style="font-size:12px;color:#777;margin-bottom:8px">Todo se suma en un solo renglón: «MATERIALES, ACCESORIOS Y MANO DE OBRA».</div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
           <label style="margin:0">Utilidad de materiales %</label><input type="number" id="ceUtil" value="30" step="any" style="width:80px;padding:7px;border:1px solid #ccc;border-radius:6px" oninput="ceMatCalc()">
@@ -2165,7 +2165,7 @@
           <div style="font-weight:700;margin-bottom:6px">👷 Mano de obra</div>
           <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
             <label style="margin:0">% sobre costo de materiales + viáticos</label>
-            <input type="number" id="ceMoPct" value="30" step="any" style="width:80px;padding:7px;border:1px solid #ccc;border-radius:6px" oninput="ceMoPctCambio()">
+            <input type="number" id="ceMoPct" value="0" step="any" style="width:80px;padding:7px;border:1px solid #ccc;border-radius:6px" oninput="ceMoPctCambio()">
             <span>Propuesto: <b id="ceMoProp">—</b></span>
             <label style="margin:0">Monto a cobrar</label>
             <input type="number" id="ceMoMonto" step="any" style="width:130px;padding:7px;border:1px solid #ccc;border-radius:6px" oninput="ceMoManual()">
@@ -2177,7 +2177,7 @@
           <div id="ceMatSuma" style="font-size:14px"></div>
           <button class="btn primary" onclick="ceUsarMat()">➡️ Usar como línea de la cotización</button>
         </div>
-      </div>
+      </details>
 
       <div class="tableWrap" style="margin-top:12px"><table class="table ceTbl" style="min-width:820px"><thead><tr>
         <th style="width:120px">Código</th><th class="left">Descripción</th><th style="width:70px">Cant.</th><th style="width:120px">Precio unit.</th><th style="width:100px">Desc.</th><th style="width:120px">Precio</th><th style="width:34px"></th></tr></thead>
@@ -10596,11 +10596,12 @@ function ceAbrir(c) {
   ((c && c.viat) || []).forEach(v => { const p = String(v.unidad || '').split('x'); ceViaAdd({ concepto: v.material, pers: Number(p[0]) || 1, dias: Number(p[1]) || 1, precio: v.costo }, true); });
   ceMoMon = $('ceMoneda').value;
   delete $('ceMoMonto').dataset.manual;
-  $('ceMoPct').value = c && c.mo && Number(c.mo.unidad) ? Number(c.mo.unidad) : 30;
+  $('ceMoPct').value = c && c.mo && Number(c.mo.unidad) ? Number(c.mo.unidad) : 0;
   $('ceMoMonto').value = c && c.mo ? c.mo.costo : '';
   if (c && c.mo && Math.abs(c.mo.costo - ceMoProp()) > 0.5) $('ceMoMonto').dataset.manual = '1';
   $('ceMatBox').open = !!(c && ((c.detalle && c.detalle.length) || c.mo));
   $('ceViaBox').open = !!(c && c.viat && c.viat.length);
+  $('ceResBox').open = !!(c && ((c.detalle && c.detalle.length) || c.mo || (c.viat && c.viat.length)));
   $('ceLineas').innerHTML = '';
   ((c && c.lineas) || []).forEach(l => ceAddLinea(l));
   if (nueva || !c.lineas || !c.lineas.length) ceAddLinea({ codigo: '001-100-001', descripcion: 'MATERIALES, ACCESORIOS Y MANO DE OBRA', cantidad: 1 });
@@ -10729,6 +10730,7 @@ function ceMatCalc() {
   });
   const t = ceMatTotales(), n = ceMatLeer().filter(d => d.material && d.cantidad > 0).length;
   $('ceMatResumen').textContent = n ? '· ' + n + ' material' + (n === 1 ? '' : 'es') + ' · costo ' + ctMoney(t.costoMat, mon) : '';
+  $('ceResResumen').textContent = t.precio ? '· precio de la línea ' + ctMoney(t.precio, mon) : '';
   $('ceUtilMonto').textContent = t.utilMat ? ctMoney(t.utilMat, mon) : '—';
   $('ceUtilVMonto').textContent = t.utilVia ? ctMoney(t.utilVia, mon) : '—';
   $('ceMatSuma').innerHTML = 'Materiales <b>' + ctMoney(t.costoMat, mon) + '</b> + Viáticos <b>' + ctMoney(t.via, mon) + '</b> + Utilidades <b>' + ctMoney(t.utilMonto, mon) + '</b> + Mano de obra <b>' + ctMoney(t.mo, mon) + '</b> = <b style="font-size:16px">' + ctMoney(t.precio, mon) + '</b>';
@@ -11755,6 +11757,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 17 · 12-oct 19:30</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 18 · 12-oct 20:00</div>
 </body>
 </html>
