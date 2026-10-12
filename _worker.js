@@ -8396,7 +8396,7 @@ function obtenerCotizacionesWeb(token) {
   const cat = {};
   leerObjetos_(cotHoja_('LIN')).forEach(l => {
     const d = txt_(l.Descripcion);
-    if (d && txt_(l.Origen) !== 'MAT') cat[txt_(l.Codigo) + '|' + d.toUpperCase()] = { codigo: txt_(l.Codigo), descripcion: d, precio: invNum_(l.Precio) };
+    if (d && txt_(l.Origen) !== 'MAT' && txt_(l.Origen) !== 'VIA') cat[txt_(l.Codigo) + '|' + d.toUpperCase()] = { codigo: txt_(l.Codigo), descripcion: d, precio: invNum_(l.Precio) };
   });
   [['001-100-001', 'MATERIALES, ACCESORIOS Y MANO DE OBRA'], ['001-100-100', 'VIATICOS Y MOVILIZACION'],
     ['001-200-010', 'RENTA DE GRUA CON CANASTA'], ['001-200-015', 'RENTA DE ANDAMIOS']].forEach(b => { const k = b[0] + '|' + b[1]; if (!cat[k]) cat[k] = { codigo: b[0], descripcion: b[1], precio: 0 }; });
@@ -8479,7 +8479,7 @@ function guardarCotizacionWeb(token, cot, lineas, detalle) {
     const otras = leerObjetos_(cotHoja_('LIN')).filter(l => txt_(l.Cotizacion) !== num).map(l => cotCopia_('LIN', l));
     cotReescribir_('LIN', otras.concat(lineas.map((l, i) => ({
       Cotizacion: num, Linea: i + 1, Codigo: txt_(l.codigo).slice(0, 30), Descripcion: txt_(l.descripcion).slice(0, 300),
-      Cantidad: invNum_(l.cantidad), Precio: invNum_(l.precio), Descuento: invNum_(l.descuento), Origen: txt_(l.origen) === 'MAT' ? 'MAT' : ''
+      Cantidad: invNum_(l.cantidad), Precio: invNum_(l.precio), Descuento: invNum_(l.descuento), Origen: txt_(l.origen) === 'MAT' ? 'MAT' : (txt_(l.origen) === 'VIA' ? 'VIA' : '')
     }))));
 
     const otrosDet = leerObjetos_(cotHoja_('DET')).filter(d => txt_(d.Cotizacion) !== num).map(d => cotCopia_('DET', d));

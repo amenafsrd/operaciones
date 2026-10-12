@@ -2152,6 +2152,26 @@
         </div>
       </details>
 
+      <details id="ceViaBox" style="margin-top:12px;border:1px solid #e0e0e0;border-radius:10px;padding:10px 12px;background:#fafafa">
+        <summary style="cursor:pointer;font-weight:700">🚐 Viáticos y movilización <span id="ceViaResumen" style="font-weight:400;color:#666"></span></summary>
+        <div style="font-size:12px;color:#777;margin:6px 0">Calcula hospedaje, comidas, combustible y otros gastos del equipo. Los precios se escriben en colones (₡) y se pasan solos a la moneda de la cotización. Es un cálculo interno; en la cotización sale como una sola línea.</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
+          <label style="margin:0">Personas del proyecto</label><input type="number" id="ceViaPers" value="4" min="1" step="1" style="width:70px;padding:7px;border:1px solid #ccc;border-radius:6px">
+          <label style="margin:0">Días</label><input type="number" id="ceViaDias" value="1" min="1" step="1" style="width:70px;padding:7px;border:1px solid #ccc;border-radius:6px">
+          <button class="btn secondary" onclick="ceViaPlantilla()">📋 Cargar viáticos estándar</button>
+          <span style="font-size:12px;color:#777">Llena hospedaje, desayuno, almuerzo, cena, hidratación y combustible con las personas y días indicados.</span>
+        </div>
+        <div class="tableWrap"><table class="table ceTbl" style="min-width:720px"><thead><tr><th class="left">Concepto</th><th style="width:80px">Personas</th><th style="width:80px">Días / veces</th><th style="width:120px">Precio unit. ₡</th><th style="width:120px">Importe ₡</th><th style="width:34px"></th></tr></thead>
+          <tbody id="ceVias"></tbody></table></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px">
+          <button class="btn secondary" onclick="ceViaAdd()">➕ Agregar renglón</button>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-top:10px">
+          <div id="ceViaSuma" style="font-size:14px"></div>
+          <button class="btn primary" onclick="ceUsarVia()">➡️ Usar como línea de la cotización</button>
+        </div>
+      </details>
+
       <div class="tableWrap" style="margin-top:12px"><table class="table ceTbl" style="min-width:820px"><thead><tr>
         <th style="width:120px">Código</th><th class="left">Descripción</th><th style="width:70px">Cant.</th><th style="width:120px">Precio unit.</th><th style="width:100px">Desc.</th><th style="width:120px">Precio</th><th style="width:34px"></th></tr></thead>
         <tbody id="ceLineas"></tbody></table></div>
@@ -10570,6 +10590,10 @@ function ceAbrir(c) {
   $('ceMoMonto').value = c && c.mo ? c.mo.costo : '';
   if (c && c.mo && Math.abs(c.mo.costo - ceMoProp()) > 0.5) $('ceMoMonto').dataset.manual = '1';
   $('ceMatBox').open = !!(c && ((c.detalle && c.detalle.length) || c.mo));
+  $('ceVias').innerHTML = '';
+  ((c && c.viat) || []).forEach(v => { const p = String(v.unidad || '').split('x'); ceViaAdd({ concepto: v.material, pers: Number(p[0]) || 1, dias: Number(p[1]) || 1, precio: v.costo }, true); });
+  $('ceViaBox').open = !!(c && c.viat && c.viat.length);
+  ceViaCalc();
   $('ceLineas').innerHTML = '';
   ((c && c.lineas) || []).forEach(l => ceAddLinea(l));
   if (nueva || !c.lineas || !c.lineas.length) ceAddLinea({ codigo: '001-100-001', descripcion: 'MATERIALES, ACCESORIOS Y MANO DE OBRA', cantidad: 1 });
@@ -10584,9 +10608,9 @@ function ceTcVal() { return Number($('ceTc').value) || ctDatos.tcDefecto; }
 function ceAddLinea(l) {
   l = l || {};
   const tr = document.createElement('tr');
-  if (l.origen === 'MAT') tr.dataset.origen = 'MAT';
+  if (l.origen === 'MAT' || l.origen === 'VIA') tr.dataset.origen = l.origen;
   tr.innerHTML = '<td><input class="lc" list="ctDlCod" value="' + esc(l.codigo || '') + '" onchange="ceAuto(this,\'c\')"></td>' +
-    '<td><input class="ld" list="ctDlDesc" value="' + esc(l.descripcion || '') + '" onchange="ceAuto(this,\'d\')">' + (l.origen === 'MAT' ? '<div style="font-size:11px;color:#1e4fa3">🧱 se actualiza con los materiales</div>' : '') + '</td>' +
+    '<td><input class="ld" list="ctDlDesc" value="' + esc(l.descripcion || '') + '" onchange="ceAuto(this,\'d\')">' + (l.origen === 'MAT' ? '<div style="font-size:11px;color:#1e4fa3">🧱 se actualiza con los materiales</div>' : (l.origen === 'VIA' ? '<div style="font-size:11px;color:#1e4fa3">🚐 se actualiza con los viáticos</div>' : '')) + '</td>' +
     '<td><input class="lq" type="number" step="any" value="' + (l.cantidad == null ? 1 : l.cantidad) + '" oninput="ceCalc()"></td>' +
     '<td><input class="lp" type="number" step="any" value="' + (l.precio || '') + '" oninput="ceCalc()"></td>' +
     '<td><input class="lx" type="number" step="any" value="' + (l.descuento || '') + '" oninput="ceCalc()"></td>' +
@@ -10699,6 +10723,72 @@ function ceMatCalc() {
   if (tr) { tr.querySelector('.lp').value = t.precio; ceCalc(); }
 }
 
+/* --- Viáticos y movilización --- */
+
+const CE_VIA_STD = [['Hospedaje', 35000, 'noches'], ['Desayuno', 6000, 'dias'], ['Almuerzo', 6000, 'dias'], ['Cena', 7000, 'dias'], ['Hidratación', 6000, 'uno'], ['Combustible', 40000, 'uno']];
+
+function ceViaAdd(d, sinCalc) {
+  d = d || {};
+  const tr = document.createElement('tr');
+  tr.innerHTML = '<td class="left"><input class="vn" value="' + esc(d.concepto || '') + '" placeholder="Ej. Hospedaje, almuerzo, combustible"></td>' +
+    '<td><input class="vp" type="number" step="any" value="' + (d.pers == null ? $('ceViaPers').value : d.pers) + '" oninput="ceViaCalc()"></td>' +
+    '<td><input class="vd" type="number" step="any" value="' + (d.dias == null ? $('ceViaDias').value : d.dias) + '" oninput="ceViaCalc()"></td>' +
+    '<td><input class="vc" type="number" step="any" value="' + (d.precio == null ? '' : d.precio) + '" oninput="ceViaCalc()"></td>' +
+    '<td class="vi" style="text-align:right;font-weight:700"></td><td><button class="btnMini" onclick="this.closest(\'tr\').remove();ceViaCalc()">✖</button></td>';
+  $('ceVias').appendChild(tr);
+  if (!sinCalc) ceViaCalc();
+}
+
+function ceViaPlantilla() {
+  const p = Number($('ceViaPers').value) || 1, dd = Number($('ceViaDias').value) || 1;
+  const hay = ceViaLeer().some(v => v.concepto || v.precio);
+  if (hay && !confirm('Se reemplazan los renglones de viáticos que ya tienes. ¿Continuar?')) return;
+  $('ceVias').innerHTML = '';
+  CE_VIA_STD.forEach(x => ceViaAdd({ concepto: x[0], precio: x[1], pers: x[2] === 'uno' ? 1 : p, dias: x[2] === 'noches' ? Math.max(1, dd - 1) : (x[2] === 'uno' ? 1 : dd) }, true));
+  ceViaCalc();
+}
+
+function ceViaLeer() {
+  return Array.from($('ceVias').querySelectorAll('tr')).map(tr => ({
+    concepto: tr.querySelector('.vn').value.trim(), pers: Number(tr.querySelector('.vp').value) || 0,
+    dias: Number(tr.querySelector('.vd').value) || 0, precio: Number(tr.querySelector('.vc').value) || 0
+  }));
+}
+
+function ceViaTotal() {
+  const crc = ceViaLeer().reduce((s, v) => s + v.pers * v.dias * v.precio, 0);
+  const mon = ceMoneda();
+  return { crc: Math.round(crc * 100) / 100, monto: mon === 'USD' ? ctRed(crc / ceTcVal()) : ctRed(crc) };
+}
+
+function ceViaCalc() {
+  const mon = ceMoneda();
+  Array.from($('ceVias').querySelectorAll('tr')).forEach(tr => {
+    const v = (Number(tr.querySelector('.vp').value) || 0) * (Number(tr.querySelector('.vd').value) || 0) * (Number(tr.querySelector('.vc').value) || 0);
+    tr.querySelector('.vi').textContent = '₡' + Math.round(v).toLocaleString('es-CR');
+  });
+  const t = ceViaTotal(), n = ceViaLeer().filter(v => v.concepto && v.pers * v.dias * v.precio > 0).length;
+  $('ceViaResumen').textContent = n ? '· ' + n + ' concepto' + (n === 1 ? '' : 's') + ' · ' + ctMoney(t.monto, mon) : '';
+  $('ceViaSuma').innerHTML = 'Total en colones <b>₡' + Math.round(t.crc).toLocaleString('es-CR') + '</b>' + (mon === 'USD' ? ' ÷ TC ' + ceTcVal() : '') + ' = <b style="font-size:16px">' + ctMoney(t.monto, mon) + '</b>';
+  const tr = $('ceLineas').querySelector('tr[data-origen="VIA"]');
+  if (tr) { tr.querySelector('.lp').value = t.monto; ceCalc(); }
+}
+
+function ceUsarVia() {
+  const t = ceViaTotal();
+  if (!t.monto) { toast('Agrega viáticos con precio primero.'); return; }
+  let tr = $('ceLineas').querySelector('tr[data-origen="VIA"]');
+  if (!tr) {
+    const vacia = Array.from($('ceLineas').querySelectorAll('tr')).find(r => !Number(r.querySelector('.lp').value));
+    if (vacia) vacia.remove();
+    ceAddLinea({ codigo: '001-100-100', descripcion: 'VIATICOS Y MOVILIZACION', cantidad: 1, origen: 'VIA' });
+    tr = $('ceLineas').querySelector('tr[data-origen="VIA"]');
+  }
+  tr.querySelector('.lp').value = t.monto;
+  ceCalc();
+  toast('Línea de viáticos actualizada: ' + ctMoney(t.monto, ceMoneda()) + '.');
+}
+
 /* Al cambiar de moneda o de tipo de cambio se vuelven a calcular los costos que no se escribieron a mano */
 function ceCambioMoneda() {
   const mon = ceMoneda(), tc = ceTcVal();
@@ -10713,6 +10803,7 @@ function ceCambioMoneda() {
     if (m) tr.querySelector('.mc').value = mtCostoEn(m, mon, tc);
   });
   ceMatCalc();
+  ceViaCalc();
   ceCalc();
 }
 
@@ -10807,6 +10898,7 @@ async function ceGuardar() {
   const detalle = ceMatLeer().filter(d => d.material && d.cantidad > 0);
   const moMonto = ceMatTotales().mo;
   if (moMonto > 0) detalle.push({ material: 'Mano de obra', grupo: '__MO__', unidad: String(Number($('ceMoPct').value) || 0), cantidad: 1, costo: moMonto });
+  ceViaLeer().filter(v => v.concepto && v.pers > 0 && v.dias > 0 && v.precio > 0).forEach(v => detalle.push({ material: v.concepto, grupo: '__VIAT__', unidad: v.pers + 'x' + v.dias, cantidad: v.pers * v.dias, costo: v.precio }));
   $('ceGuardar').disabled = true;
   try {
     const r = await api('guardarCotizacionWeb', cot, lineas, detalle);
@@ -10832,7 +10924,8 @@ async function ctAbrir(num, silencioso) {
   }
   /* La mano de obra se guarda como un renglón especial del detalle; aquí se separa de los materiales */
   ctActual.mo = ctActual.detalle.find(d => d.grupo === '__MO__') || null;
-  ctActual.detalle = ctActual.detalle.filter(d => d.grupo !== '__MO__');
+  ctActual.viat = ctActual.detalle.filter(d => d.grupo === '__VIAT__');
+  ctActual.detalle = ctActual.detalle.filter(d => d.grupo !== '__MO__' && d.grupo !== '__VIAT__');
   ctPintarDetalle();
   if (!silencioso) { ctTabActual = 'res'; ctTab('res'); }
   else ctTab(ctTabActual);
@@ -10893,6 +10986,14 @@ function ctVerRes() {
       c.detalle.map(d => '<tr><td class="left">' + esc(d.material) + '</td><td>' + esc(d.unidad) + '</td><td>' + d.cantidad + '</td><td>' + ctMoney(d.costo, M) + '</td><td><b>' + ctMoney(d.cantidad * d.costo, M) + '</b></td></tr>').join('') +
       '</tbody></table></div><div style="margin-top:8px"><button class="btn secondary" onclick="ctListaMatPdf()">📋 Lista de materiales (PDF, sin precios)</button></div></details>';
   }
+  let via = '';
+  if (c.viat && c.viat.length) {
+    const crc = c.viat.reduce((q, d) => q + d.cantidad * d.costo, 0), tot = M === 'USD' ? ctRed(crc / (c.tc || 1)) : ctRed(crc);
+    via = '<details style="margin-top:12px;border:1px solid #e0e0e0;border-radius:10px;padding:10px 12px;background:#fafafa"><summary style="cursor:pointer;font-weight:700">🚐 Viáticos y movilización (interno) · ' + ctMoney(tot, M) + '</summary>' +
+      '<div class="tableWrap" style="margin-top:8px"><table class="table" style="min-width:560px;font-size:13px"><thead><tr><th class="left">Concepto</th><th>Personas</th><th>Días / veces</th><th>Precio unit. ₡</th><th>Importe ₡</th></tr></thead><tbody>' +
+      c.viat.map(d => { const p = String(d.unidad || '').split('x'); return '<tr><td class="left">' + esc(d.material) + '</td><td>' + esc(p[0] || '') + '</td><td>' + esc(p[1] || '') + '</td><td>₡' + Math.round(d.costo).toLocaleString('es-CR') + '</td><td><b>₡' + Math.round(d.cantidad * d.costo).toLocaleString('es-CR') + '</b></td></tr>'; }).join('') +
+      '</tbody></table></div><div style="margin-top:6px;font-size:13px">Total ₡' + Math.round(crc).toLocaleString('es-CR') + (M === 'USD' ? ' ÷ TC ' + c.tc : '') + ' = <b>' + ctMoney(tot, M) + '</b></div></details>';
+  }
   $('ctCuerpo').innerHTML = '<div class="ctKv"><b>Fecha</b><span>' + esc(fmtFechaSeg(c.fecha)) + '</span><b>Cliente</b><span>' + esc(c.cliente) + '</span><b>Contacto</b><span>' + esc(c.contacto || '—') + '</span><b>Proyecto</b><span>' + esc(c.proyecto || '—') + '</span>' +
     '<b>Dirección</b><span>' + esc(c.direccion || '—') + '</span><b>Correo</b><span>' + esc(c.correo || '—') + '</span><b>Teléfono</b><span>' + esc(c.telefono || '—') + '</span>' +
     '<b>Moneda</b><span>' + (M === 'CRC' ? 'Colones (₡)' : 'Dólares ($)') + ' · TC ' + c.tc + '</span>' +
@@ -10900,7 +11001,7 @@ function ctVerRes() {
     '<div class="tableWrap" style="margin-top:12px"><table class="table" style="min-width:700px"><thead><tr><th>Código</th><th class="left">Descripción</th><th>Cant.</th><th>Precio unit.</th><th>Desc.</th><th>Precio</th></tr></thead><tbody>' + filas + '</tbody></table></div>' +
     '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;align-items:flex-start"><div style="flex:1;min-width:260px;font-size:13px;white-space:pre-wrap">' + (c.notas ? '<b>Notas:</b> ' + esc(c.notas) : '') + '</div>' +
     '<div class="ceTot" style="min-width:260px"><div><span>Sub-total</span><b>' + ctMoney(c.subtotal, M) + '</b></div><div><span>I.V.A. ' + c.ivaPct + '%</span><b>' + ctMoney(c.iva, M) + '</b></div>' +
-    (c.otros ? '<div><span>Otros</span><b>' + ctMoney(c.otros, M) + '</b></div>' : '') + '<div class="g"><span>TOTAL</span><span>' + ctMoney(c.total, M) + '</span></div></div></div>' + mats;
+    (c.otros ? '<div><span>Otros</span><b>' + ctMoney(c.otros, M) + '</b></div>' : '') + '<div class="g"><span>TOTAL</span><span>' + ctMoney(c.total, M) + '</span></div></div></div>' + mats + via;
 }
 
 /* ---------- Cambios de estado ---------- */
@@ -11641,6 +11742,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 14 · 12-oct 18:00</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 15 · 12-oct 18:30</div>
 </body>
 </html>
