@@ -306,7 +306,7 @@
     .segLista > summary { cursor: pointer; padding: 11px 14px; font-weight: 700; background: #f6f6f6; }
     .segLista .tableWrap { padding: 0 12px 12px; }
     .segLista .acc { padding: 8px 14px; }
-    .segLienzoBox { background: #fff; border-radius: 12px; box-shadow: 0 2px 8px #00000012; padding: 12px; }
+    .segLienzoBox { overflow: auto; background: #fff; border-radius: 12px; box-shadow: 0 2px 8px #00000012; padding: 12px; }
     #segLienzo { width: 100%; max-width: 1200px; display: block; margin: auto; border: 1px solid #eee; }
     .segCards.mini { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
     .segBadge { display: inline-block; padding: 3px 9px; border-radius: 10px; font-size: 11px; font-weight: 700; white-space: nowrap; }
@@ -5509,6 +5509,19 @@ function sideToggle(forzar) {
 }
 try { if (localStorage.getItem('srd_side2') === '0') document.body.classList.add('sideOculto'); } catch (e) { }
 window._subCerrado = {};
+function ajustarListas() {
+  const ids = ['fichasContenido', 'personalContenido', 'vehiculosContenido', 'cambiosContenido', 'movilesContenido'];
+  const desk = window.matchMedia('(min-width: 901px)').matches;
+  ids.forEach(id => {
+    const el = $(id); if (!el) return;
+    if (!el.offsetParent) return;
+    if (!desk) { el.style.maxHeight = ''; return; }
+    const top = el.getBoundingClientRect().top + window.scrollY;
+    el.style.maxHeight = Math.max(240, window.innerHeight - top - 18) + 'px';
+  });
+}
+window.addEventListener('resize', ajustarListas);
+setInterval(ajustarListas, 700);
 (function () {
   const nav = document.getElementById('sideNav'); if (!nav) return;
   let prev = null;
@@ -6805,7 +6818,7 @@ function htmlResultadoCorte(r) {
 
 /* ---------- Gráficas ---------- */
 
-const SEG_COL = { f: '#2e7d32', i: '#f9a825', s: '#c62828', p: '#546e7a' };
+const SEG_COL = { f: '#2f9e5f', i: '#f2b233', s: '#d9534f', p: '#6b7f95' };
 
 const segPluginValores = {
   id: 'valores',
@@ -6863,7 +6876,7 @@ function segConfigGrafica(tipo) {
     responsive: false, animation: false, devicePixelRatio: 2, maintainAspectRatio: false,
     layout: { padding: { top: 10, right: 16 } },
     plugins: {
-      title: { display: true, text: titulo, font: { size: 20, weight: 'bold' }, color: '#222', padding: { bottom: 14 } },
+      title: { display: true, text: titulo, font: { size: 18, weight: 'bold' }, color: '#1f2d3d', padding: { bottom: 14 } },
       legend: { display: false }
     }
   });
@@ -6878,7 +6891,7 @@ function segConfigGrafica(tipo) {
     o.plugins.valores = { modo: 'pie' };
     return {
       type: tipo === 'dona' ? 'doughnut' : 'pie',
-      data: { labels: items.map(x => x[0]), datasets: [{ data: items.map(x => x[1]), backgroundColor: items.map(x => x[2]), borderColor: '#fff', borderWidth: 3 }] },
+      data: { labels: items.map(x => x[0]), datasets: [{ data: items.map(x => x[1]), backgroundColor: items.map(x => x[2]), borderColor: '#fff', borderWidth: 4, hoverOffset: 0 }] },
       options: o, plugins: [segPluginValores]
     };
   }
@@ -6921,7 +6934,7 @@ function segConfigGrafica(tipo) {
       type: 'line',
       data: {
         labels: d.cortes.map(c => c.corte),
-        datasets: [{ data: d.cortes.map(c => c.acumulado), borderColor: SEG_COL.f, backgroundColor: SEG_COL.f, borderWidth: 4, pointRadius: 6, tension: 0.25 }]
+        datasets: [{ data: d.cortes.map(c => c.acumulado), borderColor: SEG_COL.f, backgroundColor: 'rgba(47,158,95,.14)', fill: true, pointBackgroundColor: '#fff', pointBorderColor: SEG_COL.f, pointBorderWidth: 3, borderWidth: 4, pointRadius: 6, tension: 0.3 }]
       },
       options: o, plugins: [segPluginValores]
     };
@@ -6982,6 +6995,11 @@ async function renderGrafica() {
 
   Chart.defaults.font.family = 'Arial, Helvetica, sans-serif';
   Chart.defaults.font.size = 14;
+  Chart.defaults.color = '#44505f';
+  Chart.defaults.borderColor = '#e6eaf0';
+  Chart.defaults.elements.bar.borderRadius = 6;
+  Chart.defaults.elements.bar.borderSkipped = false;
+  Chart.defaults.datasets.bar.maxBarThickness = 64;
 
   if (segGrafico) { segGrafico.destroy(); segGrafico = null; }
 
@@ -7015,14 +7033,19 @@ function segComponerLienzo(chartCanvas, logo) {
   const lp = recorte(filasP), lm = recorte(filasM);
   const nFilas = Math.max(lp.length, lm.length, 1);
   const hDet = detalle ? 56 + nFilas * 30 + 20 : 0;
-  const H = 270 + chh + 50 + hDet;
+  const H = detalle ? chh + 414 + nFilas * 30 : chh + 320;
 
   const cv = $('segLienzo');
   cv.width = W; cv.height = H;
   const c = cv.getContext('2d');
 
-  c.fillStyle = '#fff';
+  c.fillStyle = '#f2f4f8';
   c.fillRect(0, 0, W, H);
+  const tarjeta = (x, y, w, h, r) => {
+    c.save(); c.shadowColor = 'rgba(20,35,60,.10)'; c.shadowBlur = 14; c.shadowOffsetY = 3;
+    c.fillStyle = '#fff'; c.beginPath(); c.roundRect(x, y, w, h, r || 14); c.fill(); c.restore();
+  };
+  c.fillStyle = '#fff'; c.fillRect(0, 0, W, 144);
 
   let xt = M;
   if (logo) {
@@ -7041,7 +7064,7 @@ function segComponerLienzo(chartCanvas, logo) {
   c.fillText(f.charAt(0).toUpperCase() + f.slice(1) + (ultimo ? '  ·  Corte ' + ultimo : ''), xt, 100);
 
   c.fillStyle = '#a31616';
-  c.fillRect(M, 128, cwid, 4);
+  c.fillRect(0, 140, W, 4);
 
   const total = t.instaladas + t.iniciadas + t.suspendidas + t.pendientes;
   const cajas = [
@@ -7051,22 +7074,25 @@ function segComponerLienzo(chartCanvas, logo) {
   ];
   const gap = 16, bw = (cwid - gap * 4) / 5;
   cajas.forEach((b, i) => {
-    const x = M + i * (bw + gap), y = 152;
-    c.fillStyle = '#f6f6f6'; c.fillRect(x, y, bw, 92);
-    c.fillStyle = b[2]; c.fillRect(x, y, bw, 7);
-    c.textAlign = 'center';
-    c.fillStyle = '#555'; c.font = 'bold 17px Arial';
-    c.fillText(b[0], x + bw / 2, y + 36);
-    c.fillStyle = '#222'; c.font = 'bold 38px Arial';
-    c.fillText(String(b[1]), x + bw / 2, y + 78);
+    const x = M + i * (bw + gap), y = 164;
+    tarjeta(x, y, bw, 92, 14);
+    c.fillStyle = b[2]; c.beginPath(); c.roundRect(x + 14, y + 16, 6, 60, 3); c.fill();
+    c.textAlign = 'left';
+    c.fillStyle = '#6b7685'; c.font = 'bold 15px Arial';
+    c.fillText(b[0].toUpperCase(), x + 32, y + 36);
+    c.fillStyle = b[2] === '#a31616' ? '#a31616' : '#1f2d3d'; c.font = 'bold 40px Arial';
+    c.fillText(String(b[1]), x + 32, y + 76);
   });
 
-  c.drawImage(chartCanvas, M, 266, cwid, chh);
+  tarjeta(M, 276, cwid, chh + 20, 16);
+  c.drawImage(chartCanvas, M + 6, 286, cwid - 12, chh);
 
   if (detalle) {
-    const y0 = 266 + chh + 22;
-    const colW = (cwid - 30) / 2;
+    tarjeta(M, chh + 322, cwid, 84 + nFilas * 30, 16);
+    const y0 = chh + 360;
+    const colW = (cwid - 80) / 2;
     const bloque = (x, titulo, filas, color, vacio) => {
+      x += 20;
       c.textAlign = 'left'; c.fillStyle = '#222'; c.font = 'bold 20px Arial';
       c.fillText(titulo, x, y0 + 4);
       c.fillStyle = color; c.fillRect(x, y0 + 12, colW, 3);
@@ -7085,17 +7111,17 @@ function segComponerLienzo(chartCanvas, logo) {
         if (t !== f.txt) t = t.trim() + '…';
         c.fillText(t, x, y + 15);
         const w = Math.max(4, Math.round(barMax * f.val / maxV));
-        c.fillStyle = color; c.fillRect(x + lab, y + 2, w, 18);
+        c.fillStyle = color; c.beginPath(); c.roundRect(x + lab, y + 2, w, 18, 4); c.fill();
         c.fillStyle = '#222'; c.font = 'bold 15px Arial';
         c.fillText(String(f.val), x + lab + w + 8, y + 16);
       });
     };
     bloque(M, 'Pendientes por móvil (' + t.pendientes + ')', lp, SEG_COL.p, 'No hay órdenes pendientes.');
-    bloque(M + colW + 30, 'Motivos de suspensión (' + t.suspendidas + ')', lm, SEG_COL.s, 'Sin suspensiones registradas.');
+    bloque(M + colW + 40, 'Motivos de suspensión (' + t.suspendidas + ')', lm, SEG_COL.s, 'Sin suspensiones registradas.');
   }
 
   c.textAlign = 'right'; c.fillStyle = '#999'; c.font = '13px Arial';
-  c.fillText('Soluciones Red Dorada · SRD', W - M, H - 16);
+  c.fillText('Soluciones Red Dorada · SRD', W - M, H - 14);
 }
 
 function segDescargarImagen() {
@@ -11596,6 +11622,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 10 · 12-oct 16:00</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 11 · 12-oct 16:30</div>
 </body>
 </html>
