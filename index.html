@@ -3596,6 +3596,8 @@ function copiarTexto(t) {
   }
 }
 
+const URL_PLATAFORMA = 'https://operaciones.solucionesrdcr.com';
+
 function copiarCredenciales(mensaje) {
 
   if (!credActual) return;
@@ -3604,6 +3606,7 @@ function copiarCredenciales(mensaje) {
 
   copiarTexto(mensaje
     ? 'Hola ' + c.nombre.split(' ')[0] + ', ya tienes acceso a SRD Gestión Operativa.\n\n' +
+      'Ingresa aquí: ' + URL_PLATAFORMA + '\n\n' +
       'Usuario: ' + c.usuario + '\nContraseña temporal: ' + c.clave + '\n\n' +
       'Al entrar por primera vez el sistema te pedirá crear tu propia contraseña. No compartas estos datos.'
     : 'Usuario: ' + c.usuario + '\nContraseña temporal: ' + c.clave);
