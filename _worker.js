@@ -180,7 +180,7 @@ class Hoja {
 
 function hojaCargada_(nombre) {
   const h = REQ.hojas.get(nombre);
-  if (!h) throw new NeedSheet(nombre);
+  if (!h) { REQ.faltan.add(nombre); throw new NeedSheet(nombre); }   // se anota por si el código original captura el error
   return h;
 }
 const SpreadsheetApp = {
@@ -232,7 +232,7 @@ const Session = {
   getScriptTimeZone() { return 'America/Costa_Rica'; },
   getActiveUser() { return { getEmail() { return AUTH_EMAIL; } }; }
 };
-const Logger = { log() {} };
+const Logger = { log(...a) { console.log(...a); } };
 
 /* ---------- Utilities ---------- */
 function bytesDe_(d) {
@@ -8999,7 +8999,7 @@ async function asegurarHojas_(nombres) {
   }
 }
 function armarRequest_(nombres) {
-  REQ = { hojas: new Map(), efectos: [] };
+  REQ = { hojas: new Map(), efectos: [], faltan: new Set() };
   for (const n of nombres) {
     const e = STORE.get(n);
     REQ.hojas.set(n, new Hoja(n, e.rows.map(r => r.slice()), e.v, e.existe));
@@ -9050,15 +9050,18 @@ async function ejecutar_(fn, args, email) {
       AUTH_EMAIL = email || '';
       try {
         resultado = f.apply(null, args);
-        break;
       } catch (e) {
-        if (e instanceof NeedSheet) {
-          nombres.add(e.hoja);
-          await asegurarHojas_([e.hoja]);
-          continue;
-        }
-        throw e;
+        if (!(e instanceof NeedSheet) && !REQ.faltan.size) throw e;
+        if (e instanceof NeedSheet) REQ.faltan.add(e.hoja);
       }
+      if (REQ.faltan.size) {           // faltaban hojas (aunque el código original haya capturado el error): se repite con ellas
+        const nuevas = [...REQ.faltan].filter(n => !nombres.has(n));
+        if (!nuevas.length) throw new Error('No se pudo cargar la hoja ' + [...REQ.faltan].join(', '));
+        nuevas.forEach(n => nombres.add(n));
+        await asegurarHojas_(nuevas);
+        continue;
+      }
+      break;
     }
     APRENDIDO.set(fn, [...nombres].filter(n => !BASE_HOJAS.includes(n) && !n.startsWith('__F_')));
     const efectos = REQ.efectos;
