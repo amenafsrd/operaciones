@@ -517,6 +517,23 @@
 
     /* Barras de desplazamiento discretas */
     * { scrollbar-width: thin; scrollbar-color: #b9c1cd transparent; }
+    /* Cronograma compacto */
+    #calendarioContenido { max-height: none; min-height: 0; }
+    #calendarioContenido .table { min-width: 760px; }
+    #calendarioContenido .table td { padding: 2px 6px; line-height: 1.2; }
+    #calendarioContenido .table th { padding: 5px 6px; }
+    #calendarioContenido .table br { display: none; }
+    #calendarioContenido .table small { margin-left: 5px; color: var(--gris); font-size: 11.5px; }
+    #calendarioContenido .table th small { color: #c9d2df; }
+    #calendarioContenido .state { min-width: 78px; min-height: 26px; padding: 1px 4px; font-size: 12px; border-radius: 6px; }
+    #calendarioContenido .table tbody tr:nth-child(even) td { background: #fff; }
+    #calPanelHis .tableWrap, #historialContenido .tableWrap { max-height: 320px; }
+    #vistaCalendario .toolbar { gap: 6px 10px; padding: 8px 12px; }
+    #vistaCalendario .toolbar .field { min-width: 0 !important; width: auto; }
+    #vistaCalendario .toolbar .field select, #vistaCalendario .toolbar .field input { min-height: 30px; font-size: 13px; }
+    #vistaCalendario .toolbar .btn { min-height: 30px; padding: 0 11px; font-size: 13px; }
+    #vistaCalendario .toolbar label.chkInline { padding-bottom: 0 !important; }
+    .loginCard .lInp input { padding: 0 46px 0 44px; min-height: 48px; height: 48px; font-size: 15px; border-radius: 10px; }
 </style>
 </head>
 
@@ -545,7 +562,7 @@
       <img id="lLogo" alt="Soluciones Red Dorada" style="display:block;width:210px;max-width:70%;height:auto;margin:0 auto 14px">
       <h2>Bienvenido</h2>
       <div class="sub">Ingresa con tu usuario y contraseña</div>
-      <div id="lSlogan" style="margin:10px 0 6px;padding:12px 16px;border-left:4px solid #b71c1c;background:#fdecec;border-radius:6px;font-size:16px;color:#7f1d1d;text-align:left"></div>
+      <div id="lSlogan" style="margin:2px 0 4px;padding:10px 0 0;border-top:1px solid #e5e7eb;font-size:13.5px;font-style:italic;color:#64748b;text-align:left;line-height:1.4"></div>
 
       <label for="lUsuario">Usuario</label>
       <div class="lInp">
@@ -646,9 +663,8 @@
         </div>
 
         <div class="subtabs" id="calSubtabs">
-          <button id="stCalSem" class="active" onclick="calSub('sem')">📅 Cronograma semanal</button>
+          <button id="stCalSem" class="active" onclick="calSub('sem')">📅 Cronograma e historial</button>
           <button id="stCalRot" onclick="calSub('rot')">🔄 Rotación de Backup</button>
-          <button id="stCalHis" onclick="calSub('his')">🕘 Historial y notas</button>
         </div>
 
         <div class="panel" id="calPanelSem">
@@ -676,7 +692,7 @@
             <div class="loading">Cargando rotación...</div>
           </div>
         </div>
-        <div class="panel" id="calPanelHis" style="margin-top:15px;display:none">
+        <div class="panel" id="calPanelHis" style="margin-top:12px">
           <div class="panelHead">
             <h2>🕘 Historial de modificaciones</h2>
             <span id="tituloHistorial"></span>
@@ -5448,10 +5464,12 @@ function renderizarCambios() {
 
 /* ---------- Menú lateral: módulos + secciones de cada módulo ---------- */
 function calSub(x) {
-  [['sem', 'calPanelSem', 'stCalSem'], ['rot', 'calPanelRot', 'stCalRot'], ['his', 'calPanelHis', 'stCalHis']].forEach(a => {
-    $(a[1]).style.display = a[0] === x ? 'block' : 'none';
-    $(a[2]).classList.toggle('active', a[0] === x);
-  });
+  const sem = x !== 'rot';
+  $('calPanelSem').style.display = sem ? 'block' : 'none';
+  $('calPanelHis').style.display = sem ? 'block' : 'none';
+  $('calPanelRot').style.display = sem ? 'none' : 'block';
+  $('stCalSem').classList.toggle('active', sem);
+  $('stCalRot').classList.toggle('active', !sem);
   sideRefrescar();
 }
 function sideToggle(forzar) {
@@ -11513,6 +11531,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 2 · 12-oct 12:20</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 5 · 12-oct 13:10</div>
 </body>
 </html>
