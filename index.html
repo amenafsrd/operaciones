@@ -423,31 +423,15 @@
     #side .subnav button:hover { background: #ffffff14; color: #fff; }
     #side .subnav button.on { background: #ffffff1f; color: #fff; font-weight: 700; box-shadow: inset 3px 0 0 var(--rojo); }
     #app > .wrap:not(:has(> section[style*="block"])) { padding: 0; }
-    :root { --railW: 58px; }
-    #side { transition: width .15s ease; }
     #side .ni { display: inline-block; width: 22px; text-align: center; flex: none; }
-    body.sideRiel #app { grid-template-columns: var(--railW) minmax(0, 1fr); }
-    body.sideRiel #side { width: var(--railW); overflow-x: hidden; padding: 10px 6px; }
-    body.sideRiel #side .nt, body.sideRiel #side .subnav { display: none; }
-    body.sideRiel #side .nav > button { justify-content: center; padding: 10px 0; position: relative; }
-    body.sideRiel #side .ni { font-size: 19px; width: auto; }
-    body.sideRiel #side .bdg { position: absolute; top: 1px; right: 2px; margin: 0 !important; padding: 0 5px !important; font-size: 9px !important; }
-    body.sideRiel #side:hover { width: var(--sideW); box-shadow: 8px 0 28px #000a; overflow-y: auto; padding: 10px 8px; z-index: 45; }
-    body.sideRiel #side:hover .nt { display: inline; }
-    body.sideRiel #side:hover .subnav { display: flex; }
-    body.sideRiel #side:hover .nav > button { justify-content: flex-start; padding: 10px 12px; }
-    body.sideRiel #side:hover .ni { font-size: inherit; width: 22px; }
-    body.sideRiel #side:hover .bdg { position: static; margin-left: 3px !important; padding: 1px 7px !important; font-size: 11px !important; }
+    #side .nav > button .car { margin-left: auto; font-size: 10px; opacity: .6; transition: transform .15s; }
+    #side .nav > button .car.abierto { transform: rotate(90deg); }
+    @media (min-width: 901px) { #btnMenu { display: none; } }
     #sideVelo { display: none; }
     .subtabs { display: none !important; }
     #modalFichas .subtabs, .modal .subtabs { display: flex !important; }
     @media (max-width: 900px) {
-      #app, body.sideRiel #app { grid-template-columns: minmax(0, 1fr); }
-      body.sideRiel #side { width: var(--sideW); }
-      body.sideRiel #side .nt { display: inline; }
-      body.sideRiel #side .subnav { display: flex; }
-      body.sideRiel #side .nav > button { justify-content: flex-start; padding: 10px 12px; }
-      body.sideRiel #side .ni { font-size: inherit; width: 22px; }
+      #app { grid-template-columns: minmax(0, 1fr); }
       #app > .wrap, #app > section { grid-column: 1; }
       #side { position: fixed; left: 0; top: var(--topH); bottom: 0; height: auto; transform: translateX(-100%); transition: transform .2s; box-shadow: 4px 0 20px #0008; display: block !important; }
       body.sideAbierto #side { transform: none; }
@@ -5511,12 +5495,21 @@ function calSub(x) {
   sideRefrescar();
 }
 function sideToggle(forzar) {
-  const mov = window.matchMedia('(max-width: 900px)').matches;
-  const cls = mov ? 'sideAbierto' : 'sideRiel';
-  const on = typeof forzar === 'boolean' ? (mov ? forzar : !forzar) : !document.body.classList.contains(cls);
-  document.body.classList.toggle(cls, on);
-  if (!mov) { try { localStorage.setItem('srd_side', on ? '0' : '1'); } catch (e) { } }
+  const on = typeof forzar === 'boolean' ? forzar : !document.body.classList.contains('sideAbierto');
+  document.body.classList.toggle('sideAbierto', on);
 }
+window._subCerrado = {};
+(function () {
+  const nav = document.getElementById('sideNav'); if (!nav) return;
+  let prev = null;
+  nav.addEventListener('click', e => { if (e.target.closest('.subnav')) return; prev = vistaActual; }, true);
+  nav.addEventListener('click', e => {
+    const b = e.target.closest('.nav > button'); if (!b || e.target.closest('.subnav')) return;
+    const v = b.id.replace(/^nav/, '').toLowerCase();
+    if (v === prev && v === vistaActual) window._subCerrado[v] = !window._subCerrado[v]; else window._subCerrado[v] = false;
+    sideRefrescar();
+  });
+})();
 function sideRefrescar() {
   const nav = $('sideNav'); if (!nav) return;
   try {
@@ -5527,11 +5520,15 @@ function sideRefrescar() {
     $('crumb').innerHTML = esc(mod) + (act ? ' › <b>' + esc(act.textContent.trim()) + '</b>' : '');
   } catch (e) { }
   nav.querySelectorAll('.subnav').forEach(n => n.remove());
+  nav.querySelectorAll('.car').forEach(n => n.remove());
   const mapa = { calendario: 'vistaCalendario', moviles: 'vistaFichas', seguimiento: 'vistaSeguimiento', bodega: 'vistaBodega', cotizaciones: 'vistaCotiz' };
   const sec = $(mapa[vistaActual]); const btn = $('nav' + vistaActual.charAt(0).toUpperCase() + vistaActual.slice(1));
   if (!sec || !btn) return;
   const tabs = Array.from(sec.querySelectorAll(':scope > .subtabs button')).filter(b => b.style.display !== 'none' && !b.hidden);
   if (!tabs.length) return;
+  const cerrado = !!window._subCerrado[vistaActual];
+  const car = document.createElement('span'); car.className = 'car' + (cerrado ? '' : ' abierto'); car.textContent = '▶'; btn.appendChild(car);
+  if (cerrado) return;
   const caja = document.createElement('div'); caja.className = 'subnav';
   tabs.forEach(b => {
     const x = document.createElement('button');
@@ -5542,9 +5539,6 @@ function sideRefrescar() {
   });
   btn.insertAdjacentElement('afterend', caja);
 }
-(function () {
-  try { if (localStorage.getItem('srd_side') === '0') document.body.classList.add('sideRiel'); } catch (e) { }
-})();
 
 function mostrarVista(v, forzar) {
 
@@ -11592,6 +11586,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 7 · 12-oct 14:00</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 8 · 12-oct 15:00</div>
 </body>
 </html>
