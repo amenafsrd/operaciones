@@ -1,0 +1,707 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SRD Operaciones</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#f3f4f6;color:#222;font-size:14px}
+header{background:#b71c1c;color:#fff;padding:12px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+header img{height:42px;background:#fff;border-radius:8px;padding:3px}
+header h1{margin:0;font-size:18px}header small{opacity:.85;display:block;font-size:12px}
+.userbox{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:13px}
+.wrap{padding:20px;max-width:1500px;margin:auto}
+.toolbar{background:#fff;padding:15px;border-radius:12px;box-shadow:0 2px 8px #00000012;margin-bottom:15px;display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+.toolbar input,.toolbar select,.field input,.field select,.field textarea{padding:9px 10px;border:1px solid #ccc;border-radius:7px;background:#fff;font:inherit}
+.field input,.field select,.field textarea{width:100%}
+label{font-size:12px;font-weight:700;color:#555;display:block;margin-bottom:4px}
+.field{margin-bottom:10px}
+button{font-family:inherit}
+.btn{border:0;border-radius:8px;padding:10px 14px;cursor:pointer;font-weight:700;background:#eee;color:#333}
+.btn:disabled{opacity:.5;cursor:default}
+.primary{background:#b71c1c;color:#fff}
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:15px}
+.card{background:#fff;border-radius:12px;padding:16px;box-shadow:0 2px 8px #00000012}
+.card .n{font-size:28px;font-weight:800}.card .t{font-size:12px;color:#777;margin-top:4px}
+.panel{background:#fff;border-radius:12px;box-shadow:0 2px 8px #00000012;overflow:hidden}
+.panelHead{padding:15px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.panelHead h2{margin:0;font-size:18px}
+.panel>.toolbar,.panel>.cards,.panel>#devSemanas{margin:15px}
+.panel>.toolbar{box-shadow:none;border:1px solid #eee}
+.tableWrap{overflow:auto}
+.table{width:100%;border-collapse:collapse;min-width:700px}
+.table th{background:#b71c1c;color:#fff;padding:10px 8px;text-align:center;font-size:12px;white-space:nowrap}
+.table td{border:1px solid #ddd;padding:8px;text-align:center;font-size:12px}
+.table td.left,.table th.left{text-align:left}
+.btnMini{border:1px solid #ccc;background:#fff;border-radius:6px;cursor:pointer;padding:3px 8px;font-size:12px}
+.btnMini:hover{background:#ffe9e9}
+.segBadge{display:inline-block;padding:3px 9px;border-radius:10px;font-size:11px;font-weight:700;white-space:nowrap}
+.modalBg{position:fixed;inset:0;background:#0007;display:none;align-items:center;justify-content:center;padding:14px;z-index:90}
+.modalBg.show{display:flex}
+.modal{background:#fff;width:min(640px,100%);max-height:95vh;overflow:auto;border-radius:12px;padding:20px;box-shadow:0 10px 40px #0006}
+.modal h3{margin:0 0 15px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.modalActions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+.toast{position:fixed;right:20px;bottom:20px;background:#222;color:#fff;padding:12px 16px;border-radius:8px;display:none;z-index:99;max-width:min(420px,90vw)}
+.toast.show{display:block}
+#loginBg{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px;background:linear-gradient(135deg,#b71c1c,#7f0f0f)}
+.loginCard{background:#fff;border-radius:16px;padding:28px;width:min(380px,100%);box-shadow:0 12px 40px #0005;text-align:center}
+.loginCard img{max-width:200px;margin-bottom:6px}
+.loginCard h2{margin:6px 0 2px}.loginCard p{color:#666;font-size:13px;margin:0 0 16px}
+.loginCard .field{text-align:left}
+#err{color:#b3261e;font-size:13px;min-height:18px;margin-bottom:8px}
+nav{background:#fff;border-bottom:1px solid #e5e7eb;padding:0 16px;display:flex;gap:4px;overflow-x:auto}
+nav button{border:0;background:none;padding:13px 16px;font-weight:700;color:#666;cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap}
+nav button.on{color:#b71c1c;border-bottom-color:#b71c1c}
+.modal.ancho{width:min(920px,100%)}
+.sec{font-size:12px;font-weight:800;color:#b71c1c;text-transform:uppercase;letter-spacing:.04em;margin:14px 0 8px;border-bottom:1px solid #eee;padding-bottom:4px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:0 12px}
+.num{text-align:right!important}
+.tabla-obj input{width:70px;padding:5px;border:1px solid #ccc;border-radius:5px;text-align:right}
+.chip{display:inline-block;padding:2px 9px;border-radius:10px;font-size:11px;font-weight:700}
+@media(max-width:700px){.grid3{grid-template-columns:1fr}}
+@media(max-width:900px){.cards{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.grid2{grid-template-columns:1fr}.wrap{padding:10px}}
+</style></head>
+<body>
+<div id="loginBg">
+  <form class="loginCard" onsubmit="entrar(event)">
+    <img id="lLogo" alt="SRD">
+    <h2>SRD Operaciones</h2><p>Ingresa con tu correo y contraseña</p>
+    <div class="field"><label>Correo</label><input id="lMail" type="email" autocomplete="username" required></div>
+    <div class="field"><label>Contraseña</label><input id="lPass" type="password" autocomplete="current-password" required></div>
+    <div id="err"></div>
+    <button class="btn primary" id="lBtn" style="width:100%">Entrar</button>
+  </form>
+</div>
+
+<div id="app" style="display:none">
+  <header>
+    <img id="hLogo" alt="SRD">
+    <div><h1>SRD Operaciones</h1><small>Móviles · Materiales · Devoluciones</small></div>
+    <div class="userbox"><span id="uNombre"></span><button class="btn" onclick="salir()">Salir</button></div>
+  </header>
+  <nav id="nav">
+    <button id="nvMov" onclick="ir('mov')">🚐 Móviles y técnicos</button>
+    <button id="nvMat" onclick="ir('mat')">📦 Materiales</button>
+    <button id="nvDev" onclick="ir('dev')">🔁 Devoluciones de cambio</button>
+  </nav>
+  <div class="wrap">
+
+<!-- ===== Móviles ===== -->
+<div id="vistaMov" style="display:none">
+  <div class="panel">
+    <div class="panelHead"><div><h2>Móviles y técnicos</h2><div style="font-size:12px;color:#777;margin-top:3px">Cada móvil con su técnico y asistente actuales. Al cambiar el personal se conserva el historial.</div></div>
+      <button class="btn primary" id="mvBtnAdd" onclick="movEditar('')" style="display:none">➕ Agregar móvil</button></div>
+    <div class="toolbar">
+      <input id="mvBuscar" placeholder="Buscar móvil, técnico, placa…" oninput="movRender()" style="min-width:240px">
+      <select id="mvEstado" onchange="movRender()"><option value="ACTIVA">Activas</option><option value="INACTIVA">Inactivas</option><option value="">Todas</option></select>
+    </div>
+    <div id="mvCards" class="cards"></div>
+    <div id="mvTabla" style="margin:0 15px 15px"></div>
+  </div>
+</div>
+
+<!-- ===== Materiales ===== -->
+<div id="vistaMat" style="display:none">
+  <div class="panel">
+    <div class="panelHead"><div><h2>Materiales</h2><div style="font-size:12px;color:#777;margin-top:3px">Catálogo con costo, mínimo de bodega, stock al 100 % de la línea y objetivo por móvil.</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="matBtnVista" onclick="matCambiarVista()">🎯 Objetivo por móvil</button><button class="btn primary" id="matBtnAdd" onclick="matEditar('')" style="display:none">➕ Agregar material</button></div></div>
+    <div class="toolbar" id="matTb"><input id="matBuscar" placeholder="Buscar material, código o alias…" oninput="matRender()" style="min-width:260px">
+      <select id="matAct" onchange="matRender()"><option value="1">Activos</option><option value="">Todos</option></select></div>
+    <div id="matCards" class="cards"></div>
+    <div id="matTabla" style="margin:0 15px 15px"></div>
+  </div>
+</div>
+
+<div id="vistaDev" style="display:none">
+        <!-- Devoluciones de cambio -->
+        <div id="bodPanelDev" style="display:block">
+          <div class="panel">
+            <div class="panelHead"><div><h2>Devoluciones de cambio</h2>
+              <div style="font-size:12px;color:#777;margin-top:3px">Control de los equipos que las móviles deben devolver tras un cambio. Se carga el Excel semanal; <b>no mueve stock ni gastos</b>. Marca lo devuelto, justifica lo que no debe devolverse o cambia el tipo de equipo si correspondía a otro.</div></div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button class="btn primary" id="devBtnImp" onclick="$('devArchivo').click()">📥 Cargar Excel semanal</button>
+                <button class="btn" onclick="devExportar()">📊 Exportar Excel</button>
+              </div>
+            </div>
+            <input type="file" id="devArchivo" accept=".xlsx,.xls" style="display:none" onchange="devImportar(this)">
+            <div class="toolbar">
+              <input id="devContrato" placeholder="Contrato" oninput="devRender()" style="max-width:130px">
+              <input id="devOt" placeholder="N.º de OT" oninput="devRender()" style="max-width:130px">
+              <select id="devMovil" onchange="devRender()"></select>
+              <label style="font-size:12px;color:#666">Desde <input type="date" id="devDesde" onchange="devRender()"></label>
+              <label style="font-size:12px;color:#666">Hasta <input type="date" id="devHasta" onchange="devRender()"></label>
+              <select id="devEstado" onchange="devRender()">
+                <option value="">Todos los estados</option><option value="pend">Con saldo pendiente</option><option value="Pendiente">Pendiente</option><option value="Parcial">Parcial</option><option value="Devuelto">Devuelto</option><option value="Justificado">Justificado</option>
+              </select>
+              <select id="devEquipo" onchange="devRender()"></select>
+              <button class="btn" onclick="['devContrato','devOt','devMovil','devDesde','devHasta','devEstado','devEquipo'].forEach(k=>$(k).value='');devRender()">Limpiar</button>
+            </div>
+            <div id="devCards" class="cards"></div>
+            <div id="devSemanas"></div>
+          </div>
+        </div>
+
+
+  </div>
+</div>
+</div>
+
+<div id="devModalBg" class="modalBg"><div class="modal" id="devModal"></div></div>
+<div id="toast" class="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+const SUPABASE_URL = 'https://nthgjpxzpucohsgtazlt.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_rrKMTXKzTaNHYFjEdrlKVw__dIudr8o';   /* clave pública (publishable): es seguro que viaje en la página */
+const LOGO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAScAAABtCAIAAABsjDCoAAATOklEQVR42u1deVxT17beJyEBDDNoGEUFCYIMMgoCEQrvXbn2+pxqHYpPfvXqVdui1qqlKhZbtfdeh0q1+pyropaqV2/xqrUlMiijKINEEBEUiIrMUyDJ++PYSJGcnITk5JyT/f38A5OVvfZee337rLX3PnsjMpkMQEBAEAgGNAEEBGQdBARkHQQEhEZhQJJ61O471Hgmrf9Vc19rO8CXajLYRkwbC0t/X8ePlpr6TIR9CUEVIATPpkg6OoWrE19cvqptRSa+E12TNpiHBKr0q6YbGUBH00ssa0vEQPkgiLBYbGtL+X/Z3FEar0nL7XzmCGMAAMJgskdZa0kLZJ3W8ZuDO6Nfl5OlCIPhumOz/eL52GICLo82XSs1QEa9E+l58oB6P8/yjZA0iEiTCb1OhRDm760DLAOGzHC8i3U03yoy3GJyAGQdAAA0pv4kTPicnM3mi4S0Z93bYHOtvVKPmni64//Js8OnqhKTqdtk7sI54zauYY+0pjnrZGLxLScvkneG75VU8yA/fWPdHyNaw4iaIjwxLQCgMTVNmJBIj3aHVRUyTU3ow7r6k+cq122mhOkh6wYkioyIunKAIEoli2fFtWbn0qnhk4uz2DbWVGWd6KfLFSvWUcjikHVvw+HDRa5fbVIqRksT+Vz6wSIkiDKso0Q8CVmnQu43yjqkJAdbpmzJRy/Tr9Oy+VMeFhiYm5KaddT1Ucg6bBi5jgnOvoYhIO3tzRztTdfmWwQH+lw+pb3yGXpIOQil6KmqEXB5LXfyFfqNoaGieWAaoCU3X8Dl/ebgTiLWvbx6A1JOH3BvxiKBLZbn0Zh4AABGv0zA5WnD1VVm3f05S8r+dxX0SH2BTCbg8jD269CbePKw7jd7L52xrmJ1YnNmDnRFfYPA1r01r0ificeQiAVc3pNd3xHNuqb/3BSdSYMuqJ8ofnd+w4lz+kw8AEDNzm81EnCqwLrSxSug8+kzHn62uTW3UNG3zmv1xT0EXF7dvv8bTgl4Vw5oNn0CVw7UBsZjTb+sx2DwGx5o8Vl3d9p70NsglFJLT+LM15BK1R5lcLGurege9DYIPMRjO9rpmylkYrHmWXdrnDf0M4hBkHR1Dfl5SGGGvpnilpOXtLdXw6yTdfZCJ4MYhKyxkxR+xzHUN2tkjvaWdPfgl1fyetWT3fsJq/qYdR85f6rC+rtMKr0/K67ldj7kAKnAf3QPe0cLPYehMT7401olc5jEzEpFNDxAGBo4raxsycqX6b/gkYRzmMMHYm4W8TBfh25DxhEHH/F0fEaYBIAozU18eR57s3Ugy8VP0tFJ0V5RCQXhf+58WEV8W2StbYq+somNxjn80QwCLg9PF2Oxru9Vs7ZrGaW1ueawR693MGX58iUNjTTu6YDMn9E/GlMvCBM2Ekq8vj6ExRpy+FP1cafGeCTp7GzJya/95/62uySaYy+KneeXfk591rUV0GHBIKxY8HocsnUHtL7UwXb+LNv5szorKgv404nRWLJwuff5I7pqL5PDsY6Zah0zdeCHuX5Te5416LAX2guL+1taDSzMMWSwsqnn/0qnVczdWMEXCc38fOgd5HDcxxO2Wt0syCJb84OLMvgiIV8kZJpwdFWHbJ6SwyCwWNeee5d+Tjnp6nm+SDjkVIoepvXag6GDjpfLwx4V8UVC3p6vdaK9bNlqNVnXXVer7cq9SL8BIOhIPGNnJ3JE3bP5IuHY9Z8QrPflpXQ1WafScaXqoXzJqr7mFsgQLcEqJlJXqk18SXTzxOg1K/gioYRYpbkB0eqwbsQEIlZdctyD4SqZluB16nudpZe88WSzRpRIaMmfQpi6nro6dVjnsGQ+YVVED6hoTL0AqQKhPXifP+p5NIUwdYWRM1Vmnekkovc9CxM2ovQTcHn1x1MBvL2ZshA3PidnxWz+HOOddpwYXR3l5SqzDmEydWidyvVJAlt3OQkr12+BrkwhNAuySVs3y/AQu8ULiNHVO9ToQ5m7WuuPn5UzUMDl3f3v2b1P66FzkxY9T+rIXD23b7YQM7lyxydcZdYF55F0N11bcekd/8g3PBzn8+zQCejrJGKdTjeI4EGU7lZWlLDOiByrLsrR2VO16euBD0PR2YvQ9asSt0EjYMAibDIBWqRd3SpHmI5/i6eiQSs+2SBnYJZXqH561bPDP2i1fJMJbpS2j89PRMRHtQeOqsw6l6T1VHc+yfMmOQPLlyboCeUIWAWdeHborc+S9g6qWMlI+zvXnnzzrcqsA/Q6++nF5asCLg/jJGNIOfwwtB015OdZPlOoYqiA7Kuky+vk8Di8F6YBlECv6AUxlDN2Go2RZlPFXExjY/KybuS7fxqdsBz6NJnRU/dMwOXd8Q4jRl1QwdA71/s7OmBfYEOFExzGblxt5OT4cO0X0GqkQt23h6q/+id56pPt4k8xC44wBF3aPQhP/LJp4AXoqp2bYrdort2iuXCzMsnTLQJAp1Tfft7s+mNntKqi/vDJMRtWqxxh0tXiEGqA+/5sRV9l2lPvknqLkCCS5nVvE4+YtQ4IskECgPveoV/QlvX1SSViyrXI0N6WGqwDAFiETeaLhBYhwdAR9QoYG6luOU6E9tEu61D4XDrJFwkdPoyDptQHYCQXpQuWQfsQxDoUrl8l8kXCsOoiaFAaI7z2vqKvZBJJ080MirarraCYkqxDweRw0EPRXJM/hz5KM4RVFTEMFV4bcsveg7pNe/7zdW2rMA301xbr5HD462KUfu7f/R36Kz0CS6apwuMlqb4c0p6v9RjN+p0IrbNODu6cv6D0i6grGeHtCd2XeuAYYi8UwcVbNUDQ7SIImx14481JRGVxK15euwmtT3IE3b5uPM5Z0bfS3t7M0ZS/UVTW10db1g2C58k31+KJX74q+2A5vISZVGDZ24beFWDNQOTfvTv9fRq0ND9kmr6wbiDYNlaTrp4f+Enlhq3a3qEDoQgMtlF4nZIRMMPBG+mnyQ2+3XVaP9/FPn4R6Vj3Nsbv2DJ+x5sTwborq/PCpkE+aBtME478+jHsRA6hS5PvzfyAAC0umz+lAOsGwXj8uIEJfVvhvYpV67qrn0CeaAruKd9w585QKnbHJ7S3sYlODW/JySMifHjrFT4DylnKzN8n6PabBZamGxmli+CuCHXAcXcLEFzBI/loy46n3x+jWfN/5fJ0dd6rAdVtZx0zFX0SdlVV50+BgagKwEO5+mNnKjdspV/ba/d+TwzlQkuHOI13uOt1eQExxDymlWKE6zh0bRDSCSewl9pe/uemgMujJeU6yysef72bGF2skTYaZl2mk093Xe29mR8IuLy+plcksSlfJGQ72kFSDZN4Nn96x27he/Rrcsf98oLIGcToMg8OHDrTG06HScVvDqXJ8QgRcHn95DiSLaQwQwIpNWziue1K5ri50qmxlRuTC2NmEqbO9/IpTeZ1iroq29UfABD6MJ9lbqZb+7pu+vRx8j/I1ecIwm+swCnbll90d/p8woinKDIPyPyZNnu+BLbuRN4SZeyk8Nx0hgYp9+a55xYo4PKe7DmgQxOPXrWU0i5iFujnvPpvZHji8UVCBtuI0sZ8/PUuAZdH8MVsQQW/aIZ1YtFz/CNfzfY9Ai7vlt0E3cQSSTupPjaP2ZDA5FoTpi7bLUDRV0p3q5AWNTv3Cri82r0HCdY7cgbWdLoKrKs/euq2d7iq6mVSKXrUeWHMLCKbXf/W4fJURNj9HLYlQcTrb20viJiO8cSjkN2kfX2/cnkCLu/Jrv06qYDHoT0aYN3dv8yv3Jg8nHp03C9D6fcrlyft1e6ZNnR6/SSkIgdhEHTNYKewsnjGfOoSr7P0AepjmY4TdXjjacTTUmwBXLMpGeO8kU6N7XZlApA5+vX5bWbBfpMup2p0wG7LdgsE9EJEwwPCxpHWO0U1O78ds/5jRcQjz4jWXV1Tu/vAi0vpEjGJDiazjApHWCxsGUSmLMUk1Mpmpv7/Om3iobJGaU9vbnCkGPcuQd8rqeZBfkQ3VpU5TN12hNfZw1aR4foQSmgceCICJawjlX2R31cjZK1twyyKiqwjuDv8frlo6uUBiadxymHldVKxmGyWlbW2of9gpxKAouiZ/W3t9JhcIVvvDM263sbnmU5e0I5kzPHqywnTlT0+AOPb0Ae5sDveUE6VKGYI1j07evqOTzi0IzmBMJn+v10mTB1GvMOysvC/eQn2CAAg4lkZQBD1WZfDC6na+CW0I5lh4sFz27WNDMQzmTjB9+IPet4dfJEQMVBtZ+UfWJdp79XX8gq6Nflht3Cu3QfvkYF45qFBY9Z/AnM59VkXXl8Ct+pTBW7/SGZZWpGBeM5rVpgH++mb/RlsttpTSoMjzCiR0OvsYejTlEBoxW3Ctq1gE8/3cirH3U1/LO9x/LvwuhL1Gfv2R1aR4XyR0DTQD7o1BfL4hgckIV6A4ArThKMnUeXIadHDek4q+sLv36l8kZBhyIaeTX7iEakO4zZWPAf7URpepw9pZKFSyTAZXlvCFwkxjt2GoG5Orx6kEnGmkw8ZakIk2FxrvkhoFc3XTE6IRyjo9nW+SOgQvxD6NyQeAEAq7imM/h/9IR5fJAy5n6PBAlVICVy3b+aLhKEVcEcCSTGc/F5VdJQ8eLg6kd7EkwCgpVPnVE7EWZYWaFWsY6ZCRycVGGx2+JP7hKlrOJP2NOUwLYlnYGHKFwmjtNYE9ae/Jp46iNLPLHAS9HiyEM/I0DvtOGHqHiX/vTkjm07E8/rhe75IOEVYoN1uGn4Rk/59FqWf08oPod/rHJbhIfaLibvj6v68eGlPL9WJZ+zijPqw1X9FEqBO+VutakDW31+64K+vBNmktXLEs7Ih986R/P06/Lg3O64li7gMfEpVoYGpydDZUWdX1jiSRkPW02ImHk8hXq9WWDcIz46cepy0kwyv2Y9etXTspk8xBGjDOgDALbdAIt9FVDSQAQCARCKw9yAJ01iWVkG51w3MTXVYByJYNwg9tU+rNm9vuvoLAbpM/X09j+w1tLPFKd8lrNJeZWQAcHiEHqXcWVYh6e4hTJ1ZgK/Cmjx4WDD1XV15uc+FkxZTgsnzjNUB6xSh+0ld45m01jt57RU1UlVefWBZWnEmuJpPDnCIX8QaaQ0gSImnB449StqhpcLZVtYj3F3MQ4Ns359l5ORAclOQiHUQEHoCBjQBBARkHQQEZB0EBARkHQQErVjHYDAQBEEQpK+vD/uXyO/o6cGam/7xxx8RfMcnIQiyfPlyeckYklKpVK4dTyWxZVgsFipWVVWFszQEQRwcHPAYB0GQjz/+GENywYIFqFhYWNhwOvLixYtyjUeOHMHZd9jGSUxMlItdv359ONXLy8uTF5WcrOTCjO3bt6OSXC4XZ0OMjJTf9bV8+XI8/nDgwAF5sbt378bjt4gqB4QBAIBsAOSf2NjYDPpqEOSSbxcyCOfPn8cWGFjmsmXL8JQ5ULulpSUeSUXw8PBABczMzJTWc6Bee3v74egdKHnt2rWuri6c8opw4cIFtAQ+n4+nIWfOnFFa5ueff44WNWPGjGFWLzc3Fy3h9OnTAACxWIxdvT179qB/JCQkaMQPZTKZsbExk8lUKrZ//35UZu/evUqrKle9du1a/NYYOsJ88eIFVVYUmpubh/Pz8vLXh7quWbMG50/QcUSDyMzMNDY21pTBMzIyNG7kS5cuaaqoBQsWoK6MLbZ06etLP2tqajSluru7OztbhV2KaJDy6hXW0vHRo68vbDt4UIUr8hiDnnvoE1PuiyTHwMGGGKxcuXLevHk4hfHEHtOnT9+2bRt2vIofqEYDHMczopGtlxcdTvhGjVxXV6dUMjg4GABw7NgxTan+7LPPAABz587t6OhQP6+TyWQ+Pj6enp7Y2YjeIiUlRbODwpUrV3p7e+vr61XODYZCY2OjgYFBf3+/Ukk0wiwpKaFBp9y8eRMA4OrqijMmSkpK0pTqpqamL774AuWemqxzcXFxcXEpLi42Njbet28fJQY5jTirDuHi4sJms9vaNLNNmcvlKp0Gox+ioqIAAL29WFcs2tvby5+KtbW1GtS+bdu2wMBAAEB7e7s6rHv8+HF1dXV/f393dzf2z2xtbQEA+Dt48+/AFjt48GBTUxMAYNOmTUrLRLWPHTt2OCaLjo5Gi9q6dSvOn5w4cUKlVqenp2PIVFdXr1u3Lj4+nmBPTUtLw9MjaCs0NbTJi+JwlJzhx+Fw8vPzAQCxsbEaUY3OtMtkMpwPOnlVMeZRJRLJwIgGnZnDgz8kAFKpNC4ujsVi+fv7FxRgvU7b0NCwdOlSNpvt6elZWop1H6ydnV1sbGxhYSGeeIzL5drY2KSkpKxcuRJbMjg4mM1mx8fHY8+SK+2zGzduJCUlsdlsR0dHpUMgWlpcXNy5c+esrKyUSqKtxs7Zqqqq0NCosrJyOF5la2srb2xsbKy8WEXV6+npUdopPB4P7bslS5bIpw3Ug4WFBVrU7Nmz09LSlI6nhoaGQUFBZ8+exc6iBzZZad99+eWXAIAtW7bk5eVhSDo7O6NVnTNnzrlz5zAkExMT8VfgDzEa3P0MAUEw4N4UCAjIOggIyDoICAjN4v8BB0agIm9zrecAAAAASUVORK5CYII=';
+const SEG_URL_XLSX = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
+let perfil = null;
+
+/* ---------- utilidades ---------- */
+const $ = id => document.getElementById(id);
+const esc = t => String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const escJs = t => String(t == null ? '' : t).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+const fmtN = n => (Number(n) || 0).toLocaleString('es-CR');
+const hoyISO = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+const fmtFechaSeg = f => { const m = String(f || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[3] + '/' + m[2] + '/' + m[1] : (f || ''); };
+const puedeEditar = () => !!perfil && (perfil.rol === 'operador' || perfil.rol === 'admin');
+const esAdmin = () => !!perfil && perfil.rol === 'admin';
+let _tt; function toast(t) { const e = $('toast'); e.textContent = t; e.classList.add('show'); clearTimeout(_tt); _tt = setTimeout(() => e.classList.remove('show'), 4500); }
+function mostrarError(e, def) { toast((e && e.message) ? e.message : (def || 'Ocurrió un error.')); }
+const _libs = {};
+function cargarLib(clave, url) {
+  if (_libs[clave]) return _libs[clave];
+  return _libs[clave] = new Promise((ok, no) => { const s = document.createElement('script'); s.src = url; s.onload = ok; s.onerror = () => no(new Error('No se pudo cargar la librería de Excel. Revisa tu conexión.')); document.head.appendChild(s); });
+}
+
+/* ---------- sesión ---------- */
+$('lLogo').src = LOGO; $('hLogo').src = LOGO;
+
+async function entrar(ev) {
+  ev.preventDefault(); $('err').textContent = ''; $('lBtn').disabled = true;
+  const r = await sb.auth.signInWithPassword({ email: $('lMail').value.trim(), password: $('lPass').value });
+  $('lBtn').disabled = false;
+  if (r.error) { $('err').textContent = 'Correo o contraseña incorrectos.'; return; }
+  await iniciar();
+}
+async function salir() { await sb.auth.signOut(); location.reload(); }
+
+async function iniciar() {
+  const u = (await sb.auth.getUser()).data.user;
+  if (!u) { $('loginBg').style.display = 'flex'; $('app').style.display = 'none'; return; }
+  const r = await sb.from('perfiles').select('nombre,rol,activo').eq('id', u.id).maybeSingle();
+  if (r.error || !r.data || !r.data.activo) {
+    await sb.auth.signOut();
+    $('err').textContent = 'Tu usuario aún no está activado. Pide al administrador que lo active.';
+    $('loginBg').style.display = 'flex'; $('app').style.display = 'none'; return;
+  }
+  perfil = r.data; perfil.email = u.email;
+  $('uNombre').textContent = (perfil.nombre || u.email) + ' · ' + perfil.rol;
+  $('loginBg').style.display = 'none'; $('app').style.display = 'block';
+  ir('mov');
+}
+
+/* ---------- capa de datos: mismas llamadas que la versión Apps Script, ahora hacia Supabase ---------- */
+async function rpc(fn, args) { const r = await sb.rpc(fn, args); if (r.error) throw new Error(r.error.message); return r.data; }
+function mapLinea(r) {
+  return { linea: r.linea, periodo: r.periodo, archivo: r.archivo, fecha: r.fecha_cierre || '', orden: r.n_orden, contrato: r.contrato, idMovil: r.movil, movil: r.movil,
+    contrata: r.contrata, averia: r.averia, tipo: r.tipo, servicio: r.servicio, equipo: r.equipo, equipoOriginal: r.equipo_original,
+    debe: r.debe, devuelto: r.devuelto, justificado: r.justificado, pendiente: r.debe - r.devuelto - r.justificado, motivo: r.motivo_justif, justPor: r.justif_por,
+    justFecha: r.justif_fecha || '', boletas: r.boletas, fechaDev: r.fecha_devolucion || '', recibidoPor: r.recibido_por, cambioMotivo: r.cambio_motivo };
+}
+async function api(nombre) {
+  const a = Array.prototype.slice.call(arguments, 1);
+  switch (nombre) {
+    case 'obtenerDevolucionesWeb': {
+      let todo = [], desde = 0;
+      for (;;) {
+        const r = await sb.from('dev_lineas').select('*').gt('debe', 0).order('fecha_cierre', { ascending: false }).order('n_orden').range(desde, desde + 999);
+        if (r.error) throw new Error(r.error.message);
+        todo = todo.concat(r.data); if (r.data.length < 1000) break; desde += 1000;
+      }
+      return { lineas: todo.map(mapLinea), entregas: [] };
+    }
+    case 'importarDevolucionesWeb': return rpc('dev_importar', { p_filas: a[0], p_archivo: a[1], p_periodo: a[2] });
+    case 'registrarDevolucionLineaWeb': return rpc('dev_registrar_linea', { p_linea: a[0], p_cantidad: a[1], p_fecha: a[2] || null });
+    case 'registrarBoletaDevolucionWeb': return rpc('dev_registrar_boleta', { p_periodo: a[0], p_fecha: a[1] || null, p_boleta: a[2], p_cant: a[3], p_movil: a[4] || '' });
+    case 'justificarDevolucionWeb': return rpc('dev_justificar', { p_linea: a[0], p_cantidad: a[1], p_motivo: a[2], p_quitar: !!a[3] });
+    case 'cambiarEquipoDevolucionWeb': return rpc('dev_cambiar_equipo', { p_linea: a[0], p_nuevo: a[1], p_cantidad: a[2], p_motivo: a[3] });
+    case 'revertirDevolucionWeb': return rpc('dev_revertir', { p_linea: a[0] });
+    case 'eliminarPeriodoDevolucionesWeb': return rpc('dev_eliminar_periodo', { p_periodo: a[0], p_confirmacion: a[1] });
+    case 'obtenerHistorialDevolucionWeb': {
+      const r = await sb.from('dev_historial').select('*').eq('linea', a[0]).order('fecha_hora', { ascending: false });
+      if (r.error) throw new Error(r.error.message);
+      return r.data.map(h => ({ hora: new Date(h.fecha_hora).toLocaleString('es-CR'), usuario: h.usuario, accion: h.accion, detalle: h.detalle }));
+    }
+  }
+  throw new Error('Operación no disponible: ' + nombre);
+}
+
+/* ---------- Devoluciones de cambio ---------- */
+let devDatos = { lineas: [], entregas: [] }, devVisibles = [], devMovilesLista = [], devAbiertas = {};
+
+function devEstado(o) {
+  if (o.pendiente <= 0) return (o.justificado > 0 && o.devuelto <= 0) ? 'Justificado' : 'Devuelto';
+  return (o.devuelto > 0 || o.justificado > 0) ? 'Parcial' : 'Pendiente';
+}
+function devColor(e) {
+  return e === 'Devuelto' ? '#e8f7ec;color:#1b7a3a' : e === 'Justificado' ? '#eaf0ff;color:#2a4fb3' : e === 'Parcial' ? '#fff4d6;color:#8a6200' : '#fdeaea;color:#b3261e';
+}
+function devModal(html) { $('devModal').innerHTML = html; $('devModalBg').classList.add('show'); }
+function devCerrar() { $('devModalBg').classList.remove('show'); }
+
+async function cargarDevoluciones() {
+  try { devDatos = await api('obtenerDevolucionesWeb'); }
+  catch (e) { mostrarError(e, 'No se pudieron cargar las devoluciones.'); return; }
+  devLlenarFiltros();
+  devRender();
+}
+
+function devLlenarFiltros() {
+  const L = devDatos.lineas;
+  const mv = {};
+  L.forEach(o => { mv[o.idMovil || o.movil] = o.movil; });
+  const sm = $('devMovil'), vm = sm.value;
+  sm.innerHTML = '<option value="">Todas las móviles</option>' + Object.keys(mv).sort((a, b) => String(mv[a]).localeCompare(String(mv[b]), 'es', { numeric: true })).map(k => '<option value="' + esc(k) + '">' + esc(mv[k]) + '</option>').join('');
+  sm.value = vm;
+  const eq = Array.from(new Set(L.map(o => o.equipo))).sort();
+  const se = $('devEquipo'), ve = se.value;
+  se.innerHTML = '<option value="">Todos los equipos</option>' + eq.map(x => '<option value="' + esc(x) + '">' + esc(x) + '</option>').join('');
+  se.value = ve;
+}
+
+function devFiltradas() {
+  const mv = $('devMovil').value, es = $('devEstado').value, eq = $('devEquipo').value;
+  const ct = ($('devContrato').value || '').trim().toLowerCase(), ot = ($('devOt').value || '').trim().toLowerCase();
+  const d1 = $('devDesde').value, d2 = $('devHasta').value;
+  return devDatos.lineas.filter(o => {
+    if (mv && (o.idMovil || o.movil) !== mv) return false;
+    if (eq && o.equipo !== eq) return false;
+    if (ct && String(o.contrato).toLowerCase().indexOf(ct) === -1) return false;
+    if (ot && String(o.orden).toLowerCase().indexOf(ot) === -1) return false;
+    if (d1 && (o.fecha || '') < d1) return false;
+    if (d2 && (o.fecha || '') > d2) return false;
+    const e = devEstado(o);
+    if (es === 'pend' ? o.pendiente <= 0 : (es && e !== es)) return false;
+    return true;
+  });
+}
+
+function devToggle(k) {
+  if (devAbiertas[k]) delete devAbiertas[k]; else devAbiertas[k] = 1;
+  devRender();
+}
+
+function devRender() {
+  const L = devFiltradas();
+  const sum = (A, k) => A.reduce((a, o) => a + (+o[k] || 0), 0);
+  $('devCards').innerHTML =
+    '<div class="card"><div class="n">' + fmtN(sum(L, 'debe')) + '</div><div class="t">Nos piden</div></div>' +
+    '<div class="card"><div class="n" style="color:#1b7a3a">' + fmtN(sum(L, 'devuelto')) + '</div><div class="t">Recogidos</div></div>' +
+    '<div class="card"><div class="n" style="color:#2a4fb3">' + fmtN(sum(L, 'justificado')) + '</div><div class="t">Justificados</div></div>' +
+    '<div class="card"><div class="n" style="color:#b3261e">' + fmtN(sum(L, 'pendiente')) + '</div><div class="t">Pendientes</div></div>';
+
+  /* móviles con saldo (para registrar entrega) */
+  const g = {};
+  L.forEach(o => {
+    const k = o.idMovil || o.movil;
+    const r = g[k] || (g[k] = { id: o.idMovil, movil: o.movil, pen: 0, eq: {} });
+    r.pen += o.pendiente;
+    if (o.pendiente > 0) r.eq[o.equipo] = (r.eq[o.equipo] || 0) + o.pendiente;
+  });
+  devMovilesLista = Object.keys(g).map(k => g[k]);
+
+  /* semanas */
+  const sem = {};
+  L.forEach(o => { const k = o.periodo || '(sin periodo)'; (sem[k] || (sem[k] = [])).push(o); });
+  const llaves = Object.keys(sem).sort().reverse();
+  const filtrando = !!(L.length !== devDatos.lineas.length);
+  devVisibles = [];
+  let h = '';
+  llaves.forEach(k => {
+    const A = sem[k], abierta = !!devAbiertas[k] || (filtrando && llaves.length === 1);
+    const debe = sum(A, 'debe'), dev = sum(A, 'devuelto'), jus = sum(A, 'justificado'), pen = sum(A, 'pendiente');
+    const bol = Array.from(new Set(A.reduce((r, o) => r.concat(String(o.boletas || '').split(/[,;]\s*/).filter(Boolean)), [])));
+    const pct = debe ? Math.round((dev + jus) * 100 / debe) : 0;
+    h += '<div style="border:1px solid #e3e6ea;border-radius:10px;margin-bottom:10px;overflow:hidden">' +
+      '<div onclick="devToggle(\'' + escJs(k) + '\')" style="cursor:pointer;display:flex;gap:14px;align-items:center;flex-wrap:wrap;padding:11px 14px;background:' + (abierta ? '#eef3fb' : '#f8f9fb') + '">' +
+      '<div style="font-weight:700;min-width:190px">' + (abierta ? '▾' : '▸') + ' 📅 ' + esc(k) + '</div>' +
+      '<div style="font-size:13px">Nos piden: <b>' + fmtN(debe) + '</b></div>' +
+      '<div style="font-size:13px;color:#1b7a3a">Recogidos: <b>' + fmtN(dev) + '</b></div>' +
+      (jus ? '<div style="font-size:13px;color:#2a4fb3">Justificados: <b>' + fmtN(jus) + '</b></div>' : '') +
+      '<div style="font-size:13px;color:' + (pen > 0 ? '#b3261e' : '#1b7a3a') + '">Pendientes: <b>' + fmtN(pen) + '</b></div>' +
+      '<div style="flex:1;min-width:90px;max-width:160px;background:#e3e6ea;border-radius:6px;height:8px"><div style="width:' + pct + '%;background:#1b9a4a;height:8px;border-radius:6px"></div></div><span style="font-size:12px;color:#666">' + pct + '%</span>' +
+      (bol.length ? '<div style="font-size:12px;color:#555">Boleta: <b>' + esc(bol.join(', ')) + '</b></div>' : '') +
+      (puedeEditar() && pen > 0 ? '<button class="btnMini" style="margin-left:auto" title="Registrar boleta de devolución" onclick="event.stopPropagation();devRecibirSemana(\'' + escJs(k) + '\')">📄 Registrar boleta</button>' : '') +
+      (esAdmin() && k !== '(sin periodo)' && !filtrando ? '<button class="btnMini" style="' + (puedeEditar() && pen > 0 ? '' : 'margin-left:auto') + '" title="Eliminar semana" onclick="event.stopPropagation();devEliminarSemana(\'' + escJs(k) + '\')">🗑</button>' : '') +
+      '</div>';
+    if (abierta) {
+      h += '<div class="tableWrap"><table class="table" style="min-width:900px"><thead><tr><th>Fecha</th><th>Móvil</th><th>OT</th><th>Contrato</th><th>Avería</th><th>Equipo</th><th style="text-align:right">Debe</th><th style="text-align:right">Dev.</th><th style="text-align:right">Just.</th><th style="text-align:right">Pend.</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>';
+      A.forEach(o => {
+        const i = devVisibles.length; devVisibles.push(o);
+        const e = devEstado(o);
+        h += '<tr><td>' + esc(fmtFechaSeg(o.fecha)) + '</td><td>' + esc(o.movil) + '</td><td>' + esc(o.orden) + '</td><td>' + esc(o.contrato) + '</td><td style="font-size:12px">' + esc(o.averia) + '</td>' +
+          '<td><b>' + esc(o.equipo) + '</b>' + (o.equipoOriginal ? '<div style="font-size:11px;color:#8a6200" title="' + esc(o.cambioMotivo) + '">cambiado desde ' + esc(o.equipoOriginal) + '</div>' : '') + (o.recibidoPor ? '<div style="font-size:11px;color:#1b7a3a">Recibió: ' + esc(o.recibidoPor) + (o.fechaDev ? ' · ' + esc(fmtFechaSeg(o.fechaDev)) : '') + '</div>' : '') + (o.motivo ? '<div style="font-size:11px;color:#2a4fb3">Just.: ' + esc(o.motivo) + '</div>' : '') + '</td>' +
+          '<td style="text-align:right">' + fmtN(o.debe) + '</td><td style="text-align:right">' + fmtN(o.devuelto) + '</td><td style="text-align:right">' + fmtN(o.justificado) + '</td><td style="text-align:right;font-weight:700">' + fmtN(o.pendiente) + '</td>' +
+          '<td><span class="segBadge" style="background:' + devColor(e) + '">' + e + '</span></td><td style="white-space:nowrap">';
+        if (puedeEditar() && o.pendiente > 0) h += '<button class="btnMini" title="Marcar devuelto" onclick="devAccion(\'dev\',' + i + ')">✔</button> <button class="btnMini" title="Cambiar equipo" onclick="devAccion(\'cambio\',' + i + ')">🔄</button> ';
+        if (esAdmin() && o.pendiente > 0) h += '<button class="btnMini" title="Justificar (no debe devolver)" onclick="devAccion(\'just\',' + i + ')">✍️</button> ';
+        if (esAdmin() && (o.devuelto > 0 || o.justificado > 0 || o.equipoOriginal)) h += '<button class="btnMini" title="Revertir" onclick="devAccion(\'rev\',' + i + ')">↩</button> ';
+        h += '<button class="btnMini" title="Historial" onclick="devAccion(\'hist\',' + i + ')">🕘</button></td></tr>';
+      });
+      h += '</tbody></table></div>';
+    }
+    h += '</div>';
+  });
+  if (!llaves.length) h = '<div style="text-align:center;color:#888;padding:24px">Sin datos. Carga el Excel semanal de devoluciones.</div>';
+  $('devSemanas').innerHTML = h;
+}
+
+/* ----- Importar Excel ----- */
+function devISO(v) {
+  if (v instanceof Date && !isNaN(v)) {
+    const d = new Date(v.getTime() + 60000);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  const t = String(v || '').trim();
+  let m = t.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return m[1] + '-' + m[2] + '-' + m[3];
+  m = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  return m ? m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0') : '';
+}
+
+async function devLeerExcel(file) {
+  await cargarLib('xlsx', SEG_URL_XLSX);
+  const wb = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true });
+  for (const n of wb.SheetNames) {
+    const m = XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: true, defval: '' });
+    const hi = m.findIndex(f => f.some(c => /^nombre[_ ]?movil$/i.test(String(c).trim())));
+    if (hi < 0) continue;
+    const H = m[hi].map(c => String(c).trim());
+    const ix = re => H.findIndex(c => re.test(c));
+    const cM = ix(/^nombre[_ ]?movil$/i), cCo = ix(/^contrata$/i), cAv = ix(/^aver/i), cTi = ix(/^tipo$/i), cFe = ix(/^fecha/i), cSe = ix(/^servicio/i), cCt = ix(/^contrato$/i), cOt = ix(/^c[oó]digo$/i), cTo = ix(/^total$/i);
+    if (cOt < 0) throw new Error('No encontré la columna CODIGO (número de OT) en la hoja «' + n + '».');
+    const fin = cTo > cOt ? cTo : H.length;
+    const cols = [];
+    for (let c = cOt + 1; c < fin; c++) if (H[c]) cols.push(c);
+    const filas = [];
+    m.slice(hi + 1).forEach(f => {
+      const movil = String(f[cM] || '').trim(), orden = String(f[cOt] || '').trim();
+      if (!movil || !orden) return;
+      const equipos = {};
+      cols.forEach(c => { const q = Number(f[c]); if (q > 0) equipos[H[c]] = q; });
+      if (!Object.keys(equipos).length) return;
+      filas.push({ movil: movil, contrata: cCo >= 0 ? String(f[cCo]).trim() : '', averia: cAv >= 0 ? String(f[cAv]).trim() : '', tipo: cTi >= 0 ? String(f[cTi]).trim() : '',
+        fecha: devISO(f[cFe]), servicio: cSe >= 0 ? String(f[cSe]).trim() : '', contrato: cCt >= 0 ? String(f[cCt]).trim() : '', orden: orden, equipos: equipos });
+    });
+    return filas;
+  }
+  throw new Error('No encontré una hoja con la columna NOMBRE_MOVIL (hoja «BD»).');
+}
+
+async function devImportar(inp) {
+  const f = inp.files[0]; inp.value = '';
+  if (!f) return;
+  let filas;
+  try { filas = await devLeerExcel(f); } catch (e) { mostrarError(e, 'No se pudo leer el Excel.'); return; }
+  if (!filas.length) { toast('El archivo no trae equipos a devolver.'); return; }
+  const mm = f.name.match(/(\d{4}-\d{2}-\d{2})_al_(\d{4}-\d{2}-\d{2})/);
+  const periodo = mm ? mm[1] + ' al ' + mm[2] : '';
+  const und = filas.reduce((a, r) => a + Object.keys(r.equipos).reduce((b, k) => b + r.equipos[k], 0), 0);
+  if (!confirm('Cargar «' + f.name + '»?\n\n' + filas.length + ' órdenes · ' + und + ' equipos a devolver.\nNo afecta stock ni gastos. Las líneas ya cargadas no se duplican.')) return;
+  try {
+    const r = await api('importarDevolucionesWeb', filas, f.name, periodo);
+    toast('Cargado: ' + r.nuevas + ' líneas nuevas, ' + r.repetidas + ' ya existían.' + (r.sinMovil ? ' ' + r.sinMovil + ' sin móvil identificada.' : ''));
+    if (r.periodo) devAbiertas[r.periodo] = 1;
+    await cargarDevoluciones();
+  } catch (e) { mostrarError(e, 'No se pudo importar.'); }
+}
+
+function devEliminarSemana(p) {
+  const A = devDatos.lineas.filter(o => (o.periodo || '(sin periodo)') === p);
+  const sum = k => A.reduce((a, o) => a + (+o[k] || 0), 0);
+  window._devDel = p;
+  devModal('<h3 style="color:#b3261e">🗑 Eliminar importación</h3>' +
+    '<div style="font-size:13px;background:#fdeaea;border-radius:8px;padding:10px;margin-bottom:10px"><b>' + esc(p) + '</b><br>' + A.length + ' líneas · ' + fmtN(sum('debe')) + ' equipos pedidos<br>Recogidos: <b>' + fmtN(sum('devuelto')) + '</b> · Justificados: <b>' + fmtN(sum('justificado')) + '</b></div>' +
+    '<div style="font-size:13px;margin-bottom:10px">Se borra <b>toda</b> la semana, incluidas las devoluciones, boletas y justificaciones registradas. <b>No se puede deshacer.</b></div>' +
+    '<div class="field"><label>Para confirmar escribe <b>ELIMINAR</b></label><input id="dvConf" autocomplete="off" oninput="$(\'dvConfBtn\').disabled = this.value.trim().toUpperCase() !== \'ELIMINAR\'"></div>' +
+    '<div class="modalActions"><button class="btn" onclick="devCerrar()">Cancelar</button><button class="btn primary" id="dvConfBtn" disabled style="background:#b3261e" onclick="devConfirmarEliminar()">Eliminar definitivamente</button></div>');
+}
+function devConfirmarEliminar() {
+  devLlamar('eliminarPeriodoDevolucionesWeb', [window._devDel, $('dvConf').value], 'Importación eliminada.');
+  delete devAbiertas[window._devDel];
+}
+
+/* ----- Acciones por línea ----- */
+function devCab(o) {
+  return '<div style="font-size:13px;background:#f6f7f9;border-radius:8px;padding:8px 10px;margin-bottom:10px"><b>' + esc(o.movil) + '</b> · OT ' + esc(o.orden) + ' · contrato ' + esc(o.contrato) + '<br><b>' + esc(o.equipo) + '</b> — debe ' + fmtN(o.debe) + ', devuelto ' + fmtN(o.devuelto) + ', justificado ' + fmtN(o.justificado) + ', <b>pendiente ' + fmtN(o.pendiente) + '</b></div>';
+}
+function devPie(okJs, txt) {
+  return '<div class="modalActions"><button class="btn" onclick="devCerrar()">Cancelar</button><button class="btn primary" onclick="' + okJs + '">' + txt + '</button></div>';
+}
+
+async function devAccion(tipo, i) {
+  const o = devVisibles[i]; if (!o) return;
+  window._devO = o;
+  if (tipo === 'dev') {
+    devModal('<h3>✔ Marcar devuelto</h3>' + devCab(o) +
+      '<div class="grid2"><div class="field"><label>Cantidad devuelta</label><input id="dvCant" type="number" min="1" max="' + o.pendiente + '" value="' + o.pendiente + '"></div>' +
+      '<div class="field"><label>Fecha</label><input id="dvFecha" type="date" value="' + hoyISO() + '"></div></div>' +
+      devPie('devGuardarDev()', 'Guardar'));
+  } else if (tipo === 'just') {
+    devModal('<h3>✍️ Justificar: no debe devolver</h3>' + devCab(o) +
+      '<div class="field"><label>Cantidad a justificar</label><input id="dvCant" type="number" min="1" max="' + o.pendiente + '" value="' + o.pendiente + '"></div>' +
+      '<div class="field"><label>Motivo</label><textarea id="dvMot" rows="3" placeholder="Ej. el cliente conservó el equipo, equipo dañado por el cliente…"></textarea></div>' + devPie('devGuardarJust()', 'Justificar'));
+  } else if (tipo === 'cambio') {
+    const eq = Array.from(new Set(devDatos.lineas.map(x => x.equipo))).filter(x => x !== o.equipo).sort();
+    devModal('<h3>🔄 Cambiar tipo de equipo</h3>' + devCab(o) +
+      '<div style="font-size:12px;color:#777;margin-bottom:8px">Si el equipo a devolver correspondía a otro, mueve la cantidad pendiente a ese equipo.</div>' +
+      '<div class="grid2"><div class="field"><label>Debe devolver realmente</label><input id="dvEq" list="dvEqList" placeholder="Equipo correcto"><datalist id="dvEqList">' + eq.map(x => '<option value="' + esc(x) + '">').join('') + '</datalist></div>' +
+      '<div class="field"><label>Cantidad a mover</label><input id="dvCant" type="number" min="1" max="' + o.pendiente + '" value="' + o.pendiente + '"></div></div>' +
+      '<div class="field"><label>Motivo</label><textarea id="dvMot" rows="2"></textarea></div>' + devPie('devGuardarCambio()', 'Cambiar'));
+  } else if (tipo === 'rev') {
+    if (!confirm('¿Revertir devoluciones/justificaciones/cambio de esta línea?')) return;
+    try { await api('revertirDevolucionWeb', o.linea); toast('Línea revertida.'); await cargarDevoluciones(); }
+    catch (e) { mostrarError(e, 'No se pudo revertir.'); }
+  } else if (tipo === 'hist') {
+    let H = [];
+    try { H = await api('obtenerHistorialDevolucionWeb', o.linea); } catch (e) { mostrarError(e, 'No se pudo cargar el historial.'); return; }
+    devModal('<h3>🕘 Historial</h3>' + devCab(o) + (H.length ? '<div class="tableWrap"><table class="table" style="min-width:900px"><thead><tr><th>Fecha</th><th>Usuario</th><th>Acción</th><th>Detalle</th></tr></thead><tbody>' +
+      H.map(h => '<tr><td>' + esc(h.hora) + '</td><td>' + esc(h.usuario) + '</td><td>' + esc(h.accion) + '</td><td>' + esc(h.detalle) + '</td></tr>').join('') + '</tbody></table></div>' : '<div style="color:#888">Sin movimientos.</div>') +
+      '<div class="modalActions"><button class="btn" onclick="devCerrar()">Cerrar</button></div>');
+  }
+}
+
+async function devLlamar(nombre, args, ok) {
+  try { await api.apply(null, [nombre].concat(args)); devCerrar(); toast(ok); await cargarDevoluciones(); }
+  catch (e) { mostrarError(e, 'No se pudo guardar.'); }
+}
+function devGuardarDev() { devLlamar('registrarDevolucionLineaWeb', [window._devO.linea, +$('dvCant').value, $('dvFecha').value, ''], 'Devolución registrada.'); }
+function devGuardarJust() {
+  if (!$('dvMot').value.trim()) { toast('Escribe el motivo.'); return; }
+  devLlamar('justificarDevolucionWeb', [window._devO.linea, +$('dvCant').value, $('dvMot').value, false], 'Justificación registrada.');
+}
+function devGuardarCambio() {
+  if (!$('dvEq').value.trim()) { toast('Indica el equipo correcto.'); return; }
+  devLlamar('cambiarEquipoDevolucionWeb', [window._devO.linea, $('dvEq').value.trim(), +$('dvCant').value, $('dvMot').value], 'Equipo cambiado.');
+}
+
+/* ----- Entrega masiva por móvil ----- */
+function devBoletaCalc() {
+  const k = window._devSemK, mv = $('dvMovSel').value;
+  const eq = {};
+  devDatos.lineas.forEach(o => {
+    if ((o.periodo || '(sin periodo)') !== k || o.pendiente <= 0) return;
+    if (mv && (o.idMovil || o.movil) !== mv) return;
+    eq[o.equipo] = (eq[o.equipo] || 0) + o.pendiente;
+  });
+  window._devEq = eq;
+  $('dvTabla').innerHTML = Object.keys(eq).sort().map(e => '<tr><td>' + esc(e) + '</td><td>' + fmtN(eq[e]) + '</td><td><input class="dvQ" data-eq="' + esc(e) + '" type="number" min="0" max="' + eq[e] + '" value="0" style="width:80px"></td></tr>').join('') || '<tr><td colspan="3" style="color:#888">Sin pendientes.</td></tr>';
+}
+function devBoletaTodo() { document.querySelectorAll('#devModal .dvQ').forEach(x => { x.value = x.max; }); }
+function devRecibirSemana(k) {
+  const A = devDatos.lineas.filter(o => (o.periodo || '(sin periodo)') === k && o.pendiente > 0);
+  if (!A.length) { toast('No hay equipos pendientes.'); return; }
+  window._devSemK = k;
+  const mv = {}; A.forEach(o => { mv[o.idMovil || o.movil] = o.movil; });
+  devModal('<h3>📄 Registrar boleta de devolución</h3><div style="font-size:13px;background:#f6f7f9;border-radius:8px;padding:8px 10px;margin-bottom:10px"><b>' + esc(k) + '</b></div>' +
+    '<div class="grid2"><div class="field"><label>Boleta #</label><input id="dvBol"></div><div class="field"><label>Fecha</label><input id="dvFecha" type="date" value="' + hoyISO() + '"></div></div>' +
+    '<div class="field"><label>Aplicar a</label><select id="dvMovSel" onchange="devBoletaCalc()"><option value="">Cualquier móvil de la semana (las órdenes más antiguas primero)</option>' +
+    Object.keys(mv).sort((a, b) => String(mv[a]).localeCompare(String(mv[b]), 'es', { numeric: true })).map(x => '<option value="' + esc(x) + '">Solo ' + esc(mv[x]) + '</option>').join('') + '</select></div>' +
+    '<div style="font-size:12px;color:#777;margin-bottom:6px">Anota cuántos equipos de cada tipo trae esta boleta. Pueden ser equipos sobrantes que se usan para completar lo pendiente de otras móviles: esas líneas quedan devueltas y no se vuelven a pedir. La boleta no se puede registrar dos veces.</div>' +
+    '<table class="table" style="min-width:0"><thead><tr><th class="left">Equipo</th><th>Pendiente</th><th>Entrega en boleta</th></tr></thead><tbody id="dvTabla"></tbody></table>' +
+    '<div class="modalActions"><button class="btn" onclick="devBoletaTodo()" style="margin-right:auto">Llenar con todo lo pendiente</button><button class="btn" onclick="devCerrar()">Cancelar</button><button class="btn primary" onclick="devGuardarBoleta()">Registrar boleta</button></div>');
+  devBoletaCalc();
+}
+function devGuardarBoleta() {
+  if (!$('dvBol').value.trim()) { toast('Escribe el número de boleta.'); return; }
+  const c = {}; let t = 0;
+  document.querySelectorAll('#devModal .dvQ').forEach(x => { const q = +x.value || 0; if (q > 0) { c[x.dataset.eq] = q; t += q; } });
+  if (!t) { toast('Indica al menos una cantidad.'); return; }
+  const k = window._devSemK;
+  devLlamar('registrarBoletaDevolucionWeb', [k === '(sin periodo)' ? '' : k, $('dvFecha').value, $('dvBol').value.trim(), c, $('dvMovSel').value && (devDatos.lineas.find(o => (o.idMovil || o.movil) === $('dvMovSel').value) || {}).idMovil || ''], 'Boleta registrada (' + t + ' equipos).');
+}
+
+async function devExportar() {
+  await cargarLib('xlsx', SEG_URL_XLSX);
+  const L = devVisibles;
+  const rows = [['Periodo', 'Fecha', 'Móvil', 'OT', 'Contrato', 'Avería', 'Equipo', 'Equipo original', 'Debe', 'Devuelto', 'Justificado', 'Pendiente', 'Estado', 'Boletas', 'Motivo justificación']]
+    .concat(L.map(o => [o.periodo, o.fecha, o.movil, o.orden, o.contrato, o.averia, o.equipo, o.equipoOriginal, o.debe, o.devuelto, o.justificado, o.pendiente, devEstado(o), o.boletas, o.motivo]));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Devoluciones');
+  const res = [['Móvil', 'Debe', 'Devuelto', 'Justificado', 'Pendiente']].concat(devMovilesLista.map(r => [r.movil, r.debe, r.dev, r.jus, r.pen]));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(res), 'Resumen por móvil');
+  XLSX.writeFile(wb, 'Devoluciones_de_cambio_' + hoyISO() + '.xlsx');
+}
+
+
+
+/* ============ Navegación ============ */
+const VISTAS = { mov: ['vistaMov', 'nvMov', () => cargarMoviles()], mat: ['vistaMat', 'nvMat', () => cargarMateriales()], dev: ['vistaDev', 'nvDev', () => cargarDevoluciones()] };
+function ir(v) {
+  Object.keys(VISTAS).forEach(k => { $(VISTAS[k][0]).style.display = k === v ? 'block' : 'none'; $(VISTAS[k][1]).classList.toggle('on', k === v); });
+  VISTAS[v][2]();
+}
+function abrirModal(html, ancho) { $('devModal').classList.toggle('ancho', !!ancho); devModal(html); }
+const colones = n => '₡' + (Number(n) || 0).toLocaleString('es-CR', { maximumFractionDigits: 2 });
+async function traerTodo(tabla, orden) {
+  let todo = [], desde = 0;
+  for (;;) {
+    let q = sb.from(tabla).select('*'); (orden || []).forEach(o => { q = q.order(o); });
+    const r = await q.range(desde, desde + 999);
+    if (r.error) throw new Error(r.error.message);
+    todo = todo.concat(r.data); if (r.data.length < 1000) break; desde += 1000;
+  }
+  return todo;
+}
+const val = id => ($(id) ? $(id).value : '');
+
+/* ============ Móviles y técnicos ============ */
+let movDatos = [];
+async function cargarMoviles() {
+  try { movDatos = await traerTodo('moviles', ['movil']); } catch (e) { mostrarError(e, 'No se pudieron cargar las móviles.'); return; }
+  movDatos.sort((a, b) => String(a.movil).localeCompare(String(b.movil), 'es', { numeric: true }));
+  $('mvBtnAdd').style.display = esAdmin() ? '' : 'none';
+  movRender();
+}
+function movRender() {
+  const q = val('mvBuscar').trim().toLowerCase(), es = val('mvEstado');
+  const act = movDatos.filter(m => m.estado === 'ACTIVA');
+  $('mvCards').innerHTML =
+    '<div class="card"><div class="n">' + act.length + '</div><div class="t">Móviles activas</div></div>' +
+    '<div class="card"><div class="n">' + act.filter(m => m.tecnico_actual).length + '</div><div class="t">Con técnico</div></div>' +
+    '<div class="card"><div class="n" style="color:#b3261e">' + act.filter(m => !m.tecnico_actual).length + '</div><div class="t">Sin técnico</div></div>' +
+    '<div class="card"><div class="n">' + movDatos.filter(m => m.estado === 'INACTIVA').length + '</div><div class="t">Inactivas</div></div>';
+  const L = movDatos.filter(m => (!es || m.estado === es) && (!q || [m.movil, m.tecnico_actual, m.asistente, m.placa, m.domicilio, m.contrata].join(' ').toLowerCase().indexOf(q) !== -1));
+  let h = '<div class="tableWrap"><table class="table" style="min-width:980px"><thead><tr><th>Móvil</th><th>Técnico</th><th>Asistente</th><th>Contrata</th><th>Domicilio</th><th>Placa</th><th>Vehículo</th><th>Ingreso</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>';
+  L.forEach(m => {
+    const col = m.estado === 'ACTIVA' ? 'background:#e8f7ec;color:#1b7a3a' : 'background:#eee;color:#666';
+    h += '<tr><td><b>' + esc(m.movil) + '</b><div style="font-size:11px;color:#999">' + esc(m.id_movil) + '</div></td><td class="left">' + (m.tecnico_actual ? esc(m.tecnico_actual) + (m.tecnico_telefono ? '<div style="font-size:11px;color:#777">' + esc(m.tecnico_telefono) + '</div>' : '') : '<span style="color:#b3261e">— sin técnico —</span>') + '</td>' +
+      '<td class="left">' + esc(m.asistente) + '</td><td>' + esc(m.contrata) + '</td><td>' + esc(m.domicilio) + '</td><td>' + esc(m.placa) + '</td><td>' + esc(m.tipo_vehiculo) + '</td><td>' + esc(fmtFechaSeg(m.fecha_ingreso)) + '</td>' +
+      '<td><span class="chip" style="' + col + '">' + esc(m.estado) + '</span></td><td style="white-space:nowrap">' +
+      (esAdmin() ? '<button class="btnMini" title="Editar" onclick="movEditar(\'' + escJs(m.id_movil) + '\')">✏️</button> ' : '') +
+      '<button class="btnMini" title="Historial" onclick="movHistorial(\'' + escJs(m.id_movil) + '\')">🕘</button> ' +
+      (esAdmin() ? (m.estado === 'ACTIVA' ? '<button class="btnMini" title="Dar de baja" onclick="movBaja(\'' + escJs(m.id_movil) + '\')">⛔</button>' : '<button class="btnMini" title="Reactivar" onclick="movReactivar(\'' + escJs(m.id_movil) + '\')">♻️</button>') : '') + '</td></tr>';
+  });
+  if (!L.length) h += '<tr><td colspan="10" style="color:#888;padding:18px">Sin resultados.</td></tr>';
+  $('mvTabla').innerHTML = h + '</tbody></table></div>';
+}
+const MOV_CAMPOS = [
+  ['Móvil y vehículo', [['movil', 'Móvil *'], ['contrata', 'Contrata'], ['domicilio', 'Domicilio'], ['placa', 'Placa'], ['tipo_vehiculo', 'Tipo de vehículo'], ['anio_vehiculo', 'Año'], ['modelo_color', 'Modelo / color'], ['id_movil_tlc', 'ID móvil cliente'], ['tecnologia', 'Tecnología']]],
+  ['Ubicación', [['provincia', 'Provincia'], ['canton', 'Cantón'], ['region', 'Región'], ['direccion_exacta', 'Dirección exacta'], ['ubicacion_gps', 'Ubicación GPS']]],
+  ['Técnico', [['tecnico_actual', 'Nombre'], ['tecnico_cedula', 'Cédula'], ['tecnico_telefono', 'Teléfono'], ['tecnico_correo', 'Correo'], ['tecnico_nota_ingreso', 'Nota de ingreso']]],
+  ['Asistente', [['asistente', 'Nombre'], ['asistente_cedula', 'Cédula'], ['asistente_telefono', 'Teléfono'], ['asistente_correo', 'Correo'], ['asistente_nota_ingreso', 'Nota de ingreso']]]
+];
+function movEditar(id) {
+  const m = id ? movDatos.find(x => x.id_movil === id) : {};
+  window._movId = id;
+  let h = '<h3>' + (id ? '✏️ Editar móvil ' + esc(m.movil) : '➕ Agregar móvil') + '</h3>';
+  MOV_CAMPOS.forEach(g => {
+    h += '<div class="sec">' + g[0] + '</div><div class="grid3">' + g[1].map(c => '<div class="field"><label>' + c[1] + '</label><input id="mf_' + c[0] + '" value="' + esc(m[c[0]] || '') + '"></div>').join('') + '</div>';
+  });
+  h += '<div class="sec">Cambio de personal</div><div class="grid3"><div class="field"><label>Fecha del cambio</label><input id="mf_fecha" type="date" value="' + hoyISO() + '"></div>' +
+    (id ? '<div class="field" style="grid-column:span 2"><label><input type="checkbox" id="mf_corregir" style="width:auto"> Solo corregir datos (no es un cambio de técnico/asistente/vehículo)</label></div>' : '') + '</div>' +
+    '<div class="modalActions"><button class="btn" onclick="devCerrar()">Cancelar</button><button class="btn primary" onclick="movGuardar()">Guardar</button></div>';
+  abrirModal(h, true);
+}
+async function movGuardar() {
+  const d = {}; MOV_CAMPOS.forEach(g => g[1].forEach(c => { d[c[0]] = val('mf_' + c[0]); }));
+  if (window._movId) d.id_movil = window._movId; else d.fecha_ingreso = val('mf_fecha');
+  try {
+    await rpc('mov_guardar', { p_datos: d, p_fecha_cambio: val('mf_fecha') || null, p_solo_corregir: !!($('mf_corregir') && $('mf_corregir').checked) });
+    devCerrar(); toast('Móvil guardada.'); await cargarMoviles();
+  } catch (e) { mostrarError(e, 'No se pudo guardar.'); }
+}
+async function movBaja(id) { const m = movDatos.find(x => x.id_movil === id); if (!confirm('¿Dar de baja la móvil ' + m.movil + '? Se cierra la asignación actual.')) return; try { await rpc('mov_baja', { p_id: id }); toast('Móvil dada de baja.'); await cargarMoviles(); } catch (e) { mostrarError(e); } }
+async function movReactivar(id) { try { await rpc('mov_reactivar', { p_id: id }); toast('Móvil reactivada.'); await cargarMoviles(); } catch (e) { mostrarError(e); } }
+async function movHistorial(id) {
+  const m = movDatos.find(x => x.id_movil === id);
+  let A, C;
+  try {
+    const r = await Promise.all([sb.from('asignaciones').select('*').eq('id_movil', id).order('fecha_inicio', { ascending: false }).order('id', { ascending: false }), sb.from('cambios_moviles').select('*').eq('id_movil', id).order('fecha_hora', { ascending: false }).limit(200)]);
+    if (r[0].error) throw new Error(r[0].error.message); if (r[1].error) throw new Error(r[1].error.message);
+    A = r[0].data; C = r[1].data;
+  } catch (e) { mostrarError(e); return; }
+  let h = '<h3>🕘 Historial · móvil ' + esc(m.movil) + '</h3><div class="sec">Quién ha trabajado con esta móvil</div><div class="tableWrap"><table class="table" style="min-width:600px"><thead><tr><th>Desde</th><th>Hasta</th><th>Técnico</th><th>Asistente</th><th>Placa</th><th>Motivo</th></tr></thead><tbody>' +
+    A.map(a => '<tr><td>' + esc(fmtFechaSeg(a.fecha_inicio)) + '</td><td>' + (a.activa ? '<b style="color:#1b7a3a">actual</b>' : esc(fmtFechaSeg(a.fecha_fin))) + '</td><td class="left">' + esc(a.tecnico) + '</td><td class="left">' + esc(a.asistente) + '</td><td>' + esc(a.placa) + '</td><td class="left">' + esc(a.motivo_fin) + '</td></tr>').join('') + '</tbody></table></div>' +
+    '<div class="sec">Cambios en la ficha</div><div class="tableWrap"><table class="table" style="min-width:600px"><thead><tr><th>Fecha</th><th>Usuario</th><th>Campo</th><th>Antes</th><th>Después</th></tr></thead><tbody>' +
+    (C.length ? C.map(c => '<tr><td>' + esc(new Date(c.fecha_hora).toLocaleString('es-CR')) + '</td><td>' + esc(c.usuario) + '</td><td class="left">' + esc(c.campo) + '</td><td class="left">' + esc(c.anterior) + '</td><td class="left">' + esc(c.nuevo) + '</td></tr>').join('') : '<tr><td colspan="5" style="color:#888">Sin cambios registrados.</td></tr>') + '</tbody></table></div>' +
+    '<div class="modalActions"><button class="btn" onclick="devCerrar()">Cerrar</button></div>';
+  abrirModal(h, true);
+}
+
+/* ============ Materiales ============ */
+let matDatos = [], objDatos = [], matVista = 'lista';
+async function cargarMateriales() {
+  try {
+    const r = await Promise.all([traerTodo('materiales', ['orden']), traerTodo('moviles', ['movil']), traerTodo('objetivo_movil', ['id_movil', 'clave'])]);
+    matDatos = r[0]; movDatos = r[1].sort((a, b) => String(a.movil).localeCompare(String(b.movil), 'es', { numeric: true })); objDatos = r[2];
+  } catch (e) { mostrarError(e, 'No se pudieron cargar los materiales.'); return; }
+  $('matBtnAdd').style.display = esAdmin() ? '' : 'none';
+  matRender();
+}
+function matCambiarVista() { matVista = matVista === 'lista' ? 'obj' : 'lista'; matRender(); }
+function matRender() {
+  $('matBtnVista').textContent = matVista === 'lista' ? '🎯 Objetivo por móvil' : '📋 Ver catálogo';
+  $('matTb').style.display = matVista === 'lista' ? 'flex' : 'none';
+  const act = matDatos.filter(m => m.activo);
+  $('matCards').innerHTML = '<div class="card"><div class="n">' + act.length + '</div><div class="t">Materiales activos</div></div>' +
+    '<div class="card"><div class="n">' + colones(act.reduce((a, m) => a + m.stock_completo * m.costo_unitario, 0)) + '</div><div class="t">Valor del stock completo de bodega</div></div>' +
+    '<div class="card"><div class="n">' + act.filter(m => !m.costo_unitario).length + '</div><div class="t">Sin costo</div></div>' +
+    '<div class="card"><div class="n">' + act.filter(m => !m.stock_completo).length + '</div><div class="t">Sin stock completo</div></div>';
+  if (matVista === 'obj') return matRenderObj();
+  const q = val('matBuscar').trim().toLowerCase(), so = val('matAct');
+  const L = matDatos.filter(m => (!so || m.activo) && (!q || [m.material, m.codigo, m.alias, m.clave].join(' ').toLowerCase().indexOf(q) !== -1));
+  let h = '<div class="tableWrap"><table class="table" style="min-width:1000px"><thead><tr><th>#</th><th class="left">Material</th><th>Código</th><th>Unidad</th><th>Categoría</th><th>Mínimo bodega</th><th>Objetivo base (por móvil)</th><th>Stock completo</th><th>Costo unit.</th><th>Activo</th><th></th></tr></thead><tbody>';
+  L.forEach(m => {
+    h += '<tr><td>' + m.orden + '</td><td class="left"><b>' + esc(m.material) + '</b>' + (m.alias ? '<div style="font-size:11px;color:#888">' + esc(m.alias) + '</div>' : '') + '</td><td>' + esc(m.codigo) + '</td><td>' + esc(m.unidad) + '</td><td>' + esc(m.categoria) + '</td>' +
+      '<td class="num">' + fmtN(m.minimo_bodega) + '</td><td class="num">' + fmtN(m.objetivo_base) + '</td><td class="num">' + fmtN(m.stock_completo) + '</td><td class="num">' + colones(m.costo_unitario) + '</td><td>' + (m.activo ? 'Sí' : 'No') + '</td>' +
+      '<td>' + (esAdmin() ? '<button class="btnMini" onclick="matEditar(\'' + escJs(m.clave) + '\')">✏️</button>' : '') + '</td></tr>';
+  });
+  if (!L.length) h += '<tr><td colspan="11" style="color:#888;padding:18px">Sin resultados.</td></tr>';
+  $('matTabla').innerHTML = h + '</tbody></table></div>';
+}
+function matEditar(clave) {
+  const m = clave ? matDatos.find(x => x.clave === clave) : { activo: true, unidad: 'u' };
+  window._matClave = clave;
+  const f = (id, lab, v, tipo) => '<div class="field"><label>' + lab + '</label><input id="mt_' + id + '" ' + (tipo === 'n' ? 'type="number" min="0" step="any"' : '') + ' value="' + esc(v == null ? '' : v) + '"></div>';
+  abrirModal('<h3>' + (clave ? '✏️ Editar material' : '➕ Agregar material') + '</h3><div class="grid2">' + f('material', 'Material *', m.material) + f('codigo', 'Código(s) (separados por ;)', m.codigo) + f('unidad', 'Unidad', m.unidad) + f('alias', 'Alias (otros nombres, separados por ;)', m.alias) +
+    '<div class="field"><label>Categoría</label><select id="mt_categoria">' + ['', 'Consumo', 'De corte', 'Equipos'].map(c => '<option value="' + c + '"' + (m.categoria === c ? ' selected' : '') + '>' + (c || '(sin categoría)') + '</option>').join('') + '</select></div>' +
+    '<div class="field"><label>Activo</label><select id="mt_activo"><option value="true"' + (m.activo ? ' selected' : '') + '>Sí</option><option value="false"' + (!m.activo ? ' selected' : '') + '>No</option></select></div>' +
+    f('costo_unitario', 'Costo por unidad (₡)', m.costo_unitario, 'n') + f('minimo_bodega', 'Mínimo en bodega', m.minimo_bodega, 'n') + f('objetivo_base', 'Objetivo base por móvil', m.objetivo_base, 'n') + f('stock_completo', 'Stock completo de bodega (100 %)', m.stock_completo, 'n') + '</div>' +
+    '<div class="modalActions"><button class="btn" onclick="devCerrar()">Cancelar</button><button class="btn primary" onclick="matGuardar()">Guardar</button></div>');
+}
+async function matGuardar() {
+  const d = { clave: window._matClave || '' };
+  ['material', 'codigo', 'unidad', 'alias', 'categoria', 'activo', 'costo_unitario', 'minimo_bodega', 'objetivo_base', 'stock_completo'].forEach(k => { d[k] = val('mt_' + k); });
+  d.activo = d.activo === 'true';
+  try { await rpc('mat_guardar', { p_datos: d }); devCerrar(); toast('Material guardado.'); await cargarMateriales(); } catch (e) { mostrarError(e, 'No se pudo guardar.'); }
+}
+function matRenderObj() {
+  const act = matDatos.filter(m => m.activo), mv = movDatos.filter(m => m.estado === 'ACTIVA');
+  const mapa = {}; objDatos.forEach(o => { mapa[o.id_movil + '|' + o.clave] = o.objetivo; });
+  let h = '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px"><span style="font-size:12px;color:#777">Cantidad que debe llevar cada móvil. Edita y pulsa 💾 en la fila.</span>' +
+    (esAdmin() ? '<button class="btn" onclick="matAplicarBase(false)">Completar vacíos con el objetivo base</button><button class="btn" onclick="matAplicarBase(true)">Igualar todas al objetivo base</button>' : '') + '</div>' +
+    '<div class="tableWrap tabla-obj"><table class="table" style="min-width:' + (160 + act.length * 90) + 'px"><thead><tr><th class="left">Móvil</th>' + act.map(m => '<th title="' + esc(m.material) + '" style="max-width:100px;white-space:normal">' + esc(m.material.length > 22 ? m.material.slice(0, 20) + '…' : m.material) + '<div style="font-weight:400;opacity:.8">base ' + fmtN(m.objetivo_base) + '</div></th>').join('') + '<th></th></tr></thead><tbody>';
+  mv.forEach(m => {
+    h += '<tr data-id="' + esc(m.id_movil) + '"><td class="left"><b>' + esc(m.movil) + '</b><div style="font-size:11px;color:#777">' + esc(m.tecnico_actual) + '</div></td>' +
+      act.map(t => '<td><input data-clave="' + esc(t.clave) + '" type="number" min="0" step="any" value="' + (mapa[m.id_movil + '|' + t.clave] == null ? '' : mapa[m.id_movil + '|' + t.clave]) + '"' + (esAdmin() ? '' : ' disabled') + '></td>').join('') +
+      '<td>' + (esAdmin() ? '<button class="btnMini" onclick="matGuardarObj(\'' + escJs(m.id_movil) + '\')">💾</button>' : '') + '</td></tr>';
+  });
+  $('matTabla').innerHTML = h + '</tbody></table></div>';
+}
+async function matGuardarObj(id) {
+  const v = {}; document.querySelectorAll('#matTabla tr[data-id="' + id + '"] input').forEach(i => { if (i.value !== '') v[i.dataset.clave] = i.value; });
+  try { await rpc('mat_objetivo_guardar', { p_id_movil: id, p_valores: v }); toast('Objetivo guardado.'); await cargarMateriales(); } catch (e) { mostrarError(e); }
+}
+async function matAplicarBase(sobre) {
+  if (sobre && !confirm('Esto reemplaza los ajustes individuales de TODAS las móviles por el objetivo base. ¿Continuar?')) return;
+  try { await rpc('mat_aplicar_objetivo_base', { p_sobrescribir: sobre }); toast('Objetivos actualizados.'); await cargarMateriales(); } catch (e) { mostrarError(e); }
+}
+
+/* ---------- arranque ---------- */
+iniciar();
+</script>
+</body></html>
