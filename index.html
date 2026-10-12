@@ -2131,30 +2131,12 @@
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px">
           <button class="btn secondary" onclick="mpAbrir()">🔎 Elegir del catálogo</button>
           <button class="btn secondary" onclick="ceAddMat()">➕ Agregar renglón</button>
-          <span style="flex:1"></span>
-          <label style="margin:0">Utilidad % sobre materiales</label><input type="number" id="ceUtil" value="0" step="any" style="width:80px;padding:7px;border:1px solid #ccc;border-radius:6px" oninput="ceMatCalc()">
-        </div>
-        <div style="margin-top:12px;padding:10px 12px;border:1px solid #d9e3f5;border-radius:10px;background:#f3f7ff">
-          <div style="font-weight:700;margin-bottom:6px">👷 Mano de obra</div>
-          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-            <label style="margin:0">% sobre el costo de materiales</label>
-            <input type="number" id="ceMoPct" value="30" step="any" style="width:80px;padding:7px;border:1px solid #ccc;border-radius:6px" oninput="ceMoPctCambio()">
-            <span>Propuesto: <b id="ceMoProp">—</b></span>
-            <label style="margin:0">Monto a cobrar</label>
-            <input type="number" id="ceMoMonto" step="any" style="width:130px;padding:7px;border:1px solid #ccc;border-radius:6px" oninput="ceMoManual()">
-            <button class="btn secondary" onclick="ceMoUsarProp()">↺ Usar el propuesto</button>
-          </div>
-          <div style="font-size:12px;color:#777;margin-top:6px">Se propone un porcentaje del costo de los materiales, pero puedes escribir el monto que quieras: se suma al precio de los materiales.</div>
-        </div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-top:10px">
-          <div id="ceMatSuma" style="font-size:14px"></div>
-          <button class="btn primary" onclick="ceUsarMat()">➡️ Usar como línea de la cotización</button>
         </div>
       </details>
 
       <details id="ceViaBox" style="margin-top:12px;border:1px solid #e0e0e0;border-radius:10px;padding:10px 12px;background:#fafafa">
         <summary style="cursor:pointer;font-weight:700">🚐 Viáticos y movilización <span id="ceViaResumen" style="font-weight:400;color:#666"></span></summary>
-        <div style="font-size:12px;color:#777;margin:6px 0">Calcula hospedaje, comidas, combustible y otros gastos del equipo. Los precios se escriben en colones (₡) y se pasan solos a la moneda de la cotización. Es un cálculo interno; en la cotización sale como una sola línea.</div>
+        <div style="font-size:12px;color:#777;margin:6px 0">Calcula hospedaje, comidas, combustible y otros gastos del equipo. Los precios se escriben en colones (₡) y se pasan solos a la moneda de la cotización. Se suman a los materiales y de ese monto se calculan la mano de obra y la utilidad; en la cotización todo sale en una sola línea.</div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
           <label style="margin:0">Personas del proyecto</label><input type="number" id="ceViaPers" value="4" min="1" step="1" style="width:70px;padding:7px;border:1px solid #ccc;border-radius:6px">
           <label style="margin:0">Días</label><input type="number" id="ceViaDias" value="1" min="1" step="1" style="width:70px;padding:7px;border:1px solid #ccc;border-radius:6px">
@@ -2166,11 +2148,36 @@
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px">
           <button class="btn secondary" onclick="ceViaAdd()">➕ Agregar renglón</button>
         </div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-top:10px">
-          <div id="ceViaSuma" style="font-size:14px"></div>
-          <button class="btn primary" onclick="ceUsarVia()">➡️ Usar como línea de la cotización</button>
-        </div>
+        <div id="ceViaSuma" style="font-size:14px;margin-top:10px"></div>
       </details>
+
+      <div id="ceResBox" style="margin-top:12px;border:1px solid #cfe0ff;border-radius:10px;padding:10px 12px;background:#f3f7ff">
+        <div style="font-weight:700;margin-bottom:2px">💰 Margen de utilidad y mano de obra</div>
+        <div style="font-size:12px;color:#777;margin-bottom:8px">Todo se suma en un solo renglón: «MATERIALES, ACCESORIOS Y MANO DE OBRA».</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
+          <label style="margin:0">Utilidad de materiales %</label><input type="number" id="ceUtil" value="30" step="any" style="width:80px;padding:7px;border:1px solid #ccc;border-radius:6px" oninput="ceMatCalc()">
+          <span>= <b id="ceUtilMonto">—</b></span>
+          <span style="width:14px"></span>
+          <label style="margin:0">Utilidad de viáticos %</label><input type="number" id="ceUtilV" value="0" step="any" style="width:80px;padding:7px;border:1px solid #ccc;border-radius:6px" oninput="ceMatCalc()">
+          <span>= <b id="ceUtilVMonto">—</b></span>
+        </div>
+        <div style="padding:8px 0 0">
+          <div style="font-weight:700;margin-bottom:6px">👷 Mano de obra</div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+            <label style="margin:0">% sobre costo de materiales + viáticos</label>
+            <input type="number" id="ceMoPct" value="30" step="any" style="width:80px;padding:7px;border:1px solid #ccc;border-radius:6px" oninput="ceMoPctCambio()">
+            <span>Propuesto: <b id="ceMoProp">—</b></span>
+            <label style="margin:0">Monto a cobrar</label>
+            <input type="number" id="ceMoMonto" step="any" style="width:130px;padding:7px;border:1px solid #ccc;border-radius:6px" oninput="ceMoManual()">
+            <button class="btn secondary" onclick="ceMoUsarProp()">↺ Usar el propuesto</button>
+          </div>
+          <div style="font-size:12px;color:#777;margin-top:6px">Se propone un porcentaje de materiales + viáticos, pero puedes escribir el monto que quieras: se suma al precio de la línea.</div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-top:10px">
+          <div id="ceMatSuma" style="font-size:14px"></div>
+          <button class="btn primary" onclick="ceUsarMat()">➡️ Usar como línea de la cotización</button>
+        </div>
+      </div>
 
       <div class="tableWrap" style="margin-top:12px"><table class="table ceTbl" style="min-width:820px"><thead><tr>
         <th style="width:120px">Código</th><th class="left">Descripción</th><th style="width:70px">Cant.</th><th style="width:120px">Precio unit.</th><th style="width:100px">Desc.</th><th style="width:120px">Precio</th><th style="width:34px"></th></tr></thead>
@@ -10581,22 +10588,23 @@ function ceAbrir(c) {
   $('ceIva').value = c ? c.ivaPct : 13;
   $('ceOtros').value = c ? c.otros : 0;
   $('ceCond').value = c && c.condiciones ? c.condiciones : ctDatos.condiciones;
-  $('ceUtil').value = c ? c.utilidadPct : 0;
+  $('ceUtil').value = c ? c.utilidadPct : 30;
+  $('ceUtilV').value = c && c.uv ? c.uv.unidad : 0;
   $('ceMats').innerHTML = '';
   ((c && c.detalle) || []).forEach(d => ceAddMat(d, true));
+  $('ceVias').innerHTML = '';
+  ((c && c.viat) || []).forEach(v => { const p = String(v.unidad || '').split('x'); ceViaAdd({ concepto: v.material, pers: Number(p[0]) || 1, dias: Number(p[1]) || 1, precio: v.costo }, true); });
   ceMoMon = $('ceMoneda').value;
   delete $('ceMoMonto').dataset.manual;
   $('ceMoPct').value = c && c.mo && Number(c.mo.unidad) ? Number(c.mo.unidad) : 30;
   $('ceMoMonto').value = c && c.mo ? c.mo.costo : '';
   if (c && c.mo && Math.abs(c.mo.costo - ceMoProp()) > 0.5) $('ceMoMonto').dataset.manual = '1';
   $('ceMatBox').open = !!(c && ((c.detalle && c.detalle.length) || c.mo));
-  $('ceVias').innerHTML = '';
-  ((c && c.viat) || []).forEach(v => { const p = String(v.unidad || '').split('x'); ceViaAdd({ concepto: v.material, pers: Number(p[0]) || 1, dias: Number(p[1]) || 1, precio: v.costo }, true); });
   $('ceViaBox').open = !!(c && c.viat && c.viat.length);
-  ceViaCalc();
   $('ceLineas').innerHTML = '';
   ((c && c.lineas) || []).forEach(l => ceAddLinea(l));
   if (nueva || !c.lineas || !c.lineas.length) ceAddLinea({ codigo: '001-100-001', descripcion: 'MATERIALES, ACCESORIOS Y MANO DE OBRA', cantidad: 1 });
+  ceViaCalc();
   ceMatCalc();
   ceCalc();
   $('modalCotEd').classList.add('show');
@@ -10688,18 +10696,22 @@ function ceMatLeer() {
 }
 
 function ceMatTotales() {
-  const costo = ctRed(ceMatLeer().reduce((s, d) => s + d.cantidad * d.costo, 0));
-  const util = Number($('ceUtil').value) || 0;
-  const mat = ctRed(costo * (1 + util / 100));
+  const costoMat = ctRed(ceMatLeer().reduce((s, d) => s + d.cantidad * d.costo, 0));
+  const via = ceViaTotal().monto;
+  const costo = ctRed(costoMat + via);
+  const util = $('ceUtil').value === '' ? 0 : Number($('ceUtil').value) || 0, utilV = Number($('ceUtilV').value) || 0;
+  const utilMat = ctRed(costoMat * util / 100), utilVia = ctRed(via * utilV / 100);
+  const utilMonto = ctRed(utilMat + utilVia);
+  const mat = ctRed(costo + utilMonto);
   const mo = ctRed(Number($('ceMoMonto').value) || 0);
-  return { costo: costo, mat: mat, mo: mo, precio: ctRed(mat + mo), util: util };
+  return { costo: costo, costoMat: costoMat, via: via, utilMat: utilMat, utilVia: utilVia, utilMonto: utilMonto, mat: mat, mo: mo, precio: ctRed(mat + mo), util: util, utilV: utilV };
 }
 
 /* --- Mano de obra: monto propuesto (% del costo de materiales) que se puede editar --- */
 let ceMoMon = 'USD';
 
 function ceMoProp() {
-  const costo = ctRed(ceMatLeer().reduce((s, d) => s + d.cantidad * d.costo, 0));
+  const costo = ctRed(ceMatLeer().reduce((s, d) => s + d.cantidad * d.costo, 0) + ceViaTotal().monto);
   return ctRed(costo * (Number($('ceMoPct').value) || 0) / 100);
 }
 
@@ -10716,8 +10728,10 @@ function ceMatCalc() {
     tr.querySelector('.mi').textContent = ctMoney((Number(tr.querySelector('.mq').value) || 0) * (Number(tr.querySelector('.mc').value) || 0), mon);
   });
   const t = ceMatTotales(), n = ceMatLeer().filter(d => d.material && d.cantidad > 0).length;
-  $('ceMatResumen').textContent = n || t.mo ? '· ' + n + ' material' + (n === 1 ? '' : 'es') + ' · costo ' + ctMoney(t.costo, mon) + (t.mo ? ' · mano de obra ' + ctMoney(t.mo, mon) : '') + ' · precio ' + ctMoney(t.precio, mon) : '';
-  $('ceMatSuma').innerHTML = 'Materiales <b>' + ctMoney(t.mat, mon) + '</b> + Mano de obra <b>' + ctMoney(t.mo, mon) + '</b> = <b style="font-size:16px">' + ctMoney(t.precio, mon) + '</b>';
+  $('ceMatResumen').textContent = n ? '· ' + n + ' material' + (n === 1 ? '' : 'es') + ' · costo ' + ctMoney(t.costoMat, mon) : '';
+  $('ceUtilMonto').textContent = t.utilMat ? ctMoney(t.utilMat, mon) : '—';
+  $('ceUtilVMonto').textContent = t.utilVia ? ctMoney(t.utilVia, mon) : '—';
+  $('ceMatSuma').innerHTML = 'Materiales <b>' + ctMoney(t.costoMat, mon) + '</b> + Viáticos <b>' + ctMoney(t.via, mon) + '</b> + Utilidades <b>' + ctMoney(t.utilMonto, mon) + '</b> + Mano de obra <b>' + ctMoney(t.mo, mon) + '</b> = <b style="font-size:16px">' + ctMoney(t.precio, mon) + '</b>';
   /* La línea ligada a los materiales se mantiene al día */
   const tr = $('ceLineas').querySelector('tr[data-origen="MAT"]');
   if (tr) { tr.querySelector('.lp').value = t.precio; ceCalc(); }
@@ -10769,24 +10783,8 @@ function ceViaCalc() {
   });
   const t = ceViaTotal(), n = ceViaLeer().filter(v => v.concepto && v.pers * v.dias * v.precio > 0).length;
   $('ceViaResumen').textContent = n ? '· ' + n + ' concepto' + (n === 1 ? '' : 's') + ' · ' + ctMoney(t.monto, mon) : '';
-  $('ceViaSuma').innerHTML = 'Total en colones <b>₡' + Math.round(t.crc).toLocaleString('es-CR') + '</b>' + (mon === 'USD' ? ' ÷ TC ' + ceTcVal() : '') + ' = <b style="font-size:16px">' + ctMoney(t.monto, mon) + '</b>';
-  const tr = $('ceLineas').querySelector('tr[data-origen="VIA"]');
-  if (tr) { tr.querySelector('.lp').value = t.monto; ceCalc(); }
-}
-
-function ceUsarVia() {
-  const t = ceViaTotal();
-  if (!t.monto) { toast('Agrega viáticos con precio primero.'); return; }
-  let tr = $('ceLineas').querySelector('tr[data-origen="VIA"]');
-  if (!tr) {
-    const vacia = Array.from($('ceLineas').querySelectorAll('tr')).find(r => !Number(r.querySelector('.lp').value));
-    if (vacia) vacia.remove();
-    ceAddLinea({ codigo: '001-100-100', descripcion: 'VIATICOS Y MOVILIZACION', cantidad: 1, origen: 'VIA' });
-    tr = $('ceLineas').querySelector('tr[data-origen="VIA"]');
-  }
-  tr.querySelector('.lp').value = t.monto;
-  ceCalc();
-  toast('Línea de viáticos actualizada: ' + ctMoney(t.monto, ceMoneda()) + '.');
+  $('ceViaSuma').innerHTML = 'Total viáticos en colones <b>₡' + Math.round(t.crc).toLocaleString('es-CR') + '</b>' + (mon === 'USD' ? ' ÷ TC ' + ceTcVal() : '') + ' = <b style="font-size:16px">' + ctMoney(t.monto, mon) + '</b>';
+  if (!ceViaCalc.enMat) { ceViaCalc.enMat = true; try { ceMatCalc(); } finally { ceViaCalc.enMat = false; } }
 }
 
 /* Al cambiar de moneda o de tipo de cambio se vuelven a calcular los costos que no se escribieron a mano */
@@ -10809,7 +10807,7 @@ function ceCambioMoneda() {
 
 function ceUsarMat() {
   const t = ceMatTotales();
-  if (!t.costo && !t.mo) { toast('Agrega materiales con cantidad o un monto de mano de obra primero.'); return; }
+  if (!t.costo && !t.mo) { toast('Agrega materiales, viáticos o un monto de mano de obra primero.'); return; }
   let tr = $('ceLineas').querySelector('tr[data-origen="MAT"]');
   if (!tr) {
     /* Si la línea inicial sigue vacía (sin precio) se reutiliza en vez de dejar una duplicada */
@@ -10820,7 +10818,7 @@ function ceUsarMat() {
   }
   tr.querySelector('.lp').value = t.precio;
   ceCalc();
-  toast('Línea de materiales actualizada: ' + ctMoney(t.precio, ceMoneda()) + '.');
+  toast('Línea de la cotización actualizada: ' + ctMoney(t.precio, ceMoneda()) + '.');
 }
 
 /* --- Selector del catálogo con cantidades --- */
@@ -10897,6 +10895,7 @@ async function ceGuardar() {
   };
   const detalle = ceMatLeer().filter(d => d.material && d.cantidad > 0);
   const moMonto = ceMatTotales().mo;
+  if (Number($('ceUtilV').value)) detalle.push({ material: 'Utilidad de viáticos', grupo: '__UV__', unidad: String(Number($('ceUtilV').value)), cantidad: 1, costo: ceMatTotales().utilVia });
   if (moMonto > 0) detalle.push({ material: 'Mano de obra', grupo: '__MO__', unidad: String(Number($('ceMoPct').value) || 0), cantidad: 1, costo: moMonto });
   ceViaLeer().filter(v => v.concepto && v.pers > 0 && v.dias > 0 && v.precio > 0).forEach(v => detalle.push({ material: v.concepto, grupo: '__VIAT__', unidad: v.pers + 'x' + v.dias, cantidad: v.pers * v.dias, costo: v.precio }));
   $('ceGuardar').disabled = true;
@@ -10925,7 +10924,8 @@ async function ctAbrir(num, silencioso) {
   /* La mano de obra se guarda como un renglón especial del detalle; aquí se separa de los materiales */
   ctActual.mo = ctActual.detalle.find(d => d.grupo === '__MO__') || null;
   ctActual.viat = ctActual.detalle.filter(d => d.grupo === '__VIAT__');
-  ctActual.detalle = ctActual.detalle.filter(d => d.grupo !== '__MO__' && d.grupo !== '__VIAT__');
+  ctActual.uv = ctActual.detalle.find(d => d.grupo === '__UV__') || null;
+  ctActual.detalle = ctActual.detalle.filter(d => d.grupo !== '__MO__' && d.grupo !== '__VIAT__' && d.grupo !== '__UV__');
   ctPintarDetalle();
   if (!silencioso) { ctTabActual = 'res'; ctTab('res'); }
   else ctTab(ctTabActual);
@@ -10979,9 +10979,22 @@ function ctVerRes() {
   const c = ctActual, M = c.moneda;
   const filas = c.lineas.map(l => '<tr><td>' + esc(l.codigo) + '</td><td class="left">' + esc(l.descripcion) + '</td><td>' + l.cantidad + '</td><td>' + ctMoney(l.precio, M) + '</td><td>' + (l.descuento ? ctMoney(l.descuento, M) : '') + '</td><td><b>' + ctMoney(Math.max(0, l.cantidad * l.precio - l.descuento), M) + '</b></td></tr>').join('');
   let mats = '';
-  if (c.detalle.length || c.mo) {
-    const costo = ctRed(c.detalle.reduce((s, d) => s + d.cantidad * d.costo, 0));
-    mats = '<details style="margin-top:12px;border:1px solid #e0e0e0;border-radius:10px;padding:10px 12px;background:#fafafa"><summary style="cursor:pointer;font-weight:700">🧱 Materiales del trabajo (interno) · costo ' + ctMoney(costo, M) + ' · utilidad ' + c.utilidadPct + ' %' + (c.mo ? ' · mano de obra ' + ctMoney(c.mo.costo, M) : '') + '</summary>' +
+  const hayViat = !!(c.viat && c.viat.length);
+  if (c.detalle.length || c.mo || hayViat) {
+    const costoMat = ctRed(c.detalle.reduce((s, d) => s + d.cantidad * d.costo, 0));
+    const crcVia = hayViat ? c.viat.reduce((q, d) => q + d.cantidad * d.costo, 0) : 0;
+    const via = M === 'USD' ? ctRed(crcVia / (c.tc || 1)) : ctRed(crcVia);
+    const utilMat = ctRed(costoMat * (c.utilidadPct || 0) / 100);
+    const utilVPct = c.uv ? Number(c.uv.unidad) || 0 : 0, utilVia = ctRed(via * utilVPct / 100);
+    const mo = c.mo ? c.mo.costo : 0;
+    const filaD = (t, v, extra, neg) => '<tr><td class="left">' + t + '</td><td style="text-align:right">' + (extra || '') + '</td><td style="text-align:right"><b>' + ctMoney(v, M) + '</b></td></tr>';
+    mats = '<details open style="margin-top:12px;border:1px solid #cfe0ff;border-radius:10px;padding:10px 12px;background:#f3f7ff"><summary style="cursor:pointer;font-weight:700">💰 Desglose interno de la línea de la cotización</summary>' +
+      '<div class="tableWrap" style="margin-top:8px"><table class="table" style="min-width:420px;font-size:13px"><thead><tr><th class="left">Concepto</th><th>%</th><th>Monto</th></tr></thead><tbody>' +
+      filaD('🧱 Materiales (costo)', costoMat) + filaD('Utilidad de materiales', utilMat, (c.utilidadPct || 0) + ' %') +
+      filaD('🚐 Viáticos y movilización', via) + (utilVia || utilVPct ? filaD('Utilidad de viáticos', utilVia, utilVPct + ' %') : '') +
+      filaD('👷 Mano de obra', mo) +
+      '<tr><td class="left"><b>Total de la línea</b></td><td></td><td style="text-align:right"><b>' + ctMoney(ctRed(costoMat + utilMat + via + utilVia + mo), M) + '</b></td></tr></tbody></table></div></details>';
+    if (c.detalle.length) mats += '<details style="margin-top:12px;border:1px solid #e0e0e0;border-radius:10px;padding:10px 12px;background:#fafafa"><summary style="cursor:pointer;font-weight:700">🧱 Materiales cotizados · costo ' + ctMoney(costoMat, M) + '</summary>' +
       '<div class="tableWrap" style="margin-top:8px"><table class="table" style="min-width:600px;font-size:13px"><thead><tr><th class="left">Material</th><th>Und.</th><th>Cantidad</th><th>Costo unit.</th><th>Importe</th></tr></thead><tbody>' +
       c.detalle.map(d => '<tr><td class="left">' + esc(d.material) + '</td><td>' + esc(d.unidad) + '</td><td>' + d.cantidad + '</td><td>' + ctMoney(d.costo, M) + '</td><td><b>' + ctMoney(d.cantidad * d.costo, M) + '</b></td></tr>').join('') +
       '</tbody></table></div><div style="margin-top:8px"><button class="btn secondary" onclick="ctListaMatPdf()">📋 Lista de materiales (PDF, sin precios)</button></div></details>';
@@ -11742,6 +11755,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 15 · 12-oct 18:30</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 17 · 12-oct 19:30</div>
 </body>
 </html>
