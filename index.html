@@ -411,7 +411,7 @@
     .top { height: var(--topH); box-sizing: border-box; padding: 0 16px; justify-content: space-between; }
     .btnMenu { background: transparent; border: 1px solid #ffffff33; color: #fff; border-radius: 8px; width: 36px; height: 34px; font-size: 18px; cursor: pointer; }
     .btnMenu:hover { background: #ffffff1a; }
-    #app { display: grid; grid-template-columns: var(--sideW) minmax(0, 1fr); grid-template-rows: auto; align-items: start; min-height: 100vh; }
+    #app { display: grid; grid-template-columns: var(--sideW) minmax(0, 1fr); grid-auto-rows: min-content; align-content: start; align-items: start; min-height: 100vh; }
     #app > .top { grid-column: 1 / -1; grid-row: 1; }
     #side { grid-column: 1; grid-row: 2 / span 30; position: sticky; top: var(--topH); height: calc(100vh - var(--topH)); width: var(--sideW);
             background: #0b1626; border-right: 1px solid #1d3558; overflow-y: auto; z-index: 35; padding: 10px 8px 20px; box-sizing: border-box; align-self: start; }
@@ -11513,6 +11513,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar · 12-oct 12:00</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 2 · 12-oct 12:20</div>
 </body>
 </html>
