@@ -6839,10 +6839,29 @@ const segPluginValores = {
         if (!v) return;
         if (modo === 'pie') {
           const tot = ds.data.reduce((a, b) => a + b, 0);
-          const p = el.tooltipPosition();
-          c.fillStyle = '#fff'; c.shadowColor = '#000a'; c.shadowBlur = 4;
-          c.fillText(v + ' (' + Math.round(v * 100 / tot) + '%)', p.x, p.y);
-          c.shadowBlur = 0;
+          const pct = Math.round(v * 100 / tot);
+          const txt = v + ' (' + pct + '%)';
+          if (v / tot < 0.09) {
+            const ang = (el.startAngle + el.endAngle) / 2, R = el.outerRadius;
+            const x1 = el.x + Math.cos(ang) * (R - 2), y1 = el.y + Math.sin(ang) * (R - 2);
+            const x2 = el.x + Math.cos(ang) * (R + 22), y2 = el.y + Math.sin(ang) * (R + 22);
+            const der = Math.cos(ang) >= 0;
+            c.strokeStyle = ds.backgroundColor[j]; c.lineWidth = 2;
+            c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.lineTo(x2 + (der ? 16 : -16), y2); c.stroke();
+            c.fillStyle = '#1f2d3d'; c.textAlign = der ? 'left' : 'right';
+            c.fillText(txt, x2 + (der ? 22 : -22), y2);
+            c.textAlign = 'center';
+          } else {
+            const p = el.tooltipPosition();
+            c.fillStyle = '#fff'; c.shadowColor = '#0008'; c.shadowBlur = 4;
+            c.fillText(txt, p.x, p.y);
+            c.shadowBlur = 0;
+          }
+          if (chart.config.type === 'doughnut' && j === 0) {
+            c.fillStyle = '#1f2d3d'; c.font = 'bold 44px Arial'; c.fillText(String(tot), el.x, el.y - 8);
+            c.fillStyle = '#6b7685'; c.font = 'bold 15px Arial'; c.fillText('ÓRDENES', el.x, el.y + 26);
+            c.font = 'bold 15px Arial';
+          }
         } else if (modo === 'stack') {
           if (Math.abs(el.base - el.y) < 16) return;
           c.fillStyle = '#fff'; c.shadowColor = '#000a'; c.shadowBlur = 3;
@@ -6887,7 +6906,11 @@ function segConfigGrafica(tipo) {
       ['Suspendidas', t.suspendidas, SEG_COL.s], ['Pendientes', t.pendientes, SEG_COL.p]
     ].filter(x => x[1] > 0);
     const o = base('Estado de las órdenes de trabajo');
-    o.plugins.legend = { display: true, position: 'right', labels: { font: { size: 16 }, padding: 16 } };
+    const totP = items.reduce((q, x) => q + x[1], 0);
+    o.layout = { padding: { top: 20, bottom: 20, left: 70, right: 70 } };
+    o.cutout = tipo === 'dona' ? '58%' : 0;
+    o.plugins.legend = { display: true, position: 'right', labels: { font: { size: 17 }, padding: 18, usePointStyle: true, pointStyle: 'rectRounded', boxWidth: 16,
+      generateLabels: ch => items.map((x, k) => ({ text: x[0] + '   ' + x[1] + '  (' + Math.round(x[1] * 100 / totP) + '%)', fillStyle: x[2], strokeStyle: x[2], pointStyle: 'rectRounded', index: k, hidden: false })) } };
     o.plugins.valores = { modo: 'pie' };
     return {
       type: tipo === 'dona' ? 'doughnut' : 'pie',
@@ -11622,6 +11645,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 11 · 12-oct 16:30</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 12 · 12-oct 17:00</div>
 </body>
 </html>
