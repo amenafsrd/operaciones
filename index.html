@@ -423,13 +423,31 @@
     #side .subnav button:hover { background: #ffffff14; color: #fff; }
     #side .subnav button.on { background: #ffffff1f; color: #fff; font-weight: 700; box-shadow: inset 3px 0 0 var(--rojo); }
     #app > .wrap:not(:has(> section[style*="block"])) { padding: 0; }
-    body.sideOculto #app { grid-template-columns: 0 minmax(0, 1fr); }
-    body.sideOculto #side { display: none; }
+    :root { --railW: 58px; }
+    #side { transition: width .15s ease; }
+    #side .ni { display: inline-block; width: 22px; text-align: center; flex: none; }
+    body.sideRiel #app { grid-template-columns: var(--railW) minmax(0, 1fr); }
+    body.sideRiel #side { width: var(--railW); overflow-x: hidden; padding: 10px 6px; }
+    body.sideRiel #side .nt, body.sideRiel #side .subnav { display: none; }
+    body.sideRiel #side .nav > button { justify-content: center; padding: 10px 0; position: relative; }
+    body.sideRiel #side .ni { font-size: 19px; width: auto; }
+    body.sideRiel #side .bdg { position: absolute; top: 1px; right: 2px; margin: 0 !important; padding: 0 5px !important; font-size: 9px !important; }
+    body.sideRiel #side:hover { width: var(--sideW); box-shadow: 8px 0 28px #000a; overflow-y: auto; padding: 10px 8px; z-index: 45; }
+    body.sideRiel #side:hover .nt { display: inline; }
+    body.sideRiel #side:hover .subnav { display: flex; }
+    body.sideRiel #side:hover .nav > button { justify-content: flex-start; padding: 10px 12px; }
+    body.sideRiel #side:hover .ni { font-size: inherit; width: 22px; }
+    body.sideRiel #side:hover .bdg { position: static; margin-left: 3px !important; padding: 1px 7px !important; font-size: 11px !important; }
     #sideVelo { display: none; }
     .subtabs { display: none !important; }
     #modalFichas .subtabs, .modal .subtabs { display: flex !important; }
     @media (max-width: 900px) {
-      #app, body.sideOculto #app { grid-template-columns: minmax(0, 1fr); }
+      #app, body.sideRiel #app { grid-template-columns: minmax(0, 1fr); }
+      body.sideRiel #side { width: var(--sideW); }
+      body.sideRiel #side .nt { display: inline; }
+      body.sideRiel #side .subnav { display: flex; }
+      body.sideRiel #side .nav > button { justify-content: flex-start; padding: 10px 12px; }
+      body.sideRiel #side .ni { font-size: inherit; width: 22px; }
       #app > .wrap, #app > section { grid-column: 1; }
       #side { position: fixed; left: 0; top: var(--topH); bottom: 0; height: auto; transform: translateX(-100%); transition: transform .2s; box-shadow: 4px 0 20px #0008; display: block !important; }
       body.sideAbierto #side { transform: none; }
@@ -534,6 +552,26 @@
     #vistaCalendario .toolbar .btn { min-height: 30px; padding: 0 11px; font-size: 13px; }
     #vistaCalendario .toolbar label.chkInline { padding-bottom: 0 !important; }
     .loginCard .lInp input { padding: 0 46px 0 44px; min-height: 48px; height: 48px; font-size: 15px; border-radius: 10px; }
+    /* Móviles compacto */
+    .tblMov th { padding: 6px 10px; }
+    .tblMov td { padding: 4px 10px; vertical-align: middle; }
+    .tblMov td.movNum .n { font-size: 18px; }
+    .tblMov td small { margin-top: 0; }
+    .tblMov td br { display: none; }
+    .tblMov .av.sm { width: 28px; height: 28px; }
+    .tblMov .persona { gap: 8px; }
+    .tblMov td.acc { padding-right: 8px; }
+    .tblMov .accWrap { flex-wrap: nowrap; max-width: none; gap: 4px; }
+    .tblMov .accWrap .btn { min-height: 28px; padding: 0 10px; font-size: 12.5px; }
+    .tblMov .accWrap .btnMini { min-height: 28px; white-space: nowrap; }
+    .tblMov { min-width: 900px; }
+    .resMov .card { padding: 7px 12px; }
+    .resMov .card .n { font-size: 20px; }
+    #vistaFichas .toolbar { padding: 8px 12px; }
+    #vistaFichas .toolbar .btn { min-height: 30px; }
+    .tblMov .lbl { display: none; }
+    @media (min-width: 1700px) { .tblMov .lbl { display: inline; } }
+    .tblMov .accWrap .btnMini { min-width: 30px; }
 </style>
 </head>
 
@@ -618,13 +656,13 @@
 
     <aside id="side">
       <div class="nav" id="sideNav">
-        <button id="navCalendario" class="active" onclick="mostrarVista('calendario')">📅 Cronograma</button>
-        <button id="navMoviles" onclick="mostrarVista('moviles')">🚐 Móviles</button>
-        <button id="navSeguimiento" onclick="mostrarVista('seguimiento')">📋 Seguimiento</button>
-        <button id="navBodega" onclick="mostrarVista('bodega')">📦 Bodega</button>
-        <button id="navCotizaciones" onclick="mostrarVista('cotizaciones')">💼 Cotizaciones</button>
-        <button id="navResumen" onclick="mostrarVista('resumen')">📊 Resumen</button>
-        <button id="navUsuarios" onclick="mostrarVista('usuarios')" style="display:none">👥 Usuarios</button>
+        <button id="navCalendario" class="active" onclick="mostrarVista('calendario')"><span class="ni">📅</span><span class="nt"> Cronograma</span></button>
+        <button id="navMoviles" onclick="mostrarVista('moviles')"><span class="ni">🚐</span><span class="nt"> Móviles</span></button>
+        <button id="navSeguimiento" onclick="mostrarVista('seguimiento')"><span class="ni">📋</span><span class="nt"> Seguimiento</span></button>
+        <button id="navBodega" onclick="mostrarVista('bodega')"><span class="ni">📦</span><span class="nt"> Bodega</span></button>
+        <button id="navCotizaciones" onclick="mostrarVista('cotizaciones')"><span class="ni">💼</span><span class="nt"> Cotizaciones</span></button>
+        <button id="navResumen" onclick="mostrarVista('resumen')"><span class="ni">📊</span><span class="nt"> Resumen</span></button>
+        <button id="navUsuarios" onclick="mostrarVista('usuarios')" style="display:none"><span class="ni">👥</span><span class="nt"> Usuarios</span></button>
       </div>
 
     </aside>
@@ -4107,19 +4145,19 @@ function renderizarFichas() {
         '<small>' + esc(g('Provincia')) + (g('Direccion_Exacta') ? ' · ' + esc(g('Direccion_Exacta')) : '') + '</small></td>' +
       '<td>' + avisos + '</td>' +
       '<td class="acc"><div class="accWrap">' +
-        '<button class="btn secondary" style="padding:6px 10px" onclick="abrirFicha(\'' + idj + '\')">📋 Ficha</button>' +
+        '<button class="btn secondary" onclick="abrirFicha(\'' + idj + '\')">📋 Ficha</button>' +
         (activa && disponible
-          ? '<button class="btn primary" style="padding:6px 10px" title="Asignar un técnico o asistente a esta móvil" onclick="abrirCambioPersonal(\'' + idj + '\',\'tec\')">＋ Asignar personal</button>' +
-            '<button class="btnMini" title="¿La dejaste sin técnicos por error? Devuelve el personal que tenía" onclick="deshacerSinTecnicos(\'' + idj + '\')">↩️ Deshacer</button>'
+          ? '<button class="btn primary" title="Asignar un técnico o asistente a esta móvil" onclick="abrirCambioPersonal(\'' + idj + '\',\'tec\')">＋ Asignar</button>' +
+            '<button class="btnMini" title="¿La dejaste sin técnicos por error? Devuelve el personal que tenía" onclick="deshacerSinTecnicos(\'' + idj + '\')">↩️<span class="lbl"> Deshacer</span></button>'
           : '') +
         (activa && !disponible
-          ? '<button class="btnMini" title="Cambiar técnico, asistente o vehículo (queda registrado quién estaba)" onclick="abrirCambioPersonal(\'' + idj + '\')">👤 Cambiar personal</button>' +
-            '<button class="btnMini" title="Sacar al técnico y al asistente: la móvil queda disponible para otro personal" onclick="abrirSinTecnicos(\'' + idj + '\')">🚫 Dejar sin técnicos</button>'
+          ? '<button class="btnMini" title="Cambiar técnico, asistente o vehículo (queda registrado quién estaba)" onclick="abrirCambioPersonal(\'' + idj + '\')">👤<span class="lbl"> Cambiar</span></button>' +
+            '<button class="btnMini" title="Sacar al técnico y al asistente: la móvil queda disponible para otro personal" onclick="abrirSinTecnicos(\'' + idj + '\')">🚫<span class="lbl"> Sin técnicos</span></button>'
           : '') +
-        '<button class="btnMini" title="Historial de la móvil" onclick="verHistorialMovil(\'' + idj + '\')">🕘 Historial</button>' +
+        '<button class="btnMini" title="Historial de la móvil" onclick="verHistorialMovil(\'' + idj + '\')">🕘<span class="lbl"> Historial</span></button>' +
         (activa
-          ? '<button class="btnMini" title="Dar de baja la móvil" onclick="darDeBaja(\'' + idj + '\')">⛔ Baja</button>'
-          : '<button class="btnMini" title="Reactivar la móvil" onclick="reactivar(\'' + idj + '\')">♻️ Reactivar</button>') +
+          ? '<button class="btnMini" title="Dar de baja la móvil" onclick="darDeBaja(\'' + idj + '\')">⛔<span class="lbl"> Baja</span></button>'
+          : '<button class="btnMini" title="Reactivar la móvil" onclick="reactivar(\'' + idj + '\')">♻️<span class="lbl"> Reactivar</span></button>') +
       '</div></td></tr>';
   });
 
@@ -5474,7 +5512,7 @@ function calSub(x) {
 }
 function sideToggle(forzar) {
   const mov = window.matchMedia('(max-width: 900px)').matches;
-  const cls = mov ? 'sideAbierto' : 'sideOculto';
+  const cls = mov ? 'sideAbierto' : 'sideRiel';
   const on = typeof forzar === 'boolean' ? (mov ? forzar : !forzar) : !document.body.classList.contains(cls);
   document.body.classList.toggle(cls, on);
   if (!mov) { try { localStorage.setItem('srd_side', on ? '0' : '1'); } catch (e) { } }
@@ -5483,7 +5521,7 @@ function sideRefrescar() {
   const nav = $('sideNav'); if (!nav) return;
   try {
     const bn = $('nav' + vistaActual.charAt(0).toUpperCase() + vistaActual.slice(1));
-    const mod = bn ? bn.textContent.replace(/\s*⚠.*$/, '').replace(/\d+\s*$/, '').trim() : '';
+    const mod = bn ? ((bn.querySelector('.ni') || {}).textContent || '') + ' ' + ((bn.querySelector('.nt') || {}).textContent || '').trim() : '';
     const sec0 = { calendario: 'vistaCalendario', moviles: 'vistaFichas', seguimiento: 'vistaSeguimiento', bodega: 'vistaBodega', cotizaciones: 'vistaCotiz' }[vistaActual];
     const act = sec0 && $(sec0) ? $(sec0).querySelector(':scope > .subtabs button.active') : null;
     $('crumb').innerHTML = esc(mod) + (act ? ' › <b>' + esc(act.textContent.trim()) + '</b>' : '');
@@ -5505,7 +5543,7 @@ function sideRefrescar() {
   btn.insertAdjacentElement('afterend', caja);
 }
 (function () {
-  try { if (localStorage.getItem('srd_side') === '0') document.body.classList.add('sideOculto'); } catch (e) { }
+  try { if (localStorage.getItem('srd_side') === '0') document.body.classList.add('sideRiel'); } catch (e) { }
 })();
 
 function mostrarVista(v, forzar) {
@@ -8844,7 +8882,7 @@ function notifPintar() {
   b.textContent = n > 99 ? '99+' : String(n);
   b.style.display = n ? '' : 'none';
   const nb = $('navBodega');
-  if (nb) nb.innerHTML = '📦 Bodega' + (nAl ? ' <span style="background:#e65100;color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;margin-left:3px">⚠ ' + nAl + '</span>' : '');
+  if (nb) nb.innerHTML = '<span class="ni">📦</span><span class="nt"> Bodega</span>' + (nAl ? ' <span class="bdg" style="background:#e65100;color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;margin-left:3px">⚠ ' + nAl + '</span>' : '');
   if ($('notifPanel') && $('notifPanel').style.display !== 'none') notifRender();
 }
 
@@ -11531,6 +11569,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 5 · 12-oct 13:10</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 6 · 12-oct 13:30</div>
 </body>
 </html>
