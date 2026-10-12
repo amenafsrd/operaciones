@@ -3296,11 +3296,8 @@ function exportarCalendarioCliente() {
   api('exportarCalendarioClienteExcelWeb', ano, semana)
     .then(r => {
       ultimoExport = r;
-      $('exportTitulo').textContent = '📥 Calendario Cliente listo';
-      $('exportNota').textContent = 'También quedó guardado en Drive, en la carpeta "SRD - Calendarios Cliente".';
-      $('exportNombre').textContent = r.nombre;
-      $('exportLink').href = r.url;
-      $('modalExport').classList.add('show');
+      descargarExport();
+      toast('Excel descargado: ' + r.nombre);
     })
     .catch(err => mostrarError(err, 'No se pudo exportar el Calendario Cliente.'));
 }
@@ -5026,11 +5023,8 @@ function exportarFichas() {
   api('exportarFichasExcelWeb', ano, mes)
     .then(r => {
       ultimoExport = r;
-      $('exportTitulo').textContent = '📥 Archivo mensual listo';
-      $('exportNota').textContent = 'También quedó guardado en Drive, en la carpeta "' + r.carpeta + '".';
-      $('exportNombre').textContent = r.nombre;
-      $('exportLink').href = r.url;
-      $('modalExport').classList.add('show');
+      descargarExport();
+      toast('Excel descargado: ' + r.nombre);
     })
     .catch(err => mostrarError(err, 'No se pudo exportar el archivo mensual.'));
 }
@@ -11645,6 +11639,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 12 · 12-oct 17:00</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 13 · 12-oct 17:30</div>
 </body>
 </html>
