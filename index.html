@@ -222,14 +222,41 @@
              border-radius: 8px; display: none; z-index: 100; box-shadow: 0 4px 15px #0004; max-width: 90vw; }
     .toast.show { display: block; }
 
-    .loginBg { position: fixed; inset: 0; background: #f4f5f7; z-index: 200; display: flex;
-               align-items: center; justify-content: center; padding: 20px; }
+    .loginBg { position: fixed; inset: 0; background: #fff; z-index: 200; overflow: hidden; display: flex;
+               align-items: center; justify-content: center; font-family: inherit; }
     .loginBg.hide { display: none; }
-    .loginCard { background: #fff; width: min(380px, 100%); border-radius: 14px; padding: 28px;
-                 box-shadow: 0 10px 40px #0002; }
-    .loginCard .brand { color: #b71c1c; text-align: center; margin-bottom: 4px; }
-    .loginCard .sub { text-align: center; color: #777; margin-bottom: 20px; }
-    .loginCard .field { margin-bottom: 14px; }
+    .lzq { position: absolute; left: 0; top: 0; bottom: 0; width: 62.5vw;
+           background: #0d1b2e url(login-fondo.jpg) left center / cover no-repeat; }
+    .loginBg::before { content: ''; position: absolute; right: -12vw; bottom: -30vh; width: 46vw; height: 80vh;
+           background: #fbe3e3; border-radius: 100% 0 0 0; }
+    .loginBg::after { content: ''; position: absolute; right: -14vw; bottom: -40vh; width: 44vw; height: 72vh;
+           background: linear-gradient(135deg, #d32f2f, #b71c1c); border-radius: 100% 0 0 0; }
+    .lzd { position: absolute; right: 0; top: 0; bottom: 0; width: 42vw; min-width: 440px; z-index: 2;
+           display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .loginCard { background: #fff; width: min(450px, 100%); border-radius: 18px; padding: 34px 38px 30px;
+                 box-shadow: 0 18px 50px #0003; position: relative; z-index: 3; }
+    .loginCard h2 { margin: 6px 0 2px; font-size: 32px; color: #111827; letter-spacing: -.5px; }
+    .loginCard .sub { color: #6b7280; margin-bottom: 14px; font-size: 15px; }
+    .loginCard label { display: block; font-weight: 700; font-size: 14px; margin: 14px 0 6px; color: #111827; }
+    .lInp { position: relative; }
+    .lInp svg.ic { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; stroke: #9ca3af; fill: none; stroke-width: 1.8; }
+    .lInp input { width: 100%; box-sizing: border-box; height: 48px; padding: 0 46px 0 44px; border: 1px solid #d6d8dd;
+                  border-radius: 10px; font-size: 15px; background: #fff; }
+    .lInp input:focus { outline: 2px solid #b71c1c33; border-color: #b71c1c; }
+    .lInp .ojo { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: 0; cursor: pointer; padding: 6px; display: flex; }
+    .lInp .ojo svg { width: 20px; height: 20px; stroke: #6b7280; fill: none; stroke-width: 1.8; }
+    .lFila { display: flex; justify-content: space-between; align-items: center; margin: 16px 0 14px; font-size: 14px; flex-wrap: wrap; gap: 8px; }
+    .lFila label { display: flex; align-items: center; gap: 8px; margin: 0; font-weight: 400; cursor: pointer; }
+    .lFila input[type=checkbox] { width: 18px; height: 18px; accent-color: #b71c1c; }
+    .lFila a { color: #b71c1c; text-decoration: underline; cursor: pointer; font-size: 13px; }
+    .lBtn { width: 100%; height: 50px; border: 0; border-radius: 10px; background: linear-gradient(180deg, #c62828, #a71717); color: #fff;
+            font-size: 17px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 10px #b71c1c55; display: flex; align-items: center; justify-content: center; gap: 10px; }
+    .lBtn:disabled { opacity: .6; cursor: wait; }
+    @media (max-width: 860px) {
+      .lzq { display: none; }
+      .lzd { width: 100%; min-width: 0; }
+      .loginCard { padding: 26px 22px; }
+    }
     .lError { color: #b71c1c; font-size: 13px; min-height: 18px; margin-bottom: 10px; font-weight: 700; }
 
     @media (max-width: 900px) {
@@ -300,28 +327,40 @@
 
   <!-- ================= INICIO DE SESIÓN ================= -->
   <div id="loginBg" class="loginBg">
+    <div class="lzq"></div>
+    <div class="lzd">
     <div class="loginCard">
-      <img id="lLogo" alt="Soluciones Red Dorada" style="display:block;width:190px;max-width:70%;height:auto;margin:0 auto 12px">
-      <div class="brand">SRD Gestión Operativa</div>
-      <div class="sub" style="margin-bottom:4px">Soluciones Red Dorada</div>
-      <div id="lSlogan" style="margin:10px 0 14px;padding:8px 12px;border-left:3px solid #b71c1c;background:#fdf2f2;border-radius:6px;font-size:13px;font-style:italic;color:#7f1d1d;text-align:left"></div>
-      <div class="sub" style="font-size:13px">Ingresa con tu usuario y contraseña</div>
+      <img id="lLogo" alt="Soluciones Red Dorada" style="display:block;width:210px;max-width:70%;height:auto;margin:0 auto 14px">
+      <h2>Bienvenido</h2>
+      <div class="sub">Ingresa con tu usuario y contraseña</div>
+      <div id="lSlogan" style="margin:10px 0 6px;padding:12px 16px;border-left:4px solid #b71c1c;background:#fdecec;border-radius:6px;font-size:16px;color:#7f1d1d;text-align:left"></div>
 
-      <div class="field">
-        <label>Usuario</label>
-        <input id="lUsuario" autocomplete="username" autocapitalize="none"
+      <label for="lUsuario">Usuario</label>
+      <div class="lInp">
+        <svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
+        <input id="lUsuario" placeholder="Ingresa tu usuario" autocomplete="username" autocapitalize="none"
                onkeydown="if(event.key==='Enter') $('lClave').focus()">
       </div>
 
-      <div class="field">
-        <label>Contraseña</label>
-        <input id="lClave" type="password" autocomplete="current-password"
+      <label for="lClave">Contraseña</label>
+      <div class="lInp">
+        <svg class="ic" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+        <input id="lClave" type="password" placeholder="Ingresa tu contraseña" autocomplete="current-password"
                onkeydown="if(event.key==='Enter') entrar()">
+        <button type="button" class="ojo" aria-label="Mostrar u ocultar contraseña" onclick="const i=$('lClave'); i.type = i.type==='password' ? 'text' : 'password'">
+          <svg viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
+
+      <div class="lFila">
+        <label><input type="checkbox" id="lRecordar" checked> Recordarme</label>
+        <a onclick="alert('Para restablecer tu contraseña pídele a un administrador que te genere una nueva desde el módulo Usuarios.')">¿Olvidaste tu contraseña?</a>
       </div>
 
       <div id="lError" class="lError"></div>
 
-      <button id="lBoton" class="btn primary" style="width:100%" onclick="entrar()">Ingresar</button>
+      <button id="lBoton" class="lBtn" onclick="entrar()">Ingresar <span style="font-size:20px">→</span></button>
+    </div>
     </div>
   </div>
 
@@ -2175,19 +2214,35 @@ function mostrarError(err, prefijo) {
 
 function guardarToken(t) {
   try {
-    if (t) { sessionStorage.setItem('srd_token', t); sessionStorage.setItem('srd_refresh', refreshTok || ''); }
-    else { sessionStorage.removeItem('srd_token'); sessionStorage.removeItem('srd_refresh'); refreshTok = null; }
+    const rec = localStorage.getItem('srd_rec') === '1';
+    if (t) {
+      sessionStorage.setItem('srd_token', t); sessionStorage.setItem('srd_refresh', refreshTok || '');
+      if (rec) { localStorage.setItem('srd_token', t); localStorage.setItem('srd_refresh', refreshTok || ''); }
+    } else {
+      ['srd_token', 'srd_refresh'].forEach(k => { sessionStorage.removeItem(k); localStorage.removeItem(k); });
+      refreshTok = null;
+    }
   } catch (e) { /* el navegador puede bloquearlo */ }
 }
 
 function leerToken() {
-  try { refreshTok = sessionStorage.getItem('srd_refresh') || null; return sessionStorage.getItem('srd_token'); } catch (e) { return null; }
+  try {
+    let t = sessionStorage.getItem('srd_token');
+    if (t) { refreshTok = sessionStorage.getItem('srd_refresh') || null; return t; }
+    if (localStorage.getItem('srd_rec') === '1') {
+      t = localStorage.getItem('srd_token');
+      refreshTok = localStorage.getItem('srd_refresh') || null;
+      return t;
+    }
+  } catch (e) { /* bloqueado */ }
+  return null;
 }
 
 function entrar() {
 
   $('lError').textContent = '';
   $('lBoton').disabled = true;
+  try { localStorage.setItem('srd_rec', $('lRecordar').checked ? '1' : '0'); } catch (e) { /* sin almacenamiento */ }
 
   const claveEscrita = $('lClave').value;
 
