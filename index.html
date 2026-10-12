@@ -426,7 +426,11 @@
     #side .ni { display: inline-block; width: 22px; text-align: center; flex: none; }
     #side .nav > button .car { margin-left: auto; font-size: 10px; opacity: .6; transition: transform .15s; }
     #side .nav > button .car.abierto { transform: rotate(90deg); }
-    @media (min-width: 901px) { #btnMenu { display: none; } }
+    @media (min-width: 901px) {
+      body.sideOculto #app { grid-template-columns: minmax(0, 1fr); }
+      body.sideOculto #side { display: none; }
+      body.sideOculto #app > .wrap, body.sideOculto #app > section { grid-column: 1; }
+    }
     #sideVelo { display: none; }
     .subtabs { display: none !important; }
     #modalFichas .subtabs, .modal .subtabs { display: flex !important; }
@@ -673,12 +677,14 @@
           <label class="chkInline" style="padding-bottom:10px">
             <input type="checkbox" id="calVacantes" checked onchange="renderizarCalendario()"> Mostrar móviles sin técnico
           </label>
+          <div style="display:none">
           <div class="field" style="min-width:200px"><label>Buscar</label><input id="calBuscar" oninput="renderizarCalendario()" placeholder="Móvil, técnico, zona o contrata"></div>
           <div class="field" style="min-width:140px"><label>Contrata</label><select id="calFContrata" onchange="renderizarCalendario()"><option value="">Todas</option></select></div>
           <div class="field" style="min-width:150px"><label>Zona de trabajo</label><select id="calFZona" onchange="renderizarCalendario()"><option value="">Todas</option></select></div>
           <div class="field" style="min-width:130px"><label>Estado en la semana</label><select id="calFEstado" onchange="renderizarCalendario()"><option value="">Todos</option><option value="__vacio">Con días sin definir</option></select></div>
+          </div>
           <label class="chkInline" style="padding-bottom:10px"><input type="checkbox" id="calFCambios" onchange="renderizarCalendario()"> Solo con cambios sin guardar</label>
-          <button class="btn secondary" style="margin-bottom:2px" onclick="calLimpiarFiltros()">✖ Limpiar</button>
+          <span style="flex:1 1 20px"></span>
           <button id="btnActivarTodas" class="btn secondary" title="Pone «Activa» en todas las casillas vacías de las móviles con técnico (no toca las que ya tienen estado)" onclick="activarTodas()">✅ Activar todas</button>
           <button id="btnDeshacerCal" class="btn secondary" title="Deshace el último cambio (o el último guardado)" onclick="deshacerCalendario()">↩️ Deshacer</button>
           <button id="btnExport" class="btn warning" onclick="exportarCalendarioCliente()">📥 Calendario Cliente (Excel)</button>
@@ -5495,9 +5501,13 @@ function calSub(x) {
   sideRefrescar();
 }
 function sideToggle(forzar) {
-  const on = typeof forzar === 'boolean' ? forzar : !document.body.classList.contains('sideAbierto');
-  document.body.classList.toggle('sideAbierto', on);
+  const mov = window.matchMedia('(max-width: 900px)').matches;
+  if (mov) { document.body.classList.toggle('sideAbierto', typeof forzar === 'boolean' ? forzar : !document.body.classList.contains('sideAbierto')); return; }
+  if (forzar === false) return;
+  const on = document.body.classList.toggle('sideOculto');
+  try { localStorage.setItem('srd_side2', on ? '0' : '1'); } catch (e) { }
 }
+try { if (localStorage.getItem('srd_side2') === '0') document.body.classList.add('sideOculto'); } catch (e) { }
 window._subCerrado = {};
 (function () {
   const nav = document.getElementById('sideNav'); if (!nav) return;
@@ -11586,6 +11596,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 8 · 12-oct 15:00</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 10 · 12-oct 16:00</div>
 </body>
 </html>
