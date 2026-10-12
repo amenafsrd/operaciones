@@ -4329,7 +4329,7 @@ const SEG = {
   PENALIZACIONES: { 'Ausencia': 75000, 'Abandono de ruta': 25000, 'Salida temprano': 0 },
   MOTIVOS_AUS: ['Sin aviso', 'Enfermedad / incapacidad', 'Permiso', 'Vacaciones', 'Falla de vehículo', 'Calamidad / emergencia', 'Salió sin autorización', 'Cita médica', 'Asunto personal / familiar', 'Otro'],
 
-  CORTES: ['8am', '9am', '10am', '11am', '12md', '1pm', '2pm', '3pm', '4pm', '5pm', '6pm', 'Cierre'],
+  CORTES: ['6am', '7am', '8am', '9am', '10am', '11am', '12md', '1pm', '2pm', '3pm', '4pm', '5pm', '6pm', 'Cierre'],
 
   MOTIVOS: [
     'SUSPENDIDA CLIENTE NO DESEA EL SERVICIO',
@@ -4364,7 +4364,7 @@ const SEG = {
 
   /* Almuerzo: minutos que se le dan a una móvil desde que finalizó su última OT */
   MIN_CORTE: 60,
-  CORTES_DESDE: '08:00',
+  CORTES_DESDE: '06:00',
   CORTES_HASTA: '17:30',
   MIN_ALMUERZO: 60,
 
