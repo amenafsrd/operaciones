@@ -10861,6 +10861,7 @@ function ctPintarDetalle() {
     } else {
       const hayTrabajo = (c.listaGastos && c.listaGastos.length) || (c.fotos && c.fotos.length) || c.informe || c.ocNumero;
       (CT_ACC[c.estado] || []).filter(a => !(c.estado === 'ACEPTADA' && a[0] === 'ENVIADA' && hayTrabajo)).forEach(a => { h += '<button class="btn ' + a[2] + '" onclick="ctCambiar(\'' + a[0] + '\')">' + a[1] + '</button>'; });
+      if (esAdmin()) h += '<button class="btn secondary" style="color:#b3261e" title="Solo administrador. Borra la cotización con sus gastos, fotos e historial" onclick="ctEliminar()">🗑️ Eliminar cotización</button>';
       h += c.estado === 'ARCHIVADA' ? '<button class="btn secondary" onclick="ctDesarchivar()">📂 Desarchivar</button>' : (c.estado === 'ENVIADA' ? '<button class="btn secondary" title="Para cuando el cliente no responde" onclick="ctArchivar()">🗄️ Archivar (sin respuesta)</button>' : '');
     }
   }
@@ -11011,8 +11012,9 @@ async function ctDesarchivar() {
 }
 
 async function ctEliminar() {
-  if (!confirm('¿Eliminar este borrador? No gasta número consecutivo. No se puede deshacer.')) return;
-  try { await api('eliminarCotizacionWeb', ctActual.cotizacion); toast('Borrador eliminado.'); ctCerrarDetalle(); await ctCargar(); } catch (e) { mostrarError(e, 'No se pudo eliminar.'); }
+  const bor = ctActual.estado === 'BORRADOR';
+  if (!confirm(bor ? '¿Eliminar este borrador? No gasta número consecutivo. No se puede deshacer.' : '¿ELIMINAR la cotización ' + ctNum(ctActual.cotizacion) + ' definitivamente?\n\nSe borran también sus gastos, fotos, orden de compra e historial. No se puede deshacer.')) return;
+  try { await api('eliminarCotizacionWeb', ctActual.cotizacion); toast(bor ? 'Borrador eliminado.' : 'Cotización eliminada.'); ctCerrarDetalle(); await ctCargar(); } catch (e) { mostrarError(e, 'No se pudo eliminar.'); }
 }
 
 
@@ -11639,6 +11641,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 13 · 12-oct 17:30</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 14 · 12-oct 18:00</div>
 </body>
 </html>

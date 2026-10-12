@@ -8820,11 +8820,11 @@ function enviarCotWeb(token, num) {
 
 /* Las cotizaciones no se eliminan: solo se archivan. La única excepción son los borradores (nunca tuvieron número). */
 function eliminarCotizacionWeb(token, num) {
-  cotSesion_(token, 'operador');
+  const ses = cotSesion_(token, 'operador');
   num = txt_(num);
   return conBloqueo_(() => {
     const f = cotBuscar_(num);
-    if (cotEst_(f.t.values[f.i][f.t.idx.Estado]) !== 'BORRADOR') throw new Error('Solo se pueden eliminar borradores. Las cotizaciones enviadas se archivan.');
+    if (cotEst_(f.t.values[f.i][f.t.idx.Estado]) !== 'BORRADOR' && ses.rol !== 'admin') throw new Error('Solo el administrador puede eliminar cotizaciones ya enviadas. Las demás se archivan.');
     ['COT', 'LIN', 'GAS', 'HIS', 'FOT', 'DET'].forEach(k => {
       const campo = 'Cotizacion';
       cotReescribir_(k, leerObjetos_(cotHoja_(k)).filter(r => txt_(r[campo]) !== num).map(r => cotCopia_(k, r)));
