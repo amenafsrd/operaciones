@@ -7361,12 +7361,16 @@ function obtenerNotificacionesWeb(token) {
       const d14 = desde(14);
       const cots = {};
       leerObjetos_(cotHoja_('COT')).forEach(c => { cots[txt_(c.Cotizacion)] = c; });
+      const TIT = {
+        ENVIADA: ['📤', 'enviada'], ACEPTADA: ['✅', 'aceptada'], RECHAZADA: ['❌', 'rechazada'],
+        FINALIZADA: ['🏁', 'finalizada'], FACTURADA: ['🧾', 'facturada'], PAGADA: ['💰', 'pagada']
+      };
       leerObjetos_(cotHoja_('HIS')).forEach(h => {
-        const f = txt_(h.Fecha_Hora);
-        if (txt_(h.A) !== 'ACEPTADA' || f < d14) return;
+        const f = txt_(h.Fecha_Hora), a = txt_(h.A);
+        if (!TIT[a] || f < d14 || txt_(h.Usuario) === 'Sistema') return;
         const num = txt_(h.Cotizacion), c = cots[num] || {};
         const nn = /^\d+$/.test(num) && num.length < 7 ? ('000000' + num).slice(-6) : num;
-        eventos.push({ id: 'cot|' + num + '|' + f, tipo: 'cotizacion', icono: '✅', titulo: 'Cotización ' + nn + ' aceptada', detalle: (txt_(c.Cliente) || '') + (txt_(c.Proyecto) ? ' · ' + txt_(c.Proyecto) : '') + ' · por ' + txt_(h.Usuario), fecha: f, vista: 'cotizaciones', propio: txt_(h.Usuario) === ses.usuario });
+        eventos.push({ id: 'cot|' + num + '|' + a + '|' + f, tipo: 'cotizacion', icono: TIT[a][0], titulo: 'Cotización ' + nn + ' ' + TIT[a][1], detalle: (txt_(c.Cliente) || '') + (txt_(c.Proyecto) ? ' · ' + txt_(c.Proyecto) : '') + ' · por ' + txt_(h.Usuario), fecha: f, vista: 'cotizaciones', propio: txt_(h.Usuario) === ses.usuario });
       });
     } catch (e) { /* idem */ }
   }
