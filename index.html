@@ -1250,7 +1250,7 @@
         <div class="subtabs">
           <button id="stSegDia" class="active" onclick="segSubtab('dia')">📋 Seguimiento del día</button>
           <button id="stSegGraf" onclick="segSubtab('graf')">📊 Gráficas para el cliente</button>
-          <button id="stSegAus" onclick="segSubtab('aus')">🚫 Ausencias</button>
+          <button id="stSegAus" onclick="segSubtab('aus')">🚫 Incidencias</button>
         </div>
 
         <div id="segResultado"></div>
@@ -1323,26 +1323,29 @@
         </div>
 
 
-        <!-- Ausencias -->
+        <!-- Incidencias (ausencias, penalizaciones y más) -->
         <div id="segPanelAus" style="display:none">
           <div class="toolbar">
             <div class="field" style="min-width:140px"><label>Desde</label><input type="date" id="ausDesde" onchange="cargarAus()"></div>
             <div class="field" style="min-width:140px"><label>Hasta</label><input type="date" id="ausHasta" onchange="cargarAus()"></div>
-            <div class="field" style="min-width:150px"><label>Tipo</label>
-              <select id="ausFiltroTipo" onchange="renderAus()"><option value="">Todos</option><option value="Ausencia">Ausencias</option><option value="Abandono de ruta">Abandonos de ruta</option><option value="Salida temprano">Salidas tempranas (VB)</option></select></div>
+            <div class="field" style="min-width:190px"><label>Tipo de incidencia</label>
+              <select id="ausFiltroTipo" onchange="renderAus()"><option value="">Todos</option></select></div>
             <div class="field" style="min-width:150px"><label>Penalización</label>
               <select id="ausFiltroPen" onchange="renderAus()">
                 <option value="">Todas</option><option value="Pendiente">Pendientes de aplicar</option>
                 <option value="Aplicada">Aplicadas</option><option value="No aplica">Sin penalización</option>
               </select></div>
-            <div class="field" style="min-width:150px"><label>Móvil</label><select id="ausFiltroMovil" onchange="renderAus()"></select></div>
+            <div class="field" style="min-width:130px"><label>Móvil</label><select id="ausFiltroMovil" onchange="renderAus()"></select></div>
+            <div class="field" style="min-width:190px"><label>Buscar</label><input id="ausBuscar" oninput="renderAus()" placeholder="Técnico, motivo, observación..." autocomplete="off"></div>
+            <button class="btn secondary" onclick="ausLimpiar()">✖ Limpiar</button>
             <button class="btn secondary" onclick="cargarAus()">↻ Actualizar</button>
-            <button id="ausBtnNueva" class="btn primary" onclick="abrirAus()">➕ Registrar incidente</button>
+            <button class="btn warning" onclick="ausExportar()">📥 Exportar (Excel)</button>
+            <button id="ausBtnNueva" class="btn primary" onclick="abrirAus()">➕ Registrar incidencia</button>
           </div>
           <div id="ausCards" class="cards segCards"></div>
           <div id="ausSugeridas"></div>
           <div class="panel">
-            <div class="panelHead"><h2>Registro de ausencias, abandonos y salidas tempranas</h2></div>
+            <div class="panelHead"><h2>Registro de incidencias <span id="ausContador" style="font-size:12px;font-weight:400;color:#777"></span></h2></div>
             <div id="ausContenido" class="tableWrap"></div>
           </div>
         </div>
@@ -1551,20 +1554,34 @@
     </div>
   </div>
 
+  <div id="modalAlm" class="modalBg">
+    <div class="modal" style="width:min(460px,100%)">
+      <h3>🍽️ Almuerzo</h3>
+      <div id="almInfo" style="font-size:13px;margin-bottom:10px"></div>
+      <div class="field"><label>Hora a la que inició el almuerzo</label><input type="time" id="almHora"></div>
+      <div id="almNota" style="font-size:12px;color:#777;margin-top:8px"></div>
+      <div class="modalActions">
+        <button class="btn secondary" onclick="$('modalAlm').classList.remove('show')">Cancelar</button>
+        <button id="almQuitar" class="btn secondary" style="color:#b71c1c" onclick="segAlmuerzoGuardar(true)">✖ Quitar almuerzo</button>
+        <button class="btn primary" onclick="segAlmuerzoGuardar(false)">💾 Guardar</button>
+      </div>
+    </div>
+  </div>
+
   <div id="modalAus" class="modalBg">
     <div class="modal">
-      <h3 id="auTitulo">Registrar ausencia</h3>
+      <h3 id="auTitulo">Registrar incidencia</h3>
       <div class="grid2">
         <div class="field" style="grid-column:1/-1"><label>Tipo</label>
-          <select id="auTipo" onchange="auCambioTipo()"><option value="Ausencia">Ausencia (₡75.000)</option><option value="Abandono de ruta">Abandono de ruta (₡25.000)</option><option value="Salida temprano">Solicita VB para salir temprano</option></select></div>
+          <select id="auTipo" onchange="auCambioTipo()"></select></div>
         <div class="field" id="auCampoSalida"><label>Hora de salida</label><input type="time" id="auHoraSalida"></div>
         <div class="field" id="auCampoAut"><label>VB dado por</label><input id="auAutorizo" placeholder="Quién autorizó" autocomplete="off"></div>
         <div class="field"><label>Fecha</label><input type="date" id="auFecha"></div>
         <div class="field"><label>Móvil</label><select id="auMovil"></select></div>
         <div class="field" style="grid-column:1/-1"><label>Motivo</label><select id="auMotivo"></select></div>
-        <div class="field"><label>¿Se reportó con anticipación?</label>
+        <div class="field" id="auCampoRep"><label>¿Se reportó con anticipación?</label>
           <select id="auReporto"><option value="Sí">Sí, se reportó</option><option value="No">No se reportó</option></select></div>
-        <div class="field"><label>¿Se cubrió la ruta?</label>
+        <div class="field" id="auCampoCub"><label>¿Se cubrió la ruta?</label>
           <select id="auCubrio" onchange="auActualizar()"><option value="No">No se cubrió</option><option value="Sí">Sí, se cubrió</option><option value="Parcial">Parcialmente</option></select></div>
         <div class="field" id="auCampoCubre" style="grid-column:1/-1"><label>Cubierta por (móvil / técnico)</label><input id="auCubiertaPor" placeholder="Ej. Móvil 230 (backup)" autocomplete="off"></div>
         <div class="field"><label>¿Amerita penalización?</label>
@@ -5852,10 +5869,10 @@ function renderSeg() {
   let h = '<table class="table" style="min-width:1200px"><thead><tr>' +
     '<th>Móvil</th><th>Técnico</th><th>Zona</th><th>Estado</th><th>Hora inicio</th><th>Ahora</th>' +
     '<th>Asignadas</th><th>Relleno</th><th>Reasig.</th><th>Iniciadas</th>' +
-    '<th>Finalizadas</th><th>Suspend.</th><th>Pendientes</th><th>Justificación (inicio tarde)</th><th>Salida (VB)</th></tr></thead><tbody>';
+    '<th>Finalizadas</th><th>Suspend.</th><th>Pendientes</th><th>Justificación (inicio tarde)</th><th>Almuerzo</th><th>Salida (VB)</th></tr></thead><tbody>';
 
   if (!d.moviles.length) {
-    h += '<tr><td colspan="15" class="empty">No hay móviles con cronograma ni OT para esta fecha.</td></tr>';
+    h += '<tr><td colspan="16" class="empty">No hay móviles con cronograma ni OT para esta fecha.</td></tr>';
   }
 
   d.moviles.forEach(r => {
@@ -5880,6 +5897,9 @@ function renderSeg() {
       '<td>' + (ed && r.tarde
         ? '<input class="segTxt" value="' + esc(r.justificacion) + '" placeholder="Por qué inició tarde..." oninput="segEditar(\'' + id + '\',\'justificacion\',this.value)">'
         : (r.justificacion ? esc(r.justificacion) : '<span class="segSinCarga">—</span>')) + '</td>' +
+      '<td style="font-size:12px;white-space:nowrap">' + (r.almuerzoDesde
+        ? '🍽️ <b>' + esc(r.almuerzoDesde) + '</b>' + (ed ? ' <a href="#" title="Cambiar la hora" style="text-decoration:none" onclick="segAlmuerzoPedir(\'' + id + '\',\'' + esc(r.almuerzoDesde) + '\');return false">✏️</a><a href="#" title="Quitar almuerzo" style="margin-left:4px;color:#b71c1c;text-decoration:none" onclick="segAlmuerzo(\'' + id + '\',\'\');return false">✖</a>' : '')
+        : (ed && !r.salidaVB ? '<button class="btnMini" onclick="segAlmuerzoPedir(\'' + id + '\',\'\')">🍽️ Iniciar</button>' : '<span class="segSinCarga">—</span>')) + '</td>' +
       '<td style="font-size:12px;white-space:nowrap">' + (r.salidaVB
         ? '🏁 <b>' + esc(r.salidaVB) + '</b><div style="color:#888">ya no labora hoy</div>' + (ed ? '<a href="#" style="color:#b71c1c;text-decoration:none" onclick="segSalida(\'' + id + '\',\'\');return false">✖ quitar</a>' : '')
         : (ed ? '<button class="btnMini" onclick="segSalidaPedir(\'' + id + '\')">🏁 VB salida</button>' : '—')) + '</td></tr>';
@@ -6127,19 +6147,31 @@ async function segAlmuerzo(idMovil, desde) {
   }
 }
 
-/* Pregunta a qué hora inició el almuerzo: desde el fin de su última OT hasta esa hora cuenta como tiempo sin actividad */
-function segAlmuerzoPedir(idMovil, ultimaFin, actual) {
+/* Abre el selector de hora del almuerzo de una móvil (se puede registrar en cualquier momento, con la hora real en que lo inició) */
+let almMovil = '';
+function segAlmuerzoPedir(idMovil, actual) {
+  const r = (segDatos.moviles || []).find(x => x.idMovil === idMovil) || {};
+  almMovil = idMovil;
   const n = new Date(Date.now() - 6 * 3600000);
   const ahora = ('0' + n.getUTCHours()).slice(-2) + ':' + ('0' + n.getUTCMinutes()).slice(-2);
-  const v = prompt('¿A qué hora inició el almuerzo? (HH:MM)\n' +
-    (ultimaFin ? 'Su última OT terminó a las ' + ultimaFin + '. De esa hora hasta el inicio del almuerzo cuenta como tiempo sin actividad; luego se le dan ' + segDatos.minAlmuerzo + ' min.' : ''),
-    actual || ahora);
-  if (v === null) return;
-  const m = String(v).trim().match(/^(\d{1,2}):(\d{2})$/);
-  if (!m || +m[1] > 23 || +m[2] > 59) { toast('Hora no válida. Usa el formato HH:MM.'); return; }
-  const hh = ('0' + m[1]).slice(-2) + ':' + m[2];
-  if (ultimaFin && hh < ultimaFin) { toast('El almuerzo no puede iniciar antes de que terminara su última OT (' + ultimaFin + ').'); return; }
-  segAlmuerzo(idMovil, hh);
+  const act = actual || r.almuerzoDesde || '';
+  $('almInfo').innerHTML = '<b>Móvil ' + esc(r.movil || '') + '</b> · ' + esc(r.tecnico || '') + (segDatos.fecha ? ' · ' + esc(fmtFechaSeg(segDatos.fecha)) : '');
+  $('almHora').value = act || (segDatos.esHoy ? ahora : '12:00');
+  $('almHora').dataset.ultimaFin = r.ultimaFin || '';
+  $('almNota').textContent = (r.ultimaFin ? 'Su última OT terminó a las ' + r.ultimaFin + '. De esa hora hasta el inicio del almuerzo cuenta como tiempo sin actividad; ' : '') +
+    'luego se le dan ' + segDatos.minAlmuerzo + ' min de almuerzo.';
+  $('almQuitar').style.display = act ? '' : 'none';
+  $('modalAlm').classList.add('show');
+}
+
+function segAlmuerzoGuardar(quitar) {
+  if (quitar) { $('modalAlm').classList.remove('show'); segAlmuerzo(almMovil, ''); return; }
+  const v = $('almHora').value;
+  if (!v) { toast('Elige la hora de inicio del almuerzo.'); return; }
+  const uf = $('almHora').dataset.ultimaFin;
+  if (uf && v < uf) { toast('El almuerzo no puede iniciar antes de que terminara su última OT (' + uf + ').'); return; }
+  $('modalAlm').classList.remove('show');
+  segAlmuerzo(almMovil, v);
 }
 
 function renderAlertas() {
@@ -6156,7 +6188,7 @@ function renderAlertas() {
   if (d.almuerzos.length) {
     html += '<div class="segAviso" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center"><b>🍽️ En almuerzo (' + d.minAlmuerzo + ' min desde la hora de inicio):</b> ' +
       d.almuerzos.map(a => '<span class="segChip">M' + esc(a.movil) + ' ' + esc(a.tecnico) + ' · hasta las ' + esc(a.hasta) + ' (faltan ' + a.restan + ' min)' +
-        (ed ? ' <a href="#" style="margin-left:6px;text-decoration:none" title="Cambiar la hora de inicio" onclick="segAlmuerzoPedir(\'' + escJs(a.idMovil) + '\',\'' + esc(a.ultimaFin || '') + '\',\'' + esc(a.desde) + '\');return false">✏️</a><a href="#" style="margin-left:6px;color:#b71c1c;text-decoration:none" title="Quitar almuerzo" onclick="segAlmuerzo(\'' + escJs(a.idMovil) + '\',\'\');return false">✖</a>' : '') + '</span>').join('') +
+        (ed ? ' <a href="#" style="margin-left:6px;text-decoration:none" title="Cambiar la hora de inicio" onclick="segAlmuerzoPedir(\'' + escJs(a.idMovil) + '\',\'' + esc(a.desde) + '\');return false">✏️</a><a href="#" style="margin-left:6px;color:#b71c1c;text-decoration:none" title="Quitar almuerzo" onclick="segAlmuerzo(\'' + escJs(a.idMovil) + '\',\'\');return false">✖</a>' : '') + '</span>').join('') +
       '</div>';
   }
 
@@ -6178,7 +6210,7 @@ function renderAlertas() {
           : 'No ha iniciado ninguna OT hoy (referencia ' + esc(a.desde) + ')') + '</td>' +
       '<td><b class="' + (a.nivel === 'alto' ? 'segNeg' : '') + '" style="' + (a.nivel === 'alto' ? '' : 'color:#b8860b') + '">' + (a.nivel === 'alto' ? '🔴 ' : '🟠 ') + h(a.minutos) + '</b></td>' +
       '<td>' + a.pendientes + '</td>' +
-      (ed ? '<td>' + (a.puedeAlmuerzo ? '<button class="btnMini" onclick="segAlmuerzoPedir(\'' + escJs(a.idMovil) + '\',\'' + esc(a.desde) + '\')">🍽️ En almuerzo...</button> ' : '') + '</td>' : '') +
+      (ed ? '<td>' + (a.puedeAlmuerzo ? '<button class="btnMini" onclick="segAlmuerzoPedir(\'' + escJs(a.idMovil) + '\',\'\')">🍽️ En almuerzo...</button> ' : '') + '</td>' : '') +
       '</tr>').join('') + '</tbody></table></div></div>';
   el.innerHTML = html;
 }
@@ -6278,7 +6310,17 @@ async function segGuardarJustif(clave, el) {
 
 let ausDatos = null, ausEditId = '';
 
+/* Tipos de incidencia: [valor, icono, nombre, ¿afecta la ruta?] */
+const AUS_TIPOS = [
+  ['Ausencia', '🚫', 'Ausencia', true], ['Abandono de ruta', '🚧', 'Abandono de ruta', true], ['Salida temprano', '🚪', 'Salida temprano (VB)', false],
+  ['Llegada tarde', '⏰', 'Llegada tarde', false], ['Incumplimiento de procedimiento', '📋', 'Incumplimiento de procedimiento', false],
+  ['Daño o accidente', '💥', 'Daño o accidente', false], ['Otra penalización', '⚖️', 'Otra penalización', false]
+];
+const ausTipoInfo = t => AUS_TIPOS.find(x => x[0] === t) || [t, '📌', t, false];
+const ausDeRuta = t => !!ausTipoInfo(t)[3];
+
 function abrirAusencias() {
+  if ($('ausFiltroTipo').options.length < 2) $('ausFiltroTipo').innerHTML = '<option value="">Todos</option>' + AUS_TIPOS.map(t => '<option value="' + esc(t[0]) + '">' + t[1] + ' ' + esc(t[2]) + '</option>').join('');
   if (!$('ausDesde').value) {
     const h = hoyISO();
     $('ausDesde').value = h.slice(0, 8) + '01';
@@ -6292,7 +6334,7 @@ async function cargarAus() {
   try {
     ausDatos = await api('obtenerAusenciasWeb', $('ausDesde').value, $('ausHasta').value);
   } catch (e) {
-    mostrarError(e, 'No se pudieron cargar las ausencias.');
+    mostrarError(e, 'No se pudieron cargar las incidencias.');
     return;
   }
   const sel = $('ausFiltroMovil'), actual = sel.value;
@@ -6304,15 +6346,51 @@ async function cargarAus() {
 
 const colones = n => '₡' + Math.round(n || 0).toLocaleString('es-CR');
 
+function ausFiltradas() {
+  let l = ausDatos ? ausDatos.registros : [];
+  if ($('ausFiltroPen').value) l = l.filter(x => x.penaliza === 'Sí' ? x.estadoPen === $('ausFiltroPen').value : $('ausFiltroPen').value === 'No aplica');
+  if ($('ausFiltroMovil').value) l = l.filter(x => x.movil === $('ausFiltroMovil').value);
+  if ($('ausFiltroTipo').value) l = l.filter(x => x.tipo === $('ausFiltroTipo').value);
+  const q = sinTildes($('ausBuscar').value.trim());
+  if (q) l = l.filter(x => sinTildes([x.tipo, x.movil, x.tecnico, x.zona, x.motivo, x.obs, x.autorizo, x.cubiertaPor, x.usuario].join(' ')).indexOf(q) !== -1);
+  return l;
+}
+
+function ausLimpiar() {
+  ['ausFiltroTipo', 'ausFiltroPen', 'ausFiltroMovil'].forEach(i => { $(i).value = ''; });
+  $('ausBuscar').value = '';
+  renderAus();
+}
+
+async function ausExportar() {
+  if (!ausDatos) return;
+  const l = ausFiltradas();
+  if (!l.length) { toast('No hay incidencias con esos filtros para exportar.'); return; }
+  try { await cargarLib('xlsx', SEG_URL_XLSX); } catch (e) { mostrarError(e); return; }
+  const rows = [['Fecha', 'Tipo', 'Móvil', 'Técnico', 'Zona', 'Motivo', '¿Reportó?', 'Ruta cubierta', 'Cubierta por', 'Penaliza', 'Monto (₡)', 'Estado penalización', 'Fecha aplicada', 'Hora salida', 'VB dado por', 'Observación', 'Registrado por']]
+    .concat(l.map(x => [x.fecha, x.tipo, x.movil, x.tecnico, x.zona, x.motivo, ausDeRuta(x.tipo) ? x.reporto : '', ausDeRuta(x.tipo) ? x.cubrio : '', x.cubiertaPor, x.penaliza,
+      x.penaliza === 'Sí' ? x.monto : 0, x.penaliza === 'Sí' ? x.estadoPen : 'No aplica', x.fechaAplicada, x.horaSalida, x.autorizo, x.obs, x.usuario]));
+  const por = {};
+  l.forEach(x => { const o = por[x.tipo] = por[x.tipo] || { n: 0, pen: 0, ap: 0, pe: 0 }; o.n++; if (x.penaliza === 'Sí') { o.pen++; if (x.estadoPen === 'Aplicada') o.ap += x.monto; else o.pe += x.monto; } });
+  const res = [['Tipo', 'Cantidad', 'Con penalización', 'Monto aplicado (₡)', 'Monto pendiente (₡)']].concat(Object.keys(por).map(k => [k, por[k].n, por[k].pen, por[k].ap, por[k].pe]));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Incidencias');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(res), 'Resumen por tipo');
+  XLSX.writeFile(wb, 'Incidencias_' + ausDatos.desde + '_a_' + ausDatos.hasta + '.xlsx');
+  toast('Excel descargado (' + l.length + ' incidencias).');
+}
+
 function renderAus() {
 
   if (!ausDatos) return;
   const ed = puedeEditar(), r = ausDatos.resumen;
 
   $('ausCards').innerHTML =
+    '<div class="card"><div class="n">' + r.total + '</div><div class="t">Incidencias</div></div>' +
     '<div class="card"><div class="n">' + r.ausencias + '</div><div class="t">Ausencias</div></div>' +
     '<div class="card"><div class="n">' + r.abandonos + '</div><div class="t">Abandonos de ruta</div></div>' +
     '<div class="card"><div class="n">' + r.salidas + '</div><div class="t">Salidas tempranas (VB)</div></div>' +
+    '<div class="card"><div class="n">' + (r.otras || 0) + '</div><div class="t">Otras incidencias</div></div>' +
     '<div class="card"><div class="n">' + r.sinAviso + '</div><div class="t">Sin avisar</div></div>' +
     '<div class="card"><div class="n">' + r.sinCubrir + '</div><div class="t">Ruta sin cubrir</div></div>' +
     '<div class="card"><div class="n">' + colones(r.montoPendiente) + '</div><div class="t">Penal. pendientes (' + r.pendientes + ')</div></div>' +
@@ -6333,13 +6411,11 @@ function renderAus() {
   }
   $('ausSugeridas').innerHTML = sug;
 
-  let l = ausDatos.registros;
-  if ($('ausFiltroPen').value) l = l.filter(x => x.penaliza === 'Sí' ? x.estadoPen === $('ausFiltroPen').value : $('ausFiltroPen').value === 'No aplica');
-  if ($('ausFiltroMovil').value) l = l.filter(x => x.movil === $('ausFiltroMovil').value);
-  if ($('ausFiltroTipo').value) l = l.filter(x => x.tipo === $('ausFiltroTipo').value);
+  const l = ausFiltradas();
+  $('ausContador').textContent = '· ' + l.length + ' de ' + ausDatos.registros.length;
 
   if (!l.length) {
-    $('ausContenido').innerHTML = '<div class="empty">No hay ausencias registradas con esos filtros.</div>';
+    $('ausContenido').innerHTML = '<div class="empty">No hay incidencias registradas con esos filtros.</div>';
     return;
   }
 
@@ -6352,9 +6428,9 @@ function renderAus() {
         : (x.estadoPen === 'Aplicada'
           ? '<span class="segBadge c">✔ Aplicada</span><div style="font-size:11px;color:#888">' + esc(fmtFechaSeg(x.fechaAplicada)) + '</div>'
           : '<span class="segBadge t">⏳ Pendiente</span>');
-      return '<tr><td>' + esc(fmtFechaSeg(x.fecha)) + '</td><td>' + (x.tipo === 'Abandono de ruta' ? '🚧 Abandono de ruta' : x.tipo === 'Salida temprano' ? '🚪 Salida temprano (VB)' : '🚫 Ausencia') + '</td><td><b>' + esc(x.movil) + '</b></td><td class="left">' + esc(x.tecnico) + '</td>' +
-        '<td class="left">' + esc(x.motivo) + '</td><td>' + si(x.reporto, 'Sí') + '</td>' +
-        '<td>' + si(x.cubrio, 'Sí') + (x.cubiertaPor ? '<div style="font-size:11px;color:#888">' + esc(x.cubiertaPor) + '</div>' : '') + '</td>' +
+      return '<tr><td>' + esc(fmtFechaSeg(x.fecha)) + '</td><td>' + ausTipoInfo(x.tipo)[1] + ' ' + esc(ausTipoInfo(x.tipo)[2]) + '</td><td><b>' + esc(x.movil) + '</b></td><td class="left">' + esc(x.tecnico) + '</td>' +
+        '<td class="left">' + esc(x.motivo) + '</td><td>' + (ausDeRuta(x.tipo) ? si(x.reporto, 'Sí') : '<span class="segSinCarga">—</span>') + '</td>' +
+        '<td>' + (ausDeRuta(x.tipo) ? si(x.cubrio, 'Sí') : '<span class="segSinCarga">—</span>') + (x.cubiertaPor ? '<div style="font-size:11px;color:#888">' + esc(x.cubiertaPor) + '</div>' : '') + '</td>' +
         '<td>' + pen + '</td><td>' + est + '</td><td class="left">' + (x.horaSalida ? '<b>Salió ' + esc(x.horaSalida) + '</b>' + (x.autorizo ? ' · VB: ' + esc(x.autorizo) : '') + (x.obs ? '<br>' : '') : '') + esc(x.obs) + '</td>' +
         (ed ? '<td style="white-space:nowrap">' +
           (x.penaliza === 'Sí' ? '<button class="btnMini" onclick="ausPenalizacion(\'' + escJs(x.id) + '\',' + (x.estadoPen === 'Aplicada' ? 'false' : 'true') + ')">' + (x.estadoPen === 'Aplicada' ? '↩ Pendiente' : '✔ Aplicada') + '</button> ' : '') +
@@ -6364,10 +6440,12 @@ function renderAus() {
 }
 
 function auActualizar() {
-  const sal = $('auTipo').value === 'Salida temprano';
+  const sal = $('auTipo').value === 'Salida temprano', ruta = ausDeRuta($('auTipo').value);
   $('auCampoSalida').style.display = sal ? '' : 'none';
   $('auCampoAut').style.display = sal ? '' : 'none';
-  $('auCampoCubre').style.display = $('auCubrio').value === 'No' ? 'none' : '';
+  $('auCampoRep').style.display = ruta ? '' : 'none';
+  $('auCampoCub').style.display = ruta ? '' : 'none';
+  $('auCampoCubre').style.display = ruta && $('auCubrio').value !== 'No' ? '' : 'none';
   const pen = $('auPenaliza').value === 'Sí';
   $('auCampoMonto').style.display = pen ? '' : 'none';
   $('auCampoEstado').style.display = pen ? '' : 'none';
@@ -6385,6 +6463,8 @@ function auCambioTipo() {
   const actual = Number($('auMonto').value);
   if (!actual || Object.keys(p).some(k => p[k] === actual)) $('auMonto').value = ($('auPenaliza').value === 'Sí' && auMontoTipo()) ? auMontoTipo() : '';
   if ($('auTipo').value === 'Salida temprano') { $('auPenaliza').value = 'No'; $('auReporto').value = 'Sí'; }
+  else if (!ausDeRuta($('auTipo').value) && !ausEditId) $('auPenaliza').value = 'Sí';
+  if (!ausDeRuta($('auTipo').value)) { $('auReporto').value = 'Sí'; $('auCubrio').value = 'Sí'; }
   auActualizar();
 }
 
@@ -6392,7 +6472,9 @@ function abrirAus(id, idMovil, fecha) {
 
   const x = id ? ausDatos.registros.find(r => r.id === id) : null;
   ausEditId = x ? x.id : '';
-  $('auTitulo').textContent = x ? 'Editar registro' : 'Registrar ausencia, abandono o salida temprano';
+  $('auTitulo').textContent = x ? 'Editar incidencia' : 'Registrar incidencia';
+  const pm = ausDatos && ausDatos.penalizaciones ? ausDatos.penalizaciones : {};
+  $('auTipo').innerHTML = AUS_TIPOS.map(t => '<option value="' + esc(t[0]) + '">' + t[1] + ' ' + esc(t[2]) + (pm[t[0]] ? ' (' + colones(pm[t[0]]) + ')' : '') + '</option>').join('');
 
   /* Móviles: las del cronograma/ruta del día cargado en Seguimiento */
   const lista = (segDatos && segDatos.moviles) ? segDatos.moviles.slice() : [];
@@ -6410,6 +6492,7 @@ function abrirAus(id, idMovil, fecha) {
   $('auMotivo').value = x ? x.motivo : '';
   $('auReporto').value = x ? x.reporto : 'No';
   $('auCubrio').value = x ? x.cubrio : 'No';
+  if (!x && $('auTipo').value === 'Ausencia') { /* valores iniciales de una ausencia nueva */ }
   $('auCubiertaPor').value = x ? x.cubiertaPor : '';
   $('auPenaliza').value = x ? x.penaliza : 'No';
   $('auMonto').value = x && x.monto ? x.monto : '';
@@ -6433,10 +6516,10 @@ async function guardarAus() {
       penaliza: $('auPenaliza').value, monto: $('auMonto').value, estadoPen: $('auEstadoPen').value, obs: $('auObs').value
     });
     cerrarAus();
-    toast('Ausencia guardada.');
+    toast('Incidencia guardada.');
     await cargarAus();
   } catch (e) {
-    mostrarError(e, 'No se pudo guardar la ausencia.');
+    mostrarError(e, 'No se pudo guardar la incidencia.');
   } finally {
     btn.disabled = false;
   }
@@ -6453,10 +6536,10 @@ async function ausPenalizacion(id, aplicada) {
 }
 
 async function eliminarAus(id) {
-  if (!confirm('¿Eliminar este registro de ausencia?')) return;
+  if (!confirm('¿Eliminar esta incidencia?')) return;
   try {
     await api('eliminarAusenciaWeb', id);
-    toast('Ausencia eliminada.');
+    toast('Incidencia eliminada.');
     await cargarAus();
   } catch (e) {
     mostrarError(e, 'No se pudo eliminar.');
@@ -11757,6 +11840,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 18 · 12-oct 20:00</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 19 · 13-oct 10:30</div>
 </body>
 </html>

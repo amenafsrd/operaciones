@@ -4326,7 +4326,7 @@ const SEG = {
     AUSENCIAS: ['ID', 'Fecha', 'ID_Movil', 'Movil', 'Fecha_Aplicada', 'Hora_Salida', 'Creado', 'Actualizado']
   },
 
-  PENALIZACIONES: { 'Ausencia': 75000, 'Abandono de ruta': 25000, 'Salida temprano': 0 },
+  PENALIZACIONES: { 'Ausencia': 75000, 'Abandono de ruta': 25000, 'Salida temprano': 0, 'Llegada tarde': 0, 'Incumplimiento de procedimiento': 0, 'Daño o accidente': 0, 'Otra penalización': 0 },
   MOTIVOS_AUS: ['Sin aviso', 'Enfermedad / incapacidad', 'Permiso', 'Vacaciones', 'Falla de vehículo', 'Calamidad / emergencia', 'Salió sin autorización', 'Cita médica', 'Asunto personal / familiar', 'Otro'],
 
   CORTES: ['6am', '7am', '8am', '9am', '10am', '11am', '12md', '1pm', '2pm', '3pm', '4pm', '5pm', '6pm', 'Cierre'],
@@ -5258,12 +5258,13 @@ function obtenerAusenciasWeb(token, desde, hasta) {
     .filter(r => r.fecha >= desde && r.fecha <= hasta)
     .sort((a, b) => b.fecha.localeCompare(a.fecha) || a.movil.localeCompare(b.movil));
 
-  const resumen = { ausencias: 0, abandonos: 0, salidas: 0, total: registros.length, sinAviso: 0, sinCubrir: 0, penalizaciones: 0,
+  const resumen = { ausencias: 0, abandonos: 0, salidas: 0, otras: 0, total: registros.length, sinAviso: 0, sinCubrir: 0, penalizaciones: 0,
     pendientes: 0, montoPendiente: 0, aplicadas: 0, montoAplicado: 0 };
   registros.forEach(r => {
-    if (r.tipo === 'Abandono de ruta') resumen.abandonos++; else if (r.tipo === 'Salida temprano') resumen.salidas++; else resumen.ausencias++;
-    if (r.reporto === 'No' && r.tipo !== 'Salida temprano') resumen.sinAviso++;
-    if (r.cubrio === 'No' && r.tipo !== 'Salida temprano') resumen.sinCubrir++;
+    const deRuta = r.tipo === 'Ausencia' || r.tipo === 'Abandono de ruta';
+    if (r.tipo === 'Abandono de ruta') resumen.abandonos++; else if (r.tipo === 'Salida temprano') resumen.salidas++; else if (r.tipo === 'Ausencia') resumen.ausencias++; else resumen.otras++;
+    if (r.reporto === 'No' && deRuta) resumen.sinAviso++;
+    if (r.cubrio === 'No' && deRuta) resumen.sinCubrir++;
     if (r.penaliza === 'Sí') {
       resumen.penalizaciones++;
       if (r.estadoPen === 'Aplicada') { resumen.aplicadas++; resumen.montoAplicado += r.monto; }
@@ -5283,7 +5284,7 @@ function guardarAusenciaWeb(token, d) {
   const fecha = segFecha_(d.fecha);
   if (!fecha) throw new Error('Fecha no válida.');
   const motivo = txt_(d.motivo).slice(0, 80);
-  if (!motivo) throw new Error('Elige el motivo de la ausencia.');
+  if (!motivo) throw new Error('Elige el motivo de la incidencia.');
   const si = v => (txt_(v) === 'Sí' ? 'Sí' : 'No');
   const tipo = SEG.PENALIZACIONES[txt_(d.tipo)] !== undefined ? txt_(d.tipo) : 'Ausencia';
   const cubrio = ['Sí', 'No', 'Parcial'].indexOf(txt_(d.cubrio)) !== -1 ? txt_(d.cubrio) : 'No';
@@ -5332,8 +5333,8 @@ function guardarAusenciaWeb(token, d) {
       throw new Error('No se encontró la ausencia que intentas editar.');
     }
 
-    /* Evita duplicar la misma móvil el mismo día */
-    for (let i = 1; i < t.values.length; i++) {
+    /* Evita duplicar la misma móvil el mismo día (solo Ausencia, Abandono y Salida; las demás incidencias pueden repetirse) */
+    for (let i = 1; (tipo === 'Ausencia' || tipo === 'Abandono de ruta' || tipo === 'Salida temprano') && i < t.values.length; i++) {
       if (txt_(t.values[i][t.idx.Fecha]) === fecha && txt_(t.values[i][t.idx.ID_Movil]) === o.ID_Movil &&
           (txt_(t.values[i][t.idx.Tipo]) || 'Ausencia') === tipo)
         throw new Error('La móvil ' + o.Movil + ' ya tiene registrado «' + tipo + '» el ' + fecha + '. Edítalo en la lista.');
