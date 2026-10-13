@@ -606,6 +606,9 @@
     #segColBar { display: flex; gap: 8px; justify-content: flex-end; margin: 0 0 8px; }
     #segColBar button { background: transparent; border: 1px solid #c8ced8; color: #4b5563; border-radius: 4px; padding: 4px 11px; font-size: 12px; cursor: pointer; font-family: inherit; }
     #segColBar button:hover { background: #fff; color: #14263f; }
+      /* ---- Usuarios: todo alineado a la izquierda ---- */
+    .tblUsuarios th, .tblUsuarios td { text-align: left !important; vertical-align: middle; padding-left: 12px; padding-right: 12px; }
+    .tblUsuarios td:first-child b { display: inline-block; }
   </style>
 </head>
 
@@ -3784,7 +3787,7 @@ function cargarUsuarios() {
       listaUsuarios = lista || [];
       $('contadorUsuarios').textContent = listaUsuarios.length + ' usuarios';
 
-      let html = '<table class="table"><thead><tr>' +
+      let html = '<table class="table tblUsuarios"><thead><tr>' +
         '<th>Usuario</th><th>Nombre completo</th><th>Correo</th><th>Rol</th><th>Módulos</th><th>Estado</th>' +
         '<th>Último acceso</th><th>Acciones</th></tr></thead><tbody>';
 
@@ -3794,10 +3797,10 @@ function cargarUsuarios() {
           '<td class="left">' + esc(u.nombre) + '</td>' +
           '<td class="left">' + (u.correo ? esc(u.correo) : '<span class="muted">—</span>') + '</td>' +
           '<td>' + esc(ETIQUETA_ROL[u.rol] || u.rol) + '</td>' +
-          '<td class="left" style="font-size:12px">' + (u.rol === 'admin' ? 'Todos' : esc((u.modulos || []).map(m => ({ cronograma: 'Cronograma', moviles: 'Móviles', seguimiento: 'Seguimiento', bodega: 'Bodega', cotizaciones: '💼 Cotizaciones', resumen: 'Resumen' })[m] || m).join(', ') || 'Ninguno')) + '</td>' +
+          '<td class="left" style="font-size:12px">' + (u.rol === 'admin' ? 'Todos' : esc((u.modulos || []).map(m => ({ cronograma: 'Cronograma', moviles: 'Móviles', seguimiento: 'Seguimiento', bodega: 'Bodega', cotizaciones: 'Cotizaciones', resumen: 'Resumen' })[m] || m).join(', ') || 'Ninguno')) + '</td>' +
           '<td><span class="tag ' + (u.activo ? 'tag-active' : 'tag-inactive') + '">' +
             (u.activo ? 'Activo' : 'Desactivado') + '</span>' +
-            (u.pendienteClave ? '<small>pendiente de crear su contraseña</small>' : '') + '</td>' +
+            (u.pendienteClave ? '<br><small>pendiente de crear su contraseña</small>' : '') + '</td>' +
           '<td>' + esc(u.ultimoAcceso || '—') + '</td>' +
           '<td><button class="btn secondary" onclick="editarUsuario(\'' + escJs(u.usuario) + '\')">✏️ Editar</button></td>' +
           '</tr>';
@@ -12107,6 +12110,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 25 · 13-oct 12:35</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 26 · 13-oct 13:15</div>
 </body>
 </html>
