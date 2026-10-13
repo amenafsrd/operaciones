@@ -1319,7 +1319,7 @@
             <div class="panelHead">
               <div>
                 <h2>🔧 Estado de las OT <span id="segEstOtResumen" style="font-size:13px;font-weight:600;margin-left:8px"></span></h2>
-                <div style="font-size:12px;color:#777;margin-top:3px">Las finalizadas solo vienen de la plataforma (OT realmente instaladas). Aquí marca como suspendida o reasignada las que no se hicieron. Si después se rescata y la plataforma la reporta iniciada o finalizada, se actualiza sola. Al cierre del día no deben quedar pendientes.</div>
+                <div style="font-size:12px;color:#777;margin-top:3px">Las finalizadas solo vienen de la plataforma (OT realmente instaladas). Las pendientes y las reasignadas que siguen en el corte cuentan como por ejecutar; aquí marca como suspendida o reasignada las que ya se resolvieron. Si después se rescata y la plataforma la reporta iniciada o finalizada, se actualiza sola. Al cierre del día no deben quedar pendientes.</div>
               </div>
               <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
                 <select id="segEstOtFiltro" onchange="renderEstadoOt()">
@@ -6013,7 +6013,7 @@ function segRecalcular() {
   d.moviles.forEach(r => {
     r.sinCarga = (r.asignadas + r.relleno) === 0;
     r.pendientes = r.sinCarga ? 0 :
-      (r.asignadas + r.relleno) - (r.instaladas + r.iniciadas) - r.suspendidas - r.reasignadas;
+      (r.asignadas + r.relleno) - (r.instaladas + r.iniciadas) - r.suspendidas - (r.reasignadas - (r.reasigPlat || 0));
     r.tarde = (!r.estadoCal || r.estadoCal === 'Activa') && !!r.horaInicio && r.horaInicio > d.horaTarde;
     Object.keys(t).forEach(k => { t[k] += r[k] || 0; });
 
@@ -6037,7 +6037,7 @@ function segRecalcular() {
     '<div class="card i"><div class="n">' + t.iniciadas + '</div><div class="t">Iniciadas</div></div>' +
     '<div class="card s"><div class="n">' + t.suspendidas + '</div><div class="t">Suspendidas</div></div>' +
     '<div class="card"><div class="n">' + t.reasignadas + '</div><div class="t">Reasignadas</div></div>' +
-    '<div class="card p"><div class="n">' + t.pendientes + '</div><div class="t">Pendientes</div></div>' +
+    '<div class="card p"><div class="n">' + t.pendientes + '</div><div class="t" title="Incluye las reasignadas que siguen en el corte">Pendientes (con reasignadas)</div></div>' +
     '<div class="card"><div class="n">' + d.desaparecidas.length + '</div><div class="t">Ya no aparecen (por marcar)</div></div>' +
     '<div class="card"><div class="n">' + d.movidas.length + '</div><div class="t">Movidas de móvil</div></div>';
 }
@@ -6121,7 +6121,7 @@ function segColapsables() {
   const cuenta = {
     alertas: [(d.alertas || []).length, (d.alertas || []).length ? 'mal' : 'ok'],
     moviles: [(d.moviles || []).length, ''],
-    estot: [(segOtsUnicas().filter(x => x.estado === 'PENDIENTE').length), segOtsUnicas().some(x => x.estado === 'PENDIENTE') ? 'mal' : 'ok'],
+    estot: [segOtsUnicas().filter(segEsPorEjecutar).length, segOtsUnicas().some(segEsPorEjecutar) ? 'mal' : 'ok'],
     desap: [(d.desaparecidas || []).length, (d.desaparecidas || []).length ? 'mal' : 'ok'],
     tiempos: [d.tiempos ? d.tiempos.excesos.length : 0, ''],
     susp: [(d.suspendidas || []).length, ''],
@@ -6167,6 +6167,9 @@ function segColTodo(cerrar) {
 
 let segSelEst = {};
 
+/* Por ejecutar: pendiente, o reasignada que sigue en el corte (no marcada a mano) */
+function segEsPorEjecutar(x) { return x.estado === 'PENDIENTE' || (x.estado === 'REASIGNADA' && !x.manual); }
+
 function segOtsUnicas() {
   const m = {};
   (segDatos.ordenes || []).forEach(x => {
@@ -6192,11 +6195,11 @@ function renderEstadoOt(reiniciar) {
   }
 
   const todas = segOtsUnicas().filter(x => x.estado !== 'DESAPARECIDA');
-  const pend = todas.filter(x => x.estado === 'PENDIENTE').length;
+  const pend = todas.filter(segEsPorEjecutar).length;
   const ini = todas.filter(x => x.estado === 'INICIADA').length;
   const man = todas.filter(x => x.manual).length;
   $('segEstOtResumen').innerHTML = pend
-    ? '<span style="color:#b71c1c">⚠️ ' + pend + ' pendiente' + (pend === 1 ? '' : 's') + (ini ? ' · ' + ini + ' iniciada' + (ini === 1 ? '' : 's') : '') + '</span>'
+    ? '<span style="color:#b71c1c">⚠️ ' + pend + ' por ejecutar'  + (ini ? ' · ' + ini + ' iniciada' + (ini === 1 ? '' : 's') : '') + '</span>'
     : '<span style="color:#2e7d32">✔ Sin pendientes' + (ini ? ' · ' + ini + ' iniciada' + (ini === 1 ? '' : 's') : '') + '</span>';
 
   const f = $('segEstOtFiltro').value, mov = $('segEstOtMovil').value, q = ($('segEstOtBuscar').value || '').trim().toLowerCase();
@@ -12104,6 +12107,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 24 · 13-oct 12:15</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 25 · 13-oct 12:35</div>
 </body>
 </html>

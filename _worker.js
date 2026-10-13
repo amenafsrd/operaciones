@@ -4688,7 +4688,7 @@ function obtenerSeguimientoWeb(token, fecha) {
       filas[id] = {
         idMovil: id, movil: txt_(m.Movil), tecnico: '', zona: txt_(m.Domicilio),
         estadoCal: '', estadoMovil: '', asignadas: 0, relleno: 0, reasignadas: 0,
-        iniciadas: 0, instaladas: 0, suspendidas: 0, pendientes: 0, pendPlataforma: 0,
+        iniciadas: 0, instaladas: 0, suspendidas: 0, pendientes: 0, pendPlataforma: 0, reasigPlat: 0,
         horaInicio: '', horaManual: '', almuerzoDesde: '', salidaVB: '', ultimaFin: '', sinIniciarMin: null, enAlmuerzo: false, almuerzoHasta: '', horaAuto: '', justificacion: '', obs: '', tarde: false,
         auto: auto
       };
@@ -4740,7 +4740,11 @@ function obtenerSeguimientoWeb(token, fecha) {
     if (auto) {
       r.asignadas++;
       if (estado === 'INICIADA') r.iniciadas++;
-      if (estado === 'REASIGNADA') r.reasignadas++;
+      if (estado === 'REASIGNADA') {
+        r.reasignadas++;
+        /* Reasignada que sigue en el corte = trabajo por ejecutar (cuenta como pendiente); la marcada a mano sí se da por resuelta */
+        if (o.Manual !== '1') { r.reasigPlat++; r.pendPlataforma++; }
+      }
       if (estado === 'PENDIENTE') r.pendPlataforma++;
       if (estado === 'SUSPENDIDA') {
         suspPlat.push({
@@ -4803,7 +4807,7 @@ function obtenerSeguimientoWeb(token, fecha) {
     if (!r.horaInicio) r.horaInicio = r.horaAuto;
     r.sinCarga = (r.asignadas + r.relleno) === 0;
     r.pendientes = r.sinCarga ? 0 :
-      (r.asignadas + r.relleno) - (r.instaladas + r.iniciadas) - r.suspendidas - r.reasignadas;
+      (r.asignadas + r.relleno) - (r.instaladas + r.iniciadas) - r.suspendidas - (r.reasignadas - r.reasigPlat);
     r.tarde = (!r.estadoCal || r.estadoCal === 'Activa') && !!r.horaInicio && r.horaInicio > SEG.HORA_TARDE;
     Object.keys(tot).forEach(k => { tot[k] += r[k]; });
     return r;
