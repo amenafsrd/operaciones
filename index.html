@@ -560,7 +560,40 @@
     .tblMov .lbl { display: none; }
     @media (min-width: 1700px) { .tblMov .lbl { display: inline; } }
     .tblMov .accWrap .btnMini { min-width: 30px; }
-</style>
+    /* =====================  MENÚS · ESTILO SOBRIO  ===================== */
+    :root { --mn-bg: #0d1726; --mn-bg2: #121f33; --mn-line: #1c2b43; --mn-tx: #aebbcd; --mn-tx2: #6f8099; }
+    .top { background: var(--mn-bg); border-bottom: 1px solid var(--mn-line); box-shadow: inset 0 -2px 0 var(--rojo-osc, #8c1414); }
+    .top .brand { font-size: 15px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase; }
+    #hLogo { height: 26px !important; }
+    .top > div:first-child > div[style*="background:#fff"] { border-radius: 4px !important; padding: 4px 9px !important; box-shadow: none !important; }
+    .btnMenu { border: 1px solid var(--mn-line); border-radius: 4px; color: #cdd6e3; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
+    .btnMenu:hover { background: var(--mn-bg2); color: #fff; }
+    .ico { display: block; flex: none; }
+    .top .userbox .btn.secondary { background: transparent; color: #cdd6e3; border: 1px solid var(--mn-line); border-radius: 4px; padding: 6px 12px; font-weight: 500; font-size: 13px; }
+    .top .userbox .btn.secondary:hover:not(:disabled) { background: var(--mn-bg2); color: #fff; }
+    #hBell { display: inline-flex; align-items: center; padding: 6px 9px !important; }
+    #userLabel { color: #cdd6e3; font-size: 13px; }
+    .avatar { border: 1px solid #ffffff55; width: 32px; height: 32px; }
+    #crumb { font-size: 13px; letter-spacing: .2px; border-left: 1px solid var(--mn-line); color: var(--mn-tx); }
+    #crumb b { font-weight: 600; }
+    #side { background: var(--mn-bg); border-right: 1px solid var(--mn-line); padding: 14px 0 20px; }
+    #side .nav { gap: 0; }
+    #side .nav::before { content: 'MÓDULOS'; display: block; padding: 0 20px 8px; font-size: 10.5px; letter-spacing: 1.6px; font-weight: 600; color: var(--mn-tx2); }
+    #side .nav > button { background: transparent; border: 0; border-left: 3px solid transparent; border-radius: 0; box-shadow: none; padding: 11px 17px; gap: 12px; font-size: 13.5px; font-weight: 500; color: var(--mn-tx); letter-spacing: .15px; }
+    #side .nav > button:hover { background: #ffffff0a; color: #fff; }
+    #side .nav > button.active { background: var(--mn-bg2); color: #fff; font-weight: 600; border-left-color: var(--rojo); box-shadow: none; }
+    #side .ni { width: 20px; display: inline-flex; align-items: center; justify-content: center; opacity: .9; }
+    #side .nav > button .car { font-size: 15px; opacity: .55; line-height: 1; }
+    #side .subnav { margin: 0; padding: 4px 0 8px 0; border-left: 0; background: var(--mn-bg2); border-left: 3px solid var(--rojo); gap: 0; }
+    #side .subnav button { border-radius: 0; padding: 8px 18px 8px 52px; font-size: 13px; font-weight: 400; color: var(--mn-tx); position: relative; width: 100%; }
+    #side .subnav button::before { content: ''; position: absolute; left: 38px; top: 50%; width: 5px; height: 5px; margin-top: -2.5px; border-radius: 50%; background: #3a4c68; }
+    #side .subnav button:hover { background: #ffffff0a; color: #fff; }
+    #side .subnav button.on { background: transparent; color: #fff; font-weight: 600; box-shadow: none; }
+    #side .subnav button.on::before { background: var(--rojo); }
+    .subtabs button { border-radius: 4px; }
+    .primary { background: var(--rojo-osc, #8c1414); box-shadow: none; }
+    .btn { border-radius: 6px; }
+  </style>
 </head>
 
 <body>
@@ -625,7 +658,7 @@
 
     <div class="top">
       <div style="display:flex;align-items:center;gap:14px">
-        <button id="btnMenu" class="btnMenu" onclick="sideToggle()" title="Mostrar u ocultar el menú">☰</button>
+        <button id="btnMenu" class="btnMenu" onclick="sideToggle()" title="Mostrar u ocultar el menú"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
         <div style="background:#fff;border-radius:10px;padding:5px 10px;display:flex;align-items:center;box-shadow:0 1px 4px #0003"><img id="hLogo" alt="SRD" style="height:36px;width:auto;display:block"></div>
         <div>
           <div class="brand">SRD Gestión Operativa</div>
@@ -635,7 +668,7 @@
       </div>
 
       <div class="userbox">
-        <button class="btn secondary" id="hBell" title="Notificaciones" onclick="notifToggle(event)" style="position:relative;padding:6px 10px">🔔<span id="hBellN" style="display:none;position:absolute;top:-6px;right:-6px;background:#e65100;color:#fff;border-radius:10px;padding:1px 6px;font-size:11px;font-weight:700"></span></button>
+        <button class="btn secondary" id="hBell" title="Notificaciones" onclick="notifToggle(event)" style="position:relative;padding:6px 10px"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15zM10 20.5a2 2 0 0 0 4 0"/></svg><span id="hBellN" style="display:none;position:absolute;top:-6px;right:-6px;background:#e65100;color:#fff;border-radius:10px;padding:1px 6px;font-size:11px;font-weight:700"></span></button>
         <button class="avatar" id="hAvatar" title="Mi perfil: foto y contraseña" onclick="abrirPerfil()"></button>
         <span id="userLabel"></span>
         <button class="btn secondary" onclick="salir()">Salir</button>
@@ -644,13 +677,13 @@
 
     <aside id="side">
       <div class="nav" id="sideNav">
-        <button id="navCalendario" class="active" onclick="mostrarVista('calendario')"><span class="ni">📅</span><span class="nt"> Cronograma</span></button>
-        <button id="navMoviles" onclick="mostrarVista('moviles')"><span class="ni">🚐</span><span class="nt"> Móviles</span></button>
-        <button id="navSeguimiento" onclick="mostrarVista('seguimiento')"><span class="ni">📋</span><span class="nt"> Seguimiento</span></button>
-        <button id="navBodega" onclick="mostrarVista('bodega')"><span class="ni">📦</span><span class="nt"> Bodega</span></button>
-        <button id="navCotizaciones" onclick="mostrarVista('cotizaciones')"><span class="ni">💼</span><span class="nt"> Cotizaciones</span></button>
-        <button id="navResumen" onclick="mostrarVista('resumen')"><span class="ni">📊</span><span class="nt"> Resumen</span></button>
-        <button id="navUsuarios" onclick="mostrarVista('usuarios')" style="display:none"><span class="ni">👥</span><span class="nt"> Usuarios</span></button>
+        <button id="navCalendario" class="active" onclick="mostrarVista('calendario')"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="1.5"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/></svg></span><span class="nt"> Cronograma</span></button>
+        <button id="navMoviles" onclick="mostrarVista('moviles')"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 16.5V7.5a1 1 0 0 1 1-1h10v10M13.5 10h4l3 3.5v3h-7"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/></svg></span><span class="nt"> Móviles</span></button>
+        <button id="navSeguimiento" onclick="mostrarVista('seguimiento')"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4.5" width="14" height="16.5" rx="1.5"/><path d="M9 4.5V3.5h6v1M9 12.5l2 2 4-4.5"/></svg></span><span class="nt"> Seguimiento</span></button>
+        <button id="navBodega" onclick="mostrarVista('bodega')"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 7.5 12 3.5l8.5 4v9L12 20.5l-8.5-4z"/><path d="M3.5 7.5 12 11.5l8.5-4M12 11.5v9"/></svg></span><span class="nt"> Bodega</span></button>
+        <button id="navCotizaciones" onclick="mostrarVista('cotizaciones')"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="7.5" width="17" height="12" rx="1.5"/><path d="M9 7.5v-2a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M3.5 12.5h17"/></svg></span><span class="nt"> Cotizaciones</span></button>
+        <button id="navResumen" onclick="mostrarVista('resumen')"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20.5h16M7 17V11M12 17V6M17 17v-4.5"/></svg></span><span class="nt"> Resumen</span></button>
+        <button id="navUsuarios" onclick="mostrarVista('usuarios')" style="display:none"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8.5" r="3.2"/><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5M16 5.6a3.2 3.2 0 0 1 0 5.8M18 14.8c1.8.6 3 2.3 3 5.2"/></svg></span><span class="nt"> Usuarios</span></button>
       </div>
 
     </aside>
@@ -1267,6 +1300,29 @@
               <span id="segContador" style="font-size:12px;color:#777"></span>
             </div>
             <div id="segDiaContenido" class="tableWrap"><div class="loading">Cargando...</div></div>
+          </div>
+
+          <div class="panel" style="margin-bottom:15px" id="segPanelEstOt">
+            <div class="panelHead">
+              <div>
+                <h2>🔧 Estado de las OT <span id="segEstOtResumen" style="font-size:13px;font-weight:600;margin-left:8px"></span></h2>
+                <div style="font-size:12px;color:#777;margin-top:3px">Si una OT quedó finalizada (44) pero la plataforma la muestra pendiente o reasignada, cámbiala aquí. Si después la plataforma la reporta iniciada o finalizada, se actualiza sola. Al cierre del día no deben quedar pendientes.</div>
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+                <select id="segEstOtFiltro" onchange="renderEstadoOt()">
+                  <option value="sin">Sin cerrar (pend./inic./reasig.)</option>
+                  <option value="PENDIENTE">Solo pendientes</option>
+                  <option value="REASIGNADA">Solo reasignadas</option>
+                  <option value="INICIADA">Solo iniciadas</option>
+                  <option value="manual">Cambiadas a mano</option>
+                  <option value="todas">Todas</option>
+                </select>
+                <select id="segEstOtMovil" onchange="renderEstadoOt()"><option value="">Todas las móviles</option></select>
+                <input id="segEstOtBuscar" placeholder="Buscar OT / contrato" oninput="renderEstadoOt()" style="width:160px" autocomplete="off">
+              </div>
+            </div>
+            <div id="segEstOtBarra"></div>
+            <div id="segEstOtContenido" class="tableWrap"></div>
           </div>
 
           <div class="panel" style="margin-bottom:15px">
@@ -5571,14 +5627,15 @@ setInterval(ajustarListas, 700);
     sideRefrescar();
   });
 })();
+function sinEmoji(t) { return String(t || '').replace(/^[^\p{L}\p{N}]+/u, '').trim(); }
 function sideRefrescar() {
   const nav = $('sideNav'); if (!nav) return;
   try {
     const bn = $('nav' + vistaActual.charAt(0).toUpperCase() + vistaActual.slice(1));
-    const mod = bn ? ((bn.querySelector('.ni') || {}).textContent || '') + ' ' + ((bn.querySelector('.nt') || {}).textContent || '').trim() : '';
+    const mod = bn ? ((bn.querySelector('.nt') || {}).textContent || '').trim() : '';
     const sec0 = { calendario: 'vistaCalendario', moviles: 'vistaFichas', seguimiento: 'vistaSeguimiento', bodega: 'vistaBodega', cotizaciones: 'vistaCotiz' }[vistaActual];
     const act = sec0 && $(sec0) ? $(sec0).querySelector(':scope > .subtabs button.active') : null;
-    $('crumb').innerHTML = esc(mod) + (act ? ' › <b>' + esc(act.textContent.trim()) + '</b>' : '');
+    $('crumb').innerHTML = esc(mod) + (act ? ' › <b>' + esc(sinEmoji(act.textContent)) + '</b>' : '');
   } catch (e) { }
   nav.querySelectorAll('.subnav').forEach(n => n.remove());
   nav.querySelectorAll('.car').forEach(n => n.remove());
@@ -5588,12 +5645,12 @@ function sideRefrescar() {
   const tabs = Array.from(sec.querySelectorAll(':scope > .subtabs button')).filter(b => b.style.display !== 'none' && !b.hidden);
   if (!tabs.length) return;
   const cerrado = !!window._subCerrado[vistaActual];
-  const car = document.createElement('span'); car.className = 'car' + (cerrado ? '' : ' abierto'); car.textContent = '▶'; btn.appendChild(car);
+  const car = document.createElement('span'); car.className = 'car' + (cerrado ? '' : ' abierto'); car.textContent = '›'; btn.appendChild(car);
   if (cerrado) return;
   const caja = document.createElement('div'); caja.className = 'subnav';
   tabs.forEach(b => {
     const x = document.createElement('button');
-    x.textContent = b.textContent.trim();
+    x.textContent = sinEmoji(b.textContent);
     if (b.classList.contains('active')) x.className = 'on';
     x.onclick = () => { b.click(); setTimeout(sideRefrescar, 60); if (window.matchMedia('(max-width: 900px)').matches) sideToggle(false); };
     caja.appendChild(x);
@@ -5926,6 +5983,7 @@ function renderSeg() {
   segRecalcular();
   renderAlertas();
   renderDesaparecidas();
+  renderEstadoOt(true);
   renderTiempos();
   renderSuspendidas();
   renderLogCortes();
@@ -6014,6 +6072,116 @@ async function segGuardar(silencioso) {
   } catch (e) {
     mostrarError(e, 'No se pudo guardar.');
     return false;
+  }
+}
+
+/* ---------- Estado de las OT: cambio manual ---------- */
+
+let segSelEst = {};
+
+function segOtsUnicas() {
+  const m = {};
+  (segDatos.ordenes || []).forEach(x => {
+    if (!x.orden) return;
+    if (x.estado === 'DESAPARECIDA' && m[x.orden]) return;
+    if (!m[x.orden] || m[x.orden].estado === 'DESAPARECIDA') m[x.orden] = x;
+  });
+  return Object.keys(m).map(k => m[k]);
+}
+
+function renderEstadoOt(reiniciar) {
+
+  const d = segDatos;
+  if (!d || !$('segEstOtContenido')) return;
+  const ed = puedeEditar();
+  if (reiniciar) {
+    segSelEst = {};
+    const sel = $('segEstOtMovil'), v = sel.value;
+    const nombres = Array.from(new Set(segOtsUnicas().map(x => x.movil).filter(Boolean)))
+      .sort((a, b) => (Number(a) || 0) - (Number(b) || 0) || a.localeCompare(b));
+    sel.innerHTML = '<option value="">Todas las móviles</option>' + nombres.map(n => '<option value="' + esc(n) + '">' + esc(n) + '</option>').join('');
+    sel.value = nombres.indexOf(v) !== -1 ? v : '';
+  }
+
+  const todas = segOtsUnicas().filter(x => x.estado !== 'DESAPARECIDA');
+  const pend = todas.filter(x => x.estado === 'PENDIENTE').length;
+  const ini = todas.filter(x => x.estado === 'INICIADA').length;
+  const man = todas.filter(x => x.manual).length;
+  $('segEstOtResumen').innerHTML = pend
+    ? '<span style="color:#b71c1c">⚠️ ' + pend + ' pendiente' + (pend === 1 ? '' : 's') + (ini ? ' · ' + ini + ' iniciada' + (ini === 1 ? '' : 's') : '') + '</span>'
+    : '<span style="color:#2e7d32">✔ Sin pendientes' + (ini ? ' · ' + ini + ' iniciada' + (ini === 1 ? '' : 's') : '') + '</span>';
+
+  const f = $('segEstOtFiltro').value, mov = $('segEstOtMovil').value, q = ($('segEstOtBuscar').value || '').trim().toLowerCase();
+  const l = todas.filter(x => {
+    if (f === 'sin' && ['PENDIENTE', 'INICIADA', 'REASIGNADA'].indexOf(x.estado) === -1) return false;
+    if (['PENDIENTE', 'REASIGNADA', 'INICIADA'].indexOf(f) !== -1 && x.estado !== f) return false;
+    if (f === 'manual' && !x.manual) return false;
+    if (mov && x.movil !== mov) return false;
+    if (q && (x.orden + ' ' + x.contrato).toLowerCase().indexOf(q) === -1) return false;
+    return true;
+  }).sort((a, b) => (Number(a.movil) || 0) - (Number(b.movil) || 0) || String(a.movil).localeCompare(String(b.movil)) || String(a.orden).localeCompare(String(b.orden)));
+
+  const n = Object.keys(segSelEst).length;
+  $('segEstOtBarra').innerHTML = ed
+    ? '<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;padding:12px 15px;border-bottom:1px solid #eee">' +
+      '<div class="field" style="min-width:230px"><label>Cambiar las OT seleccionadas a</label><select id="segEstOtNuevo" onchange="segEstOtMotivoVis()">' +
+      '<option value="FINALIZADA">✔️ Finalizada (quedó 44)</option><option value="REASIGNADA">🔁 Reasignada</option><option value="SUSPENDIDA">⏸️ Suspendida</option><option value="">↩️ Quitar cambio manual</option></select></div>' +
+      '<div class="field" id="segEstOtMotivoBox" style="min-width:300px;flex:1;display:none"><label>Motivo de la suspensión</label><select id="segEstOtMotivo"><option value="">Elige el motivo...</option>' +
+      d.listaMotivos.map(m => '<option value="' + esc(m) + '">' + esc(m) + '</option>').join('') + '</select></div>' +
+      '<button id="segEstOtBtn" class="btn primary" onclick="segGuardarEstadoOt()"' + (n ? '' : ' disabled') + '>' + (n ? 'Aplicar a ' + n + ' OT' : 'Aplicar') + '</button></div>'
+    : '';
+  segEstOtMotivoVis();
+
+  const col = { PENDIENTE: '#e65100', INICIADA: '#1565c0', REASIGNADA: '#6a1b9a', FINALIZADA: '#2e7d32', SUSPENDIDA: '#b71c1c' };
+  if (!l.length) {
+    $('segEstOtContenido').innerHTML = '<div class="empty">' + (f === 'sin' && !mov && !q ? '🎉 No hay OT pendientes, iniciadas ni reasignadas.' : 'No hay OT con ese filtro.') + '</div>';
+    return;
+  }
+  const lim = 400;
+  $('segEstOtContenido').innerHTML = '<table class="table" style="min-width:900px"><thead><tr>' +
+    (ed ? '<th><input type="checkbox" onchange="segSelTodasEst(this.checked)" title="Seleccionar todas las visibles"></th>' : '') +
+    '<th>OT</th><th>Contrato</th><th>Móvil</th><th>Tipo</th><th>Estado en plataforma</th><th>Estado actual</th></tr></thead><tbody>' +
+    l.slice(0, lim).map(x => '<tr>' +
+      (ed ? '<td><input type="checkbox" class="chkEst" data-orden="' + esc(x.orden) + '"' + (segSelEst[x.orden] ? ' checked' : '') + ' onchange="segToggleEst(\'' + escJs(x.orden) + '\',this.checked)"></td>' : '') +
+      '<td><b>' + esc(x.orden) + '</b></td><td>' + esc(x.contrato) + '</td><td>' + esc(x.movil) + '</td><td>' + esc(x.tipo) + '</td>' +
+      '<td>' + esc((x.estadoPlat || x.estado).toLowerCase()) + '</td>' +
+      '<td><b style="color:' + (col[x.estado] || '#333') + '">' + esc(x.estado.toLowerCase()) + '</b>' +
+      (x.manual ? ' <span title="Cambiado a mano" style="font-size:11px;background:#fff3e0;color:#e65100;border-radius:8px;padding:1px 7px">✋ a mano</span>' : '') + '</td></tr>').join('') +
+    '</tbody></table>' + (l.length > lim ? '<div class="empty">Se muestran las primeras ' + lim + ' de ' + l.length + '. Usa los filtros.</div>' : '');
+}
+
+function segEstOtMotivoVis() {
+  const n = $('segEstOtNuevo'), b = $('segEstOtMotivoBox');
+  if (b && n) b.style.display = n.value === 'SUSPENDIDA' ? 'block' : 'none';
+}
+
+function segToggleEst(orden, v) {
+  if (v) segSelEst[orden] = true; else delete segSelEst[orden];
+  const n = Object.keys(segSelEst).length, b = $('segEstOtBtn');
+  if (b) { b.disabled = !n; b.textContent = n ? 'Aplicar a ' + n + ' OT' : 'Aplicar'; }
+}
+
+function segSelTodasEst(v) {
+  document.querySelectorAll('.chkEst').forEach(c => { c.checked = v; segToggleEst(c.dataset.orden, v); });
+}
+
+async function segGuardarEstadoOt() {
+
+  const ordenes = Object.keys(segSelEst);
+  if (!ordenes.length) return;
+  const nuevo = $('segEstOtNuevo').value;
+  const motivo = $('segEstOtMotivo').value;
+  if (nuevo === 'SUSPENDIDA' && !motivo) { toast('Elige el motivo de la suspensión.'); return; }
+
+  $('segEstOtBtn').disabled = true;
+  try {
+    if (segDirty() && !(await segGuardar(true))) { $('segEstOtBtn').disabled = false; return; }
+    const r = await api('guardarEstadoOtWeb', segDatos.fecha, ordenes, nuevo, motivo);
+    toast(r.cambiadas + ' OT actualizadas' + (r.omitidas ? ' (' + r.omitidas + ' no aplican)' : '') + '.');
+    await cargarSeg();
+  } catch (e) {
+    mostrarError(e, 'No se pudo cambiar el estado.');
+    if ($('segEstOtBtn')) $('segEstOtBtn').disabled = false;
   }
 }
 
@@ -8542,7 +8710,7 @@ function aliImprimir(id) {
   const l = id ? aliDatos.alistos.filter(a => a.alisto === id) : aliDatos.alistos.filter(a => a.estado === 'BORRADOR' || a.estado === 'ALISTADO').sort((a, b) => (Number(a.movil) || 0) - (Number(b.movil) || 0));
   if (!l.length) { toast('No hay alistos pendientes para imprimir.'); return; }
   const mov = m => (bodDatos && bodDatos.moviles.find(x => x.idMovil === m) || {}).tecnico || '';
-  const html = '<!doctype html><html><head><meta charset="utf-8"><title>Hojas de alisto</title><style>body{font-family:Arial,sans-serif;font-size:12px;margin:0}.p{padding:24px;page-break-after:always}h1{font-size:17px;margin:0 0 4px}table{border-collapse:collapse;width:100%;margin-top:10px}th{background:#b71c1c;color:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}th,td{border:1px solid #999;padding:6px 7px;text-align:center}td.l{text-align:left}.f{margin-top:30px;display:flex;gap:40px}.f div{flex:1;border-top:1px solid #111;padding-top:4px}</style></head><body>' +
+  const html = '<!doctype html><html><head><meta charset="utf-8"><title>Hojas de alisto</title><style>body{font-family:Arial,sans-serif;font-size:12px;margin:0}.p{padding:24px;page-break-after:always}h1{font-size:17px;margin:0 0 4px}table{border-collapse:collapse;width:100%;margin-top:10px}th{background:#b71c1c;color:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}th,td{border:1px solid #999;padding:6px 7px;text-align:center}td.l{text-align:left}.f{margin-top:30px;display:flex;gap:40px}.f div{flex:1;border-top:1px solid #111;padding-top:4px}  </style></head><body>' +
     l.map(a => '<div class="p"><h1>Hoja de alisto ' + esc(a.alisto) + ' · Móvil ' + esc(a.movil) + '</h1><div>' + esc(mov(a.idMovil)) + ' &nbsp; <b>Fecha:</b> ' + esc(fmtFechaSeg(a.fecha)) + ' &nbsp; <b>Estado:</b> ' + esc((ALI_EST[a.estado] || [a.estado])[0]) + (a.obs ? '<br><b>Obs.:</b> ' + esc(a.obs) : '') + '</div>' +
       '<table><thead><tr><th style="width:36px">✔</th><th>Línea</th><th>Código</th><th>Material</th><th>Und.</th><th>Cantidad</th></tr></thead><tbody>' +
       a.lineas.slice().sort((x, y) => x.linea - y.linea).map(y => { const m = aliMatInfo(y.clave); return '<tr><td>☐</td><td>' + y.linea + '</td><td>' + esc(codP(m.codigo)) + '</td><td class="l"><b>' + esc(y.material) + '</b></td><td>' + esc(m.unidad || '') + '</td><td><b>' + fmtN(y.cantidad) + '</b></td></tr>'; }).join('') +
@@ -9062,7 +9230,8 @@ function notifPintar() {
   b.textContent = n > 99 ? '99+' : String(n);
   b.style.display = n ? '' : 'none';
   const nb = $('navBodega');
-  if (nb) nb.innerHTML = '<span class="ni">📦</span><span class="nt"> Bodega</span>' + (nAl ? ' <span class="bdg" style="background:#e65100;color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;margin-left:3px">⚠ ' + nAl + '</span>' : '');
+  if (nb) { const ni = nb.querySelector('.ni'); const ico = ni ? ni.innerHTML : '';
+    nb.innerHTML = '<span class="ni">' + ico + '</span><span class="nt"> Bodega</span>' + (nAl ? ' <span class="bdg" style="background:#9a3412;color:#fff;border-radius:3px;padding:1px 7px;font-size:11px;font-weight:600;margin-left:auto">' + nAl + '</span>' : ''); }
   if ($('notifPanel') && $('notifPanel').style.display !== 'none') notifRender();
 }
 
@@ -11845,6 +12014,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 20 · 13-oct 11:00</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 22 · 13-oct 11:40</div>
 </body>
 </html>
