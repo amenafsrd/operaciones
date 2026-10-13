@@ -593,6 +593,19 @@
     .subtabs button { border-radius: 4px; }
     .primary { background: var(--rojo-osc, #8c1414); box-shadow: none; }
     .btn { border-radius: 6px; }
+      /* ---- Cuadros colapsables (Seguimiento del día) ---- */
+    .panel.colapsable > .panelHead { cursor: pointer; user-select: none; position: relative; padding-left: 38px; }
+    .panel.colapsable > .panelHead::before { content: ''; position: absolute; left: 16px; top: 50%; width: 7px; height: 7px; margin-top: -6px; border-right: 2px solid #6b7a90; border-bottom: 2px solid #6b7a90; transform: rotate(45deg); transition: transform .15s; }
+    .panel.colapsable.colapsado > .panelHead::before { transform: rotate(-45deg); margin-top: -4px; }
+    .panel.colapsable > .panelHead:hover { background: #f1f4f8; }
+    .panel.colapsado > :not(.panelHead) { display: none !important; }
+    .panel.colapsado > .panelHead { border-bottom: 0; }
+    .panel.colapsado > .panelHead > div > div:not(.colBadgeBox) { display: none; }
+    .colBadge { display: inline-block; margin-left: 10px; padding: 1px 9px; border-radius: 10px; font-size: 12px; font-weight: 700; background: #e3e7ed; color: #374151; vertical-align: middle; }
+    .colBadge.mal { background: #fbe9e9; color: #a31616; } .colBadge.ok { background: #e8f3ea; color: #2c6b3c; }
+    #segColBar { display: flex; gap: 8px; justify-content: flex-end; margin: 0 0 8px; }
+    #segColBar button { background: transparent; border: 1px solid #c8ced8; color: #4b5563; border-radius: 4px; padding: 4px 11px; font-size: 12px; cursor: pointer; font-family: inherit; }
+    #segColBar button:hover { background: #fff; color: #14263f; }
   </style>
 </head>
 
@@ -5988,6 +6001,7 @@ function renderSeg() {
   renderSuspendidas();
   renderLogCortes();
   segActualizarBotonGuardar();
+  segColapsables();
 }
 
 function segRecalcular() {
@@ -6073,6 +6087,80 @@ async function segGuardar(silencioso) {
     mostrarError(e, 'No se pudo guardar.');
     return false;
   }
+}
+
+
+/* ---------- Cuadros colapsables ---------- */
+
+const SEG_COL_DEF = { moviles: false, alertas: false, estot: true, desap: true, tiempos: true, susp: true, log: true };
+const SEG_COL_IDS = { segDiaContenido: 'moviles', segEstOtContenido: 'estot', segDesapContenido: 'desap', segTiemposContenido: 'tiempos', segSuspContenido: 'susp', segLogContenido: 'log' };
+
+function segColEstado() {
+  let g = {};
+  try { g = JSON.parse(localStorage.getItem('segCol') || '{}') || {}; } catch (e) { g = {}; }
+  return g;
+}
+
+function segColGuardar(clave, cerrado) {
+  const g = segColEstado(); g[clave] = cerrado;
+  try { localStorage.setItem('segCol', JSON.stringify(g)); } catch (e) { }
+}
+
+function segColapsables() {
+
+  const raiz = $('segPanelDia'); if (!raiz) return;
+  const d = segDatos || {};
+  const g = segColEstado();
+
+  if (!$('segColBar')) {
+    const b = document.createElement('div'); b.id = 'segColBar';
+    b.innerHTML = '<button onclick="segColTodo(false)">Expandir todo</button><button onclick="segColTodo(true)">Contraer todo</button>';
+    const ref = $('segAlertas'); if (ref) ref.parentNode.insertBefore(b, ref);
+  }
+
+  const cuenta = {
+    alertas: [(d.alertas || []).length, (d.alertas || []).length ? 'mal' : 'ok'],
+    moviles: [(d.moviles || []).length, ''],
+    estot: [(segOtsUnicas().filter(x => x.estado === 'PENDIENTE').length), segOtsUnicas().some(x => x.estado === 'PENDIENTE') ? 'mal' : 'ok'],
+    desap: [(d.desaparecidas || []).length, (d.desaparecidas || []).length ? 'mal' : 'ok'],
+    tiempos: [d.tiempos ? d.tiempos.excesos.length : 0, ''],
+    susp: [(d.suspendidas || []).length, ''],
+    log: [(d.log || []).length, '']
+  };
+  const etiqueta = { estot: ' pend.' };
+
+  raiz.querySelectorAll(':scope .panel, #segAlertas .panel').forEach(p => {
+    const head = p.querySelector(':scope > .panelHead'); if (!head) return;
+    let clave = p.dataset.col || '';
+    if (!clave) {
+      Object.keys(SEG_COL_IDS).forEach(id => { if (p.querySelector('#' + id)) clave = SEG_COL_IDS[id]; });
+      if (!clave && p.closest('#segAlertas')) clave = 'alertas';
+      if (!clave) return;
+      p.dataset.col = clave;
+    }
+    if (!p.classList.contains('colapsable')) {
+      p.classList.add('colapsable');
+      p.classList.toggle('colapsado', clave in g ? !!g[clave] : !!SEG_COL_DEF[clave]);
+      head.addEventListener('click', e => {
+        if (e.target.closest('select,input,button,a,textarea,label')) return;
+        const c = !p.classList.contains('colapsado');
+        p.classList.toggle('colapsado', c);
+        segColGuardar(p.dataset.col, c);
+      });
+    }
+    const h2 = head.querySelector('h2'); if (!h2) return;
+    let bd = h2.querySelector('.colBadge');
+    if (!bd) { bd = document.createElement('span'); h2.appendChild(bd); }
+    const c = cuenta[clave];
+    if (c) { bd.className = 'colBadge ' + c[1]; bd.textContent = c[0] + (etiqueta[clave] || ''); }
+  });
+}
+
+function segColTodo(cerrar) {
+  document.querySelectorAll('#segPanelDia .panel.colapsable').forEach(p => {
+    p.classList.toggle('colapsado', cerrar);
+    segColGuardar(p.dataset.col, cerrar);
+  });
 }
 
 /* ---------- Estado de las OT: cambio manual ---------- */
@@ -6363,6 +6451,7 @@ function renderAlertas() {
   if (!d.alertas.length) {
     html += '<div class="segAviso ok">✅ Ninguna móvil activa con trabajo pendiente lleva más de ' + d.minAlerta + ' min sin iniciar una OT.</div>';
     el.innerHTML = html;
+    segColapsables();
     return;
   }
 
@@ -6381,6 +6470,7 @@ function renderAlertas() {
       (ed ? '<td>' + (a.puedeAlmuerzo ? '<button class="btnMini" onclick="segAlmuerzoPedir(\'' + escJs(a.idMovil) + '\',\'\')">🍽️ En almuerzo...</button> ' : '') + '</td>' : '') +
       '</tr>').join('') + '</tbody></table></div></div>';
   el.innerHTML = html;
+  segColapsables();
 }
 
 /* ---------- Tiempos excedidos ---------- */
@@ -12014,6 +12104,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 22 · 13-oct 11:40</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 23 · 13-oct 12:00</div>
 </body>
 </html>
