@@ -1076,7 +1076,7 @@
           </div>
           <div class="panel" style="margin-top:15px">
             <div class="panelHead"><div><h2>Últimas cargas del reporte</h2>
-              <div style="font-size:12px;color:#777;margin-top:3px">Si importaste un archivo equivocado, elimina su carga: sus líneas dejan de descontar el stock de las móviles.</div></div></div>
+              <div style="font-size:12px;color:#777;margin-top:3px">Puedes subir un corte nuevo cada vez que lo necesites: las OT que ya estaban no se duplican, las nuevas se suman y las que cambiaron se actualizan (queda el detalle aquí y en las notificaciones). Si importaste un archivo equivocado, elimina su carga: lo que trajo deja de descontar el stock.</div></div></div>
             <div id="bodTablaCargas" class="tableWrap"></div>
           </div>
         </div>
@@ -8813,8 +8813,8 @@ function renderBodCons() {
 
   const c = bodDatos.cargas;
   $('bodTablaCargas').innerHTML = !c.length ? '<div class="empty">Aún no se ha importado ningún reporte de materiales.</div>' :
-    '<table class="table" style="min-width:700px"><thead><tr><th>Cargado</th><th class="left">Archivo</th><th>OT</th><th>Fechas de cierre</th><th>Sin móvil</th><th>Usuario</th>' + (esAdmin() ? '<th></th>' : '') + '</tr></thead><tbody>' +
-    c.map(x => '<tr><td>' + esc(x.hora) + '</td><td class="left">' + esc(x.archivo) + '</td><td>' + x.ot + '</td><td>' + esc(x.fechas) + '</td><td>' + x.sinMovil + '</td><td>' + esc(x.usuario) + '</td>' +
+    '<table class="table" style="min-width:700px"><thead><tr><th>Cargado</th><th class="left">Archivo</th><th>OT en el archivo</th><th>Nuevas</th><th>Sin cambios</th><th>Con cambios</th><th>Fechas de cierre</th><th>Sin móvil</th><th>Usuario</th>' + (esAdmin() ? '<th></th>' : '') + '</tr></thead><tbody>' +
+    c.map(x => '<tr><td>' + esc(x.hora) + '</td><td class="left">' + esc(x.archivo) + '</td><td>' + x.ot + '</td><td>' + (x.nuevas == null ? '—' : x.nuevas) + '</td><td>' + (x.nuevas == null ? '—' : x.sinCambios) + '</td><td>' + (x.cambiadas ? '<details><summary style="cursor:pointer"><b style="color:#b8860b">🔄 ' + x.cambiadas + '</b></summary><div style="text-align:left;font-size:12px;max-width:380px">' + x.cambios.map(c => '<div><b>' + esc(c.orden) + '</b> (M' + esc(c.movil) + '): ' + esc((c.detalle || []).join(' · ')) + '</div>').join('') + '</div></details>' : (x.nuevas == null ? '—' : 0)) + '</td><td>' + esc(x.fechas) + '</td><td>' + x.sinMovil + '</td><td>' + esc(x.usuario) + '</td>' +
       (esAdmin() ? '<td><button class="btn secondary" onclick="bodEliminarCarga(\'' + escJs(x.hora) + '\')">🗑 Eliminar</button></td>' : '') + '</tr>').join('') + '</tbody></table>';
   bodVistaCons();
 }
@@ -8875,7 +8875,7 @@ async function bodImportarConsumo(inp) {
     consFilas = filas; consArchivo = file.name; consLista = lista;
 
     if (lista.every(x => x.est === 'ok')) {
-      if (!confirm('Importar ' + filas.length + ' órdenes del reporte de materiales?\n\nSe descontará lo usado del stock de cada móvil. Si una OT ya estaba cargada, se reemplaza.')) return;
+      if (!confirm('Importar ' + filas.length + ' órdenes del reporte de materiales?\n\nSe descontará lo usado del stock de cada móvil. Las OT que ya estaban cargadas no se duplican: si cambió algo en alguna, se actualiza y te aviso qué cambió.')) return;
       await consEjecutar({});
       return;
     }
@@ -8942,7 +8942,8 @@ async function consEjecutar(mapa) {
     const r = await api('importarConsumoWeb', consFilas, consArchivo, mapa);
 
     let h = '<div class="segAviso ok" style="margin-bottom:15px"><b>✅ Reporte de materiales importado</b><ul style="margin:6px 0 0 18px">' +
-      '<li><b>' + r.ordenes + '</b> OT (' + r.lineas + ' líneas de material) · cierres: ' + esc(r.fechas.map(fmtFechaSeg).join(', ')) + '</li>';
+      '<li><b>' + r.ordenes + '</b> OT en el archivo · cierres: ' + esc(r.fechas.map(fmtFechaSeg).join(', ')) + '</li>' +
+      '<li>🆕 <b>' + r.nuevas + '</b> nuevas (se descontaron) · ✔️ <b>' + r.sinCambios + '</b> ya estaban y no cambiaron (no se duplican) · 🔄 <b>' + r.cambiadas + '</b> con cambios (actualizadas)</li>';
     if (r.materialesNuevos.length) h += '<li>🆕 Materiales nuevos agregados al catálogo (revisa su unidad): ' + esc(r.materialesNuevos.join(', ')) + '</li>';
     if (r.ignorados && r.ignorados.length) h += '<li>⛔ Ignorados (no descontaron): ' + esc(r.ignorados.join(', ')) + '</li>';
     if (r.sinMovil) h += '<li>⚠️ ' + r.sinMovil + ' OT no se pudieron ligar a una móvil y no descontaron stock.</li>';
@@ -8952,12 +8953,16 @@ async function consEjecutar(mapa) {
       h += '<div style="margin-top:8px"><b class="segNeg">⚠️ ' + r.totalSinReporte + ' OT finalizadas en Seguimiento no vienen en el reporte de materiales:</b> ' +
         r.sinReporte.map(x => esc(x.orden) + ' (M' + esc(x.movil) + ')').join(', ') + (r.totalSinReporte > r.sinReporte.length ? '…' : '') + '</div>';
     }
+    if (r.cambiadas) {
+      h += '<div style="margin-top:8px"><b style="color:#b8860b">🔄 OT que cambiaron respecto a la carga anterior (ya quedaron actualizadas):</b><ul style="margin:4px 0 0 18px">' +
+        r.cambios.map(x => '<li><b>' + esc(x.orden) + '</b> (M' + esc(x.movil) + '): ' + esc(x.detalle.join(' · ')) + '</li>').join('') + '</ul>' + (r.cambiadas > r.cambios.length ? '<div>… y ' + (r.cambiadas - r.cambios.length) + ' más.</div>' : '') + '</div>';
+    }
     h += '</div>';
     $('bodConsResultado').innerHTML = h;
 
     consFilas = null; consLista = [];
     await cargarBodega();
-    toast('Materiales importados: ' + r.ordenes + ' OT.');
+    toast('Importado: ' + r.nuevas + ' nuevas, ' + r.cambiadas + ' con cambios, ' + r.sinCambios + ' sin cambios.');
 
   } catch (e) {
     mostrarError(e, 'No se pudo importar el reporte de materiales.');
@@ -11840,6 +11845,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 19 · 13-oct 10:30</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 20 · 13-oct 11:00</div>
 </body>
 </html>

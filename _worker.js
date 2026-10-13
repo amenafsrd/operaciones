@@ -5759,7 +5759,7 @@ const INV = {
       'Referencia', 'Obs', 'Usuario', 'Creado', 'Concepto', 'Consecutivo', 'Linea', 'Editado'],
     CON: ['Fecha', 'N_Orden', 'ID_Movil', 'Movil', 'Clave', 'Material', 'Cantidad', 'Archivo', 'Carga', 'Contrato'],
     OBJ: ['ID_Movil', 'Clave', 'Objetivo'],
-    CARGAS: ['Fecha_Hora', 'Archivo', 'Filas', 'OT', 'Fechas', 'Sin_Movil', 'Usuario'],
+    CARGAS: ['Fecha_Hora', 'Archivo', 'Filas', 'OT', 'Fechas', 'Sin_Movil', 'Usuario', 'Nuevas', 'Cambiadas', 'Sin_Cambios', 'Cambios'],
     ALE: ['Clave', 'Usuario', 'Fecha_Hora', 'Disponible'],
     DEVL: ['Linea', 'Periodo', 'Archivo', 'Fecha_Cierre', 'N_Orden', 'Contrato', 'ID_Movil', 'Movil', 'Contrata', 'Averia', 'Tipo', 'Servicio',
       'Equipo', 'Equipo_Original', 'Debe', 'Devuelto', 'Justificado', 'Motivo_Justif', 'Justif_Por', 'Justif_Fecha', 'Boletas', 'Fecha_Devolucion', 'Cambio_Motivo', 'Cargado', 'Usuario', 'Recibido_Por'],
@@ -6036,7 +6036,9 @@ function obtenerBodegaWeb(token) {
 
   const cargas = leerObjetos_(invHoja_('CARGAS')).slice(-8).reverse().map(c => ({
     hora: txt_(c.Fecha_Hora), archivo: txt_(c.Archivo), filas: Number(c.Filas) || 0,
-    ot: Number(c.OT) || 0, fechas: txt_(c.Fechas), sinMovil: Number(c.Sin_Movil) || 0, usuario: txt_(c.Usuario)
+    ot: Number(c.OT) || 0, fechas: txt_(c.Fechas), sinMovil: Number(c.Sin_Movil) || 0, usuario: txt_(c.Usuario),
+    nuevas: txt_(c.Nuevas) === '' ? null : Number(c.Nuevas) || 0, cambiadas: Number(c.Cambiadas) || 0, sinCambios: Number(c.Sin_Cambios) || 0,
+    cambios: (() => { try { return JSON.parse(txt_(c.Cambios) || '[]'); } catch (e) { return []; } })()
   }));
 
   return {
@@ -6588,7 +6590,8 @@ function guardarMaterialInvWeb(token, d) {
 }
 
 /* Importa el Reporte de Materiales por Móvil: cada OT descuenta lo que usó del stock de su móvil.
-   Si la OT ya estaba cargada se reemplaza (se puede volver a subir el mismo archivo). */
+   Se pueden subir varios cortes en el día (cada uno trae todo lo finalizado): una OT que ya estaba cargada NO se duplica;
+   si no cambió se deja igual, y si cambió (materiales, móvil o fecha) se actualiza y se avisa qué cambió. */
 function importarConsumoWeb(token, filas, archivo, mapa) {
 
   const ses = requerirSesion_(token, 'operador');
@@ -6669,15 +6672,38 @@ function importarConsumoWeb(token, filas, archivo, mapa) {
     const ordenes = Object.keys(porOrden);
     if (!ordenes.length) throw new Error('No encontré órdenes en el archivo. ¿Es el Reporte de Materiales por Móvil?');
 
-    /* Reemplaza lo que ya estaba cargado de esas OT */
+    /* Compara contra lo ya cargado: nuevas se agregan, iguales se dejan, cambiadas se actualizan */
     const shCon = invHoja_('CON');
-    const previas = leerObjetos_(shCon).filter(r => !porOrden[txt_(r.N_Orden)]);
+    const todas = leerObjetos_(shCon);
+    const prev = {};
+    todas.forEach(r => {
+      const o = txt_(r.N_Orden);
+      const p = prev[o] = prev[o] || { fecha: invFecha_(r.Fecha), idMovil: txt_(r.ID_Movil), movil: txt_(r.Movil), items: {} };
+      const c = txt_(r.Clave);
+      p.items[c] = invRedondear_((p.items[c] || 0) + invNum_(r.Cantidad));
+    });
 
-    const nuevas = [];
-    let lineas = 0;
+    const cambios = [], reemplazar = {}, nuevas = [];
+    let lineas = 0, nNuevas = 0, nSin = 0, nCamb = 0;
+    const fmtQ = v => String(invRedondear_(v));
+
     ordenes.forEach(o => {
       const x = porOrden[o];
       if (!x.m) return;
+      const p = prev[o];
+      if (p) {
+        const dif = [];
+        Object.keys(Object.assign({}, p.items, x.cant)).forEach(c => {
+          const a = p.items[c] || 0, b = x.cant[c] || 0;
+          if (Math.abs(a - b) > 0.0001) dif.push((nombreDe[c] || c) + ': ' + fmtQ(a) + ' → ' + fmtQ(b));
+        });
+        if (p.idMovil !== String(x.m.ID_Movil)) dif.push('Móvil: ' + p.movil + ' → ' + txt_(x.m.Movil));
+        if (x.fecha && p.fecha && x.fecha !== p.fecha) dif.push('Fecha: ' + p.fecha + ' → ' + x.fecha);
+        if (!dif.length) { nSin++; return; }
+        nCamb++;
+        reemplazar[o] = true;
+        cambios.push({ orden: o, movil: txt_(x.m.Movil), detalle: dif });
+      } else nNuevas++;
       Object.keys(x.cant).forEach(c => {
         nuevas.push({
           Fecha: x.fecha, N_Orden: o, ID_Movil: String(x.m.ID_Movil), Movil: txt_(x.m.Movil),
@@ -6686,6 +6712,9 @@ function importarConsumoWeb(token, filas, archivo, mapa) {
         lineas++;
       });
     });
+
+    /* Las OT sin cambios conservan sus filas (y la carga original que las trajo) */
+    const previas = todas.filter(r => !reemplazar[txt_(r.N_Orden)]);
 
     invReescribir_(shCon, 'CON', previas.map(r => ({
       Fecha: invFecha_(r.Fecha), N_Orden: txt_(r.N_Orden), ID_Movil: txt_(r.ID_Movil), Movil: txt_(r.Movil),
@@ -6703,11 +6732,13 @@ function importarConsumoWeb(token, filas, archivo, mapa) {
 
     invAgregar_(invHoja_('CARGAS'), 'CARGAS', [{
       Fecha_Hora: horaCarga, Archivo: archivo, Filas: filas.length, OT: ordenes.length,
-      Fechas: dias.sort().join(', '), Sin_Movil: sinMovil, Usuario: ses.usuario
+      Fechas: dias.sort().join(', '), Sin_Movil: sinMovil, Usuario: ses.usuario,
+      Nuevas: nNuevas, Cambiadas: nCamb, Sin_Cambios: nSin, Cambios: JSON.stringify(cambios.slice(0, 40)).slice(0, 3000)
     }]);
 
     return {
       ok: true, filas: filas.length, ordenes: ordenes.length, lineas: lineas, sinMovil: sinMovil,
+      nuevas: nNuevas, sinCambios: nSin, cambiadas: nCamb, cambios: cambios.slice(0, 60),
       fechas: dias.sort(), materialesNuevos: nuevos, ignorados: ignorados,
       finalizadasSeg: finSeg.length, sinReporte: sinReporte.slice(0, 60), totalSinReporte: sinReporte.length,
       noEnSeguimiento: noEnSeguimiento
@@ -7219,7 +7250,17 @@ function obtenerNotificacionesWeb(token) {
       leerObjetos_(invHoja_('CARGAS')).forEach(c => {
         const f = txt_(c.Fecha_Hora);
         if (f < d7) return;
-        eventos.push({ id: 'car|' + f, tipo: 'bodega', icono: '📥', titulo: 'Consumo importado: ' + txt_(c.Archivo), detalle: (Number(c.OT) || 0) + ' OT · por ' + txt_(c.Usuario), fecha: f, vista: 'bodega', propio: txt_(c.Usuario) === ses.usuario });
+        const nCamb = Number(c.Cambiadas) || 0, hayNuevas = txt_(c.Nuevas) !== '';
+        eventos.push({ id: 'car|' + f, tipo: 'bodega', icono: '📥', titulo: 'Consumo importado: ' + txt_(c.Archivo),
+          detalle: hayNuevas ? ((Number(c.Nuevas) || 0) + ' OT nuevas · ' + (Number(c.Sin_Cambios) || 0) + ' sin cambios · ' + nCamb + ' con cambios · por ' + txt_(c.Usuario)) : ((Number(c.OT) || 0) + ' OT · por ' + txt_(c.Usuario)),
+          fecha: f, vista: 'bodega', propio: txt_(c.Usuario) === ses.usuario });
+        if (nCamb > 0) {
+          let lista = [];
+          try { lista = JSON.parse(txt_(c.Cambios) || '[]'); } catch (e) { lista = []; }
+          eventos.push({ id: 'carc|' + f, tipo: 'bodega', icono: '🔄', titulo: nCamb + ' OT cambiaron en el reporte de materiales',
+            detalle: lista.slice(0, 4).map(x => 'OT ' + x.orden + ' (M' + x.movil + '): ' + (x.detalle || []).slice(0, 2).join(', ')).join(' · ') + (nCamb > 4 ? ' · y ' + (nCamb - 4) + ' más' : ''),
+            fecha: f, vista: 'bodega', propio: txt_(c.Usuario) === ses.usuario });
+        }
       });
       leerObjetos_(invHoja_('CORTES')).forEach(c => {
         const f = txt_(c.Cerrado);
