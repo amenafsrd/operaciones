@@ -9450,13 +9450,14 @@ function renderCortes() {
   const l = todos.filter(c => (!ft || c.tipo === ft) && (!fe || c.estado === fe) && (!fd || c.fecha >= fd) && (!fh || c.fecha <= fh) &&
     (!$('invFDif').checked || c.diferencias > 0) && (!q || [c.corte, c.usuario, c.cerradoPor, c.tipo].join(' ').toLowerCase().indexOf(q) !== -1));
   $('invFCuenta').textContent = l.length === todos.length ? '' : l.length + ' de ' + todos.length + ' conteos';
-  $('invLista').innerHTML = !l.length ? (todos.length ? '<div class="empty">Ningún conteo coincide con la búsqueda o los filtros.</div>' : '<div class="empty">Aún no hay cortes de inventario. Crea el primero con la fecha del conteo (por ejemplo, el último día del mes).</div>') :
+  $('invLista').innerHTML = !l.length ? (todos.length ? '<div class="empty">Ningún conteo coincide con la búsqueda o los filtros.</div>' : '<div class="empty">Aún no hay cortes de inventario. Crea el primero con la fecha del conteo (por ejemplo, el último día del mes). Si todavía no hay inventario cargado, el primer conteo físico sirve como inventario inicial.</div>') :
     '<table class="table" style="min-width:820px"><thead><tr><th>Corte</th><th>Tipo</th><th>Fecha</th><th>Estado</th><th>Contados</th><th>Con diferencia</th><th>Creó</th><th>Cerró</th><th></th></tr></thead><tbody>' +
     l.map(c => '<tr><td><b>' + esc(c.corte) + '</b></td><td>' + (c.tipo === 'Individual' ? '<span class="segBadge t">Individual</span><div style="font-size:11px;color:#777">' + esc(c.corte.split('_')[0]) + '</div>' : 'General') + '</td><td>' + esc(fmtFechaSeg(c.fecha)) + '</td>' +
       '<td>' + (c.estado === 'Cerrado' ? '<span class="segBadge c">🔒 Cerrado</span>' : '<span class="segBadge t">✏️ Abierto</span>') + '</td>' +
       '<td>' + c.contados + '</td><td>' + (c.diferencias ? '<b class="segNeg">' + c.diferencias + '</b>' : '0') + '</td>' +
       '<td>' + esc(c.usuario) + '</td><td>' + (c.cerrado ? esc(c.cerradoPor) + '<div style="font-size:11px;color:#888">' + esc(c.cerrado) + '</div>' : '—') + '</td>' +
-      '<td><button class="btnMini" onclick="abrirCorte(\'' + escJs(c.corte) + '\')">' + (c.estado === 'Cerrado' ? '👁️ Ver' : '📝 Contar') + '</button></td></tr>').join('') + '</tbody></table>';
+      '<td style="white-space:nowrap"><button class="btnMini" onclick="abrirCorte(\'' + escJs(c.corte) + '\')">' + (c.estado === 'Cerrado' ? '👁️ Ver' : '📝 Contar') + '</button>' +
+        (c.estado !== 'Cerrado' && puedeEditar() && (esAdmin() || c.usuario === sesion.usuario) ? ' <button class="btnMini" title="Eliminar este corte" style="color:#b71c1c" onclick="eliminarCorte(\'' + escJs(c.corte) + '\')">🗑️ Eliminar</button>' : '') + '</td></tr>').join('') + '</tbody></table>';
 }
 
 function invTipoCambio() {
@@ -9888,6 +9889,17 @@ async function cerrarCorte() {
     abrirCorte(invActual.info.corte);
   } catch (e) {
     mostrarError(e, 'No se pudo cerrar el corte.');
+  }
+}
+
+async function eliminarCorte(corte) {
+  if (!confirm('¿Eliminar el corte ' + corte + '?\n\nSe borra también lo que se haya contado en él. Esta acción no se puede deshacer.')) return;
+  try {
+    await api('eliminarCorteInvWeb', corte);
+    toast('Corte eliminado.');
+    await cargarCortes();
+  } catch (e) {
+    mostrarError(e, 'No se pudo eliminar el corte.');
   }
 }
 
@@ -12110,6 +12122,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 27 · 13-oct 14:50</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 28 · 13-oct 15:10</div>
 </body>
 </html>
