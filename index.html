@@ -6236,7 +6236,7 @@ function renderEstadoOt(reiniciar) {
     (ed ? '<th><input type="checkbox" onchange="segSelTodasEst(this.checked)" title="Seleccionar todas las visibles"></th>' : '') +
     '<th>OT</th><th>Contrato</th><th>Móvil</th><th>Tipo</th><th>Estado en plataforma</th><th>Estado actual</th></tr></thead><tbody>' +
     l.slice(0, lim).map(x => '<tr>' +
-      (ed ? '<td><input type="checkbox" class="chkEst" data-orden="' + esc(x.orden) + '"' + (segSelEst[x.orden] ? ' checked' : '') + ' onchange="segToggleEst(\'' + escJs(x.orden) + '\',this.checked)"></td>' : '') +
+      (ed ? '<td>' + (x.estado === 'FINALIZADA' ? '<span title="Finalizada por la plataforma: no se puede cambiar" style="color:#9aa4b2">🔒</span>' : '<input type="checkbox" class="chkEst" data-orden="' + esc(x.orden) + '"' + (segSelEst[x.orden] ? ' checked' : '') + ' onchange="segToggleEst(\'' + escJs(x.orden) + '\',this.checked)">') + '</td>' : '') +
       '<td><b>' + esc(x.orden) + '</b></td><td>' + esc(x.contrato) + '</td><td>' + esc(x.movil) + '</td><td>' + esc(x.tipo) + '</td>' +
       '<td>' + esc((x.estadoPlat || x.estado).toLowerCase()) + '</td>' +
       '<td><b style="color:' + (col[x.estado] || '#333') + '">' + esc(x.estado.toLowerCase()) + '</b>' +
@@ -12110,6 +12110,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 26 · 13-oct 13:15</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 27 · 13-oct 14:50</div>
 </body>
 </html>
