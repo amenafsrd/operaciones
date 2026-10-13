@@ -1319,7 +1319,7 @@
             <div class="panelHead">
               <div>
                 <h2>🔧 Estado de las OT <span id="segEstOtResumen" style="font-size:13px;font-weight:600;margin-left:8px"></span></h2>
-                <div style="font-size:12px;color:#777;margin-top:3px">Si una OT quedó finalizada (44) pero la plataforma la muestra pendiente o reasignada, cámbiala aquí. Si después la plataforma la reporta iniciada o finalizada, se actualiza sola. Al cierre del día no deben quedar pendientes.</div>
+                <div style="font-size:12px;color:#777;margin-top:3px">Las finalizadas solo vienen de la plataforma (OT realmente instaladas). Aquí marca como suspendida o reasignada las que no se hicieron. Si después se rescata y la plataforma la reporta iniciada o finalizada, se actualiza sola. Al cierre del día no deben quedar pendientes.</div>
               </div>
               <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
                 <select id="segEstOtFiltro" onchange="renderEstadoOt()">
@@ -6213,8 +6213,8 @@ function renderEstadoOt(reiniciar) {
   $('segEstOtBarra').innerHTML = ed
     ? '<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;padding:12px 15px;border-bottom:1px solid #eee">' +
       '<div class="field" style="min-width:230px"><label>Cambiar las OT seleccionadas a</label><select id="segEstOtNuevo" onchange="segEstOtMotivoVis()">' +
-      '<option value="FINALIZADA">✔️ Finalizada (quedó 44)</option><option value="REASIGNADA">🔁 Reasignada</option><option value="SUSPENDIDA">⏸️ Suspendida</option><option value="">↩️ Quitar cambio manual</option></select></div>' +
-      '<div class="field" id="segEstOtMotivoBox" style="min-width:300px;flex:1;display:none"><label>Motivo de la suspensión</label><select id="segEstOtMotivo"><option value="">Elige el motivo...</option>' +
+      '<option value="SUSPENDIDA">⏸️ Suspendida</option><option value="REASIGNADA">🔁 Reasignada</option><option value="">↩️ Quitar cambio manual</option></select></div>' +
+      '<div class="field" id="segEstOtMotivoBox" style="min-width:300px;flex:1;display:block"><label>Motivo de la suspensión</label><select id="segEstOtMotivo"><option value="">Elige el motivo...</option>' +
       d.listaMotivos.map(m => '<option value="' + esc(m) + '">' + esc(m) + '</option>').join('') + '</select></div>' +
       '<button id="segEstOtBtn" class="btn primary" onclick="segGuardarEstadoOt()"' + (n ? '' : ' disabled') + '>' + (n ? 'Aplicar a ' + n + ' OT' : 'Aplicar') + '</button></div>'
     : '';
@@ -12104,6 +12104,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 23 · 13-oct 12:00</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 24 · 13-oct 12:15</div>
 </body>
 </html>

@@ -4294,7 +4294,8 @@ const SEG = {
     SUSP: 'SEG_SUSP',
     CORTES: 'SEG_CORTES',
     TIEMPOS: 'SEG_TIEMPOS',
-    AUSENCIAS: 'SEG_AUSENCIAS'
+    AUSENCIAS: 'SEG_AUSENCIAS',
+    ESTADOS: 'SEG_ESTADOS'
   },
 
   HEADERS: {
@@ -4312,7 +4313,8 @@ const SEG = {
     TIEMPOS: ['Fecha', 'N_Orden', 'Tipo', 'ID_Movil', 'Justificacion', 'Usuario', 'Actualizado'],
     AUSENCIAS: ['ID', 'Fecha', 'Tipo', 'ID_Movil', 'Movil', 'Tecnico', 'Zona', 'Motivo', 'Reporto',
       'Cubrio_Ruta', 'Cubierta_Por', 'Penaliza', 'Monto', 'Estado_Pen', 'Fecha_Aplicada',
-      'Hora_Salida', 'Autorizo', 'Obs', 'Usuario', 'Creado', 'Actualizado']
+      'Hora_Salida', 'Autorizo', 'Obs', 'Usuario', 'Creado', 'Actualizado'],
+    ESTADOS: ['Fecha', 'N_Orden', 'Estado', 'Estado_Plataforma', 'Motivo', 'Usuario', 'Actualizado']
   },
 
   /* Columnas que deben quedarse como texto (fechas, OT, contratos, horas) */
@@ -4323,7 +4325,8 @@ const SEG = {
     SUSP: ['ID', 'Fecha', 'Contrato', 'N_Orden', 'ID_Movil', 'Movil', 'Creado'],
     CORTES: ['Fecha_Hora', 'Fecha', 'Corte'],
     TIEMPOS: ['Fecha', 'N_Orden', 'Tipo', 'ID_Movil'],
-    AUSENCIAS: ['ID', 'Fecha', 'ID_Movil', 'Movil', 'Fecha_Aplicada', 'Hora_Salida', 'Creado', 'Actualizado']
+    AUSENCIAS: ['ID', 'Fecha', 'ID_Movil', 'Movil', 'Fecha_Aplicada', 'Hora_Salida', 'Creado', 'Actualizado'],
+    ESTADOS: ['Fecha', 'N_Orden', 'Actualizado']
   },
 
   PENALIZACIONES: { 'Ausencia': 75000, 'Abandono de ruta': 25000, 'Salida temprano': 0, 'Llegada tarde': 0, 'Incumplimiento de procedimiento': 0, 'Daño o accidente': 0, 'Otra penalización': 0 },
@@ -4637,6 +4640,25 @@ function obtenerSeguimientoWeb(token, fecha) {
     return d >= desde14 && d <= fecha;
   });
 
+  /* Estados puestos a mano por el back office (ej. la OT quedó 44 pero la plataforma la muestra reasignada/pendiente).
+     Se respetan mientras la plataforma no avance: si luego la OT sale INICIADA o FINALIZADA en un corte, manda la plataforma. */
+  const manualEstado = {};
+  segLeer_('ESTADOS', desde14, fecha).forEach(e => {
+    if (txt_(e.Fecha) >= desde14 && txt_(e.Fecha) <= fecha) manualEstado[txt_(e.Fecha) + '|' + txt_(e.N_Orden)] = e;
+  });
+  otsTodas.forEach(o => {
+    const e = manualEstado[txt_(o.Fecha) + '|' + txt_(o.N_Orden)];
+    if (!e) return;
+    const plat = txt_(o.Estado).toUpperCase();
+    o.Estado_Plataforma = plat;
+    if (plat === 'FINALIZADA' || plat === 'INICIADA') return;
+    const nuevo = txt_(e.Estado).toUpperCase();
+    if (nuevo !== 'REASIGNADA' && nuevo !== 'SUSPENDIDA') return;
+    o.Estado = nuevo;
+    o.Manual = '1';
+    if (nuevo === 'SUSPENDIDA') o.Motivo_Sus = txt_(e.Motivo) || txt_(o.Motivo_Sus) || 'SUSPENDIDA';
+  });
+
   const ots = otsTodas.filter(o => txt_(o.Fecha) === fecha);
   const suspManual = suspTodas.filter(s => txt_(s.Fecha) === fecha);
 
@@ -4697,7 +4719,8 @@ function obtenerSeguimientoWeb(token, fecha) {
       tipo: txt_(o.Tipo_Orden), averia: txt_(o.Averia), hora: txt_(o.Hora_Ejecuta),
       horaIni: txt_(o.Hora_Ini), horaFin: txt_(o.Hora_Fin),
       corte: txt_(o.Corte), estado: estado, motivo: txt_(o.Motivo_Sus),
-      movilOrigen: origen, estadoPrevio: txt_(o.Estado_Previo), ultimoCorte: txt_(o.Ultimo_Corte)
+      movilOrigen: origen, estadoPrevio: txt_(o.Estado_Previo), ultimoCorte: txt_(o.Ultimo_Corte),
+      manual: o.Manual === '1', estadoPlat: txt_(o.Estado_Plataforma) || estado
     };
     lista.push(item);
 
@@ -5716,6 +5739,65 @@ function marcarSuspendidasWeb(token, fecha, ordenes, motivo, obs) {
     }
 
     return { ok: true, marcadas: filas.length, omitidas: omitidas };
+  });
+}
+
+/* Cambia a mano el estado de OT (REASIGNADA o SUSPENDIDA; las finalizadas solo las reporta la plataforma) o quita el cambio (estado vacío) */
+function guardarEstadoOtWeb(token, fecha, ordenes, estado, motivo) {
+
+  const ses = requerirSesion_(token, 'operador');
+
+  fecha = segFecha_(fecha);
+  if (!fecha) throw new Error('Fecha no válida.');
+  estado = txt_(estado).toUpperCase();
+  if (['REASIGNADA', 'SUSPENDIDA', ''].indexOf(estado) === -1) throw new Error('Estado no válido. Las finalizadas solo vienen de la plataforma.');
+  motivo = txt_(motivo).slice(0, 120);
+  if (estado === 'SUSPENDIDA' && !motivo) throw new Error('Elige el motivo de la suspensión.');
+  if (!Array.isArray(ordenes) || !ordenes.length) throw new Error('Selecciona al menos una OT.');
+  if (ordenes.length > 300) throw new Error('Demasiadas OT en una sola vez.');
+
+  return conBloqueo_(() => {
+
+    const plat = {};
+    segLeer_('OT', fecha, fecha).forEach(o => { if (txt_(o.Fecha) === fecha) plat[txt_(o.N_Orden)] = txt_(o.Estado).toUpperCase(); });
+
+    const sh = segHoja_('ESTADOS');
+    const t = leerTabla_(sh);
+    const ncol = t.values[0].length;
+    const pos = {};
+    t.values.forEach((r, i) => { if (i > 0 && txt_(r[t.idx.Fecha]) === fecha) pos[txt_(r[t.idx.N_Orden])] = i; });
+
+    const ahora = segAhora_();
+    const nuevas = [];
+    const borrar = [];
+    let cambiadas = 0, omitidas = 0;
+
+    ordenes.forEach(x => {
+      const orden = segOrden_(x);
+      if (!orden || plat[orden] === undefined) { omitidas++; return; }
+      const i = pos[orden];
+      if (!estado) {
+        if (i !== undefined) { borrar.push(i); cambiadas++; } else omitidas++;
+        return;
+      }
+      if (plat[orden] === 'FINALIZADA') { omitidas++; return; }
+      const o = { Fecha: fecha, N_Orden: orden, Estado: estado, Estado_Plataforma: plat[orden],
+        Motivo: estado === 'SUSPENDIDA' ? motivo : '', Usuario: ses.usuario, Actualizado: ahora };
+      const fila = new Array(ncol).fill('');
+      Object.keys(o).forEach(n => { if (t.idx[n] !== undefined) fila[t.idx[n]] = o[n]; });
+      if (i !== undefined) sh.getRange(i + 1, 1, 1, ncol).setValues([fila]);
+      else nuevas.push(fila);
+      cambiadas++;
+    });
+
+    if (nuevas.length) {
+      const ini = sh.getLastRow() + 1;
+      if (ini + nuevas.length - 1 > sh.getMaxRows()) sh.insertRowsAfter(sh.getMaxRows(), nuevas.length);
+      sh.getRange(ini, 1, nuevas.length, ncol).setValues(nuevas);
+    }
+    borrar.sort((a, b) => b - a).forEach(i => sh.deleteRow(i + 1));
+
+    return { ok: true, cambiadas: cambiadas, omitidas: omitidas };
   });
 }
 
@@ -9060,7 +9142,7 @@ function prepararSistemaWeb(token) {
 
   }
 
-return {loginWeb: loginWeb, miPerfilWeb: miPerfilWeb, guardarFotoPerfilWeb: guardarFotoPerfilWeb, validarSesionWeb: validarSesionWeb, logoutWeb: logoutWeb, cambiarClaveWeb: cambiarClaveWeb, listarUsuariosWeb: listarUsuariosWeb, crearUsuarioWeb: crearUsuarioWeb, actualizarUsuarioWeb: actualizarUsuarioWeb, obtenerDatosWeb: obtenerDatosWeb, obtenerSemanasWeb: obtenerSemanasWeb, obtenerCalendarioWeb: obtenerCalendarioWeb, obtenerRotacionBackupWeb: obtenerRotacionBackupWeb, guardarCalendarioWeb: guardarCalendarioWeb, obtenerHistorialWeb: obtenerHistorialWeb, agregarMovilWeb: agregarMovilWeb, actualizarMovilWeb: actualizarMovilWeb, obtenerHistorialMovilWeb: obtenerHistorialMovilWeb, darDeBajaMovilWeb: darDeBajaMovilWeb, reactivarMovilWeb: reactivarMovilWeb, exportarCalendarioClienteExcelWeb: exportarCalendarioClienteExcelWeb, obtenerResumenWeb: obtenerResumenWeb, obtenerFichasWeb: obtenerFichasWeb, guardarFichasWeb: guardarFichasWeb, obtenerPersonalWeb: obtenerPersonalWeb, buscarPersonaWeb: buscarPersonaWeb, obtenerVehiculosWeb: obtenerVehiculosWeb, deshacerSinTecnicosWeb: deshacerSinTecnicosWeb, guardarSalidaPersonalWeb: guardarSalidaPersonalWeb, obtenerCambiosFichasWeb: obtenerCambiosFichasWeb, exportarFichasExcelWeb: exportarFichasExcelWeb, obtenerSeguimientoWeb: obtenerSeguimientoWeb, guardarJustificacionTiempoWeb: guardarJustificacionTiempoWeb, guardarSeguimientoWeb: guardarSeguimientoWeb, guardarAlmuerzoWeb: guardarAlmuerzoWeb, guardarSalidaWeb: guardarSalidaWeb, corregirCorteWeb: corregirCorteWeb, eliminarCorteWeb: eliminarCorteWeb, obtenerAusenciasWeb: obtenerAusenciasWeb, guardarAusenciaWeb: guardarAusenciaWeb, marcarPenalizacionWeb: marcarPenalizacionWeb, eliminarAusenciaWeb: eliminarAusenciaWeb, importarFinalizadasWeb: importarFinalizadasWeb, guardarSuspendidaWeb: guardarSuspendidaWeb, marcarSuspendidasWeb: marcarSuspendidasWeb, eliminarSuspendidaWeb: eliminarSuspendidaWeb, obtenerBodegaWeb: obtenerBodegaWeb, guardarAlistosWeb: guardarAlistosWeb, obtenerAlistosWeb: obtenerAlistosWeb, cambiarEstadoAlistoWeb: cambiarEstadoAlistoWeb, aplicarAlistoWeb: aplicarAlistoWeb, obtenerMovimientosInvWeb: obtenerMovimientosInvWeb, guardarMovimientoInvWeb: guardarMovimientoInvWeb, firmarMovimientoInvWeb: firmarMovimientoInvWeb, obtenerFirmaInvWeb: obtenerFirmaInvWeb, eliminarMovimientoInvWeb: eliminarMovimientoInvWeb, guardarObjetivosWeb: guardarObjetivosWeb, aplicarCostosAdendumWeb: aplicarCostosAdendumWeb, guardarMaterialInvWeb: guardarMaterialInvWeb, importarConsumoWeb: importarConsumoWeb, obtenerConsumoDetalleWeb: obtenerConsumoDetalleWeb, eliminarCargaConsumoWeb: eliminarCargaConsumoWeb, importarDevolucionesWeb: importarDevolucionesWeb, obtenerDevolucionesWeb: obtenerDevolucionesWeb, obtenerHistorialDevolucionWeb: obtenerHistorialDevolucionWeb, registrarDevolucionLineaWeb: registrarDevolucionLineaWeb, recibirLineasDevolucionWeb: recibirLineasDevolucionWeb, registrarBoletaDevolucionWeb: registrarBoletaDevolucionWeb, registrarEntregaMovilWeb: registrarEntregaMovilWeb, justificarDevolucionWeb: justificarDevolucionWeb, cambiarEquipoDevolucionWeb: cambiarEquipoDevolucionWeb, revertirDevolucionWeb: revertirDevolucionWeb, eliminarPeriodoDevolucionesWeb: eliminarPeriodoDevolucionesWeb, aceptarAlertasBodegaWeb: aceptarAlertasBodegaWeb, obtenerNotificacionesWeb: obtenerNotificacionesWeb, obtenerConsumoInvWeb: obtenerConsumoInvWeb, obtenerCortesInvWeb: obtenerCortesInvWeb, crearCorteInvWeb: crearCorteInvWeb, obtenerConteoInvWeb: obtenerConteoInvWeb, guardarConteoInvWeb: guardarConteoInvWeb, justificarDiferenciaInvWeb: justificarDiferenciaInvWeb, cerrarCorteInvWeb: cerrarCorteInvWeb, reabrirCorteInvWeb: reabrirCorteInvWeb, guardarMapeoInvWeb: guardarMapeoInvWeb, compararClienteWeb: compararClienteWeb, cargarCatalogoOficialWeb: cargarCatalogoOficialWeb, aplicarObjetivoBaseWeb: aplicarObjetivoBaseWeb, unirMaterialInvWeb: unirMaterialInvWeb, eliminarMaterialesInvWeb: eliminarMaterialesInvWeb, kardexMaterialWeb: kardexMaterialWeb, guardarClienteCotWeb: guardarClienteCotWeb, eliminarClienteCotWeb: eliminarClienteCotWeb, guardarMaterialCotWeb: guardarMaterialCotWeb, eliminarMaterialCotWeb: eliminarMaterialCotWeb, importarMaterialesCotWeb: importarMaterialesCotWeb, obtenerCotizacionesWeb: obtenerCotizacionesWeb, obtenerCotizacionWeb: obtenerCotizacionWeb, guardarCotizacionWeb: guardarCotizacionWeb, cambiarEstadoCotWeb: cambiarEstadoCotWeb, subirFotoCotWeb: subirFotoCotWeb, eliminarFotoCotWeb: eliminarFotoCotWeb, obtenerArchivoCotWeb: obtenerArchivoCotWeb, guardarInformeCotWeb: guardarInformeCotWeb, guardarGastoCotWeb: guardarGastoCotWeb, marcarPagoGastoCotWeb: marcarPagoGastoCotWeb, anularGastoCotWeb: anularGastoCotWeb, eliminarGastoCotWeb: eliminarGastoCotWeb, guardarOCCotWeb: guardarOCCotWeb, facturarCotWeb: facturarCotWeb, registrarPagoFacturaCotWeb: registrarPagoFacturaCotWeb, revertirPagoFacturaCotWeb: revertirPagoFacturaCotWeb, revertirFacturaCotWeb: revertirFacturaCotWeb, archivarCotWeb: archivarCotWeb, desarchivarCotWeb: desarchivarCotWeb, enviarCotWeb: enviarCotWeb, eliminarCotizacionWeb: eliminarCotizacionWeb, configurarConsecutivoCotWeb: configurarConsecutivoCotWeb, loginPaso1_: loginPaso1_, loginPaso2_: loginPaso2_, refrescarWeb: refrescarWeb, prepararSistemaWeb: prepararSistemaWeb};
+return {loginWeb: loginWeb, miPerfilWeb: miPerfilWeb, guardarFotoPerfilWeb: guardarFotoPerfilWeb, validarSesionWeb: validarSesionWeb, logoutWeb: logoutWeb, cambiarClaveWeb: cambiarClaveWeb, listarUsuariosWeb: listarUsuariosWeb, crearUsuarioWeb: crearUsuarioWeb, actualizarUsuarioWeb: actualizarUsuarioWeb, obtenerDatosWeb: obtenerDatosWeb, obtenerSemanasWeb: obtenerSemanasWeb, obtenerCalendarioWeb: obtenerCalendarioWeb, obtenerRotacionBackupWeb: obtenerRotacionBackupWeb, guardarCalendarioWeb: guardarCalendarioWeb, obtenerHistorialWeb: obtenerHistorialWeb, agregarMovilWeb: agregarMovilWeb, actualizarMovilWeb: actualizarMovilWeb, obtenerHistorialMovilWeb: obtenerHistorialMovilWeb, darDeBajaMovilWeb: darDeBajaMovilWeb, reactivarMovilWeb: reactivarMovilWeb, exportarCalendarioClienteExcelWeb: exportarCalendarioClienteExcelWeb, obtenerResumenWeb: obtenerResumenWeb, obtenerFichasWeb: obtenerFichasWeb, guardarFichasWeb: guardarFichasWeb, obtenerPersonalWeb: obtenerPersonalWeb, buscarPersonaWeb: buscarPersonaWeb, obtenerVehiculosWeb: obtenerVehiculosWeb, deshacerSinTecnicosWeb: deshacerSinTecnicosWeb, guardarSalidaPersonalWeb: guardarSalidaPersonalWeb, obtenerCambiosFichasWeb: obtenerCambiosFichasWeb, exportarFichasExcelWeb: exportarFichasExcelWeb, obtenerSeguimientoWeb: obtenerSeguimientoWeb, guardarJustificacionTiempoWeb: guardarJustificacionTiempoWeb, guardarSeguimientoWeb: guardarSeguimientoWeb, guardarAlmuerzoWeb: guardarAlmuerzoWeb, guardarSalidaWeb: guardarSalidaWeb, corregirCorteWeb: corregirCorteWeb, eliminarCorteWeb: eliminarCorteWeb, obtenerAusenciasWeb: obtenerAusenciasWeb, guardarAusenciaWeb: guardarAusenciaWeb, marcarPenalizacionWeb: marcarPenalizacionWeb, eliminarAusenciaWeb: eliminarAusenciaWeb, importarFinalizadasWeb: importarFinalizadasWeb, guardarSuspendidaWeb: guardarSuspendidaWeb, marcarSuspendidasWeb: marcarSuspendidasWeb, guardarEstadoOtWeb: guardarEstadoOtWeb, eliminarSuspendidaWeb: eliminarSuspendidaWeb, obtenerBodegaWeb: obtenerBodegaWeb, guardarAlistosWeb: guardarAlistosWeb, obtenerAlistosWeb: obtenerAlistosWeb, cambiarEstadoAlistoWeb: cambiarEstadoAlistoWeb, aplicarAlistoWeb: aplicarAlistoWeb, obtenerMovimientosInvWeb: obtenerMovimientosInvWeb, guardarMovimientoInvWeb: guardarMovimientoInvWeb, firmarMovimientoInvWeb: firmarMovimientoInvWeb, obtenerFirmaInvWeb: obtenerFirmaInvWeb, eliminarMovimientoInvWeb: eliminarMovimientoInvWeb, guardarObjetivosWeb: guardarObjetivosWeb, aplicarCostosAdendumWeb: aplicarCostosAdendumWeb, guardarMaterialInvWeb: guardarMaterialInvWeb, importarConsumoWeb: importarConsumoWeb, obtenerConsumoDetalleWeb: obtenerConsumoDetalleWeb, eliminarCargaConsumoWeb: eliminarCargaConsumoWeb, importarDevolucionesWeb: importarDevolucionesWeb, obtenerDevolucionesWeb: obtenerDevolucionesWeb, obtenerHistorialDevolucionWeb: obtenerHistorialDevolucionWeb, registrarDevolucionLineaWeb: registrarDevolucionLineaWeb, recibirLineasDevolucionWeb: recibirLineasDevolucionWeb, registrarBoletaDevolucionWeb: registrarBoletaDevolucionWeb, registrarEntregaMovilWeb: registrarEntregaMovilWeb, justificarDevolucionWeb: justificarDevolucionWeb, cambiarEquipoDevolucionWeb: cambiarEquipoDevolucionWeb, revertirDevolucionWeb: revertirDevolucionWeb, eliminarPeriodoDevolucionesWeb: eliminarPeriodoDevolucionesWeb, aceptarAlertasBodegaWeb: aceptarAlertasBodegaWeb, obtenerNotificacionesWeb: obtenerNotificacionesWeb, obtenerConsumoInvWeb: obtenerConsumoInvWeb, obtenerCortesInvWeb: obtenerCortesInvWeb, crearCorteInvWeb: crearCorteInvWeb, obtenerConteoInvWeb: obtenerConteoInvWeb, guardarConteoInvWeb: guardarConteoInvWeb, justificarDiferenciaInvWeb: justificarDiferenciaInvWeb, cerrarCorteInvWeb: cerrarCorteInvWeb, reabrirCorteInvWeb: reabrirCorteInvWeb, guardarMapeoInvWeb: guardarMapeoInvWeb, compararClienteWeb: compararClienteWeb, cargarCatalogoOficialWeb: cargarCatalogoOficialWeb, aplicarObjetivoBaseWeb: aplicarObjetivoBaseWeb, unirMaterialInvWeb: unirMaterialInvWeb, eliminarMaterialesInvWeb: eliminarMaterialesInvWeb, kardexMaterialWeb: kardexMaterialWeb, guardarClienteCotWeb: guardarClienteCotWeb, eliminarClienteCotWeb: eliminarClienteCotWeb, guardarMaterialCotWeb: guardarMaterialCotWeb, eliminarMaterialCotWeb: eliminarMaterialCotWeb, importarMaterialesCotWeb: importarMaterialesCotWeb, obtenerCotizacionesWeb: obtenerCotizacionesWeb, obtenerCotizacionWeb: obtenerCotizacionWeb, guardarCotizacionWeb: guardarCotizacionWeb, cambiarEstadoCotWeb: cambiarEstadoCotWeb, subirFotoCotWeb: subirFotoCotWeb, eliminarFotoCotWeb: eliminarFotoCotWeb, obtenerArchivoCotWeb: obtenerArchivoCotWeb, guardarInformeCotWeb: guardarInformeCotWeb, guardarGastoCotWeb: guardarGastoCotWeb, marcarPagoGastoCotWeb: marcarPagoGastoCotWeb, anularGastoCotWeb: anularGastoCotWeb, eliminarGastoCotWeb: eliminarGastoCotWeb, guardarOCCotWeb: guardarOCCotWeb, facturarCotWeb: facturarCotWeb, registrarPagoFacturaCotWeb: registrarPagoFacturaCotWeb, revertirPagoFacturaCotWeb: revertirPagoFacturaCotWeb, revertirFacturaCotWeb: revertirFacturaCotWeb, archivarCotWeb: archivarCotWeb, desarchivarCotWeb: desarchivarCotWeb, enviarCotWeb: enviarCotWeb, eliminarCotizacionWeb: eliminarCotizacionWeb, configurarConsecutivoCotWeb: configurarConsecutivoCotWeb, loginPaso1_: loginPaso1_, loginPaso2_: loginPaso2_, refrescarWeb: refrescarWeb, prepararSistemaWeb: prepararSistemaWeb};
 })();
 
 /* =====================================================================
