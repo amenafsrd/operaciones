@@ -9772,11 +9772,11 @@ const PM = {
   HOJAS: { PRE: 'PM_PRECIOS', CON: 'PM_CONTRATISTAS', SEM: 'PM_SEMANAS', ORD: 'PM_ORDENES', AJU: 'PM_AJUSTES', PAG: 'PM_PAGOS', EXT: 'PM_EXTRAS', PAR: 'PM_PARAMETROS', APE: 'PM_APELACIONES', PST: 'PM_PRESTAMOS', PMV: 'PM_PRESTAMOS_MOV' },
   HEADERS: {
     PRE: ['ID', 'Servicio', 'Precio', 'Alias', 'Orden', 'Activo', 'Precio_TC'],
-    CON: ['ID', 'Nombre', 'Cedula', 'IBAN', 'Moviles', 'Aplica_IVA', 'Telefono', 'Correo', 'Obs', 'Activo', 'Actualizado', 'Titular', 'Banco', 'Factura_Nombre', 'Factura_Cedula'],
+    CON: ['ID', 'Nombre', 'Cedula', 'IBAN', 'Moviles', 'Aplica_IVA', 'Telefono', 'Correo', 'Obs', 'Activo', 'Actualizado', 'Titular', 'Banco', 'Factura_Nombre', 'Factura_Cedula', 'Referencia_Banco'],
     SEM: ['ID', 'Desde', 'Hasta', 'Estado', 'Notas', 'Creado_Por', 'Creado', 'Cerrada'],
     ORD: ['ID', 'ID_Semana', 'Contrato', 'Cliente', 'Servicios', 'Cantidad', 'Costo_Archivo', 'Costo_Aplicado', 'Movil', 'Fecha', 'UF_Servicio', 'UF_Costo', 'Obs', 'Tipo', 'Manual', 'N_Orden', 'Validacion'],
     AJU: ['ID', 'ID_Semana', 'ID_Contratista', 'Tipo', 'Monto', 'Detalle', 'Contrato', 'Movil', 'Creado_Por', 'Creado', 'ID_Prestamo', 'Origen'],
-    PST: ['ID', 'ID_Contratista', 'Fecha', 'Monto', 'Tasa_Mensual', 'Cuota_Semanal', 'Concepto', 'Estado', 'Creado_Por', 'Creado'],
+    PST: ['ID', 'ID_Contratista', 'Fecha', 'Monto', 'Tasa_Mensual', 'Cuota_Semanal', 'Concepto', 'Estado', 'Creado_Por', 'Creado', 'Tasa_Semanal', 'Deudor_Tipo', 'Deudor_Nombre'],
     PMV: ['ID', 'ID_Prestamo', 'Fecha', 'Tipo', 'Monto', 'Nota', 'Creado_Por', 'Creado'],
     PAG: ['ID_Semana', 'ID_Contratista', 'Factura', 'Obs', 'Pagado', 'Actualizado', 'VB_Sin_Factura'],
     EXT: ['ID', 'ID_Semana', 'Nombre', 'Cedula', 'IBAN', 'Monto', 'Concepto', 'Creado'],
@@ -9922,9 +9922,9 @@ function guardarEmpresaPmWeb(token, d) {
 }
 
 function pmConInfo_(c) {
-  return { id: txt_(c.ID), nombre: txt_(c.Nombre), titular: txt_(c.Titular), cedula: txt_(c.Cedula), iban: pmIban_(c.IBAN), moviles: txt_(c.Moviles), aplicaIva: txt_(c.Aplica_IVA) !== 'No',
+  return { id: txt_(c.ID), nombre: txt_(c.Nombre), titular: txt_(c.Nombre), cedula: txt_(c.Cedula), iban: pmIban_(c.IBAN), moviles: txt_(c.Moviles), aplicaIva: txt_(c.Aplica_IVA) !== 'No',
     telefono: txt_(c.Telefono), correo: txt_(c.Correo), obs: txt_(c.Obs), activo: txt_(c.Activo) !== 'No',
-    banco: txt_(c.Banco), facturaNombre: txt_(c.Factura_Nombre), facturaCedula: txt_(c.Factura_Cedula) };
+    banco: txt_(c.Banco), referencia: txt_(c.Referencia_Banco), facturaNombre: '', facturaCedula: '' };
 }
 function pmMovilesDe_(c) { return String(c.moviles || '').split(/[^0-9]+/).filter(Boolean).map(x => String(Number(x))); }
 
@@ -9978,7 +9978,7 @@ function pmResumen_(ordenes, ajustes, contratistas, pagos, hasta) {
   const filas = {};
   const nueva = (id, c) => {
     return filas[id] = { idCon: id, nombre: c ? c.nombre : '', titular: c ? (c.titular || c.nombre) : '', adelanto: 0, cedula: c ? c.cedula : '', iban: c ? c.iban : '', aplicaIva: c ? c.aplicaIva : true, moviles: {}, nOrdenes: 0, detalle: 0, uf: 0,
-      reclamos: 0, alquileres: 0, penalizaciones: 0, camisas: 0, otros: 0, inventario: 0, ins: 0, rebajo: 0, prestamo: 0, herramientas: 0, extra: 0, factura: '', obs: '', pagado: '', vb: '', banco: c ? c.banco : '', facturaNombre: c ? c.facturaNombre : '', facturaCedula: c ? c.facturaCedula : '', sinContratista: !c };
+      reclamos: 0, alquileres: 0, penalizaciones: 0, camisas: 0, otros: 0, inventario: 0, ins: 0, rebajo: 0, prestamo: 0, herramientas: 0, extra: 0, factura: '', obs: '', pagado: '', vb: '', banco: c ? c.banco : '', referencia: c ? c.referencia : '', facturaNombre: '', facturaCedula: '', sinContratista: !c };
   };
   const conPorId = {}; contratistas.forEach(c => { conPorId[c.id] = c; });
   ordenes.forEach(o => {
@@ -10303,8 +10303,8 @@ function guardarContratistaPmWeb(token, d) {
       const choque = pmMovilesDe_({ moviles: txt_(c.Moviles) }).filter(m => misMov.indexOf(m) >= 0);
       if (choque.length) throw new Error('La móvil ' + choque.join(', ') + ' ya está asignada a «' + txt_(c.Nombre) + '». Quítala de allí primero (una móvil solo puede pagarse a un contratista).');
     });
-    const o = { Nombre: nombre, Titular: txt_(d.titular).replace(/\s+/g, ' ').slice(0, 100), Cedula: txt_(d.cedula).slice(0, 30), IBAN: iban, Moviles: moviles, Aplica_IVA: d.aplicaIva === false || txt_(d.aplicaIva) === 'No' ? 'No' : 'Sí',
-      Banco: txt_(d.banco).slice(0, 60), Factura_Nombre: txt_(d.facturaNombre).replace(/\s+/g, ' ').slice(0, 100), Factura_Cedula: txt_(d.facturaCedula).slice(0, 30),
+    const o = { Nombre: nombre, Titular: '', Cedula: txt_(d.cedula).slice(0, 30), IBAN: iban, Moviles: moviles, Aplica_IVA: d.aplicaIva === false || txt_(d.aplicaIva) === 'No' ? 'No' : 'Sí',
+      Banco: txt_(d.banco).slice(0, 60), Referencia_Banco: txt_(d.referencia).slice(0, 60), Factura_Nombre: '', Factura_Cedula: '',
       Telefono: txt_(d.telefono).slice(0, 30), Correo: txt_(d.correo).slice(0, 80), Obs: txt_(d.obs).slice(0, 200), Activo: d.activo === false || txt_(d.activo) === 'No' ? 'No' : 'Sí', Actualizado: ahora };
     for (let i = 1; i < t.values.length; i++) {
       if (txt_(d.id) && txt_(t.values[i][t.idx.ID]) === txt_(d.id)) { Object.keys(o).forEach(n => sh.getRange(i + 1, t.idx[n] + 1).setValue(o[n])); return { ok: true, id: txt_(d.id) }; }
@@ -10518,7 +10518,7 @@ function pmPrestamoEstado_(p, movs, hasta) {
   hasta = hasta || segHoyISO_();
   const ev = [{ f: p.fecha, t: 'DESEMBOLSO', m: p.monto }].concat(movs.map(x => ({ f: x.fecha, t: x.tipo, m: x.monto }))).filter(e => e.f)
     .sort((a, b) => a.f.localeCompare(b.f) || (a.t === 'DESEMBOLSO' ? -1 : 1));
-  const tasaDia = (p.tasa || 0) / 100 / 30;
+  const tasaDia = (p.tasa || 0) / 100 / 7; /* p.tasa = interés SEMANAL (%) sobre el saldo de capital */
   let cap = 0, int = 0, last = null, generado = 0, abCap = 0, abInt = 0, prestado = 0;
   ev.forEach(e => {
     if (e.f > hasta) return;
@@ -10550,7 +10550,9 @@ function pmPrestamosLista_() {
   const cons = {}; leerObjetos_(pmHoja_('CON')).forEach(c => { cons[txt_(c.ID)] = txt_(c.Nombre); });
   const movs = pmMovsPrestamos_();
   return leerObjetos_(pmHoja_('PST')).map(p => {
-    const o = { id: txt_(p.ID), idCon: txt_(p.ID_Contratista), contratista: cons[txt_(p.ID_Contratista)] || '(contratista eliminado)', fecha: segFecha_(p.Fecha) || '', monto: pmNum_(p.Monto), tasa: pmNum_(p.Tasa_Mensual), cuota: pmNum_(p.Cuota_Semanal), concepto: txt_(p.Concepto), estado: txt_(p.Estado) || 'Activo' };
+    const o = { id: txt_(p.ID), idCon: txt_(p.ID_Contratista), contratista: cons[txt_(p.ID_Contratista)] || '(contratista eliminado)', fecha: segFecha_(p.Fecha) || '', monto: pmNum_(p.Monto), tasa: txt_(p.Tasa_Semanal) !== '' ? pmNum_(p.Tasa_Semanal) : pmR_(pmNum_(p.Tasa_Mensual) / 4), cuota: pmNum_(p.Cuota_Semanal), concepto: txt_(p.Concepto), estado: txt_(p.Estado) || 'Activo',
+      deudorTipo: txt_(p.Deudor_Tipo) === 'Asistente' ? 'Asistente' : 'Técnico', deudorNombre: txt_(p.Deudor_Nombre) };
+    o.deudor = o.deudorTipo === 'Asistente' ? (o.deudorNombre || 'Asistente') : o.contratista;
     o.movs = movs[o.id] || [];
     o.estadoCalc = pmPrestamoEstado_(o, o.movs);
     return o;
@@ -10563,15 +10565,17 @@ function obtenerPrestamosPmWeb(token) {
 function guardarPrestamoPmWeb(token, d) {
   const ses = requerirSesion_(token, 'admin');
   d = d || {};
-  if (!leerObjetos_(pmHoja_('CON')).some(c => txt_(c.ID) === txt_(d.idCon))) throw new Error('Elige el contratista.');
+  if (!leerObjetos_(pmHoja_('CON')).some(c => txt_(c.ID) === txt_(d.idCon))) throw new Error('Elige el contratista (de cuyo pago se rebajan las cuotas).');
   const monto = pmNum_(d.monto), tasa = pmNum_(d.tasa), cuota = Math.max(0, pmNum_(d.cuota));
   const fecha = segFecha_(d.fecha);
   if (!fecha) throw new Error('Indica la fecha en que se prestó.');
   if (!(monto > 0)) throw new Error('El monto prestado debe ser mayor que cero.');
-  if (tasa < 0 || tasa > 100) throw new Error('El interés mensual debe estar entre 0 y 100 %.');
+  if (tasa < 0 || tasa > 100) throw new Error('El interés semanal debe estar entre 0 y 100 %.');
+  const tipoD = txt_(d.deudorTipo) === 'Asistente' ? 'Asistente' : 'Técnico', nomD = txt_(d.deudorNombre).replace(/\s+/g, ' ').slice(0, 100);
+  if (tipoD === 'Asistente' && !nomD) throw new Error('Escribe el nombre del asistente.');
   return conBloqueo_(() => {
     const sh = pmHoja_('PST'); const t = leerTabla_(sh);
-    const o = { ID_Contratista: txt_(d.idCon), Fecha: fecha, Monto: monto, Tasa_Mensual: tasa, Cuota_Semanal: cuota, Concepto: txt_(d.concepto).slice(0, 160), Estado: txt_(d.estado) === 'Cancelado' ? 'Cancelado' : 'Activo' };
+    const o = { ID_Contratista: txt_(d.idCon), Fecha: fecha, Monto: monto, Tasa_Semanal: tasa, Tasa_Mensual: pmR_(tasa * 52 / 12), Deudor_Tipo: tipoD, Deudor_Nombre: tipoD === 'Asistente' ? nomD : '', Cuota_Semanal: cuota, Concepto: txt_(d.concepto).slice(0, 160), Estado: txt_(d.estado) === 'Cancelado' ? 'Cancelado' : 'Activo' };
     if (txt_(d.id)) {
       for (let i = 1; i < t.values.length; i++) if (txt_(t.values[i][t.idx.ID]) === txt_(d.id)) { Object.keys(o).forEach(n => sh.getRange(i + 1, t.idx[n] + 1).setValue(o[n])); return { ok: true, id: txt_(d.id) }; }
       throw new Error('No se encontró el préstamo.');
@@ -10755,10 +10759,10 @@ function generarBancoPmWeb(token, idSemana, fechaPago, envio) {
     if (!(r.deposito > 0)) { if (r.nOrdenes) avisos.push(r.nombre + ': depósito en cero o negativo, no se incluye.'); return; }
     if (!/^\d{20}$/.test(r.iban || '')) { avisos.push(r.nombre + ': falta la cuenta IBAN (20 dígitos), no se incluye.'); return; }
     if (!r.factura && !r.vb) { avisos.push(r.nombre + ': sin factura y sin visto bueno del administrador, no se incluye.'); return; }
-    items.push({ iban: r.iban, monto: r.deposito, texto: pmFacturaBanco_(r.factura), nombre: r.titular || r.nombre, factura: !!r.factura, contratista: r.nombre, movil: Object.keys(r.moviles).join(', '), banco: r.banco || '', numFactura: r.factura || '', vb: r.vb || '',
+    items.push({ iban: r.iban, monto: r.deposito, texto: pmFacturaBanco_(r.factura), nombre: r.titular || r.nombre, factura: !!r.factura, contratista: r.nombre, movil: Object.keys(r.moviles).join(', '), banco: r.banco || '', referencia: r.referencia || '', numFactura: r.factura || '', vb: r.vb || '',
       subtotal: r.subtotal, iva: r.iva, totalFacturado: r.totalFacturado, deducciones: r.deducciones });
   });
-  sd.extras.forEach(e => items.push({ iban: e.iban, monto: e.monto, texto: e.concepto || 'Servicios prestados', nombre: e.nombre, factura: false, contratista: e.nombre, movil: '', banco: '', numFactura: '', vb: '', subtotal: 0, iva: 0, totalFacturado: 0, deducciones: 0 }));
+  sd.extras.forEach(e => items.push({ iban: e.iban, monto: e.monto, texto: e.concepto || 'Servicios prestados', nombre: e.nombre, factura: false, contratista: e.nombre, movil: '', banco: '', referencia: '', numFactura: '', vb: '', subtotal: 0, iva: 0, totalFacturado: 0, deducciones: 0 }));
   if (!items.length) throw new Error('No hay pagos para incluir en el archivo.');
   const cents = it => Math.round(it.monto * 100);
   const total = items.reduce((a, it) => a + cents(it), 0);
@@ -10771,7 +10775,7 @@ function generarBancoPmWeb(token, idSemana, fechaPago, envio) {
     out += pmCampo_(l, 181) + '2' + CRLF;
   });
   return { texto: out, nombre: 'INP' + codigo + '_envio_' + nEnvio + '.prn', envio: nEnvio, total: total / 100, cantidad: items.length, avisos: avisos,
-    lineas: items.map((it, i) => ({ n: i + 1, nombre: it.nombre, contratista: it.contratista, movil: it.movil, banco: it.banco, iban: it.iban, factura: it.numFactura, vb: it.vb, subtotal: it.subtotal, iva: it.iva, totalFacturado: it.totalFacturado, deducciones: it.deducciones, monto: it.monto, texto: it.texto })),
+    lineas: items.map((it, i) => ({ n: i + 1, nombre: it.nombre, contratista: it.contratista, movil: it.movil, banco: it.banco, referencia: it.referencia, iban: it.iban, factura: it.numFactura, vb: it.vb, subtotal: it.subtotal, iva: it.iva, totalFacturado: it.totalFacturado, deducciones: it.deducciones, monto: it.monto, texto: it.texto })),
     codigo: codigo, periodo: periodo, fechaPago: f };
 }
 
