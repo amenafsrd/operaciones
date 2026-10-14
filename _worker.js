@@ -865,6 +865,9 @@ function listarUsuariosWeb(token) {
 
   requerirSesion_(token, 'admin');
 
+  const fichas = {};
+  leerObjetos_(rhHoja_('COLAB')).forEach(c => { if (txt_(c.Usuario)) fichas[normalizarUsuario_(c.Usuario)] = rhColabInfo_(c); });
+
   return leerObjetos_(obtenerHoja_(CONFIG.HOJAS.USUARIOS)).map(x => ({
     usuario: normalizarUsuario_(x.Usuario),
     nombre: String(x.Nombre || ''),
@@ -873,6 +876,7 @@ function listarUsuariosWeb(token) {
     rol: String(x.Rol || '').toLowerCase(),
     modulos: modulosDe_(String(x.Rol || '').toLowerCase(), x.Modulos),
     foto: String(x.Foto || ''),
+    ficha: fichas[normalizarUsuario_(x.Usuario)] || null,
     activo: String(x.Activo) === 'SI',
     ultimoAcceso: (x.Ultimo_Acceso instanceof Date && !isNaN(x.Ultimo_Acceso))
       ? Utilities.formatDate(x.Ultimo_Acceso, Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm')
@@ -984,6 +988,8 @@ function crearUsuarioWeb(token, datos) {
   const rol = String(datos.rol || '').toLowerCase();
   if (ROLES.indexOf(rol) === -1) throw new Error('Rol no válido.');
 
+  const ficha = datos.ficha ? rhFichaLimpia_(datos.ficha) : null;
+
   const usuario = generarUsuarioUnico_(nombre);
   const clave = generarClave_();
 
@@ -991,6 +997,7 @@ function crearUsuarioWeb(token, datos) {
     usuario: usuario, nombre: nombre, correo: correo, rol: rol,
     clave: clave, activo: true, debeCambiar: true, modulos: datos.modulos
   });
+  if (ficha) rhGuardarFichaUsuario_(usuario, nombre, ficha);
 
   return { ok: true, usuario: usuario, clave: clave, nombre: nombre, correo: correo, rol: rol };
 }
@@ -1013,6 +1020,7 @@ function actualizarUsuarioWeb(token, datos) {
   if (nombre && nombre.split(' ').length < 2) throw new Error('Escribe el nombre completo (nombre y apellido).');
 
   const nueva = datos.generarClave ? generarClave_() : '';
+  const ficha = datos.ficha ? rhFichaLimpia_(datos.ficha) : null;
 
   guardarUsuario_({
     usuario: datos.usuario,
@@ -1024,6 +1032,7 @@ function actualizarUsuarioWeb(token, datos) {
     activo: datos.activo,
     modulos: datos.modulos
   });
+  if (ficha) rhGuardarFichaUsuario_(datos.usuario, nombre || String(buscarUsuario_(datos.usuario).Nombre || ''), ficha);
 
   return { ok: true, clave: nueva, usuario: normalizarUsuario_(datos.usuario) };
 }
@@ -9043,18 +9052,23 @@ function configurarConsecutivoCotWeb(token, ultimo) {
    ========================================================= */
 
 const RH = {
-  HOJAS: { COLAB: 'RH_COLABORADORES', SOL: 'RH_SOLICITUDES', PAG: 'RH_PAGOS' },
+  HOJAS: { COLAB: 'RH_COLABORADORES', SOL: 'RH_SOLICITUDES', PAG: 'RH_PAGOS', ASI: 'RH_ASISTENCIA' },
   HEADERS: {
     COLAB: ['ID', 'Usuario', 'Nombre', 'Puesto', 'Fecha_Ingreso', 'Salario_Base', 'Periodicidad', 'Dias_Semana', 'Dias_Por_Periodo',
-      'Dias_Tomados_Previos', 'Activo', 'Fecha_Salida', 'Obs', 'Creado', 'Actualizado'],
+      'Dias_Tomados_Previos', 'Activo', 'Fecha_Salida', 'Obs', 'Creado', 'Actualizado',
+      'Cedula', 'Fecha_Nacimiento', 'Telefono', 'Correo_Personal', 'Direccion', 'Contacto_Emergencia', 'Tel_Emergencia'],
     SOL: ['ID', 'ID_Colab', 'Tipo', 'Desde', 'Hasta', 'Dias', 'Motivo', 'Estado', 'Comentario_Admin', 'Resuelto_Por', 'Resuelto', 'Creado_Por', 'Creado'],
-    PAG: ['ID', 'ID_Colab', 'Fecha', 'Periodo', 'Tipo', 'Bruto', 'Deducciones', 'Neto', 'Obs', 'Registrado_Por', 'Creado']
+    PAG: ['ID', 'ID_Colab', 'Fecha', 'Periodo', 'Tipo', 'Bruto', 'Deducciones', 'Neto', 'Obs', 'Registrado_Por', 'Creado'],
+    ASI: ['ID_Colab', 'Fecha', 'Estado', 'Obs', 'Registrado_Por', 'Actualizado']
   },
   TEXTO: {
-    COLAB: ['ID', 'Usuario', 'Fecha_Ingreso', 'Fecha_Salida', 'Creado', 'Actualizado'],
+    COLAB: ['ID', 'Usuario', 'Fecha_Ingreso', 'Fecha_Salida', 'Creado', 'Actualizado', 'Cedula', 'Fecha_Nacimiento', 'Telefono', 'Tel_Emergencia'],
     SOL: ['ID', 'ID_Colab', 'Desde', 'Hasta', 'Resuelto', 'Creado'],
-    PAG: ['ID', 'ID_Colab', 'Fecha', 'Periodo', 'Creado']
+    PAG: ['ID', 'ID_Colab', 'Fecha', 'Periodo', 'Creado'],
+    ASI: ['ID_Colab', 'Fecha', 'Actualizado']
   },
+  /* Estados de asistencia que se marcan a mano (los de solicitudes aprobadas se ponen solos) */
+  ESTADOS_ASI: { LAB: 'Laborado', AUS: 'Ausencia', LIB: 'Día libre', FER: 'Feriado' },
   TIPOS_SOL: { VAC: 'Vacaciones', PCG: 'Permiso con goce', PSG: 'Permiso sin goce', INC: 'Incapacidad' },
   /* Tipos de pago; los marcados "salarial" entran en la base del aguinaldo */
   TIPOS_PAGO: { SALARIO: 'Salario', EXTRAS: 'Horas extra', BONO: 'Comisión / bono salarial', VACPAG: 'Vacaciones pagadas', AGUINALDO: 'Aguinaldo',
@@ -9092,13 +9106,17 @@ function rhDias_(desde, hasta, diasSemana) {
   return n;
 }
 
+function rhPeriodicidad_(v) { v = txt_(v); return v === 'Mensual' || v === 'Semanal' ? v : 'Quincenal'; }
+
 function rhColabInfo_(c) {
   const ds = Number(c.Dias_Semana) === 6 ? 6 : 5;
   return {
     id: txt_(c.ID), usuario: txt_(c.Usuario), nombre: txt_(c.Nombre), puesto: txt_(c.Puesto), ingreso: segFecha_(c.Fecha_Ingreso) || '',
-    salario: rhNum_(c.Salario_Base), periodicidad: txt_(c.Periodicidad) === 'Mensual' ? 'Mensual' : 'Quincenal', diasSemana: ds,
+    salario: rhNum_(c.Salario_Base), periodicidad: rhPeriodicidad_(c.Periodicidad), diasSemana: ds,
     diasPeriodo: rhNum_(c.Dias_Por_Periodo) > 0 ? rhNum_(c.Dias_Por_Periodo) : 2 * ds,
-    previos: rhNum_(c.Dias_Tomados_Previos), activo: txt_(c.Activo) !== 'No', salida: segFecha_(c.Fecha_Salida) || '', obs: txt_(c.Obs)
+    previos: rhNum_(c.Dias_Tomados_Previos), activo: txt_(c.Activo) !== 'No', salida: segFecha_(c.Fecha_Salida) || '', obs: txt_(c.Obs),
+    cedula: txt_(c.Cedula), nacimiento: segFecha_(c.Fecha_Nacimiento) || '', telefono: txt_(c.Telefono), correoPersonal: txt_(c.Correo_Personal),
+    direccion: txt_(c.Direccion), contactoEmergencia: txt_(c.Contacto_Emergencia), telEmergencia: txt_(c.Tel_Emergencia)
   };
 }
 
@@ -9211,7 +9229,7 @@ function guardarColaboradorWeb(token, d) {
     }
     const o = {
       Usuario: usuario, Nombre: nombre, Puesto: txt_(d.puesto).slice(0, 60), Fecha_Ingreso: ingreso, Salario_Base: Math.max(0, rhNum_(d.salario)),
-      Periodicidad: txt_(d.periodicidad) === 'Mensual' ? 'Mensual' : 'Quincenal', Dias_Semana: ds,
+      Periodicidad: rhPeriodicidad_(d.periodicidad), Dias_Semana: ds,
       Dias_Por_Periodo: rhNum_(d.diasPeriodo) > 0 ? rhNum_(d.diasPeriodo) : 2 * ds, Dias_Tomados_Previos: Math.max(0, rhNum_(d.previos)),
       Activo: d.activo === false || txt_(d.activo) === 'No' ? 'No' : 'Sí', Fecha_Salida: salida, Obs: txt_(d.obs).slice(0, 300), Actualizado: ahora
     };
@@ -9417,6 +9435,145 @@ function eliminarPagoRhWeb(token, id) {
 function fmtRh_(iso) { const p = String(iso || '').split('-'); return p.length === 3 ? p[2] + '/' + p[1] : String(iso || ''); }
 
 
+/* ---------- Asistencia / días laborados ---------- */
+
+/* Marcas manuales (Laborado, Ausencia, Día libre, Feriado) más los días cubiertos por solicitudes aprobadas.
+   Devuelve por colaborador: dias {fecha: {e, auto, obs}} y las fechas del rango. */
+function obtenerAsistenciaRhWeb(token, desde, hasta) {
+
+  const ses = requerirSesion_(token, 'consulta');
+  const admin = ses.rol === 'admin';
+  desde = segFecha_(desde); hasta = segFecha_(hasta);
+  if (!desde || !hasta || hasta < desde) throw new Error('Rango de fechas no válido.');
+  if (rhMs_(hasta) - rhMs_(desde) > 40 * 86400000) throw new Error('El rango máximo es de 40 días.');
+  const mio = rhMiColab_(ses);
+  if (!admin && !mio) throw new Error('No tienes acceso a este módulo.');
+
+  let colabs = leerObjetos_(rhHoja_('COLAB')).map(rhColabInfo_);
+  if (!admin) colabs = colabs.filter(c => c.id === mio.id);
+  else colabs = colabs.filter(c => c.activo || (c.salida && c.salida >= desde));
+  const ids = {}; colabs.forEach(c => { ids[c.id] = { id: c.id, nombre: c.nombre, periodicidad: c.periodicidad, diasSemana: c.diasSemana, ingreso: c.ingreso, salida: c.salida, dias: {} }; });
+  if (admin) colabs.forEach(c => { ids[c.id].salario = c.salario; });
+
+  leerObjetos_(rhHoja_('ASI')).forEach(m => {
+    const id = txt_(m.ID_Colab), f = segFecha_(m.Fecha);
+    if (!ids[id] || !f || f < desde || f > hasta || !RH.ESTADOS_ASI[txt_(m.Estado)]) return;
+    ids[id].dias[f] = { e: txt_(m.Estado), obs: txt_(m.Obs) };
+  });
+  leerObjetos_(rhHoja_('SOL')).forEach(x => {
+    const id = txt_(x.ID_Colab);
+    if (!ids[id] || txt_(x.Estado) !== 'Aprobada') return;
+    const d1 = segFecha_(x.Desde), d2 = segFecha_(x.Hasta);
+    if (!d1 || !d2 || d2 < desde || d1 > hasta) return;
+    const ds = ids[id].diasSemana;
+    for (let t = Math.max(rhMs_(d1), rhMs_(desde)); t <= Math.min(rhMs_(d2), rhMs_(hasta)); t += 86400000) {
+      const wd = new Date(t).getUTCDay();
+      if (wd === 0 || (wd === 6 && ds !== 6)) continue;
+      ids[id].dias[new Date(t).toISOString().slice(0, 10)] = { e: txt_(x.Tipo), auto: true, obs: txt_(x.Motivo) };
+    }
+  });
+  return { admin: admin, hoy: rhHoy_(), desde: desde, hasta: hasta, estados: RH.ESTADOS_ASI, tipos: RH.TIPOS_SOL, colaboradores: Object.keys(ids).map(k => ids[k]).sort((a, b) => a.nombre.localeCompare(b.nombre)) };
+}
+
+/* estado '' quita la marca (el día vuelve a su valor por defecto) */
+function marcarAsistenciaRhWeb(token, idColab, fechas, estado, obs) {
+
+  const ses = requerirSesion_(token, 'admin');
+  estado = txt_(estado);
+  if (estado && !RH.ESTADOS_ASI[estado]) throw new Error('Estado de asistencia no válido.');
+  const lista = (Array.isArray(fechas) ? fechas : [fechas]).map(segFecha_).filter(Boolean);
+  if (!lista.length) throw new Error('Indica la fecha.');
+  if (lista.length > 40) throw new Error('Máximo 40 días por vez.');
+  if (!leerObjetos_(rhHoja_('COLAB')).some(c => txt_(c.ID) === txt_(idColab))) throw new Error('Colaborador no encontrado.');
+  return conBloqueo_(() => {
+    const sh = rhHoja_('ASI');
+    const ahora = segAhora_();
+    lista.forEach(f => {
+      const t = leerTabla_(sh);
+      let fila = -1;
+      for (let i = 1; i < t.values.length; i++) {
+        if (txt_(t.values[i][t.idx.ID_Colab]) === txt_(idColab) && segFecha_(t.values[i][t.idx.Fecha]) === f) { fila = i; break; }
+      }
+      if (!estado) { if (fila >= 0) sh.deleteRow(fila + 1); return; }
+      const o = { ID_Colab: txt_(idColab), Fecha: f, Estado: estado, Obs: txt_(obs).slice(0, 120), Registrado_Por: ses.usuario, Actualizado: ahora };
+      if (fila < 0) appendPorEncabezados_(sh, o);
+      else Object.keys(o).forEach(n => { if (t.idx[n] !== undefined) sh.getRange(fila + 1, t.idx[n] + 1).setValue(o[n]); });
+    });
+    return { ok: true };
+  });
+}
+
+
+/* ---------- Ficha personal (vive en la ficha del colaborador, ligada al usuario) ---------- */
+
+/* Valida y normaliza los datos personales; lanza error si algo no es válido */
+function rhFichaLimpia_(f) {
+  f = f || {};
+  const ingreso = txt_(f.ingreso) ? segFecha_(f.ingreso) : '';
+  if (txt_(f.ingreso) && !ingreso) throw new Error('La fecha de ingreso no es válida.');
+  const nac = txt_(f.nacimiento) ? segFecha_(f.nacimiento) : '';
+  if (txt_(f.nacimiento) && !nac) throw new Error('La fecha de nacimiento no es válida.');
+  const correo = txt_(f.correoPersonal);
+  if (correo && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(correo)) throw new Error('El correo personal no es válido.');
+  return {
+    ingreso: ingreso, puesto: txt_(f.puesto).slice(0, 60), cedula: txt_(f.cedula).slice(0, 30), nacimiento: nac,
+    telefono: txt_(f.telefono).slice(0, 30), correoPersonal: correo.slice(0, 80), direccion: txt_(f.direccion).slice(0, 200),
+    contactoEmergencia: txt_(f.contactoEmergencia).slice(0, 80), telEmergencia: txt_(f.telEmergencia).slice(0, 30)
+  };
+}
+
+function rhFichaCols_(f) {
+  return { Cedula: f.cedula, Fecha_Nacimiento: f.nacimiento, Telefono: f.telefono, Correo_Personal: f.correoPersonal,
+    Direccion: f.direccion, Contacto_Emergencia: f.contactoEmergencia, Tel_Emergencia: f.telEmergencia };
+}
+
+/* Crea o actualiza la ficha del colaborador ligada a un usuario. Sin fecha de ingreso no se puede crear una ficha nueva. */
+function rhGuardarFichaUsuario_(usuario, nombre, f) {
+  const u = normalizarUsuario_(usuario);
+  const hayDatos = Object.keys(f).some(k => f[k]);
+  return conBloqueo_(() => {
+    const sh = rhHoja_('COLAB');
+    const t = leerTabla_(sh);
+    let fila = -1;
+    for (let i = 1; i < t.values.length; i++) if (normalizarUsuario_(t.values[i][t.idx.Usuario]) === u) { fila = i; break; }
+    const ahora = segAhora_();
+    if (fila < 0) {
+      if (!hayDatos) return { ok: true, creada: false };
+      if (!f.ingreso) throw new Error('Para crear la ficha de la persona indica su fecha de ingreso.');
+      const o = Object.assign({ ID: 'C' + Date.now().toString(36).toUpperCase(), Usuario: u, Nombre: nombre, Puesto: f.puesto, Fecha_Ingreso: f.ingreso,
+        Salario_Base: 0, Periodicidad: 'Quincenal', Dias_Semana: 5, Dias_Por_Periodo: 10, Dias_Tomados_Previos: 0, Activo: 'Sí', Creado: ahora, Actualizado: ahora }, rhFichaCols_(f));
+      appendPorEncabezados_(sh, o);
+      return { ok: true, creada: true };
+    }
+    const o = Object.assign({ Nombre: nombre, Puesto: f.puesto, Actualizado: ahora }, rhFichaCols_(f));
+    if (f.ingreso) o.Fecha_Ingreso = f.ingreso;
+    Object.keys(o).forEach(n => { if (t.idx[n] !== undefined) sh.getRange(fila + 1, t.idx[n] + 1).setValue(o[n]); });
+    return { ok: true, creada: false };
+  });
+}
+
+/* Cada persona actualiza sus propios datos de contacto (cédula, ingreso y puesto solo los cambia el administrador) */
+function guardarMiFichaRhWeb(token, d) {
+
+  const ses = requerirSesion_(token, 'consulta');
+  const mio = rhMiColab_(ses);
+  if (!mio) throw new Error('Tu usuario no tiene ficha de colaborador.');
+  const f = rhFichaLimpia_(Object.assign({}, d || {}, { ingreso: '', puesto: '' }));
+  return conBloqueo_(() => {
+    const sh = rhHoja_('COLAB');
+    const t = leerTabla_(sh);
+    for (let i = 1; i < t.values.length; i++) {
+      if (txt_(t.values[i][t.idx.ID]) !== mio.id) continue;
+      const o = { Fecha_Nacimiento: f.nacimiento, Telefono: f.telefono, Correo_Personal: f.correoPersonal, Direccion: f.direccion,
+        Contacto_Emergencia: f.contactoEmergencia, Tel_Emergencia: f.telEmergencia, Actualizado: segAhora_() };
+      Object.keys(o).forEach(n => { if (t.idx[n] !== undefined) sh.getRange(i + 1, t.idx[n] + 1).setValue(o[n]); });
+      return { ok: true };
+    }
+    throw new Error('No se encontró tu ficha.');
+  });
+}
+
+
 /* =====================================================================
    AJUSTES PARA EL NUEVO SERVIDOR (reemplazan funciones de arriba)
    ===================================================================== */
@@ -9589,7 +9746,7 @@ function prepararSistemaWeb(token) {
 
   }
 
-return {loginWeb: loginWeb, miPerfilWeb: miPerfilWeb, guardarFotoPerfilWeb: guardarFotoPerfilWeb, validarSesionWeb: validarSesionWeb, logoutWeb: logoutWeb, cambiarClaveWeb: cambiarClaveWeb, listarUsuariosWeb: listarUsuariosWeb, crearUsuarioWeb: crearUsuarioWeb, actualizarUsuarioWeb: actualizarUsuarioWeb, obtenerDatosWeb: obtenerDatosWeb, obtenerSemanasWeb: obtenerSemanasWeb, obtenerCalendarioWeb: obtenerCalendarioWeb, obtenerRotacionBackupWeb: obtenerRotacionBackupWeb, guardarCalendarioWeb: guardarCalendarioWeb, obtenerHistorialWeb: obtenerHistorialWeb, agregarMovilWeb: agregarMovilWeb, actualizarMovilWeb: actualizarMovilWeb, obtenerHistorialMovilWeb: obtenerHistorialMovilWeb, darDeBajaMovilWeb: darDeBajaMovilWeb, reactivarMovilWeb: reactivarMovilWeb, exportarCalendarioClienteExcelWeb: exportarCalendarioClienteExcelWeb, obtenerResumenWeb: obtenerResumenWeb, obtenerFichasWeb: obtenerFichasWeb, guardarFichasWeb: guardarFichasWeb, obtenerPersonalWeb: obtenerPersonalWeb, buscarPersonaWeb: buscarPersonaWeb, obtenerVehiculosWeb: obtenerVehiculosWeb, deshacerSinTecnicosWeb: deshacerSinTecnicosWeb, guardarSalidaPersonalWeb: guardarSalidaPersonalWeb, obtenerCambiosFichasWeb: obtenerCambiosFichasWeb, exportarFichasExcelWeb: exportarFichasExcelWeb, obtenerSeguimientoWeb: obtenerSeguimientoWeb, guardarJustificacionTiempoWeb: guardarJustificacionTiempoWeb, guardarSeguimientoWeb: guardarSeguimientoWeb, guardarAlmuerzoWeb: guardarAlmuerzoWeb, guardarSalidaWeb: guardarSalidaWeb, corregirCorteWeb: corregirCorteWeb, eliminarCorteWeb: eliminarCorteWeb, obtenerAusenciasWeb: obtenerAusenciasWeb, guardarAusenciaWeb: guardarAusenciaWeb, marcarPenalizacionWeb: marcarPenalizacionWeb, eliminarAusenciaWeb: eliminarAusenciaWeb, importarFinalizadasWeb: importarFinalizadasWeb, guardarSuspendidaWeb: guardarSuspendidaWeb, marcarSuspendidasWeb: marcarSuspendidasWeb, guardarEstadoOtWeb: guardarEstadoOtWeb, eliminarSuspendidaWeb: eliminarSuspendidaWeb, obtenerBodegaWeb: obtenerBodegaWeb, guardarAlistosWeb: guardarAlistosWeb, obtenerAlistosWeb: obtenerAlistosWeb, cambiarEstadoAlistoWeb: cambiarEstadoAlistoWeb, aplicarAlistoWeb: aplicarAlistoWeb, obtenerMovimientosInvWeb: obtenerMovimientosInvWeb, guardarMovimientoInvWeb: guardarMovimientoInvWeb, firmarMovimientoInvWeb: firmarMovimientoInvWeb, obtenerFirmaInvWeb: obtenerFirmaInvWeb, eliminarMovimientoInvWeb: eliminarMovimientoInvWeb, guardarObjetivosWeb: guardarObjetivosWeb, aplicarCostosAdendumWeb: aplicarCostosAdendumWeb, guardarMaterialInvWeb: guardarMaterialInvWeb, importarConsumoWeb: importarConsumoWeb, obtenerConsumoDetalleWeb: obtenerConsumoDetalleWeb, eliminarCargaConsumoWeb: eliminarCargaConsumoWeb, importarDevolucionesWeb: importarDevolucionesWeb, obtenerDevolucionesWeb: obtenerDevolucionesWeb, obtenerHistorialDevolucionWeb: obtenerHistorialDevolucionWeb, registrarDevolucionLineaWeb: registrarDevolucionLineaWeb, recibirLineasDevolucionWeb: recibirLineasDevolucionWeb, registrarBoletaDevolucionWeb: registrarBoletaDevolucionWeb, registrarEntregaMovilWeb: registrarEntregaMovilWeb, justificarDevolucionWeb: justificarDevolucionWeb, cambiarEquipoDevolucionWeb: cambiarEquipoDevolucionWeb, revertirDevolucionWeb: revertirDevolucionWeb, eliminarPeriodoDevolucionesWeb: eliminarPeriodoDevolucionesWeb, aceptarAlertasBodegaWeb: aceptarAlertasBodegaWeb, obtenerNotificacionesWeb: obtenerNotificacionesWeb, obtenerConsumoInvWeb: obtenerConsumoInvWeb, obtenerCortesInvWeb: obtenerCortesInvWeb, crearCorteInvWeb: crearCorteInvWeb, obtenerConteoInvWeb: obtenerConteoInvWeb, guardarConteoInvWeb: guardarConteoInvWeb, justificarDiferenciaInvWeb: justificarDiferenciaInvWeb, cerrarCorteInvWeb: cerrarCorteInvWeb, eliminarCorteInvWeb: eliminarCorteInvWeb, reabrirCorteInvWeb: reabrirCorteInvWeb, guardarMapeoInvWeb: guardarMapeoInvWeb, compararClienteWeb: compararClienteWeb, cargarCatalogoOficialWeb: cargarCatalogoOficialWeb, aplicarObjetivoBaseWeb: aplicarObjetivoBaseWeb, unirMaterialInvWeb: unirMaterialInvWeb, eliminarMaterialesInvWeb: eliminarMaterialesInvWeb, kardexMaterialWeb: kardexMaterialWeb, guardarClienteCotWeb: guardarClienteCotWeb, eliminarClienteCotWeb: eliminarClienteCotWeb, guardarMaterialCotWeb: guardarMaterialCotWeb, eliminarMaterialCotWeb: eliminarMaterialCotWeb, importarMaterialesCotWeb: importarMaterialesCotWeb, obtenerCotizacionesWeb: obtenerCotizacionesWeb, obtenerCotizacionWeb: obtenerCotizacionWeb, guardarCotizacionWeb: guardarCotizacionWeb, cambiarEstadoCotWeb: cambiarEstadoCotWeb, subirFotoCotWeb: subirFotoCotWeb, eliminarFotoCotWeb: eliminarFotoCotWeb, obtenerArchivoCotWeb: obtenerArchivoCotWeb, guardarInformeCotWeb: guardarInformeCotWeb, guardarGastoCotWeb: guardarGastoCotWeb, marcarPagoGastoCotWeb: marcarPagoGastoCotWeb, anularGastoCotWeb: anularGastoCotWeb, eliminarGastoCotWeb: eliminarGastoCotWeb, guardarOCCotWeb: guardarOCCotWeb, facturarCotWeb: facturarCotWeb, registrarPagoFacturaCotWeb: registrarPagoFacturaCotWeb, revertirPagoFacturaCotWeb: revertirPagoFacturaCotWeb, revertirFacturaCotWeb: revertirFacturaCotWeb, archivarCotWeb: archivarCotWeb, desarchivarCotWeb: desarchivarCotWeb, enviarCotWeb: enviarCotWeb, eliminarCotizacionWeb: eliminarCotizacionWeb, configurarConsecutivoCotWeb: configurarConsecutivoCotWeb, miAccesoRhWeb: miAccesoRhWeb, obtenerRhWeb: obtenerRhWeb, guardarColaboradorWeb: guardarColaboradorWeb, crearSolicitudRhWeb: crearSolicitudRhWeb, cancelarSolicitudRhWeb: cancelarSolicitudRhWeb, resolverSolicitudRhWeb: resolverSolicitudRhWeb, obtenerPagosRhWeb: obtenerPagosRhWeb, registrarPagoRhWeb: registrarPagoRhWeb, eliminarPagoRhWeb: eliminarPagoRhWeb, loginPaso1_: loginPaso1_, loginPaso2_: loginPaso2_, refrescarWeb: refrescarWeb, prepararSistemaWeb: prepararSistemaWeb};
+return {loginWeb: loginWeb, miPerfilWeb: miPerfilWeb, guardarFotoPerfilWeb: guardarFotoPerfilWeb, validarSesionWeb: validarSesionWeb, logoutWeb: logoutWeb, cambiarClaveWeb: cambiarClaveWeb, listarUsuariosWeb: listarUsuariosWeb, crearUsuarioWeb: crearUsuarioWeb, actualizarUsuarioWeb: actualizarUsuarioWeb, obtenerDatosWeb: obtenerDatosWeb, obtenerSemanasWeb: obtenerSemanasWeb, obtenerCalendarioWeb: obtenerCalendarioWeb, obtenerRotacionBackupWeb: obtenerRotacionBackupWeb, guardarCalendarioWeb: guardarCalendarioWeb, obtenerHistorialWeb: obtenerHistorialWeb, agregarMovilWeb: agregarMovilWeb, actualizarMovilWeb: actualizarMovilWeb, obtenerHistorialMovilWeb: obtenerHistorialMovilWeb, darDeBajaMovilWeb: darDeBajaMovilWeb, reactivarMovilWeb: reactivarMovilWeb, exportarCalendarioClienteExcelWeb: exportarCalendarioClienteExcelWeb, obtenerResumenWeb: obtenerResumenWeb, obtenerFichasWeb: obtenerFichasWeb, guardarFichasWeb: guardarFichasWeb, obtenerPersonalWeb: obtenerPersonalWeb, buscarPersonaWeb: buscarPersonaWeb, obtenerVehiculosWeb: obtenerVehiculosWeb, deshacerSinTecnicosWeb: deshacerSinTecnicosWeb, guardarSalidaPersonalWeb: guardarSalidaPersonalWeb, obtenerCambiosFichasWeb: obtenerCambiosFichasWeb, exportarFichasExcelWeb: exportarFichasExcelWeb, obtenerSeguimientoWeb: obtenerSeguimientoWeb, guardarJustificacionTiempoWeb: guardarJustificacionTiempoWeb, guardarSeguimientoWeb: guardarSeguimientoWeb, guardarAlmuerzoWeb: guardarAlmuerzoWeb, guardarSalidaWeb: guardarSalidaWeb, corregirCorteWeb: corregirCorteWeb, eliminarCorteWeb: eliminarCorteWeb, obtenerAusenciasWeb: obtenerAusenciasWeb, guardarAusenciaWeb: guardarAusenciaWeb, marcarPenalizacionWeb: marcarPenalizacionWeb, eliminarAusenciaWeb: eliminarAusenciaWeb, importarFinalizadasWeb: importarFinalizadasWeb, guardarSuspendidaWeb: guardarSuspendidaWeb, marcarSuspendidasWeb: marcarSuspendidasWeb, guardarEstadoOtWeb: guardarEstadoOtWeb, eliminarSuspendidaWeb: eliminarSuspendidaWeb, obtenerBodegaWeb: obtenerBodegaWeb, guardarAlistosWeb: guardarAlistosWeb, obtenerAlistosWeb: obtenerAlistosWeb, cambiarEstadoAlistoWeb: cambiarEstadoAlistoWeb, aplicarAlistoWeb: aplicarAlistoWeb, obtenerMovimientosInvWeb: obtenerMovimientosInvWeb, guardarMovimientoInvWeb: guardarMovimientoInvWeb, firmarMovimientoInvWeb: firmarMovimientoInvWeb, obtenerFirmaInvWeb: obtenerFirmaInvWeb, eliminarMovimientoInvWeb: eliminarMovimientoInvWeb, guardarObjetivosWeb: guardarObjetivosWeb, aplicarCostosAdendumWeb: aplicarCostosAdendumWeb, guardarMaterialInvWeb: guardarMaterialInvWeb, importarConsumoWeb: importarConsumoWeb, obtenerConsumoDetalleWeb: obtenerConsumoDetalleWeb, eliminarCargaConsumoWeb: eliminarCargaConsumoWeb, importarDevolucionesWeb: importarDevolucionesWeb, obtenerDevolucionesWeb: obtenerDevolucionesWeb, obtenerHistorialDevolucionWeb: obtenerHistorialDevolucionWeb, registrarDevolucionLineaWeb: registrarDevolucionLineaWeb, recibirLineasDevolucionWeb: recibirLineasDevolucionWeb, registrarBoletaDevolucionWeb: registrarBoletaDevolucionWeb, registrarEntregaMovilWeb: registrarEntregaMovilWeb, justificarDevolucionWeb: justificarDevolucionWeb, cambiarEquipoDevolucionWeb: cambiarEquipoDevolucionWeb, revertirDevolucionWeb: revertirDevolucionWeb, eliminarPeriodoDevolucionesWeb: eliminarPeriodoDevolucionesWeb, aceptarAlertasBodegaWeb: aceptarAlertasBodegaWeb, obtenerNotificacionesWeb: obtenerNotificacionesWeb, obtenerConsumoInvWeb: obtenerConsumoInvWeb, obtenerCortesInvWeb: obtenerCortesInvWeb, crearCorteInvWeb: crearCorteInvWeb, obtenerConteoInvWeb: obtenerConteoInvWeb, guardarConteoInvWeb: guardarConteoInvWeb, justificarDiferenciaInvWeb: justificarDiferenciaInvWeb, cerrarCorteInvWeb: cerrarCorteInvWeb, eliminarCorteInvWeb: eliminarCorteInvWeb, reabrirCorteInvWeb: reabrirCorteInvWeb, guardarMapeoInvWeb: guardarMapeoInvWeb, compararClienteWeb: compararClienteWeb, cargarCatalogoOficialWeb: cargarCatalogoOficialWeb, aplicarObjetivoBaseWeb: aplicarObjetivoBaseWeb, unirMaterialInvWeb: unirMaterialInvWeb, eliminarMaterialesInvWeb: eliminarMaterialesInvWeb, kardexMaterialWeb: kardexMaterialWeb, guardarClienteCotWeb: guardarClienteCotWeb, eliminarClienteCotWeb: eliminarClienteCotWeb, guardarMaterialCotWeb: guardarMaterialCotWeb, eliminarMaterialCotWeb: eliminarMaterialCotWeb, importarMaterialesCotWeb: importarMaterialesCotWeb, obtenerCotizacionesWeb: obtenerCotizacionesWeb, obtenerCotizacionWeb: obtenerCotizacionWeb, guardarCotizacionWeb: guardarCotizacionWeb, cambiarEstadoCotWeb: cambiarEstadoCotWeb, subirFotoCotWeb: subirFotoCotWeb, eliminarFotoCotWeb: eliminarFotoCotWeb, obtenerArchivoCotWeb: obtenerArchivoCotWeb, guardarInformeCotWeb: guardarInformeCotWeb, guardarGastoCotWeb: guardarGastoCotWeb, marcarPagoGastoCotWeb: marcarPagoGastoCotWeb, anularGastoCotWeb: anularGastoCotWeb, eliminarGastoCotWeb: eliminarGastoCotWeb, guardarOCCotWeb: guardarOCCotWeb, facturarCotWeb: facturarCotWeb, registrarPagoFacturaCotWeb: registrarPagoFacturaCotWeb, revertirPagoFacturaCotWeb: revertirPagoFacturaCotWeb, revertirFacturaCotWeb: revertirFacturaCotWeb, archivarCotWeb: archivarCotWeb, desarchivarCotWeb: desarchivarCotWeb, enviarCotWeb: enviarCotWeb, eliminarCotizacionWeb: eliminarCotizacionWeb, configurarConsecutivoCotWeb: configurarConsecutivoCotWeb, miAccesoRhWeb: miAccesoRhWeb, obtenerRhWeb: obtenerRhWeb, guardarColaboradorWeb: guardarColaboradorWeb, crearSolicitudRhWeb: crearSolicitudRhWeb, cancelarSolicitudRhWeb: cancelarSolicitudRhWeb, resolverSolicitudRhWeb: resolverSolicitudRhWeb, obtenerPagosRhWeb: obtenerPagosRhWeb, registrarPagoRhWeb: registrarPagoRhWeb, eliminarPagoRhWeb: eliminarPagoRhWeb, obtenerAsistenciaRhWeb: obtenerAsistenciaRhWeb, marcarAsistenciaRhWeb: marcarAsistenciaRhWeb, guardarMiFichaRhWeb: guardarMiFichaRhWeb, loginPaso1_: loginPaso1_, loginPaso2_: loginPaso2_, refrescarWeb: refrescarWeb, prepararSistemaWeb: prepararSistemaWeb};
 })();
 
 /* =====================================================================

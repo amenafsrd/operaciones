@@ -612,6 +612,8 @@
       /* ---- Colaboradores ---- */
     .tblRh th, .tblRh td { text-align: left; vertical-align: middle; }
     #rhModal .field { margin-bottom: 8px; }
+      #uModulos label { display:flex; align-items:center; gap:8px; }
+    #uModulos input { width:auto; margin:0; }
   </style>
 </head>
 
@@ -1271,11 +1273,13 @@
           <button id="rhTMis" onclick="rhTab('mis')">Mis vacaciones y permisos</button>
           <button id="rhTSol" onclick="rhTab('sol')">Solicitudes</button>
           <button id="rhTCol" onclick="rhTab('col')">Colaboradores</button>
+          <button id="rhTAsi" onclick="rhTab('asi')">Asistencia</button>
           <button id="rhTPag" onclick="rhTab('pag')">Pagos</button>
         </div>
         <div id="rhPMis"></div>
         <div id="rhPSol" style="display:none"></div>
         <div id="rhPCol" style="display:none"></div>
+        <div id="rhPAsi" style="display:none"></div>
         <div id="rhPPag" style="display:none"></div>
         <div id="rhModalBg" class="modalBg" style="z-index:90"><div class="modal" id="rhModal" style="max-width:560px"></div></div>
       </section>
@@ -1804,6 +1808,22 @@
         </div>
         <div id="uModNota" class="nota" style="padding:6px 0 0"></div>
       </div>
+
+      <details id="uFichaDet" style="margin-top:12px;border:1px solid #ddd;border-radius:8px;padding:8px 12px">
+        <summary style="cursor:pointer;font-weight:600">🪪 Ficha personal (ingreso, contacto, emergencia)</summary>
+        <div class="grid2" style="margin-top:10px">
+          <div class="field"><label>Fecha de ingreso</label><input id="uFIngreso" type="date"></div>
+          <div class="field"><label>Puesto</label><input id="uFPuesto" maxlength="60" autocomplete="off"></div>
+          <div class="field"><label>Cédula</label><input id="uFCedula" maxlength="30" autocomplete="off"></div>
+          <div class="field"><label>Fecha de nacimiento</label><input id="uFNac" type="date"></div>
+          <div class="field"><label>Teléfono</label><input id="uFTel" maxlength="30" autocomplete="off"></div>
+          <div class="field"><label>Correo personal</label><input id="uFCorreoP" type="email" maxlength="80" autocomplete="off"></div>
+          <div class="field" style="grid-column:1/-1"><label>Dirección</label><input id="uFDir" maxlength="200" autocomplete="off"></div>
+          <div class="field"><label>Contacto de emergencia</label><input id="uFContacto" maxlength="80" autocomplete="off"></div>
+          <div class="field"><label>Teléfono de emergencia</label><input id="uFTelEmg" maxlength="30" autocomplete="off"></div>
+        </div>
+        <div class="nota" style="padding:6px 0 0">Esta es la misma ficha del módulo Colaboradores: al guardar con fecha de ingreso, la persona queda registrada ahí para vacaciones y permisos (el salario se anota en Colaboradores).</div>
+      </details>
 
       <div id="uNotaNuevo" class="avisoPersona" style="margin-top:12px">
         El <b>usuario</b> (nombre.apellido) y una <b>contraseña temporal</b> se generan solos al guardar.
@@ -3815,7 +3835,7 @@ function cargarUsuarios() {
       $('contadorUsuarios').textContent = listaUsuarios.length + ' usuarios';
 
       let html = '<table class="table tblUsuarios"><thead><tr>' +
-        '<th>Usuario</th><th>Nombre completo</th><th>Correo</th><th>Rol</th><th>Módulos</th><th>Estado</th>' +
+        '<th>Usuario</th><th>Nombre completo</th><th>Correo</th><th>Ingreso / contacto</th><th>Rol</th><th>Módulos</th><th>Estado</th>' +
         '<th>Último acceso</th><th>Acciones</th></tr></thead><tbody>';
 
       listaUsuarios.forEach(u => {
@@ -3823,6 +3843,7 @@ function cargarUsuarios() {
           '<td><span style="display:inline-flex;align-items:center;gap:8px">' + avatarHtml(u.foto, u.nombre || u.usuario, 'sm') + '<b>' + esc(u.usuario) + '</b></span></td>' +
           '<td class="left">' + esc(u.nombre) + '</td>' +
           '<td class="left">' + (u.correo ? esc(u.correo) : '<span class="muted">—</span>') + '</td>' +
+          '<td class="left" style="font-size:12px">' + (u.ficha && u.ficha.ingreso ? 'Ingreso ' + esc(fmtFechaSeg(u.ficha.ingreso)) + (u.ficha.telefono ? '<br>' + esc(u.ficha.telefono) : '') : '<span class="muted">Sin ficha</span>') + '</td>' +
           '<td>' + esc(ETIQUETA_ROL[u.rol] || u.rol) + '</td>' +
           '<td class="left" style="font-size:12px">' + (u.rol === 'admin' ? 'Todos' : esc((u.modulos || []).map(m => ({ cronograma: 'Cronograma', moviles: 'Móviles', seguimiento: 'Seguimiento', bodega: 'Bodega', cotizaciones: 'Cotizaciones', resumen: 'Resumen' })[m] || m).join(', ') || 'Ninguno')) + '</td>' +
           '<td><span class="tag ' + (u.activo ? 'tag-active' : 'tag-inactive') + '">' +
@@ -3848,10 +3869,23 @@ function uRolCambio() {
   $('uModNota').textContent = adm ? 'El administrador entra a todos los módulos.' : 'Cotizaciones solo la ven los usuarios con ese módulo marcado.';
 }
 
+function uFichaPoner(f) {
+  f = f || {};
+  $('uFIngreso').value = f.ingreso || ''; $('uFPuesto').value = f.puesto || ''; $('uFCedula').value = f.cedula || ''; $('uFNac').value = f.nacimiento || '';
+  $('uFTel').value = f.telefono || ''; $('uFCorreoP').value = f.correoPersonal || ''; $('uFDir').value = f.direccion || '';
+  $('uFContacto').value = f.contactoEmergencia || ''; $('uFTelEmg').value = f.telEmergencia || '';
+  $('uFichaDet').open = !!(f.ingreso);
+}
+function uFichaLeer() {
+  return { ingreso: $('uFIngreso').value, puesto: $('uFPuesto').value, cedula: $('uFCedula').value, nacimiento: $('uFNac').value, telefono: $('uFTel').value,
+    correoPersonal: $('uFCorreoP').value, direccion: $('uFDir').value, contactoEmergencia: $('uFContacto').value, telEmergencia: $('uFTelEmg').value };
+}
+
 function abrirNuevoUsuario() {
 
   uEditando = false;
   uUsuarioEditado = '';
+  uFichaPoner(null);
 
   $('uTitulo').textContent = 'Nuevo usuario';
   $('uNombre').value = '';
@@ -3882,6 +3916,7 @@ function editarUsuario(usuario) {
   $('uRol').value = u.rol;
   uSetModulos(u.modulos || []);
   $('uActivo').value = u.activo ? 'SI' : 'NO';
+  uFichaPoner(u.ficha);
   $('uCampoUsuario').style.display = 'block';
   $('uCampoActivo').style.display = 'block';
   $('uNotaNuevo').style.display = 'none';
@@ -3959,7 +3994,7 @@ function guardarUsuario() {
   const btn = $('btnGuardarUsuario');
   btn.disabled = true;
 
-  const datos = { nombre: nombre, correo: correo, rol: $('uRol').value, modulos: uGetModulos() };
+  const datos = { nombre: nombre, correo: correo, rol: $('uRol').value, modulos: uGetModulos(), ficha: uFichaLeer() };
 
   let llamada;
 
@@ -5733,22 +5768,153 @@ async function abrirColab() {
   const adm = rhDatos.admin, mio = !!rhDatos.mio;
   $('rhTMis').style.display = mio ? '' : 'none';
   ['Sol', 'Col', 'Pag'].forEach(x => { $('rhT' + x).style.display = adm ? '' : 'none'; });
+  $('rhTAsi').style.display = (adm || mio) ? '' : 'none';
   let t = rhTabAct;
-  if (!t || (t === 'mis' && !mio) || (t !== 'mis' && !adm)) t = adm ? ((rhDatos.solicitudes || []).some(x => x.estado === 'Pendiente') ? 'sol' : (mio ? 'mis' : 'sol')) : 'mis';
+  if (!t || (t === 'mis' && !mio) || (t !== 'mis' && t !== 'asi' && !adm) || (t === 'asi' && !adm && !mio)) t = adm ? ((rhDatos.solicitudes || []).some(x => x.estado === 'Pendiente') ? 'sol' : (mio ? 'mis' : 'sol')) : 'mis';
   rhTab(t);
 }
 
 function rhTab(t) {
   rhTabAct = t;
-  ['mis', 'sol', 'col', 'pag'].forEach(x => {
+  ['mis', 'sol', 'col', 'asi', 'pag'].forEach(x => {
     $('rhP' + x.charAt(0).toUpperCase() + x.slice(1)).style.display = x === t ? 'block' : 'none';
     $('rhT' + x.charAt(0).toUpperCase() + x.slice(1)).classList.toggle('active', x === t);
   });
   if (t === 'mis') rhRenderMis();
   if (t === 'sol') rhRenderSol();
   if (t === 'col') rhRenderCol();
+  if (t === 'asi') rhRenderAsi();
   if (t === 'pag') rhRenderPag();
   sideRefrescar();
+}
+
+/* ---------- Asistencia / días laborados (por período de pago) ---------- */
+
+let rhAsiTipo = '', rhAsiRef = '', rhAsiData = null;
+const rhAsiEst = {
+  LAB: ['✓', 'Laborado', '#1b6b3a', '#d6f0e0'], AUS: ['A', 'Ausencia', '#a31616', '#fde8e8'], LIB: ['L', 'Día libre', '#555', '#e6e6e6'], FER: ['F', 'Feriado', '#1d4f91', '#dce9fa'],
+  VAC: ['V', 'Vacaciones', '#5b2c83', '#eadcf6'], PCG: ['P', 'Permiso con goce', '#5b2c83', '#eadcf6'], PSG: ['S', 'Permiso sin goce', '#8a4b00', '#fde7cc'], INC: ['I', 'Incapacidad', '#8a6100', '#fff3cd']
+};
+function rh2c(n) { return Math.round(n * 100) / 100; }
+/* Pago por período: quincenal = salario mensual ÷ 2; semanal y mensual = el salario tal cual */
+function rhPagoPeriodo(c) { return c.periodicidad === 'Quincenal' ? c.salario / 2 : c.salario; }
+function rhIso(ms) { return new Date(ms).toISOString().slice(0, 10); }
+function rhMsC(iso) { return Date.parse(iso + 'T12:00:00Z'); }
+
+function rhPeriodoDe(tipo, ref) {
+  const d = new Date(rhMsC(ref));
+  if (tipo === 'Semanal') { const wd = (d.getUTCDay() + 6) % 7; const ini = rhMsC(ref) - wd * 86400000; return [rhIso(ini), rhIso(ini + 6 * 86400000)]; }
+  const y = d.getUTCFullYear(), m = d.getUTCMonth(), ult = new Date(Date.UTC(y, m + 1, 0)).getUTCDate(), mm = String(m + 1).padStart(2, '0');
+  if (tipo === 'Mensual') return [y + '-' + mm + '-01', y + '-' + mm + '-' + String(ult).padStart(2, '0')];
+  return d.getUTCDate() <= 15 ? [y + '-' + mm + '-01', y + '-' + mm + '-15'] : [y + '-' + mm + '-16', y + '-' + mm + '-' + String(ult).padStart(2, '0')];
+}
+function rhPeriodoMover(tipo, ini, fin, dir) { return dir < 0 ? rhIso(rhMsC(ini) - 86400000) : rhIso(rhMsC(fin) + 86400000); }
+
+async function rhRenderAsi() {
+  const adm = rhDatos.admin;
+  if (!rhAsiTipo) rhAsiTipo = adm ? 'Quincenal' : (rhDatos.mio.periodicidad || 'Quincenal');
+  if (!adm) rhAsiTipo = rhDatos.mio.periodicidad || 'Quincenal';
+  if (!rhAsiRef) rhAsiRef = rhDatos.hoy;
+  const [ini, fin] = rhPeriodoDe(rhAsiTipo, rhAsiRef);
+  $('rhPAsi').innerHTML = '<div class="loading">Cargando asistencia...</div>';
+  try { rhAsiData = await api('obtenerAsistenciaRhWeb', ini, fin); }
+  catch (e) { mostrarError(e, 'No se pudo cargar la asistencia.'); return; }
+  rhPintarAsi(ini, fin);
+}
+
+function rhAsiNav(dir) { const [ini, fin] = rhPeriodoDe(rhAsiTipo, rhAsiRef); rhAsiRef = rhPeriodoMover(rhAsiTipo, ini, fin, dir); rhRenderAsi(); }
+function rhAsiCambiaTipo(t) { rhAsiTipo = t; rhRenderAsi(); }
+function rhAsiHoy() { rhAsiRef = rhDatos.hoy; rhRenderAsi(); }
+
+/* Qué pasa con un día de un colaborador: estado final, si es automático, y si es el valor por defecto */
+function rhAsiDia(c, f, hoy) {
+  if ((c.ingreso && f < c.ingreso) || (c.salida && f > c.salida)) return { e: 'NA' };
+  const m = c.dias[f];
+  const wd = new Date(rhMsC(f)).getUTCDay();
+  const esperado = !(wd === 0 || (wd === 6 && c.diasSemana !== 6));
+  if (m) return { e: m.e, auto: !!m.auto, obs: m.obs, esperado: esperado };
+  if (!esperado) return { e: 'NL', esperado: false };
+  return f <= hoy ? { e: 'LAB', def: true, esperado: true } : { e: 'FUT', esperado: true };
+}
+
+function rhAsiResumen(c, dias, hoy) {
+  const r = { LAB: 0, AUS: 0, LIB: 0, FER: 0, VAC: 0, PCG: 0, PSG: 0, INC: 0, esperados: 0 };
+  dias.forEach(f => {
+    const d = rhAsiDia(c, f, hoy);
+    if (r[d.e] !== undefined) r[d.e]++;
+    if (d.esperado && d.e !== 'LIB' && d.e !== 'NA') r.esperados++;
+  });
+  r.descuento = r.AUS + r.PSG;
+  r.pagables = r.LAB + r.FER + r.VAC + r.PCG;
+  const base = rhPagoPeriodo(c);
+  r.sugerido = c.salario && r.esperados > 0 ? Math.max(0, rh2c(base - base / r.esperados * r.descuento)) : base;
+  return r;
+}
+
+function rhPintarAsi(ini, fin) {
+  const D = rhAsiData, adm = D.admin, hoy = D.hoy;
+  const dias = []; for (let t = rhMsC(ini); t <= rhMsC(fin); t += 86400000) dias.push(rhIso(t));
+  const col = D.colaboradores.filter(c => !adm || c.periodicidad === rhAsiTipo);
+  const DS = ['D', 'L', 'M', 'X', 'J', 'V', 'S'];
+  let h = '<div class="toolbar"><button class="btn secondary" onclick="rhAsiNav(-1)">‹</button><div style="font-weight:600;min-width:210px;text-align:center">' + esc(rhFecha(ini)) + ' al ' + esc(rhFecha(fin)) + '</div>' +
+    '<button class="btn secondary" onclick="rhAsiNav(1)">›</button><button class="btn secondary" onclick="rhAsiHoy()">Hoy</button>';
+  if (adm) h += '<span style="flex:1"></span><span style="font-size:12px;color:#666">Pago:</span>' + ['Semanal', 'Quincenal', 'Mensual'].map(t => '<button class="btn ' + (t === rhAsiTipo ? 'primary' : 'secondary') + '" onclick="rhAsiCambiaTipo(\'' + t + '\')">' + t + 'es</button>').join('');
+  h += '</div>';
+  h += '<div style="font-size:12px;color:#666;margin:0 0 8px">Los días hábiles pasados cuentan como <b>laborados</b> salvo que marques otra cosa. Vacaciones, permisos e incapacidades aprobados se ponen solos.' + (adm ? ' Toca un día para cambiarlo.' : '') + '</div>';
+  if (!col.length) { $('rhPAsi').innerHTML = h + '<div class="empty">No hay colaboradores ' + (adm ? rhAsiTipo.toLowerCase().replace(/l$/, 'les') : '') + ' con pago de esta periodicidad en este período.</div>'; return; }
+  h += '<div class="panel"><div class="tableWrap"><table class="table tblRh tblAsi"><thead><tr><th>Colaborador</th>' +
+    dias.map(f => { const wd = new Date(rhMsC(f)).getUTCDay(); return '<th style="text-align:center;padding:6px 3px;' + (f === hoy ? 'background:#7a1b1b;' : '') + '">' + DS[wd] + '<div style="font-weight:400;font-size:11px">' + f.slice(8) + '</div></th>'; }).join('') +
+    '<th style="text-align:center">Laborados</th><th style="text-align:center">Pagables</th><th style="text-align:center">Descontar</th>' + (adm ? '<th>Pago sugerido</th><th></th>' : '') + '</tr></thead><tbody>';
+  col.forEach(c => {
+    const r = rhAsiResumen(c, dias, hoy);
+    h += '<tr><td style="white-space:nowrap"><b>' + esc(c.nombre) + '</b></td>' + dias.map(f => {
+      const d = rhAsiDia(c, f, hoy), st = rhAsiEst[d.e];
+      if (d.e === 'NA' || d.e === 'NL' || d.e === 'FUT') return '<td style="text-align:center;color:#bbb;padding:3px">' + (d.e === 'NA' ? '' : (d.e === 'NL' ? '·' : '')) + (adm && d.e !== 'NA' ? '<span class="asiCel" style="cursor:pointer;display:inline-block;min-width:26px" onclick="rhAsiMarcar(\'' + escJs(c.id) + '\',\'' + f + '\')">&nbsp;</span>' : '') + '</td>';
+      return '<td style="text-align:center;padding:3px"><span class="asiCel" title="' + esc(st[1] + (d.def ? ' (por defecto)' : '') + (d.auto ? ' · solicitud aprobada' : '') + (d.obs ? ' · ' + d.obs : '')) + '"' +
+        (adm && !d.auto ? ' onclick="rhAsiMarcar(\'' + escJs(c.id) + '\',\'' + f + '\')"' : '') +
+        ' style="display:inline-block;min-width:26px;padding:3px 0;border-radius:5px;font-weight:700;font-size:12px;color:' + st[2] + ';background:' + st[3] + ';opacity:' + (d.def ? '.55' : '1') + ';' + (adm && !d.auto ? 'cursor:pointer' : '') + '">' + st[0] + '</span></td>';
+    }).join('') +
+    '<td style="text-align:center"><b>' + r.LAB + '</b></td><td style="text-align:center">' + r.pagables + '</td>' +
+    '<td style="text-align:center">' + (r.descuento ? '<b style="color:#a31616">' + r.descuento + '</b>' : '—') + '</td>' +
+    (adm ? '<td>' + (c.salario ? '<b>' + colones(r.sugerido) + '</b>' + (r.descuento ? '<div style="font-size:11px;color:#a31616">de ' + colones(rhPagoPeriodo(c)) + '</div>' : '') : '<span class="segSinCarga">sin salario</span>') + '</td>' +
+      '<td style="white-space:nowrap"><button class="btnMini" onclick="rhAsiPago(\'' + escJs(c.id) + '\',\'' + ini + '\',\'' + fin + '\')">💰 Pago</button></td>' : '') + '</tr>';
+  });
+  h += '</tbody></table></div></div><div style="display:flex;flex-wrap:wrap;gap:8px;margin:10px 0;font-size:12px">' +
+    Object.keys(rhAsiEst).map(k => '<span><span style="display:inline-block;min-width:22px;text-align:center;padding:2px 0;border-radius:5px;font-weight:700;color:' + rhAsiEst[k][2] + ';background:' + rhAsiEst[k][3] + '">' + rhAsiEst[k][0] + '</span> ' + rhAsiEst[k][1] + '</span>').join('') + '</div>' +
+    (adm ? '<div style="font-size:12px;color:#777">«Pago sugerido» = pago del período menos un día de salario por cada ausencia o permiso sin goce (pago ÷ días hábiles del período). Las horas extra, incapacidades y feriados trabajados se revisan aparte. Es una ayuda: puedes ajustar el monto al registrar el pago.</div>' : '');
+  $('rhPAsi').innerHTML = h;
+}
+
+let rhAsiSel = null;
+function rhAsiMarcar(idColab, f) {
+  const c = rhAsiData.colaboradores.find(x => x.id === idColab); if (!c) return;
+  const d = rhAsiDia(c, f, rhAsiData.hoy), act = c.dias[f];
+  rhAsiSel = { id: idColab, f: f };
+  rhModal('<h3>' + esc(c.nombre) + ' · ' + esc(rhFecha(f)) + '</h3>' +
+    '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px">' + ['LAB', 'AUS', 'LIB', 'FER'].map(k => '<button class="btn ' + ((act && act.e === k) ? 'primary' : 'secondary') + '" onclick="rhAsiAplicar(\'' + k + '\')">' + rhAsiEst[k][0] + ' ' + rhAsiEst[k][1] + '</button>').join('') +
+    (act ? '<button class="btn secondary" onclick="rhAsiAplicar(\'\')">↩ Quitar marca</button>' : '') + '</div>' +
+    '<div class="field"><label>Nota (opcional)</label><input id="raObs" maxlength="120" autocomplete="off" value="' + esc(act ? act.obs || '' : '') + '"></div>' +
+    '<label style="font-size:13px;display:flex;gap:6px;align-items:center;margin:6px 0"><input type="checkbox" id="raTodos"> Aplicar a todos los de esta lista en este día (ej. feriado)</label>' +
+    '<div style="font-size:12px;color:#777">Día libre = no se esperaba que trabajara (no se descuenta). Feriado = se paga aunque no se labore.</div>' +
+    '<div style="text-align:right;margin-top:12px"><button class="btn secondary" onclick="rhCerrar()">Cancelar</button></div>');
+}
+
+async function rhAsiAplicar(estado) {
+  const sel = rhAsiSel; if (!sel) return;
+  const todos = $('raTodos') && $('raTodos').checked, obs = $('raObs') ? $('raObs').value : '';
+  const ids = todos ? rhAsiData.colaboradores.filter(c => c.periodicidad === rhAsiTipo && !(c.dias[sel.f] && c.dias[sel.f].auto)).map(c => c.id) : [sel.id];
+  try {
+    for (const id of ids) await api('marcarAsistenciaRhWeb', id, [sel.f], estado, obs);
+    rhCerrar(); rhRenderAsi();
+  } catch (e) { mostrarError(e, 'No se pudo guardar la asistencia.'); }
+}
+
+function rhAsiPago(id, ini, fin) {
+  const c = rhAsiData.colaboradores.find(x => x.id === id); if (!c) return;
+  const dias = []; for (let t = rhMsC(ini); t <= rhMsC(fin); t += 86400000) dias.push(rhIso(t));
+  const r = rhAsiResumen(c, dias, rhAsiData.hoy);
+  rhColSel = id;
+  rhNuevoPago(ini.slice(0, 7) + ' ' + ini.slice(8) + '-' + fin.slice(8), r.sugerido, r.LAB + ' días laborados' + (r.descuento ? ', ' + r.descuento + ' a descontar' : ''));
 }
 
 /* ---------- Mis vacaciones y permisos ---------- */
@@ -5764,9 +5930,33 @@ function rhRenderMis() {
       'Solicita las fechas para tomarlas: el patrono debe concederlas dentro de las 15 semanas siguientes a que se cumple el período.</div>' : '') +
     '<div class="cards">' + card(sd.disponible, 'Días disponibles', 'f') + card(sd.exigibles, 'Pendientes de períodos cumplidos', sd.exigibles > 0 ? 's' : '') + card(sd.devengado, 'Días devengados') + card(sd.tomadas, 'Días tomados') +
     card(sd.programadas, 'Aprobados por tomar') + card(sd.pendientes, 'Por aprobar') + '</div>' +
+    '<div class="panel" style="margin-bottom:12px"><div class="panelHead"><h2>Mis datos</h2><button class="btnMini" onclick="rhEditarMiFicha()">✏️ Actualizar</button></div>' +
+      '<div style="padding:10px 14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px 18px;font-size:13px">' +
+      [['Cédula', m.cedula], ['Nacimiento', m.nacimiento ? rhFecha(m.nacimiento) : ''], ['Teléfono', m.telefono], ['Correo personal', m.correoPersonal], ['Dirección', m.direccion],
+       ['Contacto de emergencia', m.contactoEmergencia ? m.contactoEmergencia + (m.telEmergencia ? ' · ' + m.telEmergencia : '') : '']].map(x => '<div><div style="font-size:11px;color:#888">' + x[0] + '</div>' + (x[1] ? esc(x[1]) : '<span class="segSinCarga">—</span>') + '</div>').join('') +
+      '</div></div>' +
     '<div class="panel" style="margin-bottom:12px"><div class="panelHead"><h2>Mis vacaciones por período</h2></div><div class="tableWrap">' + rhTablaPeriodos(sd) + '</div></div>' +
     '<div class="panel"><div class="panelHead"><h2>Mis solicitudes</h2></div><div class="tableWrap">' + rhTablaSol(rhDatos.misSolicitudes, false) + '</div></div>';
   $('rhPMis').innerHTML = h;
+}
+
+function rhEditarMiFicha() {
+  const m = rhDatos.mio; if (!m) return;
+  rhModal('<h3>Mis datos</h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">' +
+    '<div class="field"><label>Teléfono</label><input id="rmTel" maxlength="30" value="' + esc(m.telefono) + '" autocomplete="off"></div>' +
+    '<div class="field"><label>Fecha de nacimiento</label><input type="date" id="rmNac" value="' + esc(m.nacimiento) + '"></div>' +
+    '<div class="field" style="grid-column:1/-1"><label>Correo personal</label><input type="email" id="rmCorreo" maxlength="80" value="' + esc(m.correoPersonal) + '" autocomplete="off"></div>' +
+    '<div class="field" style="grid-column:1/-1"><label>Dirección</label><input id="rmDir" maxlength="200" value="' + esc(m.direccion) + '" autocomplete="off"></div>' +
+    '<div class="field"><label>Contacto de emergencia</label><input id="rmCont" maxlength="80" value="' + esc(m.contactoEmergencia) + '" autocomplete="off"></div>' +
+    '<div class="field"><label>Teléfono de emergencia</label><input id="rmTelE" maxlength="30" value="' + esc(m.telEmergencia) + '" autocomplete="off"></div></div>' +
+    '<div style="font-size:12px;color:#777">La cédula, el puesto y la fecha de ingreso los actualiza el administrador.</div>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button class="btn secondary" onclick="rhCerrar()">Cancelar</button><button class="btn primary" onclick="rhGuardarMiFicha()">Guardar</button></div>');
+}
+async function rhGuardarMiFicha() {
+  try {
+    await api('guardarMiFichaRhWeb', { telefono: $('rmTel').value, nacimiento: $('rmNac').value, correoPersonal: $('rmCorreo').value, direccion: $('rmDir').value, contactoEmergencia: $('rmCont').value, telEmergencia: $('rmTelE').value });
+    rhCerrar(); toast('Datos actualizados.'); abrirColab();
+  } catch (e) { mostrarError(e, 'No se pudieron guardar los datos.'); }
 }
 
 function rhTablaPeriodos(sd) {
@@ -5925,7 +6115,8 @@ function rhEditarCol(id) {
     '<div style="display:flex;gap:10px"><div class="field" style="flex:1"><label>Puesto</label><input id="rcPuesto" value="' + esc(c.puesto) + '" maxlength="60"></div>' +
     '<div class="field" style="flex:1"><label>Fecha de ingreso</label><input type="date" id="rcIngreso" value="' + esc(c.ingreso) + '"></div></div>' +
     '<div style="display:flex;gap:10px"><div class="field" style="flex:1"><label>Salario base (₡)</label><input type="number" id="rcSalario" min="0" value="' + esc(c.salario) + '"></div>' +
-    '<div class="field" style="flex:1"><label>Pago</label><select id="rcPeriodicidad"><option' + (c.periodicidad === 'Quincenal' ? ' selected' : '') + '>Quincenal</option><option' + (c.periodicidad === 'Mensual' ? ' selected' : '') + '>Mensual</option></select></div></div>' +
+    '<div class="field" style="flex:1"><label>Pago</label><select id="rcPeriodicidad"><option' + (c.periodicidad === 'Quincenal' ? ' selected' : '') + '>Quincenal</option><option' + (c.periodicidad === 'Semanal' ? ' selected' : '') + '>Semanal</option><option' + (c.periodicidad === 'Mensual' ? ' selected' : '') + '>Mensual</option></select></div></div>' +
+    '<div style="font-size:12px;color:#777;margin:-4px 0 8px">Quincenal y Mensual: salario base <b>mensual</b>. Semanal: monto que se paga <b>por semana</b>.</div>' +
     '<div style="display:flex;gap:10px"><div class="field" style="flex:1"><label>Semana laboral</label><select id="rcDiasSemana" onchange="rhSugPeriodo()"><option value="5"' + (c.diasSemana === 5 ? ' selected' : '') + '>5 días (lun-vie)</option><option value="6"' + (c.diasSemana === 6 ? ' selected' : '') + '>6 días (lun-sáb)</option></select></div>' +
     '<div class="field" style="flex:1"><label>Días de vacaciones por cada 50 semanas</label><input type="number" id="rcDiasPeriodo" min="1" step="0.5" value="' + esc(c.diasPeriodo) + '"></div></div>' +
     '<div class="field"><label>Días de vacaciones ya tomados antes de usar el sistema</label><input type="number" id="rcPrevios" min="0" step="0.5" value="' + esc(c.previos) + '"></div>' +
@@ -5976,15 +6167,15 @@ async function rhRenderPag() {
         '</td><td><button class="btnMini" style="color:#a31616" onclick="rhEliminarPago(\'' + escJs(p.id) + '\')">🗑️</button></td></tr>').join('') + '</tbody></table>') + '</div></div>';
 }
 
-function rhNuevoPago() {
+function rhNuevoPago(per, bruto, obs) {
   const c = rhDatos.colaboradores.find(x => x.id === rhColSel); if (!c) return;
   rhModal('<h3>Registrar pago · ' + esc(c.nombre) + '</h3>' +
     '<div style="display:flex;gap:10px"><div class="field" style="flex:1"><label>Fecha del pago</label><input type="date" id="rpFecha" value="' + esc(rhDatos.hoy) + '"></div>' +
-    '<div class="field" style="flex:1"><label>Período (ej. 2026-10 1Q)</label><input id="rpPeriodo" maxlength="40" autocomplete="off"></div></div>' +
+    '<div class="field" style="flex:1"><label>Período (ej. 2026-10 1Q)</label><input id="rpPeriodo" maxlength="40" autocomplete="off" value="' + esc(per || '') + '"></div></div>' +
     '<div class="field"><label>Tipo</label><select id="rpTipo">' + Object.keys(rhDatos.tiposPago).map(k => '<option value="' + k + '">' + esc(rhDatos.tiposPago[k]) + (rhDatos.salariales.indexOf(k) !== -1 ? ' (cuenta para aguinaldo)' : '') + '</option>').join('') + '</select></div>' +
-    '<div style="display:flex;gap:10px"><div class="field" style="flex:1"><label>Monto bruto (₡)</label><input type="number" id="rpBruto" min="0" step="0.01" value="' + (c.salario ? (c.periodicidad === 'Mensual' ? c.salario : c.salario / 2) : '') + '" oninput="rhNeto()"></div>' +
+    '<div style="display:flex;gap:10px"><div class="field" style="flex:1"><label>Monto bruto (₡)</label><input type="number" id="rpBruto" min="0" step="0.01" value="' + (bruto !== undefined ? bruto : (c.salario ? rh2c(rhPagoPeriodo(c)) : '')) + '" oninput="rhNeto()"></div>' +
     '<div class="field" style="flex:1"><label>Deducciones (CCSS, renta, otras) (₡)</label><input type="number" id="rpDed" min="0" step="0.01" value="0" oninput="rhNeto()"></div></div>' +
-    '<div id="rpNeto" style="font-size:14px;margin:4px 0 8px"></div><div class="field"><label>Nota (opcional)</label><input id="rpObs" maxlength="200" autocomplete="off"></div>' +
+    '<div id="rpNeto" style="font-size:14px;margin:4px 0 8px"></div><div class="field"><label>Nota (opcional)</label><input id="rpObs" maxlength="200" autocomplete="off" value="' + esc(obs || '') + '"></div>' +
     '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button class="btn secondary" onclick="rhCerrar()">Cancelar</button><button class="btn primary" id="rpBtn" onclick="rhGuardarPago()">Registrar</button></div>');
   rhNeto();
 }
@@ -5995,7 +6186,7 @@ async function rhGuardarPago() {
   const b = $('rpBtn'); b.disabled = true;
   try {
     await api('registrarPagoRhWeb', { idColab: rhColSel, fecha: $('rpFecha').value, periodo: $('rpPeriodo').value, tipo: $('rpTipo').value, bruto: $('rpBruto').value, deducciones: $('rpDed').value, obs: $('rpObs').value });
-    rhCerrar(); toast('Pago registrado.'); rhRenderPag();
+    rhCerrar(); toast('Pago registrado.'); if (rhTabAct === 'pag') rhRenderPag();
   } catch (e) { b.disabled = false; mostrarError(e, 'No se pudo registrar el pago.'); }
 }
 
@@ -12455,6 +12646,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 30 · 13-oct 18:50</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 32 · 13-oct 20:00</div>
 </body>
 </html>
