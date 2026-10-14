@@ -6606,7 +6606,8 @@ function pmHtmlRes(cerr) {
   if (!R.filas.length) return '<div class="loading">Sin datos.</div>';
   const th = (t, s) => '<th style="text-align:' + (s || 'left') + '">' + t + '</th>';
   const num = v => '<td style="text-align:right;white-space:nowrap">' + v + '</td>';
-  return '<div style="padding:8px 12px;font-size:12px;color:#667">Haz clic en las celdas <b>Apelaciones</b>, <b>Penalizaciones</b>, <b>Alquiler</b> y <b>Rebajos</b> para ver o cargar varios valores. Apelaciones suman a la factura; penalizaciones y alquiler la restan; los rebajos solo bajan el depósito.</div>' +
+  return '<div style="padding:8px 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;border-bottom:1px solid #e3e7ee"><b style="font-size:13px">Estados de cuenta de todos:</b><button class="btn secondary" title="Un solo PDF: primero qué se factura y qué se paga, luego un estado por contratista (una página cada uno)" onclick="pmEcPdfTodos()">⬇ PDF (todos juntos)</button><button class="btn secondary" title="Un solo Excel: hoja «Facturar y pagar» y una hoja por contratista" onclick="pmEcExcelTodos()">⬇ Excel (todos juntos)</button><span style="color:#778;font-size:12px">Individual: botón 📄 Reporte de cada fila (PDF, Excel o correo).</span></div>' +
+    '<div style="padding:8px 12px;font-size:12px;color:#667">Haz clic en las celdas <b>Apelaciones</b>, <b>Penalizaciones</b>, <b>Alquiler</b> y <b>Rebajos</b> para ver o cargar varios valores. Apelaciones suman a la factura; penalizaciones y alquiler la restan; los rebajos solo bajan el depósito.</div>' +
     '<table class="pmT"><thead><tr><th colspan="3"></th><th colspan="3" style="text-align:center;background:#7a1a1a;color:#fff">Antes de facturar · afectan la factura</th><th colspan="3"></th><th style="text-align:center;background:#444;color:#fff">Después de facturar</th><th colspan="4"></th></tr><tr>' + th('Contratista (factura)') + th('Órd.', 'right') + th('Detalle', 'right') + th('Apelaciones (+)', 'right') + th('Penaliz. (−)', 'right') + th('Alquiler / otros (−)', 'right') + th('A facturar', 'right') + th('IVA 13%', 'right') + th('Total factura', 'right') + th('Rebajos (−)', 'right') + th('A depositar', 'right') + th('N.º factura') + th('Pagado') + '<th></th></tr></thead><tbody>' +
     R.filas.map(f => {
       const tec = (f.tecnicos || []).map(t => 'M' + esc(t.movil) + (t.tecnico && pmNorm(t.tecnico) !== pmNorm(f.nombre) ? ' · ' + esc(t.tecnico) : '')).join(' &nbsp;|&nbsp; ');
@@ -6618,7 +6619,7 @@ function pmHtmlRes(cerr) {
         num(f.nOrdenes) + num(pmM(f.detalle)) + pmCelda(f, 'apel', f.reclamos, cerr) + pmCelda(f, 'pen', f.penalizaciones, cerr) + pmCelda(f, 'alq', f.alquileres + f.camisas + f.otros, cerr) +
         '<td style="text-align:right;white-space:nowrap"><b>' + pmM(f.subtotal) + '</b></td>' + num(f.aplicaIva ? pmM(f.iva) : '<span style="color:#888">sin IVA</span>') + '<td style="text-align:right;white-space:nowrap"><b>' + pmM(f.totalFacturado) + '</b></td>' +
         pmCelda(f, 'reb', f.deducciones, cerr) + '<td style="text-align:right;white-space:nowrap;background:#eef7ee"><b>' + pmM(f.deposito) + '</b></td>' +
-        '<td>' + (f.sinContratista ? '' : '<input style="width:118px" value="' + esc(f.factura) + '" ' + (cerr ? 'disabled' : '') + ' onchange="pmGuardarFactura(\'' + f.idCon + '\',this.value)" placeholder="N.º factura">') + '</td><td>' + (f.pagado ? '<span class="chip verde">' + esc(pmFh(f.pagado)) + '</span>' : (f.sinContratista ? '' : '<span style="color:#999">—</span>')) + '</td><td style="white-space:nowrap">' + (f.sinContratista ? '' : '<button class="btn secondary" title="Estado de cuenta (imprimir / PDF)" onclick="pmEstadoCuenta(\'' + f.idCon + '\')">📄</button> <button class="btn secondary" title="Enviar por correo" onclick="pmCorreo(\'' + f.idCon + '\')">✉</button>') + '</td></tr>';
+        '<td>' + (f.sinContratista ? '' : '<input style="width:118px" value="' + esc(f.factura) + '" ' + (cerr ? 'disabled' : '') + ' onchange="pmGuardarFactura(\'' + f.idCon + '\',this.value)" placeholder="N.º factura">') + '</td><td>' + (f.pagado ? '<span class="chip verde">' + esc(pmFh(f.pagado)) + '</span>' : (f.sinContratista ? '' : '<span style="color:#999">—</span>')) + '</td><td style="white-space:nowrap">' + (f.sinContratista ? '' : '<button class="btn secondary" title="Estado de cuenta: PDF, Excel o correo" onclick="pmReporteModal(\'' + f.idCon + '\')">📄 Reporte</button>') + '</td></tr>';
     }).join('') +
     '<tr style="font-weight:700;background:#f3f6fa"><td>Total</td>' + num(T.nOrdenes) + num(pmM(T.detalle)) + num(pmM(T.reclamos)) + num(pmM(T.penalizaciones)) + num(pmM(T.alquileres + T.camisas + T.otros)) + num(pmM(T.subtotal)) + num(pmM(T.iva)) + num(pmM(T.totalFacturado)) + num(pmM(T.deducciones)) + num(pmM(T.deposito)) + '<td></td><td></td><td></td></tr></tbody></table>';
 }
@@ -6696,7 +6697,7 @@ function pmHtmlOrd(cerr) {
     sel('pmFm', [['', 'Todas las móviles']].concat(moviles.map(m => [m, 'Móvil ' + m])), pmOF.movil, "pmOF.movil=this.value;pmPag=0;pmRenderSemana()") +
     sel('pmFs', [['', 'Todos los servicios']].concat(servs.map(m => [m, m])), pmOF.serv, "pmOF.serv=this.value;pmPag=0;pmRenderSemana()") +
     sel('pmFe', [['todas', 'Todas'], ['dif', 'Con diferencia vs lista'], ['sin', 'Sin precio en lista'], ['cambio', 'Con cambio de tipo o precio'], ['negativa', 'Pago mayor al de Telecable'], ['manual', 'Precio manual'], ['valid', 'Validadas con materiales'], ['revisar', 'Reinstalación por revisar'], ['sel', 'Solo seleccionadas']].concat(pmVer ? [['sinseg', 'Sin seguimiento'], ['sinmat', 'Sin materiales']] : []), pmOF.est, "pmOF.est=this.value;pmPag=0;pmRenderSemana()") +
-    '<span style="color:#667;font-size:12px">' + O.length + ' orden(es)</span>' + (cerr ? '' : '<span style="flex:1"></span>' + (pmS.ordenes.some(o => !o.nOrden && !o.manual) ? '<button class="btn secondary" title="Sube de nuevo el Excel de Telecable para rellenar los números de orden que faltan" onclick="$(\'pmFileN\').click()">🔢 Completar N.º de orden</button><input type="file" id="pmFileN" accept=".xlsx,.xls" style="display:none" onchange="pmCompletarOrden(this.files[0]);this.value=\'\'">' : '') + '<button class="btn secondary" title="Sube el reporte de materiales de la semana: fibra + RG6 = instalación completa; solo fibra = cambio de acometida; sin fibra = reinstalación interna" onclick="$(\'pmFileMat\').click()">🧪 Validar reinstalaciones con materiales</button><input type="file" id="pmFileMat" accept=".xlsx,.xls" style="display:none" onchange="pmValidarMat(this.files[0]);this.value=\'\'"><button class="btn secondary" onclick="pmOrdenModal()">➕ Agregar orden</button>') + '</div>';
+    '<span style="color:#667;font-size:12px">' + O.length + ' orden(es)</span><span style="flex:1"></span><button class="btn secondary" title="Descarga las órdenes que ves con el filtro aplicado" onclick="pmOrdExcel()">⬇ Excel</button><button class="btn secondary" title="Descarga las órdenes que ves con el filtro aplicado" onclick="pmOrdPdf()">📄 PDF</button>' + (cerr ? '' : '' + (pmS.ordenes.some(o => !o.nOrden && !o.manual) ? '<button class="btn secondary" title="Sube de nuevo el Excel de Telecable para rellenar los números de orden que faltan" onclick="$(\'pmFileN\').click()">🔢 Completar N.º de orden</button><input type="file" id="pmFileN" accept=".xlsx,.xls" style="display:none" onchange="pmCompletarOrden(this.files[0]);this.value=\'\'">' : '') + '<button class="btn secondary" title="Sube el reporte de materiales de la semana: fibra + RG6 = instalación completa; solo fibra = cambio de acometida; sin fibra = reinstalación interna" onclick="$(\'pmFileMat\').click()">🧪 Validar reinstalaciones con materiales</button><input type="file" id="pmFileMat" accept=".xlsx,.xls" style="display:none" onchange="pmValidarMat(this.files[0]);this.value=\'\'"><button class="btn secondary" onclick="pmOrdenModal()">➕ Agregar orden</button>') + '</div>';
   if (!cerr) {
     h += '<div style="padding:8px 12px;background:#eef4ff;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px"><b>' + pmSel.size + ' seleccionada(s)</b>' +
       '<button class="btn secondary" onclick="pmSelTodas()">Seleccionar las ' + O.length + ' filtradas</button><button class="btn secondary" onclick="pmSel.clear();pmRenderSemana()">Quitar selección</button>' +
@@ -7227,9 +7228,7 @@ async function pmBanGuardar() {
 function pmHtmlArc() {
   return '<div style="padding:14px;display:grid;gap:14px;max-width:760px">' +
     '<div><h3 style="margin:0 0 4px">Archivo para el banco</h3><div style="font-size:12px;color:#667;margin-bottom:6px">Genera el .prn de pago de planillas y proveedores con los depósitos de esta semana' + (pmS.extras.length ? ' y las líneas adicionales' : '') + '. Antes de subirlo revisa el total.</div><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end"><label>Fecha de pago<input type="date" id="paFec" value="' + (pmD.hoy || '') + '"></label><label>N.º de envío<input type="number" id="paEnv" style="width:90px" value="' + (pmD.banco.ultimoEnvio + 1) + '"></label><button class="btn primary" onclick="pmBanco()">Generar archivo .prn</button></div><div id="pmBanOut" style="margin-top:8px"></div></div>' +
-    '<div><h3 style="margin:0 0 4px">Resumen semanal</h3><div style="font-size:12px;color:#667;margin-bottom:6px">Excel con las hojas Detalle (por contratista) y Pago (depósitos), más las órdenes.</div><button class="btn secondary" onclick="pmResumenExcel()">⬇ Descargar Excel</button></div>' +
-    '<div><h3 style="margin:0 0 4px">Corte por móvil</h3><div style="font-size:12px;color:#667;margin-bottom:6px">Detalle de las órdenes de cada móvil con su pago (sin ajustes del contratista). Excel con una hoja por móvil, o PDF para imprimir.</div><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end"><label>Móvil<select id="pmCorteM"><option value="">Todas</option>' + pmCortesMoviles().map(x => '<option value="' + x.movil + '">' + x.movil + '</option>').join('') + '</select></label><button class="btn secondary" onclick="pmCortesExcel($(\'pmCorteM\').value)">⬇ Excel</button><button class="btn secondary" onclick="pmCortePdf($(\'pmCorteM\').value)">🖨 PDF</button></div></div>' +
-    '<div><h3 style="margin:0 0 4px">Estados de cuenta</h3><div style="font-size:12px;color:#667;margin-bottom:6px">Un estado por contratista con sus órdenes, ajustes y depósito. Se abre para imprimir o guardar como PDF (todos juntos, una página cada uno).</div><button class="btn secondary" onclick="pmEstadoCuenta(\'\')">🖨 Todos los contratistas</button></div><div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:end"><label>Reporte individual<select id="pmEcCon">' + pmS.resumen.filas.filter(f => !f.sinContratista).map(f => '<option value="' + f.idCon + '">' + esc(f.nombre) + '</option>').join('') + '</select></label><button class="btn secondary" onclick="pmEstadoCuenta($(\'pmEcCon\').value)">🖨 Imprimir / PDF</button><button class="btn secondary" onclick="pmEstadoCuenta($(\'pmEcCon\').value,\'html\')">⬇ Descargar</button><button class="btn secondary" onclick="pmCorreo($(\'pmEcCon\').value)">✉ Correo</button></div></div></div>';
+    '</div>';
 }
 async function pmBanco() {
   try {
@@ -7316,12 +7315,12 @@ function pmHtmlMov() {
   const T = L.reduce((a, x) => ({ l: a.l + x.lineas, c: a.c + Object.keys(x.ctos).length, uf: a.uf + x.uf, co: a.co + x.costo, ca: a.ca + x.cambios, s: a.s + x.sin }), { l: 0, c: 0, uf: 0, co: 0, ca: 0, s: 0 });
   const num = v => '<td style="text-align:right;white-space:nowrap">' + v + '</td>';
   const fPorMovil = mv => pmS.resumen.filas.find(f => f.moviles[mv]) || {};
-  return '<div style="padding:8px 12px;font-size:12px;color:#667">Por cada móvil: lo que Telecable facturó (pagó a SRD) frente a lo que corresponde pagarle a la móvil. La diferencia es de la empresa. Pasa a <b>Órdenes</b> para revisar línea por línea (contratos, precios, servicios). Descarga el corte de cada móvil en Excel o PDF.</div>' +
-    '<table class="pmT"><thead><tr><th>Móvil</th><th>Contratista (factura)</th><th>Técnico</th><th style="text-align:right">Contratos</th><th style="text-align:right">Líneas</th><th style="text-align:right">Facturado Telecable</th><th style="text-align:right">Monto a pagar</th><th style="text-align:right">Diferencia (empresa)</th><th>Revisión</th><th>Descargar</th></tr></thead><tbody>' +
+  return '<div style="padding:8px 12px;font-size:12px;color:#667">Por cada móvil: lo que Telecable facturó (pagó a SRD) frente a lo que corresponde pagarle a la móvil. La diferencia es de la empresa. Pasa a <b>Órdenes</b> para revisar línea por línea (contratos, precios, servicios).</div>' +
+    '<table class="pmT"><thead><tr><th>Móvil</th><th>Contratista (factura)</th><th>Técnico</th><th style="text-align:right">Contratos</th><th style="text-align:right">Líneas</th><th style="text-align:right">Facturado Telecable</th><th style="text-align:right">Monto a pagar</th><th style="text-align:right">Diferencia (empresa)</th><th>Revisión</th></tr></thead><tbody>' +
     L.map(x => { const f = fPorMovil(x.movil), tec = ((f.tecnicos || []).find(t => t.movil === x.movil) || {}).tecnico || '';
       return '<tr><td><b>' + esc(x.movil) + '</b></td><td>' + (f.nombre ? esc(f.nombre) : '<span style="color:#9b1c1c">Sin contratista</span>') + '</td><td>' + esc(tec) + '</td>' + num(Object.keys(x.ctos).length) + num(x.lineas) + num(pmM(x.uf)) + num('<b>' + pmM(x.costo) + '</b>') +
-        '<td style="text-align:right;white-space:nowrap;color:' + (x.uf - x.costo >= 0 ? '#2d5a1b' : '#9b1c1c') + '">' + pmSgn(x.uf - x.costo) + '</td><td>' + (x.sin ? '<span class="chip rojo">' + x.sin + ' sin precio</span> ' : '') + (x.cambios ? '<span class="chip azul">' + x.cambios + ' con cambio</span>' : '') + (!x.sin && !x.cambios ? '<span class="chip verde">OK</span>' : '') + '</td><td style="white-space:nowrap"><button class="btn secondary" title="Excel de esta móvil" onclick="pmCortesExcel(\'' + x.movil + '\')">⬇ Excel</button> <button class="btn secondary" title="PDF de esta móvil" onclick="pmCortePdfFile(\'' + x.movil + '\')">📄 PDF</button></td></tr>'; }).join('') +
-    '<tr style="font-weight:700;background:#f3f6fa"><td colspan="3">Total (' + L.length + ' móviles)</td>' + num(T.c) + num(T.l) + num(pmM(T.uf)) + num(pmM(T.co)) + '<td style="text-align:right">' + pmSgn(T.uf - T.co) + '</td><td></td><td style="white-space:nowrap"><button class="btn secondary" title="Un Excel por cada móvil (varias descargas)" onclick="pmCorteTodos(\'xlsx\')">⬇ Un Excel por móvil</button> <button class="btn secondary" title="Un PDF por cada móvil (varias descargas)" onclick="pmCorteTodos(\'pdf\')">📄 Un PDF por móvil</button></td></tr></tbody></table>';
+        '<td style="text-align:right;white-space:nowrap;color:' + (x.uf - x.costo >= 0 ? '#2d5a1b' : '#9b1c1c') + '">' + pmSgn(x.uf - x.costo) + '</td><td>' + (x.sin ? '<span class="chip rojo">' + x.sin + ' sin precio</span> ' : '') + (x.cambios ? '<span class="chip azul">' + x.cambios + ' con cambio</span>' : '') + (!x.sin && !x.cambios ? '<span class="chip verde">OK</span>' : '') + '</td></tr>'; }).join('') +
+    '<tr style="font-weight:700;background:#f3f6fa"><td colspan="3">Total (' + L.length + ' móviles)</td>' + num(T.c) + num(T.l) + num(pmM(T.uf)) + num(pmM(T.co)) + '<td style="text-align:right">' + pmSgn(T.uf - T.co) + '</td><td></td></tr></tbody></table>';
 }
 
 /* ---------- Pagos pendientes (el pago llega ~15 días después de la semana) ---------- */
@@ -7455,16 +7454,230 @@ async function pmAplicarCuotas() {
   catch (e) { mostrarError(e, 'No se pudieron aplicar las cuotas.'); }
 }
 
-function pmCorreo(idCon) {
-  const f = pmS.resumen.filas.find(x => x.idCon === idCon); if (!f) return;
-  const c = pmD.contratistas.find(x => x.id === idCon) || {}, S = pmS.semana;
-  if (!c.correo) toast('Este contratista no tiene correo registrado; se abre el mensaje en blanco.', 5000);
-  const asunto = 'Estado de cuenta SRD · semana ' + pmFh(S.desde) + ' al ' + pmFh(S.hasta);
-  const cuerpo = 'Estimado(a) ' + f.nombre + ':\n\nAdjuntamos su estado de cuenta de la semana ' + pmFh(S.desde) + ' al ' + pmFh(S.hasta) + '.\n\n' +
-    'Monto a facturar: ' + pmM(f.subtotal) + (f.aplicaIva ? '\nIVA 13%: ' + pmM(f.iva) : '') + '\nTotal de la factura: ' + pmM(f.totalFacturado) + '\nRebajos al depósito: ' + pmM(f.deducciones) + '\nTotal a depositar: ' + pmM(f.deposito) + '\nFecha estimada de pago: ' + pmFh(S.fechaPagoEst) + '\n\nPor favor envíe su factura por el monto indicado y confirme el número.\n\n(Adjunte aquí el PDF del estado de cuenta)\n\nSoluciones Red Dorada SRL';
-  location.href = 'mailto:' + encodeURIComponent(c.correo || '') + '?subject=' + encodeURIComponent(asunto) + '&body=' + encodeURIComponent(cuerpo);
+
+/* ---------- Reporte individual por contratista: PDF, Excel y correo ---------- */
+function pmEcDatos(idCon) {
+  const S = pmS, f = S.resumen.filas.find(r => r.idCon === idCon); if (!f || f.sinContratista) return null;
+  const T = pmD.tipos, movs = Object.keys(f.moviles), aj = S.ajustes.filter(a => a.idCon === idCon);
+  const lineas = [['Detalle de órdenes (' + f.nOrdenes + ')', f.detalle, '']];
+  if (f.reclamos) lineas.push(['+ Apelaciones / reclamos', f.reclamos, '']);
+  if (f.penalizaciones) lineas.push(['− Penalizaciones', f.penalizaciones, '']);
+  if (f.alquileres) lineas.push(['− Alquiler de móvil', f.alquileres, '']);
+  if (f.camisas) lineas.push(['− Camisas / uniformes', f.camisas, '']);
+  if (f.otros) lineas.push(['− Otros rebajos que aplican a la factura', f.otros, '']);
+  lineas.push(['MONTO A FACTURAR', f.subtotal, 't']);
+  lineas.push(f.aplicaIva ? ['IVA 13%', f.iva, ''] : ['IVA (no aplica)', 0, '']);
+  lineas.push(['TOTAL FACTURA', f.totalFacturado, 't']);
+  aj.filter(a => (T[a.tipo] || {}).fase === 'despues').forEach(a => { const t = T[a.tipo] || { txt: a.tipo, signo: -1 }; lineas.push([(t.signo > 0 ? '+ ' : '− ') + t.txt + (a.detalle ? ': ' + a.detalle : ''), a.monto, '']); });
+  lineas.push(['TOTAL A DEPOSITAR', f.deposito, 'd']);
+  const detAj = fase => aj.filter(a => ((T[a.tipo] || {}).fase === 'despues') === fase).map(a => { const t = T[a.tipo] || { txt: a.tipo, signo: -1 }; return [t.txt, a.detalle, a.contrato, (t.signo > 0 ? 1 : -1) * a.monto]; });
+  const tecs = f.tecnicos || [];
+  return { f: f, emp: pmD.empresa || { nombre: 'Soluciones Red Dorada SRL' }, sem: S.semana, fechaPago: S.semana.fechaPagoEst, saldo: (S.saldosPrestamo || {})[idCon] || 0, lineas: lineas, antes: detAj(false), rebajos: detAj(true),
+    moviles: movs.map(mv => { const L = S.ordenes.filter(o => String(Number(o.movil)) === mv); return { movil: mv, tecnico: (tecs.find(t => t.movil === mv) || {}).tecnico || '', ordenes: L, total: L.reduce((a, o) => a + o.costo, 0) }; }).filter(m => m.ordenes.length),
+    iban: f.iban ? 'CR' + f.iban : 'Sin registrar' };
+}
+const pmEcNom = D => 'Estado_cuenta_' + D.f.nombre.replace(/[^\w]+/g, '_') + '_' + D.sem.desde;
+
+function pmEcAoa(D) {
+    const f = D.f, A = [];
+    A.push([D.emp.nombre, '', '', '', '', '', 'ESTADO DE CUENTA']);
+    A.push([[D.emp.cedula ? 'Céd. jurídica ' + D.emp.cedula : '', D.emp.telefono ? 'Tel. ' + D.emp.telefono : '', D.emp.correo || ''].filter(Boolean).join(' · '), '', '', '', '', '', 'Semana ' + pmFh(D.sem.desde) + ' al ' + pmFh(D.sem.hasta)]);
+    if (D.emp.direccion) A.push([D.emp.direccion]);
+    A.push([]);
+    A.push(['Contratista (factura a nombre de)', '', f.nombre, '', 'Cédula', '', f.cedula || '']);
+    A.push(['Titular de la cuenta', '', f.titular || f.nombre, '', 'Cuenta IBAN', '', D.iban]);
+    A.push(['N.º de factura', '', f.factura || 'Pendiente', '', 'Móviles', '', D.moviles.map(m => m.movil + (m.tecnico ? ' (' + m.tecnico + ')' : '')).join(', ')]);
+    A.push([]);
+    A.push(['RESUMEN DEL PAGO']);
+    D.lineas.forEach(l => A.push([l[0], '', '', '', '', '', l[1]]));
+    A.push(['Fecha estimada de pago: ' + pmFh(D.fechaPago) + (D.saldo > 0.005 ? ' · Saldo pendiente de préstamo: ' + pmM(D.saldo) : '')]);
+    A.push(['Los rebajos no modifican el monto de la factura: se descuentan únicamente del depósito.']);
+    const aju = (t, L) => { if (!L.length) return; A.push([]); A.push([t]); A.push(['Concepto', 'Detalle', '', 'Contrato', '', '', 'Monto']); L.forEach(a => A.push([a[0], a[1], '', a[2], '', '', a[3]])); };
+    aju('DETALLE DE APELACIONES, PENALIZACIONES Y ALQUILER (afectan la factura)', D.antes); aju('DETALLE DE REBAJOS (solo afectan el depósito)', D.rebajos);
+    A.push([]); A.push(['ÓRDENES DE LA SEMANA']);
+    D.moviles.forEach(m => {
+      A.push([]); A.push(['Móvil ' + m.movil + (m.tecnico ? ' · ' + m.tecnico : '')]);
+      A.push(['Fecha', 'N.º orden', 'Contrato', 'Cliente', 'Servicio', 'Cant.', 'Pago']);
+      m.ordenes.forEach(o => A.push([pmFh(o.fecha), o.nOrden || '', o.contrato, o.cliente, o.tipo || o.servicios, o.cantidad || 1, o.costo]));
+      A.push(['Subtotal móvil ' + m.movil + ' (' + m.ordenes.length + ' órdenes)', '', '', '', '', '', m.total]);
+    });
+    A.push([]); A.push(['Total detalle de órdenes (' + f.nOrdenes + ')', '', '', '', '', '', f.detalle]);
+    return A;
+}
+function pmEcHoja(A) {
+  const ws = XLSX.utils.aoa_to_sheet(A);
+  ws['!cols'] = [{ wch: 20 }, { wch: 14 }, { wch: 28 }, { wch: 40 }, { wch: 38 }, { wch: 7 }, { wch: 16 }];
+  Object.keys(ws).forEach(k => { if (k[0] !== '!' && ws[k].t === 'n') ws[k].z = '#,##0.00'; });
+  return ws;
+}
+async function pmEcExcel(idCon, silencioso) {
+  try {
+    await cargarLib('xlsx', SEG_URL_XLSX);
+    const D = pmEcDatos(idCon); if (!D) { toast('Ese contratista no tiene estado.'); return; }
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, pmEcHoja(pmEcAoa(D)), 'Estado de cuenta');
+    XLSX.writeFile(wb, pmEcNom(D) + '.xlsx');
+  } catch (e) { if (!silencioso) mostrarError(e, 'No se pudo generar el Excel.'); else throw e; }
+}
+/* Un solo Excel: hoja «Facturar y pagar» con todos y una hoja de estado por contratista */
+async function pmEcExcelTodos() {
+  try {
+    await cargarLib('xlsx', SEG_URL_XLSX);
+    const L = pmS.resumen.filas.filter(f => !f.sinContratista && f.nOrdenes > 0).map(f => pmEcDatos(f.idCon)).filter(Boolean); if (!L.length) { toast('No hay contratistas con pago.'); return; }
+    const wb = XLSX.utils.book_new(), T = pmS.resumen.totales;
+    const R = [['Contratista (factura)', 'Cédula', 'Móviles', 'N.º factura', 'Detalle órdenes', 'Apelaciones (+)', 'Penalizaciones (−)', 'Alquiler / otros (−)', 'A facturar', 'IVA 13%', 'Total factura', 'Rebajos (−)', 'A depositar', 'Titular de la cuenta', 'IBAN']];
+    L.forEach(D => { const f = D.f; R.push([f.nombre, f.cedula, D.moviles.map(m => m.movil).join(', '), f.factura || '', f.detalle, f.reclamos, f.penalizaciones, f.alquileres + f.camisas + f.otros, f.subtotal, f.iva, f.totalFacturado, f.deducciones, f.deposito, f.titular || f.nombre, D.iban]); });
+    R.push(['TOTAL', '', '', '', T.detalle, T.reclamos, T.penalizaciones, T.alquileres + T.camisas + T.otros, T.subtotal, T.iva, T.totalFacturado, T.deducciones, T.deposito, '', '']);
+    const wr = XLSX.utils.aoa_to_sheet(R); wr['!cols'] = [{ wch: 34 }, { wch: 14 }, { wch: 12 }, { wch: 14 }].concat(Array(9).fill({ wch: 16 }), [{ wch: 30 }, { wch: 26 }]);
+    Object.keys(wr).forEach(k => { if (k[0] !== '!' && wr[k].t === 'n') wr[k].z = '#,##0.00'; });
+    XLSX.utils.book_append_sheet(wb, wr, 'Facturar y pagar');
+    const usados = { 'Facturar y pagar': 1 };
+    L.forEach(D => { const n = D.f.nombre.replace(/[\/?*\[\]:]/g, ' ').slice(0, 28).trim() || 'Contratista'; let k = n, i = 2; while (usados[k]) k = n.slice(0, 26) + ' ' + i++; usados[k] = 1; XLSX.utils.book_append_sheet(wb, pmEcHoja(pmEcAoa(D)), k); });
+    XLSX.writeFile(wb, 'Estados_de_cuenta_' + L[0].sem.desde + '_' + L[0].sem.hasta + '.xlsx');
+  } catch (e) { mostrarError(e, 'No se pudo generar el Excel.'); }
 }
 
+/* Genera el PDF (jsPDF). devuelve {doc, nombre} */
+function pmEcDibujar(d, D) {
+  const f = D.f, M = 14, W = 216 - 2 * M, mon = v => ctMoneyPdf(v, 'CRC');
+  const cut = (t, n) => { t = String(t == null ? '' : t); return t.length > n ? t.slice(0, n - 1) + '…' : t; };
+  let y = M;
+  const nuevaPag = () => { d.addPage(); y = M; };
+  const necesita = h => { if (y + h > 266) nuevaPag(); };
+  const logo = ($('hLogo') && $('hLogo').src) || '';
+  try { if (logo) d.addImage(logo, 'PNG', M, y, 34, 14); } catch (e) { }
+  d.setTextColor(15, 27, 45); d.setFont('helvetica', 'bold'); d.setFontSize(12); d.text(D.emp.nombre, M + 38, y + 5);
+  d.setFont('helvetica', 'normal'); d.setFontSize(8); d.setTextColor(85, 95, 110);
+  d.text([D.emp.cedula ? 'Céd. jurídica ' + D.emp.cedula : '', D.emp.telefono ? 'Tel. ' + D.emp.telefono : '', D.emp.correo || ''].filter(Boolean).join(' · '), M + 38, y + 9.5);
+  if (D.emp.direccion) d.text(cut(D.emp.direccion, 70), M + 38, y + 13.5);
+  d.setFont('helvetica', 'bold'); d.setFontSize(14); d.setTextColor(15, 27, 45); d.text('ESTADO DE CUENTA', M + W, y + 5, { align: 'right' });
+  d.setFont('helvetica', 'normal'); d.setFontSize(8.5); d.text('Pago a contratista · Semana ' + pmFh(D.sem.desde) + ' al ' + pmFh(D.sem.hasta), M + W, y + 10, { align: 'right' });
+  y += 19; d.setDrawColor(201, 162, 39); d.setLineWidth(0.6); d.line(M, y, M + W, y); y += 4;
+  const caja = (x, yy, w, et, val) => { d.setFontSize(6.5); d.setTextColor(110, 120, 135); d.text(et.toUpperCase(), x, yy); d.setFontSize(9); d.setFont('helvetica', 'bold'); d.setTextColor(15, 27, 45); d.text(cut(val, Math.floor(w / 1.9)), x, yy + 4.2); d.setFont('helvetica', 'normal'); };
+  const w3 = W / 3;
+  caja(M, y + 2, w3, 'Contratista (factura a nombre de)', f.nombre); caja(M + w3, y + 2, w3, 'Cédula', f.cedula || '—'); caja(M + 2 * w3, y + 2, w3, 'N.º de factura', f.factura || 'Pendiente');
+  caja(M, y + 12, w3, 'Cuenta IBAN', D.iban); caja(M + w3, y + 12, w3, 'Titular de la cuenta', f.titular || f.nombre); caja(M + 2 * w3, y + 12, w3, 'Móviles', D.moviles.map(m => m.movil).join(', '));
+  y += 22;
+  const titulo = t => { necesita(12); d.setFont('helvetica', 'bold'); d.setFontSize(10); d.setTextColor(15, 27, 45); d.text(t, M, y + 4); d.setDrawColor(201, 162, 39); d.setLineWidth(0.4); d.line(M, y + 5.5, M + W, y + 5.5); y += 9; };
+  titulo('Resumen del pago');
+  D.lineas.forEach(l => {
+    necesita(7);
+    if (l[2] === 'd') { d.setFillColor(222, 240, 222); d.rect(M, y - 0.5, W, 6.4, 'F'); } else if (l[2] === 't') { d.setFillColor(238, 242, 247); d.rect(M, y - 0.5, W, 6.4, 'F'); }
+    d.setFont('helvetica', l[2] ? 'bold' : 'normal'); d.setFontSize(l[2] ? 10 : 9); d.setTextColor(29, 36, 51);
+    d.text(cut(l[0], 90), M + 2, y + 4); d.text(mon(l[1]), M + W - 2, y + 4, { align: 'right' }); d.setDrawColor(225, 230, 238); d.setLineWidth(0.15); d.line(M, y + 5.9, M + W, y + 5.9); y += 6.4;
+  });
+  d.setFont('helvetica', 'normal'); d.setFontSize(8); d.setTextColor(85, 95, 110);
+  d.text('Fecha estimada de pago: ' + pmFh(D.fechaPago) + (D.saldo > 0.005 ? ' · Saldo pendiente de préstamo: ' + mon(D.saldo) : ''), M, y + 4); y += 5;
+  d.text('Los rebajos no modifican el monto de la factura: se descuentan únicamente del depósito.', M, y + 4); y += 7;
+  const aju = (t, L) => { if (!L.length) return; titulo(t); L.forEach(a => { necesita(6); d.setFont('helvetica', 'normal'); d.setFontSize(8.5); d.setTextColor(29, 36, 51); d.text(cut(a[0], 30), M + 2, y + 3.6); d.text(cut(a[1], 60) + (a[2] ? ' · ' + a[2] : ''), M + 48, y + 3.6); d.text((a[3] > 0 ? '+' : '−') + mon(Math.abs(a[3])), M + W - 2, y + 3.6, { align: 'right' }); y += 5; }); y += 3; };
+  aju('Apelaciones, penalizaciones y alquiler (afectan la factura)', D.antes); aju('Rebajos (solo afectan el depósito)', D.rebajos);
+  titulo('Órdenes de la semana');
+  const cols = [['Fecha', 20, 'l'], ['N.º orden', 22, 'l'], ['Contrato', 20, 'l'], ['Cliente', 52, 'l'], ['Servicio', 44, 'l'], ['Cant.', 9, 'r'], ['Pago', 15, 'r']];
+  const encT = () => { d.setFillColor(238, 242, 247); d.rect(M, y, W, 6, 'F'); d.setFont('helvetica', 'bold'); d.setFontSize(7.5); d.setTextColor(15, 27, 45); let cx = M; cols.forEach(c => { d.text(c[0], c[2] === 'r' ? cx + c[1] - 1 : cx + 1, y + 4, { align: c[2] === 'r' ? 'right' : 'left' }); cx += c[1]; }); y += 7; };
+  D.moviles.forEach(m => {
+    necesita(24); d.setFont('helvetica', 'bold'); d.setFontSize(9); d.setTextColor(15, 27, 45); d.text('Móvil ' + m.movil + (m.tecnico ? ' · ' + m.tecnico : ''), M, y + 3.5); y += 6; encT();
+    m.ordenes.forEach(o => {
+      if (y > 266) { nuevaPag(); encT(); }
+      const v = [pmFh(o.fecha), o.nOrden || '—', o.contrato, cut(o.cliente, 31), cut(o.tipo || o.servicios, 27), String(o.cantidad || 1), mon(o.costo)];
+      d.setFont('helvetica', 'normal'); d.setFontSize(7.3); d.setTextColor(29, 36, 51); let cx = M; cols.forEach((c, i) => { d.text(v[i], c[2] === 'r' ? cx + c[1] - 1 : cx + 1, y + 3.4, { align: c[2] === 'r' ? 'right' : 'left' }); cx += c[1]; });
+      d.setDrawColor(228, 232, 240); d.setLineWidth(0.12); d.line(M, y + 4.6, M + W, y + 4.6); y += 5;
+    });
+    necesita(7); d.setFont('helvetica', 'bold'); d.setFontSize(8); d.setTextColor(15, 27, 45); d.text('Subtotal móvil ' + m.movil + ' (' + m.ordenes.length + ' órdenes)', M + 1, y + 4); d.text(mon(m.total), M + W - 1, y + 4, { align: 'right' }); y += 9;
+  });
+  necesita(8); d.setFontSize(9.5); d.text('Total detalle de órdenes (' + f.nOrdenes + ')', M + 1, y + 4); d.text(mon(f.detalle), M + W - 1, y + 4, { align: 'right' });
+}
+function pmEcPie(d, emp) {
+  const n = d.getNumberOfPages(); for (let p = 1; p <= n; p++) { d.setPage(p); d.setFont('helvetica', 'normal'); d.setFontSize(7); d.setTextColor(130, 138, 150); d.text(emp + ' · Documento generado el ' + new Date().toLocaleDateString('es-CR') + ' · Página ' + p + ' de ' + n, 108, 273, { align: 'center' }); }
+}
+async function pmEcPdfDoc(idCon) {
+  await cargarLib('jspdf', URL_JSPDF);
+  const D = pmEcDatos(idCon); if (!D) return null;
+  const d = new window.jspdf.jsPDF({ unit: 'mm', format: 'letter' });
+  pmEcDibujar(d, D); pmEcPie(d, D.emp.nombre);
+  return { doc: d, nombre: pmEcNom(D) + '.pdf', D: D };
+}
+/* Todos los contratistas con pago en un solo PDF: primero qué se factura y qué se paga, luego un estado por contratista */
+async function pmEcPdfTodos() {
+  try {
+    await cargarLib('jspdf', URL_JSPDF);
+    const L = pmS.resumen.filas.filter(f => !f.sinContratista && f.nOrdenes > 0).map(f => pmEcDatos(f.idCon)).filter(Boolean); if (!L.length) { toast('No hay contratistas con pago.'); return; }
+    const d = new window.jspdf.jsPDF({ unit: 'mm', format: 'letter' }), M = 14, W = 188, mon = v => ctMoneyPdf(v, 'CRC'), T = pmS.resumen.totales;
+    d.setFont('helvetica', 'bold'); d.setFontSize(14); d.setTextColor(15, 27, 45); d.text('Qué se factura y qué se paga', M, M + 6);
+    d.setFont('helvetica', 'normal'); d.setFontSize(9); d.setTextColor(85, 95, 110); d.text(L[0].emp.nombre + ' · Semana ' + pmFh(L[0].sem.desde) + ' al ' + pmFh(L[0].sem.hasta) + ' · pago estimado ' + pmFh(L[0].fechaPago), M, M + 12);
+    const cols = [['Contratista', 62, 'l'], ['A facturar', 28, 'r'], ['IVA', 22, 'r'], ['Total factura', 28, 'r'], ['Rebajos', 22, 'r'], ['A depositar', 26, 'r']];
+    let y = M + 18; const enc = () => { d.setFillColor(238, 242, 247); d.rect(M, y, W, 6.5, 'F'); d.setFont('helvetica', 'bold'); d.setFontSize(8); d.setTextColor(15, 27, 45); let cx = M; cols.forEach(c => { d.text(c[0], c[2] === 'r' ? cx + c[1] - 1 : cx + 1, y + 4.5, { align: c[2] === 'r' ? 'right' : 'left' }); cx += c[1]; }); y += 7.5; };
+    enc();
+    const fila = (v, neg) => { let cx = M; d.setFont('helvetica', neg ? 'bold' : 'normal'); d.setFontSize(8); d.setTextColor(29, 36, 51); cols.forEach((c, i) => { d.text(String(v[i]), c[2] === 'r' ? cx + c[1] - 1 : cx + 1, y + 3.8, { align: c[2] === 'r' ? 'right' : 'left' }); cx += c[1]; }); d.setDrawColor(225, 230, 238); d.setLineWidth(0.12); d.line(M, y + 5, M + W, y + 5); y += 5.6; };
+    L.forEach(D => { if (y > 262) { d.addPage(); y = M; enc(); } fila([D.f.nombre.slice(0, 34), mon(D.f.subtotal), mon(D.f.iva), mon(D.f.totalFacturado), mon(D.f.deducciones), mon(D.f.deposito)]); });
+    fila(['TOTAL (' + L.length + ')', mon(T.subtotal), mon(T.iva), mon(T.totalFacturado), mon(T.deducciones), mon(T.deposito)], true);
+    L.forEach(D => { d.addPage(); pmEcDibujar(d, D); });
+    pmEcPie(d, L[0].emp.nombre); d.save('Estados_de_cuenta_' + L[0].sem.desde + '_' + L[0].sem.hasta + '.pdf');
+  } catch (e) { mostrarError(e, 'No se pudo generar el PDF.'); }
+}
+async function pmEcPdf(idCon, silencioso) {
+  try { const r = await pmEcPdfDoc(idCon); if (!r) { toast('Ese contratista no tiene estado.'); return; } r.doc.save(r.nombre); }
+  catch (e) { if (!silencioso) mostrarError(e, 'No se pudo generar el PDF.'); else throw e; }
+}
+/* Correo: en celular / Safari abre el menú de compartir con el PDF adjunto; en el resto descarga el PDF y abre el correo para que lo adjuntes */
+async function pmCorreo(idCon) {
+  try {
+    const r = await pmEcPdfDoc(idCon); if (!r) return;
+    const f = r.D.f, c = pmD.contratistas.find(x => x.id === idCon) || {}, S = pmS.semana;
+    const asunto = 'Estado de cuenta SRD · semana ' + pmFh(S.desde) + ' al ' + pmFh(S.hasta);
+    const cuerpo = 'Estimado(a) ' + f.nombre + ':\n\nAdjuntamos su estado de cuenta de la semana ' + pmFh(S.desde) + ' al ' + pmFh(S.hasta) + '.\n\nMonto a facturar: ' + pmM(f.subtotal) + (f.aplicaIva ? '\nIVA 13%: ' + pmM(f.iva) : '') + '\nTotal de la factura: ' + pmM(f.totalFacturado) + '\nTotal a depositar: ' + pmM(f.deposito) + '\nFecha estimada de pago: ' + pmFh(S.fechaPagoEst) + '\n\nPor favor envíe su factura por el monto indicado y confirme el número.\n\nSoluciones Red Dorada SRL';
+    const blob = r.doc.output('blob'), file = new File([blob], r.nombre, { type: 'application/pdf' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) { try { await navigator.share({ files: [file], title: asunto, text: cuerpo }); return; } catch (e) { if (e && e.name === 'AbortError') return; } }
+    pmBajar(blob, r.nombre);
+    toast('PDF descargado: adjúntalo al correo que se abre.' + (c.correo ? '' : ' (El contratista no tiene correo registrado.)'), 7000);
+    setTimeout(() => { location.href = 'mailto:' + encodeURIComponent(c.correo || '') + '?subject=' + encodeURIComponent(asunto) + '&body=' + encodeURIComponent(cuerpo + '\n\n(Adjunte el PDF ' + r.nombre + ')'); }, 600);
+  } catch (e) { mostrarError(e, 'No se pudo preparar el correo.'); }
+}
+function pmReporteModal(idCon) {
+  const f = pmS.resumen.filas.find(x => x.idCon === idCon); if (!f) return;
+  pmModal('<h3>Estado de cuenta · ' + esc(f.nombre) + '</h3><div style="font-size:12px;color:#556;margin-bottom:10px">Semana ' + esc(pmFh(pmS.semana.desde)) + ' al ' + esc(pmFh(pmS.semana.hasta)) + ' · total a depositar <b>' + pmM(f.deposito) + '</b></div><div style="display:grid;gap:8px">' +
+    '<button class="btn primary" onclick="pmEcPdf(\'' + idCon + '\')">⬇ Descargar PDF</button><button class="btn secondary" onclick="pmEcExcel(\'' + idCon + '\')">⬇ Descargar Excel</button><button class="btn secondary" onclick="pmCorreo(\'' + idCon + '\')">✉ Enviar por correo (con el PDF adjunto)</button><button class="btn secondary" onclick="pmCerrar();pmEstadoCuenta(\'' + idCon + '\')">🖨 Imprimir</button></div>' +
+    '<div style="font-size:11px;color:#778;margin-top:10px">Correo: en celular o Safari se abre el menú de compartir con el PDF adjunto; en otros navegadores el PDF se descarga y se abre el correo para que lo adjuntes.</div><div style="text-align:right;margin-top:8px"><button class="btn secondary" onclick="pmCerrar()">Cerrar</button></div>', 460);
+}
+
+
+/* ---------- Descarga de las órdenes (con el filtro aplicado): ambos precios, tipo, observaciones ---------- */
+function pmOrdFilas() {
+  return pmOrdFiltradas().map(o => ({ fecha: o.fecha, movil: o.movil, nOrden: o.nOrden || '', contrato: o.contrato, cliente: o.cliente, servicio: o.servicios + (o.cantidad > 1 ? ' ×' + o.cantidad : ''), tipo: o.tipo || '', ufCosto: o.ufCosto, costo: o.costo, dif: Math.round((o.ufCosto - o.costo) * 100) / 100, manual: o.manual ? 'Sí' : '', obs: [o.obs, o.validacion].filter(Boolean).join(' · ') }));
+}
+async function pmOrdExcel() {
+  try {
+    await cargarLib('xlsx', SEG_URL_XLSX);
+    const F = pmOrdFilas(); if (!F.length) { toast('No hay órdenes con ese filtro.'); return; }
+    const A = [['Fecha', 'Móvil', 'N.º orden', 'Contrato', 'Cliente', 'Servicio (Telecable)', 'Precio Telecable', 'Tipo asignado', 'Pago a la móvil', 'Diferencia (empresa)', 'Precio manual', 'Observaciones']].concat(F.map(x => [x.fecha, x.movil, x.nOrden, x.contrato, x.cliente, x.servicio, x.ufCosto, x.tipo, x.costo, x.dif, x.manual, x.obs]));
+    A.push(['Total (' + F.length + ')', '', '', '', '', '', F.reduce((a, x) => a + x.ufCosto, 0), '', F.reduce((a, x) => a + x.costo, 0), F.reduce((a, x) => a + x.dif, 0), '', '']);
+    const ws = XLSX.utils.aoa_to_sheet(A); ws['!cols'] = [{ wch: 11 }, { wch: 7 }, { wch: 11 }, { wch: 10 }, { wch: 36 }, { wch: 38 }, { wch: 14 }, { wch: 30 }, { wch: 14 }, { wch: 14 }, { wch: 9 }, { wch: 40 }];
+    Object.keys(ws).forEach(k => { if (k[0] !== '!' && ws[k].t === 'n' && /^[GIJ]/.test(k)) ws[k].z = '#,##0.00'; });
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Ordenes'); XLSX.writeFile(wb, 'Ordenes_' + pmS.semana.desde + '_' + pmS.semana.hasta + '.xlsx');
+  } catch (e) { mostrarError(e, 'No se pudo generar el Excel.'); }
+}
+async function pmOrdPdf() {
+  try {
+    await cargarLib('jspdf', URL_JSPDF);
+    const F = pmOrdFilas(); if (!F.length) { toast('No hay órdenes con ese filtro.'); return; }
+    const d = new window.jspdf.jsPDF({ unit: 'mm', format: 'letter', orientation: 'landscape' }), M = 10, mon = v => ctMoneyPdf(v, 'CRC'), S = pmS.semana;
+    const cols = [['Fecha', 17, 'l', 10], ['Móvil', 11, 'l', 5], ['N.º orden', 19, 'l', 10], ['Contrato', 17, 'l', 9], ['Cliente', 44, 'l', 29], ['Servicio (Telecable)', 42, 'l', 28], ['Precio Tel.', 19, 'r', 0], ['Tipo asignado', 31, 'l', 21], ['Pago móvil', 19, 'r', 0], ['Diferencia', 19, 'r', 0], ['Observaciones', 33, 'l', 22]];
+    const cut = (t, n) => { t = String(t == null ? '' : t); return t.length > n ? t.slice(0, n - 1) + '…' : t; };
+    let y = M, pagina = 1;
+    const enc = () => { d.setFont('helvetica', 'bold'); d.setFontSize(11); d.setTextColor(15, 27, 45); d.text('Órdenes · semana ' + pmFh(S.desde) + ' al ' + pmFh(S.hasta) + ' · ' + F.length + ' línea(s)', M, y + 4); y += 8;
+      d.setFillColor(238, 242, 247); d.rect(M, y, 271 - 2 * 0, 6, 'F'); d.setFontSize(7); let cx = M; cols.forEach(c => { d.text(c[0], c[2] === 'r' ? cx + c[1] - 1 : cx + 1, y + 4, { align: c[2] === 'r' ? 'right' : 'left' }); cx += c[1]; }); y += 7; };
+    enc();
+    F.forEach(x => {
+      if (y > 198) { d.addPage(); y = M; enc(); }
+      const v = [pmFh(x.fecha), x.movil, x.nOrden, x.contrato, cut(x.cliente, 29), cut(x.servicio, 28), mon(x.ufCosto), cut(x.tipo, 21), mon(x.costo), mon(x.dif), cut(x.obs, 22)];
+      d.setFont('helvetica', 'normal'); d.setFontSize(6.5); d.setTextColor(29, 36, 51); let cx = M; cols.forEach((c, i) => { d.text(String(v[i]), c[2] === 'r' ? cx + c[1] - 1 : cx + 1, y + 3.3, { align: c[2] === 'r' ? 'right' : 'left' }); cx += c[1]; });
+      d.setDrawColor(228, 232, 240); d.setLineWidth(0.1); d.line(M, y + 4.4, M + 271, y + 4.4); y += 4.8;
+    });
+    if (y > 196) { d.addPage(); y = M; }
+    y += 2; d.setFont('helvetica', 'bold'); d.setFontSize(8); d.setTextColor(15, 27, 45);
+    d.text('Total: Telecable ' + mon(F.reduce((a, x) => a + x.ufCosto, 0)) + ' · Pago a móviles ' + mon(F.reduce((a, x) => a + x.costo, 0)) + ' · Diferencia ' + mon(F.reduce((a, x) => a + x.dif, 0)), M, y + 4);
+    const n = d.getNumberOfPages(); for (let p = 1; p <= n; p++) { d.setPage(p); d.setFont('helvetica', 'normal'); d.setFontSize(7); d.setTextColor(130, 138, 150); d.text('Página ' + p + ' de ' + n, 279 - M, 208, { align: 'right' }); }
+    d.save('Ordenes_' + S.desde + '_' + S.hasta + '.pdf');
+  } catch (e) { mostrarError(e, 'No se pudo generar el PDF.'); }
+}
 
 /* ---------- Validar «Reinstalación total» con el reporte de materiales ---------- */
 let pmMatFilas = null, pmValRes = null;
@@ -13918,6 +14131,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 57 · 14-oct 14:40</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 59 · 14-oct 15:01</div>
 </body>
 </html>
