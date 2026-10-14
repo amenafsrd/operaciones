@@ -408,7 +408,7 @@
     .tableWrap { max-height: calc(100vh - 230px); min-height: 220px; overflow: auto; }
     .tableWrap .table thead th { position: sticky; top: 0; z-index: 2; }
     .segLista .tableWrap, .hist .tableWrap { max-height: 60vh; }
-    .hist .tableWrap, #historialContenido .tableWrap, #ctCuerpo .tableWrap, #bodHisLista .tableWrap { min-height: 0; }
+    .hist .tableWrap, #historialContenido .tableWrap, #ctCuerpo .tableWrap, #bodHisLista .tableWrap, #pmPreTele .tableWrap { min-height: 0; }
     .top { flex-wrap: nowrap; gap: 10px; }
     .nav { flex-wrap: nowrap; }
     @media (max-width: 700px) { #userLabel { display: none; } }
@@ -7023,17 +7023,41 @@ async function pmImportarConGuardar() {
 }
 
 /* ---------- Lista de precios (costo TC y costo para el contratista) ---------- */
+let pmPreQ = '';
 function pmRenderPre() {
-  let h = '<div class="toolbar"><button class="btn secondary" onclick="pmPreAgregar()">➕ Agregar fila</button><button class="btn primary" onclick="pmPreGuardar()">💾 Guardar lista</button></div><div class="panel"><div class="panelHead"><h2>Lista de precios</h2></div><div style="padding:8px 12px;font-size:12px;color:#667"><b>Costo TC</b> es lo que Telecable le paga a SRD; <b>Costo contratista</b> es lo que SRD le paga a la móvil. El «alias» es el nombre con que Telecable escribe el servicio en su Excel (varios se separan con «|»); con eso el sistema reconoce el servicio y detecta diferencias.</div><div class="tableWrap"><table id="pmPreTb"><thead><tr><th>Servicio</th><th>Costo TC</th><th>Costo contratista</th><th>Margen</th><th>Alias en el Excel</th><th>Activo</th><th></th></tr></thead><tbody>' +
+  const q = pmNorm(pmPreQ);
+  let h = '<div class="toolbar"><input placeholder="Buscar servicio o alias" style="min-width:240px" value="' + esc(pmPreQ) + '" oninput="pmPreQ=this.value;pmPreFiltrar()"><span style="flex:1"></span><button class="btn secondary" onclick="pmPreAgregar()">➕ Agregar fila</button><button class="btn primary" onclick="pmPreGuardar()">💾 Guardar lista</button></div>' +
+    '<div id="pmPreTele"></div>' +
+    '<div class="panel"><div class="panelHead"><h2>Lista de precios</h2><span>' + pmD.precios.length + ' servicios</span></div><div style="padding:8px 12px;font-size:12px;color:#667"><b>Costo TC</b> es lo que Telecable le paga a SRD; <b>Costo contratista</b> es lo que SRD le paga a la móvil. El «alias» es el nombre con que Telecable escribe el servicio en su Excel (varios se separan con «|»); con eso el sistema reconoce el servicio y detecta diferencias.</div><div class="tableWrap"><table class="pmT" id="pmPreTb"><thead><tr><th>Servicio</th><th style="text-align:right">Costo TC</th><th style="text-align:right">Costo contratista</th><th style="text-align:right">Margen</th><th>Alias en el Excel (nombre de Telecable)</th><th>Activo</th><th></th></tr></thead><tbody>' +
     pmD.precios.map(p => pmPreFila(p)).join('') + '</tbody></table></div></div>';
   $('pmPPre').innerHTML = h;
+  pmPreFiltrar(); pmPreTelecable();
 }
-function pmPreFila(p) { return '<tr><td><input style="width:100%;min-width:220px" value="' + esc(p.servicio) + '"></td><td><input type="number" step="0.01" style="width:100px" value="' + (p.precioTc || 0) + '" oninput="pmPreMargen(this)"></td><td><input type="number" step="0.01" style="width:100px" value="' + p.precio + '" oninput="pmPreMargen(this)"></td><td class="pmMg" style="white-space:nowrap">' + ((p.precioTc || 0) > 0 ? pmM((p.precioTc || 0) - p.precio) : '—') + '</td><td><input style="width:100%;min-width:200px" value="' + esc(p.alias) + '"></td><td><input type="checkbox"' + (p.activo ? ' checked' : '') + '></td><td><button class="btn secondary" onclick="this.closest(\'tr\').remove()">✕</button></td></tr>'; }
+function pmPreFiltrar() { const q = pmNorm(pmPreQ); Array.from($('pmPreTb').tBodies[0].rows).forEach(r => { const i = r.querySelectorAll('input'); r.style.display = !q || pmNorm(i[0].value + ' ' + i[3].value).indexOf(q) >= 0 ? '' : 'none'; }); }
+function pmPreFila(p) { return '<tr><td><input style="width:100%;min-width:240px" value="' + esc(p.servicio) + '"></td><td style="text-align:right"><input type="number" step="0.01" style="width:105px;text-align:right" value="' + (p.precioTc || 0) + '" oninput="pmPreMargen(this)"></td><td style="text-align:right"><input type="number" step="0.01" style="width:105px;text-align:right" value="' + p.precio + '" oninput="pmPreMargen(this)"></td><td class="pmMg" style="white-space:nowrap;text-align:right">' + ((p.precioTc || 0) > 0 ? pmM((p.precioTc || 0) - p.precio) : '—') + '</td><td><input style="width:100%;min-width:260px" value="' + esc(p.alias) + '"></td><td style="text-align:center"><input type="checkbox"' + (p.activo ? ' checked' : '') + '></td><td><button class="btn secondary" title="Quitar fila" onclick="this.closest(\'tr\').remove()">✕</button></td></tr>'; }
 function pmPreMargen(el) { const i = el.closest('tr').querySelectorAll('input'); el.closest('tr').querySelector('.pmMg').textContent = (+i[1].value || 0) > 0 ? pmM((+i[1].value || 0) - (+i[2].value || 0)) : '—'; }
 function pmPreAgregar() { $('pmPreTb').tBodies[0].insertAdjacentHTML('beforeend', pmPreFila({ servicio: '', precio: 0, precioTc: 0, alias: '', activo: true })); }
 async function pmPreGuardar() {
   const lista = Array.from($('pmPreTb').tBodies[0].rows).map(r => { const i = r.querySelectorAll('input'); return { servicio: i[0].value, precioTc: i[1].value, precio: i[2].value, alias: i[3].value, activo: i[4].checked }; });
   try { await api('guardarPreciosPmWeb', lista); pmD = await api('obtenerPmWeb'); pmRenderPre(); toast('Lista guardada.'); } catch (e) { mostrarError(e, 'No se pudo guardar.'); }
+}
+/* Servicios que Telecable manda y que aún no tienen precio: el usuario les pone nombre y monto a pagar */
+let pmTeleL = [];
+async function pmPreTelecable() {
+  try {
+    const r = await api('serviciosTelecablePmWeb'); pmTeleL = r.filas; const el = $('pmPreTele'); if (!el) return;
+    if (!pmTeleL.length) { el.innerHTML = ''; return; }
+    el.innerHTML = '<div class="panel" style="border-left:4px solid #c9a227"><div class="panelHead"><h2>Servicios de Telecable sin precio</h2><span>' + pmTeleL.length + '</span></div><div style="padding:6px 12px;font-size:12px;color:#667">Estos servicios vienen en los archivos de Telecable y no están en la lista. Escribe el nombre con que quieres llamarlos y el monto a pagar a la móvil por unidad, y pulsa «Agregar a la lista»: se aplica a las órdenes de las semanas abiertas.</div><div class="tableWrap"><table class="pmT"><thead><tr><th>Servicio de Telecable</th><th style="text-align:right">Líneas</th><th style="text-align:right">Telecable paga (unidad)</th><th>Nombre del servicio</th><th style="text-align:right">Monto a pagar (₡)</th></tr></thead><tbody>' +
+      pmTeleL.map((x, i) => '<tr><td>' + esc(x.telecable) + '</td><td style="text-align:right">' + x.lineas + ' <span style="color:#889;font-size:11px">(' + x.semanas + ' sem.)</span></td><td style="text-align:right;white-space:nowrap">' + pmM(x.ufUnidad) + '</td><td><input class="ptN" data-i="' + i + '" style="width:100%;min-width:240px" value="' + esc(x.telecable) + '"></td><td style="text-align:right"><input class="ptP" data-i="' + i + '" type="number" step="0.01" min="0" style="width:115px;text-align:right" placeholder="0.00"></td></tr>').join('') +
+      '</tbody></table></div><div style="padding:8px 12px;text-align:right"><button class="btn primary" onclick="pmPreTeleGuardar()">➕ Agregar a la lista</button></div></div>';
+  } catch (e) { }
+}
+async function pmPreTeleGuardar() {
+  const L = [];
+  pmTeleL.forEach((x, i) => { const p = document.querySelector('.ptP[data-i="' + i + '"]').value; if (p === '') return; L.push({ telecable: x.telecable, nombre: document.querySelector('.ptN[data-i="' + i + '"]').value, precio: p, precioTc: x.ufUnidad }); });
+  if (!L.length) { toast('Escribe el monto a pagar en al menos un servicio.'); return; }
+  try { const r = await api('agregarServiciosPmWeb', L); pmD = await api('obtenerPmWeb'); pmRenderPre(); toast(r.creados + ' servicio(s) agregados; ' + r.ordenes + ' orden(es) actualizadas' + (r.cerradas ? ' (' + r.cerradas + ' en semanas cerradas no se tocaron)' : '') + '.', 6000); }
+  catch (e) { mostrarError(e, 'No se pudo agregar.'); }
 }
 
 /* ---------- Contratistas (ligados a las móviles del sistema) ---------- */
@@ -13849,6 +13873,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 53 · 14-oct 13:20</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 54 · 14-oct 13:50</div>
 </body>
 </html>
