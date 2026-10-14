@@ -6536,8 +6536,8 @@ function pmRenderSemanas() {
   pmSemId = ''; pmS = null;
   let h = '<div class="toolbar"><button class="btn primary" onclick="pmImportarModal()">⬆ Importar semana de Telecable</button></div><div class="panel"><div class="panelHead"><h2>Semanas de pago</h2></div><div class="tableWrap">';
   if (!pmD.semanas.length) h += '<div class="loading">Aún no hay semanas. Importa el Excel «Pago servicios» que envía Telecable.</div>';
-  else h += '<table class="pmT"><thead><tr><th>Semana</th><th>Estado</th><th style="text-align:right">Órdenes</th><th style="text-align:right">Costo móviles (detalle)</th><th style="text-align:right">UF Telecable</th><th style="text-align:right">Margen</th><th></th></tr></thead><tbody>' +
-    pmD.semanas.map(s => '<tr style="cursor:pointer" onclick="pmAbrir(\'' + s.id + '\')"><td><b>' + esc(pmFh(s.desde)) + ' al ' + esc(pmFh(s.hasta)) + '</b></td><td>' + (s.estado === 'Cerrada' ? '<span class="chip verde">Cerrada</span>' : '<span class="chip amar">Abierta</span>') + '</td><td style="text-align:right">' + s.ordenes + '</td><td style="text-align:right">' + pmM(s.costo) + '</td><td style="text-align:right">' + pmM(s.uf) + '</td><td style="text-align:right"><b>' + pmM(s.uf - s.costo) + '</b></td><td style="text-align:right"><button class="btn secondary" onclick="event.stopPropagation();pmAbrir(\'' + s.id + '\')">Abrir</button></td></tr>').join('') + '</tbody></table>';
+  else h += '<table class="pmT"><thead><tr><th>Semana</th><th>Estado</th><th style="text-align:right">Órdenes</th><th style="text-align:right">Contratos</th><th>Precios</th><th style="text-align:right">Costo móviles (detalle)</th><th style="text-align:right">UF Telecable</th><th style="text-align:right">Margen</th><th></th></tr></thead><tbody>' +
+    pmD.semanas.map(s => '<tr style="cursor:pointer" onclick="pmAbrir(\'' + s.id + '\')"><td><b>' + esc(pmFh(s.desde)) + ' al ' + esc(pmFh(s.hasta)) + '</b></td><td>' + (s.estado === 'Cerrada' ? '<span class="chip verde">Cerrada</span>' : '<span class="chip amar">Abierta</span>') + '</td><td style="text-align:right">' + s.ordenes + '</td><td style="text-align:right">' + (s.contratos || 0) + '</td><td>' + (s.sinPrecio ? '<span class="chip rojo" title="Líneas sin precio de pago">⚠ ' + s.sinPrecio + ' sin precio</span>' : '<span class="chip verde">Todas con precio</span>') + '</td><td style="text-align:right">' + pmM(s.costo) + '</td><td style="text-align:right">' + pmM(s.uf) + '</td><td style="text-align:right"><b>' + pmM(s.uf - s.costo) + '</b></td><td style="text-align:right;white-space:nowrap" onclick="event.stopPropagation()"><button class="btn secondary" onclick="pmVista=\'cto\';pmAbrir(\'' + s.id + '\')">Contratos</button> <button class="btn secondary" onclick="pmAbrir(\'' + s.id + '\')">Abrir</button> <button class="btn secondary" title="Eliminar este archivo de pago" onclick="pmEliminarSemanaId(\'' + s.id + '\')">🗑</button></td></tr>').join('') + '</tbody></table>';
   $('pmPSem').innerHTML = h + '</div></div>';
 }
 async function pmAbrir(id) {
@@ -6880,6 +6880,11 @@ async function pmEliminarExtra(id) { if (!confirm('¿Eliminar esta línea?')) re
 async function pmCopiarExtras() { try { const r = await api('copiarExtrasPmWeb', pmSemId); await pmRecargar(); toast(r.copiadas + ' línea(s) copiadas.'); } catch (e) { mostrarError(e, 'No se pudo copiar.'); } }
 
 async function pmCerrarSemana(c) { try { await api('estadoSemanaPmWeb', pmSemId, c); await pmRecargar(); pmD = await api('obtenerPmWeb'); pmRenderSemana(); } catch (e) { mostrarError(e, 'No se pudo cambiar el estado.'); } }
+async function pmEliminarSemanaId(id) {
+  const w = pmD.semanas.find(x => x.id === id); if (!w) return;
+  if (!confirm('Se eliminará el archivo de pago del ' + pmFh(w.desde) + ' al ' + pmFh(w.hasta) + ' con sus ' + w.ordenes + ' órdenes, ajustes, rebajos, apelaciones y facturas. Esto no se puede deshacer. ¿Seguro?')) return;
+  try { await api('eliminarSemanaPmWeb', id); pmD = await api('obtenerPmWeb'); pmRenderSemanas(); toast('Archivo de pago eliminado.'); } catch (e) { mostrarError(e, 'No se pudo eliminar.'); }
+}
 async function pmEliminarSemana() {
   if (!confirm('Se eliminará la semana con todas sus órdenes, ajustes y facturas. ¿Seguro?')) return;
   try { await api('eliminarSemanaPmWeb', pmSemId); pmD = await api('obtenerPmWeb'); pmRenderSemanas(); toast('Semana eliminada.'); } catch (e) { mostrarError(e, 'No se pudo eliminar.'); }
@@ -6901,7 +6906,7 @@ async function pmLeerArchivo(f) {
   try {
     await cargarLib('xlsx', SEG_URL_XLSX);
     const wb = XLSX.read(await f.arrayBuffer(), { type: 'array', cellDates: true });
-    const hojaDe = fn => { for (const n of wb.SheetNames) { const fl = XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: true, defval: '' }); const k = fl.findIndex((r, i) => i < 15 && fn(r.map(x => String(x).trim().toLowerCase()))); if (k >= 0) return { filas: fl.slice(k), nombre: n }; } return null; };
+    const hojaDe = fn => { for (const n of wb.SheetNames) { const fl = XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: true, defval: '' }); const k = fl.findIndex((r, i) => i < 60 && fn(r.map(x => String(x).trim().toLowerCase()))); if (k >= 0) return { filas: fl.slice(k), nombre: n }; } return null; };
     const ix = (enc, k) => enc.findIndex(x => x.indexOf(k) === 0);
     const ord = []; const fechas = []; let formato = '';
     const tFact = hojaDe(e => ix(e, 'contrato') >= 0 && ix(e, 'servicio') >= 0 && ix(e, 'monto') >= 0 && (ix(e, 'móvil') >= 0 || ix(e, 'movil') >= 0));
@@ -6927,10 +6932,23 @@ async function pmLeerArchivo(f) {
       });
     }
     if (!ord.length) throw new Error('No se encontraron órdenes en el archivo.');
+    /* penalizaciones cargadas por Telecable (bloque MOVIL / CONTRATO / DETALLE / MONTO al inicio de la hoja) */
+    const pens = [];
+    wb.SheetNames.forEach(n => {
+      const fl = XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: true, defval: '' });
+      const k = fl.findIndex((r, i) => i < 60 && (() => { const e = r.map(x => String(x).trim().toLowerCase()); return e[0] === 'movil' && e.indexOf('contrato') > 0 && e.indexOf('detalle') > 0 && e.indexOf('monto') > 0; })());
+      if (k < 0) return;
+      const e = fl[k].map(x => String(x).trim().toLowerCase());
+      for (let i = k + 1; i < fl.length; i++) {
+        const r = fl[i]; if (/^total a penalizar/i.test(String(r[0]).trim()) || String(r[0]).trim().toLowerCase() === 'contrato') break;
+        const mv = String(r[0]).trim(), mt = +r[e.indexOf('monto')];
+        if (/^\d+$/.test(mv) && mt > 0) pens.push({ movil: mv, contrato: String(r[e.indexOf('contrato')] || ''), detalle: String(r[e.indexOf('detalle')] || '').trim(), monto: mt });
+      }
+    });
     fechas.sort();
-    pmImp = { ordenes: ord, desde: fechas[0] || '', hasta: fechas[fechas.length - 1] || '' };
+    pmImp = { penalizaciones: pens, ordenes: ord, desde: fechas[0] || '', hasta: fechas[fechas.length - 1] || '' };
     const uf = ord.reduce((a, o) => a + (+o.ufCosto || 0), 0), mov = new Set(ord.map(o => pmMovilNum(o.movil)));
-    $('pmImpInfo').innerHTML = 'Formato: <b>' + formato + '</b><br><b>' + ord.length + '</b> líneas · <b>' + mov.size + '</b> móviles · UF ' + pmM(uf) + '<div style="display:flex;gap:8px;margin-top:8px"><label>Desde<input type="date" id="pmIDesde" value="' + pmImp.desde + '"></label><label>Hasta<input type="date" id="pmIHasta" value="' + pmImp.hasta + '"></label></div>';
+    $('pmImpInfo').innerHTML = 'Formato: <b>' + formato + '</b><br><b>' + ord.length + '</b> líneas · <b>' + mov.size + '</b> móviles · UF ' + pmM(uf) + (pens.length ? '<br><b>' + pens.length + '</b> penalización(es) de Telecable por ' + pmM(pens.reduce((a, x) => a + x.monto, 0)) + ' (se cargarán a la móvil correspondiente)' : '') + '<div style="display:flex;gap:8px;margin-top:8px"><label>Desde<input type="date" id="pmIDesde" value="' + pmImp.desde + '"></label><label>Hasta<input type="date" id="pmIHasta" value="' + pmImp.hasta + '"></label></div>';
     $('pmImpBtn').disabled = false;
   } catch (e) { $('pmImpInfo').innerHTML = '<span style="color:#9b1c1c">' + esc(e.message || e) + '</span>'; }
 }
@@ -6939,8 +6957,8 @@ async function pmImportarGuardar() {
   if (!pmImp) return;
   $('pmImpBtn').disabled = true; $('pmImpBtn').textContent = 'Importando...';
   try {
-    const r = await api('importarSemanaPmWeb', { desde: $('pmIDesde').value, hasta: $('pmIHasta').value, ordenes: pmImp.ordenes });
-    pmCerrar(); pmD = await api('obtenerPmWeb'); await pmAbrir(r.id); toast('Semana importada: ' + r.ordenes + ' órdenes.');
+    const r = await api('importarSemanaPmWeb', { desde: $('pmIDesde').value, hasta: $('pmIHasta').value, ordenes: pmImp.ordenes, penalizaciones: pmImp.penalizaciones });
+    pmCerrar(); pmD = await api('obtenerPmWeb'); await pmAbrir(r.id); toast('Semana importada: ' + r.ordenes + ' órdenes' + (r.penalizaciones ? ' y ' + r.penalizaciones + ' penalización(es)' : '') + '.');
     if (pmS.resumen.filas.some(f => f.sinContratista)) toast('Hay móviles sin contratista: créalos en la pestaña Contratistas.', 5000);
   } catch (e) { $('pmImpBtn').disabled = false; $('pmImpBtn').textContent = 'Importar'; mostrarError(e, 'No se pudo importar.'); }
 }
@@ -7048,7 +7066,7 @@ async function pmSugerirCrear() {
 }
 
 /* ---------- Lista de contratos y corte por móvil ---------- */
-let pmCtoMovil = '', pmCtoQ = '';
+let pmCtoMovil = '', pmCtoQ = '', pmCtoSin = false;
 const pmR2 = n => Math.round((Number(n) || 0) * 100) / 100;
 function pmContratos() {
   const m = {};
@@ -7056,17 +7074,17 @@ function pmContratos() {
     if (pmCtoMovil && String(Number(o.movil)) !== pmCtoMovil) return;
     const k = o.contrato + '|' + String(Number(o.movil));
     const x = m[k] || (m[k] = { contrato: o.contrato, movil: String(Number(o.movil)), cliente: o.cliente, fecha: o.fecha, lineas: 0, servicios: [], costo: 0, uf: 0, ordenes: [] });
-    x.lineas++; x.servicios.push((o.tipo || o.servicios) + (o.cantidad > 1 ? ' ×' + o.cantidad : '')); x.costo += o.costo; x.uf += o.ufCosto; x.ordenes.push(o.nOrden || '');
+    x.lineas++; if (!o.manual && o.costoLista === null) x.sinPrecio = (x.sinPrecio || 0) + 1; x.servicios.push((o.tipo || o.servicios) + (o.cantidad > 1 ? ' ×' + o.cantidad : '')); x.costo += o.costo; x.uf += o.ufCosto; x.ordenes.push(o.nOrden || '');
   });
   const q = pmCtoQ.trim().toLowerCase();
-  return Object.keys(m).map(k => m[k]).filter(x => !q || (x.contrato + ' ' + x.cliente + ' ' + x.servicios.join(' ')).toLowerCase().indexOf(q) >= 0)
+  return Object.keys(m).map(k => m[k]).filter(x => !pmCtoSin || x.sinPrecio).filter(x => !q || (x.contrato + ' ' + x.cliente + ' ' + x.servicios.join(' ')).toLowerCase().indexOf(q) >= 0)
     .sort((a, b) => Number(a.movil) - Number(b.movil) || a.fecha.localeCompare(b.fecha));
 }
 function pmHtmlCto() {
   const L = pmContratos(), moviles = Array.from(new Set(pmS.ordenes.map(o => String(Number(o.movil))))).sort((a, b) => a - b);
   const tc = L.reduce((a, x) => a + x.costo, 0), uf = L.reduce((a, x) => a + x.uf, 0);
-  return '<div style="padding:8px 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><input placeholder="Buscar contrato, cliente o servicio" style="min-width:220px" value="' + esc(pmCtoQ) + '" onchange="pmCtoQ=this.value;pmRenderSemana()"><select onchange="pmCtoMovil=this.value;pmRenderSemana()"><option value="">Todas las móviles</option>' + moviles.map(m => '<option value="' + m + '"' + (pmCtoMovil === m ? ' selected' : '') + '>Móvil ' + m + '</option>').join('') + '</select><span style="color:#667;font-size:12px">' + L.length + ' contrato(s) · costo ' + pmM(tc) + ' · UF ' + pmM(uf) + '</span><span style="flex:1"></span><button class="btn secondary" onclick="pmCortesExcel(pmCtoMovil)">⬇ Excel' + (pmCtoMovil ? ' de la móvil ' + pmCtoMovil : '') + '</button></div>' +
-    '<table><thead><tr><th>Móvil</th><th>Fecha</th><th>Contrato</th><th>Cliente</th><th>Servicios</th><th>Pago móvil</th><th>UF</th></tr></thead><tbody>' + L.slice(0, 500).map(x => '<tr><td>' + esc(x.movil) + '</td><td>' + esc(pmFh(x.fecha)) + '</td><td>' + esc(x.contrato) + '</td><td>' + esc(x.cliente) + '</td><td>' + esc(x.servicios.join(' + ')) + '</td><td>' + pmM(x.costo) + '</td><td>' + pmM(x.uf) + '</td></tr>').join('') + '</tbody></table>' + (L.length > 500 ? '<div class="loading">Se muestran 500 de ' + L.length + '. Filtra por móvil.</div>' : '');
+  return '<div style="padding:8px 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><input placeholder="Buscar contrato, cliente o servicio" style="min-width:220px" value="' + esc(pmCtoQ) + '" onchange="pmCtoQ=this.value;pmRenderSemana()"><select onchange="pmCtoMovil=this.value;pmRenderSemana()"><option value="">Todas las móviles</option>' + moviles.map(m => '<option value="' + m + '"' + (pmCtoMovil === m ? ' selected' : '') + '>Móvil ' + m + '</option>').join('') + '</select><label style="font-size:12px"><input type="checkbox" ' + (pmCtoSin ? 'checked' : '') + ' onchange="pmCtoSin=this.checked;pmRenderSemana()"> Solo con líneas sin precio</label><span style="color:#667;font-size:12px">' + L.length + ' contrato(s) · costo ' + pmM(tc) + ' · UF ' + pmM(uf) + '</span><span style="flex:1"></span><button class="btn secondary" onclick="pmCortesExcel(pmCtoMovil)">⬇ Excel' + (pmCtoMovil ? ' de la móvil ' + pmCtoMovil : '') + '</button></div>' +
+    '<table class="pmT"><thead><tr><th>Móvil</th><th>Fecha</th><th>Contrato</th><th>N.º orden</th><th>Cliente</th><th>Servicios</th><th>Precio</th><th>Pago móvil</th><th>UF</th></tr></thead><tbody>' + L.slice(0, 500).map(x => '<tr' + (x.sinPrecio ? ' style="background:#fdecea"' : '') + '><td>' + esc(x.movil) + '</td><td>' + esc(pmFh(x.fecha)) + '</td><td>' + esc(x.contrato) + '</td><td>' + esc(x.ordenes.filter(Boolean).join(', ')) + '</td><td>' + esc(x.cliente) + '</td><td>' + esc(x.servicios.join(' + ')) + '</td><td>' + (x.sinPrecio ? '<span class="chip rojo">' + x.sinPrecio + ' sin precio</span>' : '<span class="chip verde">OK</span>') + '</td><td>' + pmM(x.costo) + '</td><td>' + pmM(x.uf) + '</td></tr>').join('') + '</tbody></table>' + (L.length > 500 ? '<div class="loading">Se muestran 500 de ' + L.length + '. Filtra por móvil.</div>' : '');
 }
 function pmCortesMoviles() {
   const m = {};
@@ -13583,6 +13601,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 45 · 14-oct 12:40</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 47 · 14-oct 13:40</div>
 </body>
 </html>

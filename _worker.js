@@ -9922,14 +9922,15 @@ function obtenerPmWeb(token) {
   const sems = leerObjetos_(pmHoja_('SEM'));
   const agg = {};
   leerObjetos_(pmHoja_('ORD')).forEach(o => {
-    const id = txt_(o.ID_Semana); const a = agg[id] || (agg[id] = { n: 0, costo: 0, uf: 0 });
-    a.n++; a.costo += pmNum_(o.Costo_Aplicado); a.uf += pmNum_(o.UF_Costo);
+    const id = txt_(o.ID_Semana); const a = agg[id] || (agg[id] = { n: 0, costo: 0, uf: 0, ctos: {}, sin: 0 });
+    a.n++; a.costo += pmNum_(o.Costo_Aplicado); a.uf += pmNum_(o.UF_Costo); a.ctos[txt_(o.Contrato) + '|' + pmMovil_(o.Movil)] = 1;
+    if (txt_(o.Manual) !== 'Sí' && pmCostoLista_(txt_(o.Tipo) || o.Servicios, precios, o.Cantidad) === null) a.sin++;
   });
   return {
     admin: true, hoy: rhHoy_(), iva: PM.IVA, precios: precios, tipos: PM.TIPOS, penalizaciones: PM.PENALIZACIONES.map(p => ({ nombre: p[0], monto: p[1] })),
     contratistas: (() => { const sis = pmMovilesSis_(); return leerObjetos_(pmHoja_('CON')).map(pmConInfo_).map(c => Object.assign(c, pmConEstado_(c, sis), { tecnicos: pmMovilesDe_(c).map(m => ({ movil: m, tecnico: sis[m] ? sis[m].tecnico : '' })) })).sort((a, b) => a.nombre.localeCompare(b.nombre)); })(),
-    semanas: sems.map(s => { const a = agg[txt_(s.ID)] || { n: 0, costo: 0, uf: 0 };
-      return { id: txt_(s.ID), desde: segFecha_(s.Desde) || '', hasta: segFecha_(s.Hasta) || '', estado: txt_(s.Estado) || 'Abierta', notas: txt_(s.Notas), ordenes: a.n, costo: rh2_(a.costo), uf: rh2_(a.uf) }; })
+    semanas: sems.map(s => { const a = agg[txt_(s.ID)] || { n: 0, costo: 0, uf: 0, ctos: {}, sin: 0 };
+      return { id: txt_(s.ID), desde: segFecha_(s.Desde) || '', hasta: segFecha_(s.Hasta) || '', estado: txt_(s.Estado) || 'Abierta', notas: txt_(s.Notas), ordenes: a.n, contratos: Object.keys(a.ctos).length, sinPrecio: a.sin, costo: rh2_(a.costo), uf: rh2_(a.uf) }; })
       .sort((a, b) => b.desde.localeCompare(a.desde)),
     empresa: pmEmpresa_(),
     banco: { codigo: pmParam_('banco_codigo', PM.BANCO_DEF.codigo), ultimoEnvio: Number(pmParam_('banco_ultimo_envio', PM.BANCO_DEF.ultimoEnvio)), flag: pmParam_('banco_flag', PM.BANCO_DEF.flag) }
@@ -10001,7 +10002,7 @@ function obtenerSemanaPmWeb(token, idSemana) {
     return { id: txt_(o.ID), contrato: txt_(o.Contrato), cliente: txt_(o.Cliente), servicios: txt_(o.Servicios), nOrden: txt_(o.N_Orden), cantidad: pmNum_(o.Cantidad) || 1, tipo: txt_(o.Tipo), manual: txt_(o.Manual) === 'Sí', costoArchivo: pmNum_(o.Costo_Archivo), costo: pmNum_(o.Costo_Aplicado), movil: txt_(o.Movil),
       fecha: segFecha_(o.Fecha) || '', ufServicio: txt_(o.UF_Servicio), ufCosto: pmNum_(o.UF_Costo), obs: txt_(o.Obs), costoLista: lista };
   }).sort((a, b) => a.fecha.localeCompare(b.fecha) || a.movil.localeCompare(b.movil, undefined, { numeric: true }));
-  const ajustes = leerObjetos_(pmHoja_('AJU')).filter(a => txt_(a.ID_Semana) === idSemana).map(a => ({ id: txt_(a.ID), idCon: txt_(a.ID_Contratista), tipo: txt_(a.Tipo), monto: pmNum_(a.Monto), detalle: txt_(a.Detalle), contrato: txt_(a.Contrato), movil: txt_(a.Movil) }));
+  const ajustes = leerObjetos_(pmHoja_('AJU')).filter(a => txt_(a.ID_Semana) === idSemana).map(a => ({ id: txt_(a.ID), idCon: txt_(a.ID_Contratista) || ((contratistas.find(k => pmMovilesDe_(k).indexOf(pmMovil_(a.Movil)) >= 0 && pmMovil_(a.Movil)) || {}).id || ''), tipo: txt_(a.Tipo), monto: pmNum_(a.Monto), detalle: txt_(a.Detalle), contrato: txt_(a.Contrato), movil: txt_(a.Movil) }));
   const pagos = leerObjetos_(pmHoja_('PAG')).filter(p => txt_(p.ID_Semana) === idSemana).map(p => ({ idCon: txt_(p.ID_Contratista), factura: txt_(p.Factura), obs: txt_(p.Obs), pagado: txt_(p.Pagado) }));
   const extras = leerObjetos_(pmHoja_('EXT')).filter(e => txt_(e.ID_Semana) === idSemana).map(e => ({ id: txt_(e.ID), nombre: txt_(e.Nombre), cedula: txt_(e.Cedula), iban: pmIban_(e.IBAN), monto: pmNum_(e.Monto), concepto: txt_(e.Concepto) }));
   const apel = leerObjetos_(pmHoja_('APE')).filter(a => txt_(a.ID_Semana) === idSemana).map(a => ({ id: txt_(a.ID), idCon: txt_(a.ID_Contratista), tipo: txt_(a.Tipo), contrato: txt_(a.Contrato), movil: txt_(a.Movil), servicio: txt_(a.Servicio), cantidad: pmNum_(a.Cantidad) || 1, monto: pmNum_(a.Monto), motivo: txt_(a.Motivo), estado: txt_(a.Estado) || 'Pendiente', resolucion: txt_(a.Resolucion), montoAprobado: pmNum_(a.Monto_Aprobado), creadoPor: txt_(a.Creado_Por), creado: txt_(a.Creado) })).reverse();
@@ -10051,7 +10052,21 @@ function importarSemanaPmWeb(token, d) {
     const ini = sh.getLastRow() + 1;
     if (ini + datos.length - 1 > sh.getMaxRows()) sh.insertRowsAfter(sh.getMaxRows(), datos.length);
     sh.getRange(ini, 1, datos.length, encab.length).setValues(datos);
-    return { ok: true, id: id, ordenes: datos.length };
+    /* penalizaciones que Telecable carga en el archivo: restan a la factura del contratista dueño de la móvil */
+    const pens = Array.isArray(d.penalizaciones) ? d.penalizaciones : [];
+    let nPen = 0;
+    if (pens.length) {
+      const cons = leerObjetos_(pmHoja_('CON')).map(pmConInfo_);
+      pens.forEach((x, i) => {
+        const mv = pmMovil_(x.movil), monto = Math.abs(pmNum_(x.monto));
+        if (!mv || !(monto > 0)) return;
+        const c = cons.find(k => pmMovilesDe_(k).indexOf(mv) >= 0);
+        appendPorEncabezados_(pmHoja_('AJU'), { ID: pmId_('A', i), ID_Semana: id, ID_Contratista: c ? c.id : '', Tipo: 'PENALIZACION', Monto: rh2_(monto), Detalle: txt_(x.detalle).slice(0, 200) || 'Penalización Telecable',
+          Contrato: txt_(x.contrato).slice(0, 30), Movil: mv, Creado_Por: ses.usuario, Creado: segAhora_() });
+        nPen++;
+      });
+    }
+    return { ok: true, id: id, ordenes: datos.length, penalizaciones: nPen };
   });
 }
 
@@ -10059,7 +10074,7 @@ function eliminarSemanaPmWeb(token, idSemana) {
   requerirSesion_(token, 'admin');
   idSemana = txt_(idSemana);
   return conBloqueo_(() => {
-    ['ORD', 'AJU', 'PAG', 'EXT', 'SEM'].forEach(k => {
+    ['ORD', 'AJU', 'PAG', 'EXT', 'APE', 'SEM'].forEach(k => {
       const sh = pmHoja_(k); const t = leerTabla_(sh);
       const col = k === 'SEM' ? t.idx.ID : t.idx.ID_Semana;
       const quedan = t.values.slice(1).filter(r => txt_(r[col]) !== idSemana);
