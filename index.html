@@ -7015,27 +7015,54 @@ async function pmImportarGuardar() {
 }
 
 /* ---------- Contratistas ---------- */
-function pmConMovInfo() {
+function pmConMovInfo(auto) {
   const el = $('pcMovInfo'); if (!el) return;
-  const nums = String($('pcMov').value).split(/[^0-9]+/).filter(Boolean).map(x => String(Number(x))), sis = {}; (pmD.movilesSis || []).forEach(m => { sis[m.numero] = m; });
-  el.innerHTML = nums.length ? nums.map(n => { const m = sis[n]; return m ? '<div>🚚 <b>Móvil ' + esc(n) + '</b> · técnico: <b>' + esc(m.tecnico || '—') + '</b>' + (m.cedula ? ' · céd. ' + esc(m.cedula) : '') + ' · ' + (m.activa ? '<span class="chip verde">Activa</span>' : '<span class="chip amar">Inactiva' + (m.salida ? ' · salió ' + esc(pmFh(m.salida)) : '') + '</span>') + '</div>' : '<div style="color:#9b1c1c">Móvil ' + esc(n) + ': no existe en el módulo Móviles.</div>'; }).join('') : '<div style="color:#778">Escribe el número de móvil para ver su técnico y estado.</div>';
-  if (!$('pcNom').value.trim()) { const m = sis[nums[0]]; if (m && m.tecnico) { $('pcNom').value = m.tecnico; if (!$('pcCed').value.trim() && m.cedula) $('pcCed').value = m.cedula; } }
+  const num = v => String(v).split(/[^0-9]+/).filter(Boolean).map(x => String(Number(x)));
+  const mt = num($('pcMT').value)[0] || '', nums = num($('pcMov').value);
+  if (mt && nums.indexOf(mt) < 0) nums.unshift(mt);
+  const sis = {}; (pmD.movilesSis || []).forEach(m => { sis[m.numero] = m; });
+  const ced = v => String(v || '').replace(/\D/g, '');
+  let h = nums.length ? nums.map(n => { const m = sis[n]; return m ? '<div>🚚 <b>Móvil ' + esc(n) + '</b> ' + (n === mt ? '<span class="chip azul">técnico</span>' : '<span class="chip">factura</span>') + ' · técnico en la ficha: <b>' + esc(m.tecnico || '—') + '</b>' + (m.cedula ? ' · céd. ' + esc(m.cedula) : '') + ' · ' + (m.activa ? '<span class="chip verde">Activa</span>' : '<span class="chip amar">Inactiva' + (m.salida ? ' · salió ' + esc(pmFh(m.salida)) : '') + '</span>') + '</div>' : '<div style="color:#9b1c1c">Móvil ' + esc(n) + ': no existe en el módulo Móviles.</div>'; }).join('') : '<div style="color:#778">Escribe la móvil del técnico y, si factura otras, las demás en «Móviles que factura».</div>';
+  const mT = sis[mt];
+  if ($('pcMT').value.split(/[^0-9]+/).filter(Boolean).length > 1) h += '<div style="color:#9b1c1c;margin-top:4px">⚠ Un técnico solo puede tener <b>una</b> móvil a su nombre como técnico. Deja aquí una sola y pon las demás en «Móviles que factura».</div>';
+  if (mT && (mT.cedula || mT.tecnico)) {
+    const otras = (pmD.movilesSis || []).filter(m => m.activa && m.numero !== mt && ((ced(m.cedula).length >= 6 && ced(m.cedula) === ced(mT.cedula)) || (m.tecnico && pmNorm(m.tecnico) === pmNorm(mT.tecnico))));
+    if (otras.length) h += '<div style="color:#9b1c1c;margin-top:4px">⚠ En el módulo Móviles «' + esc(mT.tecnico) + '» también aparece como técnico de la móvil ' + otras.map(m => esc(m.numero)).join(', ') + '. Un técnico solo puede tener una; corrígelo en Móviles.</div>';
+  }
+  el.innerHTML = h;
+  const fuente = mT || sis[nums[0]];
+  if (fuente) {
+    if (!$('pcNom').value.trim() && fuente.tecnico) { $('pcNom').value = fuente.tecnico; if (!$('pcCed').value.trim() && fuente.cedula) $('pcCed').value = fuente.cedula; }
+    if (!$('pcCor').value.trim() && fuente.correo) $('pcCor').value = fuente.correo;
+    if (!$('pcTel').value.trim() && fuente.telefono) $('pcTel').value = fuente.telefono;
+  }
 }
+function pmConCorreoFicha() { const mt = String($('pcMT').value).replace(/\D/g, ''), m = (pmD.movilesSis || []).find(x => x.numero === String(Number(mt || 0))); if (m && m.correo) { $('pcCor').value = m.correo; } else toast('La ficha de esa móvil no tiene correo del técnico.'); }
 function pmConModal(id) {
-  const c = pmD.contratistas.find(x => x.id === id) || { nombre: '', cedula: '', iban: '', moviles: '', aplicaIva: true, telefono: '', correo: '', obs: '', activo: true, banco: '', referencia: '' };
-  const f = (et, idc, v, extra) => '<label style="display:grid;gap:3px">' + et + '<input id="' + idc + '" value="' + esc(v) + '" ' + (extra || '') + '></label>';
+  const c = pmD.contratistas.find(x => x.id === id) || { nombre: '', cedula: '', iban: '', moviles: '', aplicaIva: true, telefono: '', correo: '', correoFact: '', obs: '', activo: true, banco: '', referencia: '', movilTecnico: '' };
+  const f = (et, idc, v, extra) => '<label style="display:grid;gap:3px"><span>' + et + '</span><input id="' + idc + '" value="' + esc(v) + '" ' + (extra || '') + '></label>';
+  const req = '<span style="color:#9b1c1c">*</span>';
   pmModal('<h3>' + (id ? 'Editar' : 'Nuevo') + ' contratista</h3><div style="display:grid;gap:8px;max-height:72vh;overflow:auto;padding-right:4px">' +
-    '<div style="font-size:12px;color:#556;background:#f7f9fc;padding:8px;border-radius:6px"><b>Quien factura es el dueño de la cuenta bancaria</b>: el nombre y la cédula de abajo son los de la factura y los de la cuenta. Una persona = un registro; si cobra varias móviles, sepáralas con coma.</div>' +
-    f('Móviles que cobra (ej. 111,112)', 'pcMov', c.moviles, 'oninput="pmConMovInfo()"') + '<div id="pcMovInfo" style="font-size:12px;background:#f4f9ff;border:1px solid #dbe7f5;border-radius:6px;padding:6px 8px"></div>' +
-    f('Persona que factura (dueña de la cuenta)', 'pcNom', c.nombre, 'maxlength="100"') + f('Cédula', 'pcCed', c.cedula) +
-    '<fieldset style="border:1px solid #dde3ea;border-radius:8px;padding:8px"><legend style="font-size:12px;color:#556">Cuenta bancaria</legend><div style="display:grid;gap:8px">' + f('Nombre del banco', 'pcBan', c.banco, 'maxlength="60" placeholder="Ej. BAC, Banco Nacional, BCR…"') + f('Cuenta IBAN (20 dígitos, sin «CR»)', 'pcIban', c.iban, 'maxlength="26"') + f('Referencia del banco (opcional)', 'pcRef', c.referencia || '', 'maxlength="60" placeholder="Ej. n.º de cuenta cliente, referencia o código del banco"') + '</div></fieldset>' +
-    f('Teléfono', 'pcTel', c.telefono) + f('Correo', 'pcCor', c.correo) + '<label><input type="checkbox" id="pcIva"' + (c.aplicaIva ? ' checked' : '') + '> Factura con IVA (13%)</label><label><input type="checkbox" id="pcAct"' + (c.activo ? ' checked' : '') + '> Activo</label></div>' +
-    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn secondary" onclick="pmCerrar()">Cancelar</button><button class="btn primary" onclick="pmConGuardar(\'' + (id || '') + '\')">Guardar</button></div>', 540);
+    '<div style="font-size:12px;color:#556;background:#f7f9fc;padding:8px;border-radius:6px"><b>Quien factura es el dueño de la cuenta bancaria.</b> Una persona = un registro. Un técnico tiene <b>una sola móvil</b> a su nombre como técnico, pero puede ser el encargado de facturar <b>varias</b> móviles.</div>' +
+    f('Móvil donde es el técnico (solo una)', 'pcMT', c.movilTecnico || '', 'oninput="pmConMovInfo()" placeholder="Ej. 111"') + f('Móviles que factura (separadas por coma; incluye la suya)', 'pcMov', c.moviles, 'oninput="pmConMovInfo()" placeholder="Ej. 111,112,215"') + '<div id="pcMovInfo" style="font-size:12px;background:#f4f9ff;border:1px solid #dbe7f5;border-radius:6px;padding:6px 8px"></div>' +
+    f('Persona que factura (dueña de la cuenta) ' + req, 'pcNom', c.nombre, 'maxlength="100"') + f('Cédula', 'pcCed', c.cedula) +
+    '<fieldset style="border:1px solid #dde3ea;border-radius:8px;padding:8px"><legend style="font-size:12px;color:#556">Cuenta bancaria</legend><div style="display:grid;gap:8px">' + f('Nombre del banco ' + req, 'pcBan', c.banco, 'maxlength="60" placeholder="Ej. BAC, Banco Nacional, BCR…"') + f('Cuenta IBAN (20 dígitos, sin «CR»)', 'pcIban', c.iban, 'maxlength="26"') + f('Referencia del banco ' + req + ' <span style="font-size:11px;color:#778">(indica que está en las planillas y proveedores del banco)</span>', 'pcRef', c.referencia || '', 'maxlength="60"') + '</div></fieldset>' +
+    '<fieldset style="border:1px solid #dde3ea;border-radius:8px;padding:8px"><legend style="font-size:12px;color:#556">Contacto</legend><div style="display:grid;gap:8px">' + f('Teléfono', 'pcTel', c.telefono) +
+    '<label style="display:grid;gap:3px">Correo del técnico (predeterminado) <input id="pcCor" type="email" value="' + esc(c.correo) + '" placeholder="Se toma de la ficha de la móvil"></label><div style="margin-top:-4px"><button type="button" class="btn secondary" style="padding:2px 8px;font-size:12px" onclick="pmConCorreoFicha()">↺ Usar el de la ficha de la móvil</button> <button type="button" class="btn secondary" id="pcCorFBtn" style="padding:2px 8px;font-size:12px' + (c.correoFact ? ';display:none' : '') + '" onclick="$(\'pcCorFBox\').style.display=\'grid\';this.style.display=\'none\';$(\'pcCorF\').focus()">➕ Agregar correo de facturación</button></div>' +
+    '<label id="pcCorFBox" style="display:' + (c.correoFact ? 'grid' : 'none') + ';gap:3px">Correo de facturación (si es distinto; los estados de cuenta se envían a este y el del técnico va en copia)<input id="pcCorF" type="email" value="' + esc(c.correoFact || '') + '"></label></div></fieldset>' +
+    '<label><input type="checkbox" id="pcIva"' + (c.aplicaIva ? ' checked' : '') + '> Factura con IVA (13%)</label><label><input type="checkbox" id="pcAct"' + (c.activo ? ' checked' : '') + '> Activo (si lo desmarcas pasa a historial)</label></div>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn secondary" onclick="pmCerrar()">Cancelar</button><button class="btn primary" onclick="pmConGuardar(\'' + (id || '') + '\')">Guardar</button></div>', 560);
   pmConMovInfo();
 }
 async function pmConGuardar(id) {
-  try { await api('guardarContratistaPmWeb', { id: id, nombre: $('pcNom').value, banco: $('pcBan').value, referencia: $('pcRef').value, moviles: $('pcMov').value, iban: $('pcIban').value, cedula: $('pcCed').value, telefono: $('pcTel').value, correo: $('pcCor').value, aplicaIva: $('pcIva').checked, activo: $('pcAct').checked }); pmCerrar(); pmD = await api('obtenerPmWeb'); pmRenderCon(); toast('Contratista guardado.'); }
-  catch (e) { mostrarError(e, 'No se pudo guardar.'); }
+  const falta = (idc, msg) => { toast(msg, 5000); const e = $(idc); if (e) e.focus(); };
+  if (!$('pcNom').value.trim()) return falta('pcNom', 'Escribe el nombre de la persona que factura.');
+  if ($('pcAct').checked && !$('pcBan').value.trim()) return falta('pcBan', 'Escribe el nombre del banco.');
+  if ($('pcAct').checked && !$('pcRef').value.trim()) return falta('pcRef', 'La referencia del banco es obligatoria.');
+  try {
+    const r = await api('guardarContratistaPmWeb', { id: id, nombre: $('pcNom').value, banco: $('pcBan').value, referencia: $('pcRef').value, movilTecnico: $('pcMT').value, moviles: $('pcMov').value, iban: $('pcIban').value, cedula: $('pcCed').value, telefono: $('pcTel').value, correo: $('pcCor').value, correoFact: $('pcCorF').value, aplicaIva: $('pcIva').checked, activo: $('pcAct').checked });
+    pmCerrar(); pmD = await api('obtenerPmWeb'); pmRenderCon(); toast(r.reactivado ? 'Esa persona ya estaba en el historial: se reactivó y se actualizó su registro (no se duplicó).' : 'Contratista guardado.', r.reactivado ? 6000 : 2500);
+  } catch (e) { mostrarError(e, 'No se pudo guardar.'); }
 }
 function pmImportarConModal() {
   pmModal('<h3>Importar contratistas</h3><div style="font-size:13px;color:#555;margin-bottom:8px">Sube tu Excel de pago semanal. Se lee la hoja <b>Pago</b> (Móvil, Referencia/IBAN, Nombre, Cédula). Los que ya existen se completan sin duplicarse.</div><input type="file" id="pmFileC" accept=".xlsx,.xls" onchange="pmLeerCon(this.files[0])"><div id="pmConInfo" style="margin-top:10px;font-size:13px"></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn secondary" onclick="pmCerrar()">Cancelar</button><button class="btn primary" id="pmConBtn" disabled onclick="pmImportarConGuardar()">Importar</button></div>');
@@ -7101,21 +7128,37 @@ async function pmPreTeleGuardar() {
 }
 
 /* ---------- Contratistas (ligados a las móviles del sistema) ---------- */
-let pmConFiltro = 'vigentes';
+let pmConFiltro = 'vigentes', pmConQ = '';
 function pmConEstadoHtml(c) {
+  if (!c.activo) return '<span class="chip">Historial</span>';
   if (c.estadoSis === 'activa') return '<span class="chip verde">Móvil activa</span>';
   if (c.estadoSis === 'inactiva') return c.plazoHasta >= (pmD.hoy || '') ? '<span class="chip amar">Salió ' + esc(pmFh(c.salida)) + ' · paga hasta ' + esc(pmFh(c.plazoHasta)) + '</span>' : '<span class="chip rojo">Salió ' + esc(pmFh(c.salida)) + ' · plazo vencido</span>';
   return '<span class="chip azul" title="Ninguna de sus móviles está en el módulo Móviles">Sin vínculo</span>';
 }
+function pmConVigente(c) { const hoy = pmD.hoy || ''; return c.activo && (c.estadoSis === 'activa' || (c.estadoSis === 'inactiva' && c.plazoHasta >= hoy) || c.estadoSis === 'desconocida'); }
+function pmConFaltan(c) { const f = []; if (!c.banco) f.push('banco'); if (!c.referencia) f.push('referencia'); if (!c.iban) f.push('cuenta IBAN'); return f; }
 function pmRenderCon() {
-  const hoy = pmD.hoy || '';
-  const vig = c => c.estadoSis === 'activa' || (c.estadoSis === 'inactiva' && c.plazoHasta >= hoy) || c.estadoSis === 'desconocida';
-  const C = pmD.contratistas.filter(c => pmConFiltro === 'todos' ? true : (pmConFiltro === 'vigentes' ? vig(c) : !vig(c)));
-  let h = '<div class="toolbar"><button class="btn primary" onclick="pmConModal()">➕ Nuevo contratista</button><button class="btn secondary" onclick="pmSugerirModal()">📋 Traer desde Móviles</button><button class="btn secondary" onclick="pmLimpiarDup()">🧹 Unir duplicados</button><button class="btn secondary" onclick="pmImportarConModal()">⬆ Importar desde la hoja «Pago»</button><span style="flex:1"></span><label>Ver <select onchange="pmConFiltro=this.value;pmRenderCon()">' + [['vigentes', 'Activos y en plazo de pago'], ['fuera', 'Fuera de plazo'], ['todos', 'Todos']].map(x => '<option value="' + x[0] + '"' + (pmConFiltro === x[0] ? ' selected' : '') + '>' + x[1] + '</option>').join('') + '</select></label></div><div class="panel"><div class="panelHead"><h2>Contratistas</h2><span>' + C.length + '</span></div><div style="padding:8px 12px;font-size:12px;color:#667">El estado sale del módulo Móviles: una móvil inactiva sigue en la lista de pagos hasta ' + (pmD.diasPago || 13) + ' días después de su salida; pasado ese plazo queda solo como historial.</div><div class="tableWrap">';
-  if (!C.length) h += '<div class="loading">No hay contratistas en esta vista. Usa «Traer desde Móviles» o importa la hoja «Pago» de tu Excel.</div>';
-  else h += '<table class="pmT"><thead><tr><th>Contratista</th><th>Móvil · técnico</th><th>Estado</th><th>Banco · cuenta</th><th>IVA</th><th></th></tr></thead><tbody>' + C.map(c => { const fuera = !vig(c);
-    return '<tr' + (fuera ? ' style="background:#f3f3f3;color:#667"' : '') + '><td><b>' + esc(c.nombre) + '</b><div style="font-size:11px;color:#667">' + esc(c.cedula) + '</div></td><td>' + (c.tecnicos && c.tecnicos.length ? c.tecnicos.map(t => '<div><b>' + esc(t.movil) + '</b>' + (t.tecnico ? ' · ' + esc(t.tecnico) : '') + '</div>').join('') : esc(c.moviles)) + '</td><td>' + pmConEstadoHtml(c) + (fuera ? '<div style="font-size:11px">Solo historial</div>' : '') + '</td><td>' + (c.banco ? '<div>' + esc(c.banco) + '</div>' : '') + (c.referencia ? '<div style="font-size:11px;color:#556">Ref. ' + esc(c.referencia) + '</div>' : '') + (c.iban ? '<div style="font-size:11px">' + esc(c.iban) + '</div>' : '<span style="color:#9b1c1c">Falta cuenta</span>') + '</td><td>' + (c.aplicaIva ? '13%' : 'Sin IVA') + '</td><td style="text-align:right;white-space:nowrap"><button class="btn secondary" onclick="pmHistorial(\'' + c.id + '\')">Historial</button>' + (fuera ? '' : ' <button class="btn secondary" onclick="pmConModal(\'' + c.id + '\')">Editar</button>') + '</td></tr>'; }).join('') + '</tbody></table>';
+  const nV = pmD.contratistas.filter(pmConVigente).length, nH = pmD.contratistas.length - nV;
+  const C = pmD.contratistas.filter(c => pmConFiltro === 'todos' ? true : (pmConFiltro === 'vigentes' ? pmConVigente(c) : !pmConVigente(c)));
+  let h = '<div class="toolbar"><button class="btn primary" onclick="pmConModal()">➕ Nuevo contratista</button><button class="btn secondary" onclick="pmSugerirModal()" title="Revisa el módulo Móviles y agrega a la lista las móviles que faltan, sin duplicar personas">🔄 Actualizar móviles</button><button class="btn secondary" onclick="pmLimpiarDup()">🧹 Unir duplicados</button><button class="btn secondary" onclick="pmImportarConModal()">⬆ Importar desde la hoja «Pago»</button><span style="flex:1"></span><input id="pcBuscar" placeholder="Buscar nombre, móvil, cédula…" style="min-width:210px" value="' + esc(pmConQ) + '" oninput="pmConQ=this.value;pmConFiltrar()"><label>Ver <select onchange="pmConFiltro=this.value;pmRenderCon()">' + [['vigentes', 'Vigentes (' + nV + ')'], ['historial', 'Historial: ya no trabajan con nosotros (' + nH + ')'], ['todos', 'Todos (' + pmD.contratistas.length + ')']].map(x => '<option value="' + x[0] + '"' + (pmConFiltro === x[0] ? ' selected' : '') + '>' + x[1] + '</option>').join('') + '</select></label></div><div class="panel"><div class="panelHead"><h2>Contratistas</h2><span id="pcCuenta">' + C.length + '</span></div><div style="padding:8px 12px;font-size:12px;color:#667">El estado sale del módulo Móviles: una móvil inactiva sigue en la lista de pagos hasta ' + (pmD.diasPago || 13) + ' días después de su salida; pasado ese plazo (o si lo pasas a historial) queda solo como historial, con todos sus pagos y rebajos consultables.</div><div class="tableWrap">';
+  if (!C.length) h += '<div class="loading">No hay contratistas en esta vista. Usa «Actualizar móviles» o importa la hoja «Pago» de tu Excel.</div>';
+  else h += '<table class="pmT" id="pcTb"><thead><tr><th>Contratista</th><th>Móviles</th><th>Estado</th><th>Banco · cuenta</th><th>Correo</th><th>IVA</th><th></th></tr></thead><tbody>' + C.map(c => { const hist = !pmConVigente(c), falta = pmConFaltan(c);
+    const tecMov = c.movilTecnico ? '<div><span class="chip azul">técnico</span> <b>' + esc(c.movilTecnico) + '</b>' + ((c.tecnicos.find(t => t.movil === c.movilTecnico) || {}).tecnico ? ' · ' + esc(c.tecnicos.find(t => t.movil === c.movilTecnico).tecnico) : '') + '</div>' : '';
+    const fact = (c.tecnicos || []).filter(t => t.movil !== c.movilTecnico).map(t => '<b>' + esc(t.movil) + '</b>' + (t.tecnico ? ' <span style="color:#667">(' + esc(t.tecnico) + ')</span>' : '')).join(', ');
+    const q = pmNorm([c.nombre, c.cedula, c.moviles, c.banco, c.referencia, c.correo, c.correoFact, (c.tecnicos || []).map(t => t.tecnico).join(' ')].join(' '));
+    return '<tr data-q="' + esc(q) + '"' + (hist ? ' style="background:#f3f3f3;color:#667"' : '') + '><td><b>' + esc(c.nombre) + '</b><div style="font-size:11px;color:#667">' + esc(c.cedula) + '</div>' + (falta.length && c.activo ? '<div><span class="chip rojo" title="Sin estos datos no se incluye en el archivo del banco">Faltan: ' + esc(falta.join(', ')) + '</span></div>' : '') + '</td><td>' + (tecMov + (fact ? '<div><span class="chip">factura</span> ' + fact + '</div>' : '') || esc(c.moviles)) + '</td><td>' + pmConEstadoHtml(c) + '</td><td>' + (c.banco ? '<div>' + esc(c.banco) + '</div>' : '') + (c.referencia ? '<div style="font-size:11px;color:#556">Ref. ' + esc(c.referencia) + '</div>' : '') + (c.iban ? '<div style="font-size:11px">' + esc(c.iban) + '</div>' : '<span style="color:#9b1c1c">Falta cuenta</span>') + '</td><td style="font-size:12px">' + (c.correoFact ? '<div title="Facturación">🧾 ' + esc(c.correoFact) + '</div>' : '') + (c.correo ? '<div title="Técnico">' + esc(c.correo) + '</div>' : (c.correoFact ? '' : '<span style="color:#889">—</span>')) + '</td><td>' + (c.aplicaIva ? '13%' : 'Sin IVA') + '</td><td style="text-align:right;white-space:nowrap"><button class="btn secondary" onclick="pmHistorial(\'' + c.id + '\')">Historial</button> <button class="btn secondary" onclick="pmConModal(\'' + c.id + '\')">Editar</button> ' + (c.activo ? '<button class="btn secondary" title="Lo oculta de la lista de vigentes; conserva sus pagos y rebajos" onclick="pmConToggle(\'' + c.id + '\',false)">Pasar a historial</button>' : '<button class="btn secondary" onclick="pmConToggle(\'' + c.id + '\',true)">Reactivar</button>') + '</td></tr>'; }).join('') + '</tbody></table>';
   $('pmPCon').innerHTML = h + '</div></div>';
+  pmConFiltrar();
+}
+function pmConFiltrar() {
+  const tb = $('pcTb'); if (!tb) return; const q = pmNorm(pmConQ); let n = 0;
+  Array.from(tb.tBodies[0].rows).forEach(r => { const ok = !q || (r.dataset.q || '').indexOf(q) >= 0; r.style.display = ok ? '' : 'none'; if (ok) n++; });
+  if ($('pcCuenta')) $('pcCuenta').textContent = n;
+}
+async function pmConToggle(id, activo) {
+  const c = pmD.contratistas.find(x => x.id === id); if (!c) return;
+  if (!activo && !confirm('«' + c.nombre + '» pasará a historial: deja de aparecer en vigentes pero conserva sus móviles, pagos y rebajos. ¿Continuar?')) return;
+  try { await api('estadoContratistaPmWeb', { id: id, activo: activo }); pmD = await api('obtenerPmWeb'); pmRenderCon(); toast(activo ? 'Contratista reactivado.' : 'Pasó a historial.'); } catch (e) { mostrarError(e, 'No se pudo cambiar el estado.'); }
 }
 async function pmHistorial(id) {
   try {
@@ -7144,22 +7187,30 @@ async function pmLimpiarDup() {
 }
 async function pmSugerirModal() {
   try {
-    const L = await api('sugerirContratistasPmWeb');
-    if (!L.length) { toast('Todas las móviles activas ya tienen contratista.'); return; }
-    pmModal('<h3>Móviles sin contratista</h3><div style="font-size:13px;color:#555;margin-bottom:8px">Marca las que quieres crear. Se usa el nombre del técnico de la ficha; luego completa el IBAN en Editar.</div><div style="max-height:50vh;overflow:auto">' + L.map((m, i) => '<label style="display:flex;gap:8px;align-items:center;padding:3px 0"><input type="checkbox" class="psChk" data-i="' + i + '" checked> <b>Móvil ' + esc(m.movil) + '</b> <input class="psNom" data-i="' + i + '" style="flex:1" value="' + esc(m.tecnico || m.contrata) + '">' + (m.activa ? '' : '<span class="chip amar">salió ' + esc(pmFh(m.salida)) + '</span>') + '</label>').join('') + '</div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn secondary" onclick="pmCerrar()">Cancelar</button><button class="btn primary" onclick="pmSugerirCrear()">Crear los marcados</button></div>', 680);
+    const R = await api('sugerirContratistasPmWeb'), L = R.lista || [], conf = R.conflictos || [];
     window._pmSug = L;
+    const avisoConf = conf.length ? '<div style="font-size:12px;color:#9b1c1c;background:#fff4f4;border:1px solid #f0caca;border-radius:6px;padding:6px 8px;margin-bottom:8px">⚠ ' + conf.map(x => '«' + esc(x.tecnico) + '» figura como técnico en las móviles ' + x.moviles.map(esc).join(', ')).join('<br>⚠ ') + '.<br>Un técnico solo puede tener una móvil como técnico: corrígelo en el módulo Móviles.</div>' : '';
+    if (!L.length) { if (!conf.length) { toast('Todas las móviles vigentes ya tienen contratista.'); return; } pmModal('<h3>Actualizar móviles</h3>' + avisoConf + '<div style="font-size:13px">Todas las móviles vigentes ya tienen contratista.</div><div style="text-align:right;margin-top:12px"><button class="btn secondary" onclick="pmCerrar()">Cerrar</button></div>', 560); return; }
+    const fila = (m, i) => '<label style="display:flex;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid #eef0f4"><input type="checkbox" class="psChk" data-i="' + i + '"' + (m.vigente ? ' checked' : '') + '> <b style="white-space:nowrap">Móvil ' + esc(m.movil) + '</b> <input class="psNom" data-i="' + i + '" style="flex:1;min-width:160px" value="' + esc(m.existente ? m.existente.nombre : (m.tecnico || m.contrata)) + '"' + (m.existente ? ' readonly title="Se usa el registro que ya existe"' : '') + '>' +
+      '<span style="font-size:11.5px;white-space:nowrap">' + (m.existente ? '<span class="chip azul">Reutiliza el existente' + (m.existente.activo ? '' : ' (en historial: se reactiva)') + '</span>' : '<span class="chip verde">Nuevo</span>') + (m.activa ? '' : ' <span class="chip amar">salió ' + esc(pmFh(m.salida)) + '</span>') + (m.ordenes ? ' <span style="color:#667">' + m.ordenes + ' órd.</span>' : '') + '</span></label>';
+    const vig = L.map((m, i) => [m, i]).filter(x => x[0].vigente), his = L.map((m, i) => [m, i]).filter(x => !x[0].vigente);
+    pmModal('<h3>Actualizar móviles</h3>' + avisoConf + '<div style="font-size:13px;color:#555;margin-bottom:8px">Móviles del módulo Móviles que aún no tienen contratista. Si la persona ya existe (misma cédula o nombre, aunque esté en historial) se reutiliza su registro, <b>no se crea otro</b>. Las nuevas quedan pendientes de banco y referencia (obligatorios).</div><div style="max-height:50vh;overflow:auto">' +
+      (vig.length ? '<div style="font-weight:600;font-size:12px;margin:2px 0">Vigentes (' + vig.length + ')</div>' + vig.map(x => fila(x[0], x[1])).join('') : '') +
+      (his.length ? '<div style="font-weight:600;font-size:12px;margin:10px 0 2px;color:#667">Ya no trabajan con nosotros, con pagos registrados (' + his.length + ') · desmarcadas: solo si quieres ligarlas al historial</div>' + his.map(x => fila(x[0], x[1])).join('') : '') + '</div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn secondary" onclick="pmCerrar()">Cancelar</button><button class="btn primary" onclick="pmSugerirCrear()">Aplicar a las marcadas</button></div>', 720);
   } catch (e) { mostrarError(e, 'No se pudieron leer las móviles.'); }
 }
 async function pmSugerirCrear() {
-  const L = window._pmSug || []; let n = 0;
+  const L = window._pmSug || [], items = [];
+  Array.from(document.querySelectorAll('.psChk:checked')).forEach(chk => {
+    const i = +chk.dataset.i, m = L[i], nom = document.querySelector('.psNom[data-i="' + i + '"]').value.trim();
+    if (nom) items.push({ movil: m.movil, nombre: nom, cedula: m.cedula, correo: m.correo, telefono: m.telefono, idCon: m.existente ? m.existente.id : '' });
+  });
+  if (!items.length) { toast('Marca al menos una móvil.'); return; }
   try {
-    for (const chk of Array.from(document.querySelectorAll('.psChk:checked'))) {
-      const i = +chk.dataset.i, m = L[i], nom = document.querySelector('.psNom[data-i="' + i + '"]').value.trim();
-      if (!nom) continue;
-      await api('guardarContratistaPmWeb', { nombre: nom, moviles: m.movil, cedula: m.cedula, aplicaIva: true }); n++;
-    }
-    pmCerrar(); pmD = await api('obtenerPmWeb'); pmRenderCon(); toast(n + ' contratista(s) creados. Completa su IBAN.');
-  } catch (e) { mostrarError(e, 'No se pudieron crear.'); }
+    const r = await api('aplicarSugerenciasPmWeb', items);
+    pmCerrar(); pmD = await api('obtenerPmWeb'); pmRenderCon();
+    toast(r.creados + ' nuevo(s), ' + r.reutilizados + ' reutilizado(s)' + (r.omitidos ? ', ' + r.omitidos + ' omitida(s) porque ya tienen contratista' : '') + (r.creados ? '. Completa banco y referencia en Editar.' : '.'), 7000);
+  } catch (e) { mostrarError(e, 'No se pudo actualizar.'); }
 }
 
 /* ---------- Lista de contratos y corte por móvil ---------- */
@@ -7702,8 +7753,8 @@ async function pmCorreo(idCon) {
     const blob = r.doc.output('blob'), file = new File([blob], r.nombre, { type: 'application/pdf' });
     if (navigator.canShare && navigator.canShare({ files: [file] })) { try { await navigator.share({ files: [file], title: asunto, text: cuerpo }); return; } catch (e) { if (e && e.name === 'AbortError') return; } }
     pmBajar(blob, r.nombre);
-    toast('PDF descargado: adjúntalo al correo que se abre.' + (c.correo ? '' : ' (El contratista no tiene correo registrado.)'), 7000);
-    setTimeout(() => { location.href = 'mailto:' + encodeURIComponent(c.correo || '') + '?subject=' + encodeURIComponent(asunto) + '&body=' + encodeURIComponent(cuerpo + '\n\n(Adjunte el PDF ' + r.nombre + ')'); }, 600);
+    toast('PDF descargado: adjúntalo al correo que se abre.' + (c.correo || c.correoFact ? '' : ' (El contratista no tiene correo registrado.)'), 7000);
+    setTimeout(() => { const para = c.correoFact || c.correo || '', cc = c.correoFact && c.correo && c.correo !== c.correoFact ? '&cc=' + encodeURIComponent(c.correo) : ''; location.href = 'mailto:' + encodeURIComponent(para) + '?subject=' + encodeURIComponent(asunto) + '&body=' + encodeURIComponent(cuerpo + '\n\n(Adjunte el PDF ' + r.nombre + ')') + cc; }, 600);
   } catch (e) { mostrarError(e, 'No se pudo preparar el correo.'); }
 }
 function pmReporteModal(idCon) {
@@ -14206,6 +14257,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 64 · 14-oct 16:20</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 65 · 14-oct 16:51</div>
 </body>
 </html>
