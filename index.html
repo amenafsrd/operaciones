@@ -6678,6 +6678,8 @@ function pmOrdFiltradas() {
     if (pmOF.est === 'manual' && !o.manual) return false;
     if (pmOF.est === 'cambio' && !(o.tipo || o.manual)) return false;
     if (pmOF.est === 'negativa' && !(o.ufCosto - o.costo < -0.005)) return false;
+    if (pmOF.est === 'valid' && !(o.validacion && o.validacion.indexOf('Revisar') !== 0)) return false;
+    if (pmOF.est === 'revisar' && !(o.validacion && o.validacion.indexOf('Revisar') === 0)) return false;
     if (pmOF.est === 'sel' && !pmSel.has(o.id)) return false;
     if (pmOF.est === 'sinseg' && pmVer && pmVer.porOrden[o.id] && pmVer.porOrden[o.id].seg) return false;
     if (pmOF.est === 'sinmat' && pmVer && pmVer.porOrden[o.id] && pmVer.porOrden[o.id].mat) return false;
@@ -6694,8 +6696,8 @@ function pmHtmlOrd(cerr) {
     '<input id="pmFq" placeholder="Buscar contrato, cliente o servicio" style="min-width:220px" value="' + esc(pmOF.q) + '" onkeydown="if(event.key===\'Enter\'){pmOF.q=this.value;pmPag=0;pmRenderSemana()}" onchange="pmOF.q=this.value;pmPag=0;pmRenderSemana()">' +
     sel('pmFm', [['', 'Todas las móviles']].concat(moviles.map(m => [m, 'Móvil ' + m])), pmOF.movil, "pmOF.movil=this.value;pmPag=0;pmRenderSemana()") +
     sel('pmFs', [['', 'Todos los servicios']].concat(servs.map(m => [m, m])), pmOF.serv, "pmOF.serv=this.value;pmPag=0;pmRenderSemana()") +
-    sel('pmFe', [['todas', 'Todas'], ['dif', 'Con diferencia vs lista'], ['sin', 'Sin precio en lista'], ['cambio', 'Con cambio de tipo o precio'], ['negativa', 'Pago mayor al de Telecable'], ['manual', 'Precio manual'], ['sel', 'Solo seleccionadas']].concat(pmVer ? [['sinseg', 'Sin seguimiento'], ['sinmat', 'Sin materiales']] : []), pmOF.est, "pmOF.est=this.value;pmPag=0;pmRenderSemana()") +
-    '<span style="color:#667;font-size:12px">' + O.length + ' orden(es)</span>' + (cerr ? '' : '<span style="flex:1"></span>' + (pmS.ordenes.some(o => !o.nOrden && !o.manual) ? '<button class="btn secondary" title="Sube de nuevo el Excel de Telecable para rellenar los números de orden que faltan" onclick="$(\'pmFileN\').click()">🔢 Completar N.º de orden</button><input type="file" id="pmFileN" accept=".xlsx,.xls" style="display:none" onchange="pmCompletarOrden(this.files[0]);this.value=\'\'">' : '') + '<button class="btn secondary" onclick="pmOrdenModal()">➕ Agregar orden</button>') + '</div>';
+    sel('pmFe', [['todas', 'Todas'], ['dif', 'Con diferencia vs lista'], ['sin', 'Sin precio en lista'], ['cambio', 'Con cambio de tipo o precio'], ['negativa', 'Pago mayor al de Telecable'], ['manual', 'Precio manual'], ['valid', 'Validadas con materiales'], ['revisar', 'Reinstalación por revisar'], ['sel', 'Solo seleccionadas']].concat(pmVer ? [['sinseg', 'Sin seguimiento'], ['sinmat', 'Sin materiales']] : []), pmOF.est, "pmOF.est=this.value;pmPag=0;pmRenderSemana()") +
+    '<span style="color:#667;font-size:12px">' + O.length + ' orden(es)</span>' + (cerr ? '' : '<span style="flex:1"></span>' + (pmS.ordenes.some(o => !o.nOrden && !o.manual) ? '<button class="btn secondary" title="Sube de nuevo el Excel de Telecable para rellenar los números de orden que faltan" onclick="$(\'pmFileN\').click()">🔢 Completar N.º de orden</button><input type="file" id="pmFileN" accept=".xlsx,.xls" style="display:none" onchange="pmCompletarOrden(this.files[0]);this.value=\'\'">' : '') + '<button class="btn secondary" title="Sube el reporte de materiales de la semana: fibra + RG6 = instalación completa; solo fibra = cambio de acometida" onclick="$(\'pmFileMat\').click()">🧪 Validar reinstalaciones con materiales</button><input type="file" id="pmFileMat" accept=".xlsx,.xls" style="display:none" onchange="pmValidarMat(this.files[0]);this.value=\'\'"><button class="btn secondary" onclick="pmOrdenModal()">➕ Agregar orden</button>') + '</div>';
   if (!cerr) {
     h += '<div style="padding:8px 12px;background:#eef4ff;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px"><b>' + pmSel.size + ' seleccionada(s)</b>' +
       '<button class="btn secondary" onclick="pmSelTodas()">Seleccionar las ' + O.length + ' filtradas</button><button class="btn secondary" onclick="pmSel.clear();pmRenderSemana()">Quitar selección</button>' +
@@ -6705,7 +6707,7 @@ function pmHtmlOrd(cerr) {
   h += '<div style="padding:6px 12px;font-size:13px;display:flex;gap:18px;flex-wrap:wrap"><span>Telecable pagó: <b>' + pmM(tU) + '</b></span><span>Se paga a las móviles: <b>' + pmM(tC) + '</b></span><span>Diferencia para la empresa: <b style="color:' + (tU - tC >= 0 ? '#2d5a1b' : '#9b1c1c') + '">' + pmM(tU - tC) + '</b></span><span style="color:#667">(de las ' + O.length + ' órdenes filtradas)</span></div>';
   h += '<table class="pmT"><thead><tr>' + (cerr ? '' : '<th><input type="checkbox" onclick="pmSelPag(this.checked)"></th>') + '<th>Fecha</th><th>Móvil</th><th>N.º orden</th><th>Contrato</th><th>Cliente</th><th>Servicio (Telecable)</th><th style="text-align:right">Precio Telecable</th><th>Tipo asignado</th><th style="text-align:right">Pago a la móvil</th><th style="text-align:right">Diferencia (empresa)</th>' + (pmVer ? '<th>Seguim.</th><th>Mat.</th>' : '') + '<th></th></tr></thead><tbody>' +
     vis.map(o => { const d = !o.manual && o.costoLista !== null && Math.abs(o.costoLista - o.costo) > 0.005, dif = o.ufCosto - o.costo, cam = !!o.tipo || o.manual;
-      return '<tr' + (d ? ' style="background:#fff3cd"' : (cam ? ' style="background:#eaf3ff"' : '')) + '>' + (cerr ? '' : '<td><input type="checkbox" ' + (pmSel.has(o.id) ? 'checked' : '') + ' onclick="pmSelUno(\'' + o.id + '\',this.checked)"></td>') + '<td>' + esc(pmFh(o.fecha)) + '</td><td>' + esc(o.movil) + '</td><td>' + esc(o.nOrden) + '</td><td>' + esc(o.contrato) + '</td><td>' + esc(o.cliente) + '</td><td>' + esc(o.servicios) + (o.cantidad > 1 ? ' ×' + o.cantidad : '') + (o.obs ? '<br><span style="font-size:11px;color:#667">' + esc(o.obs) + '</span>' : '') + '</td><td style="text-align:right;white-space:nowrap">' + pmM(o.ufCosto) + '</td><td>' + (o.tipo ? '<b>' + esc(o.tipo) + '</b> <span class="chip azul">cambiado</span>' : '<span style="color:#999">según archivo</span>') + '</td><td style="text-align:right;white-space:nowrap"><b>' + pmM(o.costo) + '</b>' + (o.manual ? ' <span class="chip verde">manual</span>' : '') + (d ? '<div style="font-size:10px;color:#8a6d00">lista: ' + pmM(o.costoLista) + '</div>' : '') + (o.costoLista === null && !o.manual ? '<div style="font-size:10px;color:#9b1c1c">sin precio</div>' : '') + '</td><td style="text-align:right;white-space:nowrap;color:' + (dif > 0.005 ? '#2d5a1b' : (dif < -0.005 ? '#9b1c1c' : '#667')) + '">' + (dif > 0.005 ? '+' : '') + pmM(dif) + '</td>' + (pmVer ? pmCeldasVer(o) : '') + '<td style="white-space:nowrap">' + (cerr ? '' : '<button class="btn secondary" title="Cambiar tipo / precio de esta orden" onclick="pmEditarUna(\'' + o.id + '\')">✎</button>' + (/^Agregada manualmente/.test(o.obs) ? ' <button class="btn secondary" onclick="pmQuitarOrden(\'' + o.id + '\')">✕</button>' : '')) + '</td></tr>'; }).join('') + '</tbody></table>' +
+      return '<tr' + (d ? ' style="background:#fff3cd"' : (cam ? ' style="background:#eaf3ff"' : '')) + '>' + (cerr ? '' : '<td><input type="checkbox" ' + (pmSel.has(o.id) ? 'checked' : '') + ' onclick="pmSelUno(\'' + o.id + '\',this.checked)"></td>') + '<td>' + esc(pmFh(o.fecha)) + '</td><td>' + esc(o.movil) + '</td><td>' + esc(o.nOrden) + '</td><td>' + esc(o.contrato) + '</td><td>' + esc(o.cliente) + '</td><td>' + esc(o.servicios) + (o.cantidad > 1 ? ' ×' + o.cantidad : '') + (o.obs ? '<br><span style="font-size:11px;color:#667">' + esc(o.obs) + '</span>' : '') + '</td><td style="text-align:right;white-space:nowrap">' + pmM(o.ufCosto) + '</td><td>' + (o.tipo ? '<b>' + esc(o.tipo) + '</b> <span class="chip azul">cambiado</span>' : '<span style="color:#999">según archivo</span>') + (o.validacion ? '<div>' + (o.validacion.indexOf('Revisar') === 0 ? '<span class="chip rojo" title="' + esc(o.validacion) + '">⚠ ' + esc(o.validacion) + '</span>' : '<span class="chip verde">✔ ' + esc(o.validacion) + '</span>') + '</div>' : '') + '</td><td style="text-align:right;white-space:nowrap"><b>' + pmM(o.costo) + '</b>' + (o.manual ? ' <span class="chip verde">manual</span>' : '') + (d ? '<div style="font-size:10px;color:#8a6d00">lista: ' + pmM(o.costoLista) + '</div>' : '') + (o.costoLista === null && !o.manual ? '<div style="font-size:10px;color:#9b1c1c">sin precio</div>' : '') + '</td><td style="text-align:right;white-space:nowrap;color:' + (dif > 0.005 ? '#2d5a1b' : (dif < -0.005 ? '#9b1c1c' : '#667')) + '">' + (dif > 0.005 ? '+' : '') + pmM(dif) + '</td>' + (pmVer ? pmCeldasVer(o) : '') + '<td style="white-space:nowrap">' + (cerr ? '' : '<button class="btn secondary" title="Cambiar tipo / precio de esta orden" onclick="pmEditarUna(\'' + o.id + '\')">✎</button>' + (/^Agregada manualmente/.test(o.obs) ? ' <button class="btn secondary" onclick="pmQuitarOrden(\'' + o.id + '\')">✕</button>' : '')) + '</td></tr>'; }).join('') + '</tbody></table>' +
     (pags > 1 ? '<div style="padding:8px 12px;display:flex;gap:8px;align-items:center"><button class="btn secondary" ' + (pmPag ? '' : 'disabled') + ' onclick="pmPag--;pmRenderSemana()">←</button> Página ' + (pmPag + 1) + ' de ' + pags + ' <button class="btn secondary" ' + (pmPag < pags - 1 ? '' : 'disabled') + ' onclick="pmPag++;pmRenderSemana()">→</button></div>' : '');
   return h;
 }
@@ -7392,6 +7394,53 @@ function pmCorreo(idCon) {
   const cuerpo = 'Estimado(a) ' + f.nombre + ':\n\nAdjuntamos su estado de cuenta de la semana ' + pmFh(S.desde) + ' al ' + pmFh(S.hasta) + '.\n\n' +
     'Monto a facturar: ' + pmM(f.subtotal) + (f.aplicaIva ? '\nIVA 13%: ' + pmM(f.iva) : '') + '\nTotal de la factura: ' + pmM(f.totalFacturado) + '\nRebajos al depósito: ' + pmM(f.deducciones) + '\nTotal a depositar: ' + pmM(f.deposito) + '\nFecha estimada de pago: ' + pmFh(S.fechaPagoEst) + '\n\nPor favor envíe su factura por el monto indicado y confirme el número.\n\n(Adjunte aquí el PDF del estado de cuenta)\n\nSoluciones Red Dorada SRL';
   location.href = 'mailto:' + encodeURIComponent(c.correo || '') + '?subject=' + encodeURIComponent(asunto) + '&body=' + encodeURIComponent(cuerpo);
+}
+
+
+/* ---------- Validar «Reinstalación total» con el reporte de materiales ---------- */
+let pmMatFilas = null, pmValRes = null;
+async function pmValidarMat(f) {
+  if (!f) return;
+  try {
+    await cargarLib('xlsx', SEG_URL_XLSX);
+    const wb = XLSX.read(await f.arrayBuffer(), { type: 'array', cellDates: true });
+    const ws = wb.Sheets[wb.SheetNames[0]], A = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: true });
+    const n = v => pmNorm(String(v).replace(/ /g, ' '));
+    let hi = -1; for (let i = 0; i < Math.min(A.length, 60); i++) { const r = A[i].map(n); if (r.indexOf('contrato') >= 0 && r.some(x => x === 'n_orden' || x === 'n orden' || x === 'orden')) { hi = i; break; } }
+    if (hi < 0) throw new Error('No parece un reporte de materiales: no encuentro las columnas contrato y n_orden.');
+    const H = A[hi].map(n), ic = H.indexOf('contrato'), io = H.findIndex(x => x === 'n_orden' || x === 'n orden' || x === 'orden');
+    const colFibra = [], colRg = [];
+    H.forEach((x, i) => { if (/^f\.?\s?o\b/.test(x) || /fibra/.test(x)) { if (!/placa|carrucha|conector|caja|fajilla/.test(x)) colFibra.push(i); } if (/rg\s*-?\s*6/.test(x) && /cable/.test(x)) colRg.push(i); });
+    if (!colFibra.length) throw new Error('No encuentro la columna de fibra óptica (F.O PLANA o similar) en el reporte.');
+    if (!colRg.length) throw new Error('No encuentro la columna de cable RG6 en el reporte.');
+    const suma = (r, cols) => cols.reduce((a, i) => a + (Number(r[i]) || 0), 0);
+    pmMatFilas = A.slice(hi + 1).filter(r => r[ic] || r[io]).map(r => ({ nOrden: String(r[io] || ''), contrato: String(r[ic] || ''), fibra: suma(r, colFibra), rg6: suma(r, colRg) }));
+    pmValRes = await api('validarReinstalacionPmWeb', pmSemId, pmMatFilas, false);
+    pmValModal();
+  } catch (e) { mostrarError(e, 'No se pudo validar.'); }
+}
+function pmValModal() {
+  const R = pmValRes, F = R.filas, c = { COMPLETA: 0, ACOMETIDA: 0, REVISAR: 0 }; F.forEach(x => c[x.resultado]++);
+  const dif = F.reduce((a, x) => a + (x.despues - x.antes), 0);
+  const chip = x => x.resultado === 'COMPLETA' ? '<span class="chip verde">Instalación completa</span>' : (x.resultado === 'ACOMETIDA' ? '<span class="chip azul">Cambio de acometida</span>' : '<span class="chip rojo">Revisar</span>');
+  pmModal('<h3>Validación de «Reinstalación total (interno-externo)»</h3>' + (F.length ? '<div style="font-size:13px;margin-bottom:8px"><b>' + F.length + '</b> líneas · <b>' + c.COMPLETA + '</b> instalación completa (fibra + RG6) · <b>' + c.ACOMETIDA + '</b> cambio de acometida (solo fibra) · <b>' + c.REVISAR + '</b> por revisar · efecto en el pago a móviles: <b>' + pmSgn(dif) + '</b></div>' +
+    '<div class="tableWrap" style="max-height:52vh"><table class="pmT"><thead><tr><th>Fecha</th><th>Móvil</th><th>N.º orden</th><th>Contrato</th><th style="text-align:right">Fibra</th><th style="text-align:right">RG6</th><th>Resultado</th><th style="text-align:right">Pago antes</th><th style="text-align:right">Pago después</th></tr></thead><tbody>' +
+    F.map(x => '<tr' + (x.resultado === 'REVISAR' ? ' style="background:#fdecea"' : (x.antes !== x.despues ? ' style="background:#eaf3ff"' : '')) + '><td>' + esc(pmFh(x.fecha)) + '</td><td>' + esc(x.movil) + '</td><td>' + esc(x.nOrden) + '</td><td>' + esc(x.contrato) + '</td><td style="text-align:right">' + (x.fibra === null ? '—' : x.fibra) + '</td><td style="text-align:right">' + (x.rg6 === null ? '—' : x.rg6) + '</td><td>' + chip(x) + '<div style="font-size:11px;color:#667">' + esc(x.motivo) + '</div></td><td style="text-align:right;white-space:nowrap">' + pmM(x.antes) + '</td><td style="text-align:right;white-space:nowrap"><b>' + pmM(x.despues) + '</b></td></tr>').join('') + '</tbody></table></div>' +
+    '<div style="font-size:12px;color:#667;margin-top:6px">Al aplicar se cambia el tipo y el pago a la móvil (no el precio de Telecable) y cada contrato queda marcado en la pestaña Órdenes (filtro «Validadas con materiales»). Las líneas «Revisar» no se tocan: quedan marcadas para que las verifiques. Los precios con ajuste manual no se modifican.</div>'
+    : '<div class="loading">Esta semana no tiene líneas «Reinstalación total (interno-externo)».</div>') +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px"><button class="btn secondary" onclick="pmValExcel()">⬇ Excel</button><button class="btn secondary" onclick="pmCerrar()">' + (R.aplicado ? 'Cerrar' : 'Cancelar') + '</button>' + (F.length && !R.aplicado ? '<button class="btn primary" onclick="pmValAplicar()">Aplicar cambios</button>' : '') + '</div>', 1000);
+}
+async function pmValAplicar() {
+  try { pmValRes = await api('validarReinstalacionPmWeb', pmSemId, pmMatFilas, true); await pmRecargar(); pmValModal(); toast(pmValRes.cambiadas + ' línea(s) actualizadas y marcadas.', 5000); }
+  catch (e) { mostrarError(e, 'No se pudo aplicar.'); }
+}
+async function pmValExcel() {
+  try {
+    await cargarLib('xlsx', SEG_URL_XLSX);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['Fecha', 'Móvil', 'N.º orden', 'Contrato', 'Cliente', 'Fibra', 'RG6', 'Resultado', 'Motivo', 'Pago antes', 'Pago después']].concat(pmValRes.filas.map(x => [x.fecha, x.movil, x.nOrden, x.contrato, x.cliente, x.fibra, x.rg6, x.resultado === 'COMPLETA' ? 'Instalación completa' : (x.resultado === 'ACOMETIDA' ? 'Cambio de acometida' : 'Revisar'), x.motivo, x.antes, x.despues]))), 'Reinstalaciones');
+    XLSX.writeFile(wb, 'Validacion_reinstalaciones_' + pmS.semana.desde + '.xlsx');
+  } catch (e) { mostrarError(e, 'No se pudo generar el Excel.'); }
 }
 
 function esc(v) {
@@ -13800,6 +13849,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 51 · 14-oct 12:30</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 53 · 14-oct 13:20</div>
 </body>
 </html>
