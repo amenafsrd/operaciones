@@ -6553,7 +6553,7 @@ function pmRenderSemanas() {
   let h = '<div class="toolbar"><button class="btn primary" onclick="pmImportarModal()">⬆ Importar semana de Telecable</button></div><div class="panel"><div class="panelHead"><h2>Semanas de pago</h2></div><div class="tableWrap">';
   if (!pmD.semanas.length) h += '<div class="loading">Aún no hay semanas. Importa el Excel «Pago servicios» que envía Telecable.</div>';
   else h += '<table class="pmT"><thead><tr><th>Semana</th><th>Estado</th><th>Pago estimado</th><th>Pagos hechos</th><th style="text-align:right">Depósito pendiente</th><th style="text-align:right">Órdenes</th><th style="text-align:right">Contratos</th><th>Precios</th><th style="text-align:right">Costo móviles (detalle)</th><th style="text-align:right">UF Telecable</th><th style="text-align:right">Margen</th><th></th></tr></thead><tbody>' +
-    pmD.semanas.map(s => '<tr style="cursor:pointer" onclick="pmAbrir(\'' + s.id + '\')"><td><b>' + esc(pmFh(s.desde)) + ' al ' + esc(pmFh(s.hasta)) + '</b></td><td>' + (s.estado === 'Cerrada' ? '<span class="chip verde">Cerrada</span>' : '<span class="chip amar">Abierta</span>') + '</td><td>' + esc(pmFh(s.fechaPagoEst)) + '</td><td>' + (s.pagosHechos || 0) + ' / ' + (s.pagosTotal || 0) + '</td><td style="text-align:right;white-space:nowrap">' + pmM(s.depositoPendiente || 0) + '</td><td style="text-align:right">' + s.ordenes + '</td><td style="text-align:right">' + (s.contratos || 0) + '</td><td>' + (s.sinPrecio ? '<span class="chip rojo" title="Líneas sin precio de pago">⚠ ' + s.sinPrecio + ' sin precio</span>' : '<span class="chip verde">Todas con precio</span>') + '</td><td style="text-align:right">' + pmM(s.costo) + '</td><td style="text-align:right">' + pmM(s.uf) + '</td><td style="text-align:right"><b>' + pmM(s.uf - s.costo) + '</b></td><td style="text-align:right;white-space:nowrap" onclick="event.stopPropagation()"><button class="btn secondary" onclick="pmVista=\'cto\';pmAbrir(\'' + s.id + '\')">Contratos</button> <button class="btn secondary" onclick="pmAbrir(\'' + s.id + '\')">Abrir</button> <button class="btn secondary" title="Eliminar este archivo de pago" onclick="pmEliminarSemanaId(\'' + s.id + '\')">🗑</button></td></tr>').join('') + '</tbody></table>';
+    pmD.semanas.map(s => '<tr style="cursor:pointer" onclick="pmAbrir(\'' + s.id + '\')"><td><b>' + esc(pmFh(s.desde)) + ' al ' + esc(pmFh(s.hasta)) + '</b></td><td>' + (s.estado === 'Cerrada' ? '<span class="chip verde">Cerrada</span>' : '<span class="chip amar">Abierta</span>') + '</td><td>' + esc(pmFh(s.fechaPagoEst)) + '</td><td>' + (s.pagosHechos || 0) + ' / ' + (s.pagosTotal || 0) + '</td><td style="text-align:right;white-space:nowrap">' + pmM(s.depositoPendiente || 0) + '</td><td style="text-align:right">' + s.ordenes + '</td><td style="text-align:right">' + (s.contratos || 0) + '</td><td>' + (s.sinPrecio ? '<span class="chip rojo" title="Líneas sin precio de pago">⚠ ' + s.sinPrecio + ' sin precio</span>' : '<span class="chip verde">Todas con precio</span>') + '</td><td style="text-align:right">' + pmM(s.costo) + '</td><td style="text-align:right">' + pmM(s.uf) + '</td><td style="text-align:right"><b>' + pmM(s.uf - s.costo) + '</b></td><td style="text-align:right;white-space:nowrap" onclick="event.stopPropagation()"><button class="btn secondary" onclick="pmAbrir(\'' + s.id + '\')">Abrir</button> <button class="btn secondary" title="Eliminar este archivo de pago" onclick="pmEliminarSemanaId(\'' + s.id + '\')">🗑</button></td></tr>').join('') + '</tbody></table>';
   $('pmPSem').innerHTML = h + '</div></div>';
 }
 async function pmAbrir(id) {
@@ -6574,12 +6574,11 @@ function pmRenderSemana() {
     [['Órdenes', T.nOrdenes], ['Costo detalle', pmM(T.detalle)], ['UF Telecable', pmM(T.uf)], ['Margen (UF − costo)', pmM(margen)], ['Total facturado', pmM(T.totalFacturado)], ['Total a depositar', pmM(T.deposito)]]
       .map(x => '<div><div style="color:#667;font-size:11px">' + x[0] + '</div><b style="font-size:15px">' + x[1] + '</b></div>').join('') + '</div></div>';
   if (S.diferencias || S.sinLista) h += '<div class="panel" style="padding:10px 14px;font-size:13px;background:#fff8e1">' + (S.diferencias ? '⚠ <b>' + S.diferencias + '</b> orden(es) con costo distinto a la lista de precios. ' + (cerr ? '' : '<button class="btn secondary" onclick="pmAplicarLista()">Aplicar precio de lista</button> ') : '') + (S.sinLista ? '⚠ <b>' + S.sinLista + '</b> orden(es) sin precio de pago (el servicio no está en la lista). ' + (cerr ? '' : '<button class="btn primary" onclick="pmSinPrecioModal()">Asignar precio</button>') : '') + '</div>';
-  h += '<div class="subtabs">' + tb('mov', 'Resumen por móvil') + tb('cto', 'Contratos importados') + tb('res', 'Pago por contratista') + tb('ord', 'Órdenes') + tb('ape', 'Apelaciones' + (S.apelaciones.some(a => a.estado === 'Pendiente') ? ' •' : '')) + tb('aju', 'Ajustes') + tb('ext', 'Adicionales') + tb('ver', 'Verificación') + tb('arc', 'Archivos') + '</div>';
+  h += '<div class="subtabs">' + tb('mov', 'Resumen por móvil') + tb('ord', 'Órdenes') + tb('res', 'Pago por contratista') + tb('ape', 'Apelaciones' + (S.apelaciones.some(a => a.estado === 'Pendiente') ? ' •' : '')) + tb('aju', 'Ajustes') + tb('ext', 'Adicionales') + tb('ver', 'Verificación') + tb('arc', 'Archivos') + '</div>';
   h += '<div class="panel"><div class="tableWrap">';
   if (pmVista === 'mov') h += pmHtmlMov();
   if (pmVista === 'res') h += pmHtmlRes(cerr);
   if (pmVista === 'ord') h += pmHtmlOrd(cerr);
-  if (pmVista === 'cto') h += pmHtmlCto();
   if (pmVista === 'ape') h += pmHtmlApe(cerr);
   if (pmVista === 'aju') h += pmHtmlAju(cerr);
   if (pmVista === 'ext') h += pmHtmlExt(cerr);
@@ -7150,6 +7149,52 @@ async function pmCortesExcel(movil) {
     XLSX.writeFile(wb, 'Corte_' + (movil ? 'movil_' + movil + '_' : 'moviles_') + pmS.semana.desde + '_' + pmS.semana.hasta + '.xlsx');
   } catch (e) { mostrarError(e, 'No se pudo generar el Excel.'); }
 }
+
+/* PDF real (descarga) del corte de una móvil: órdenes de la semana con su pago */
+async function pmCortePdfFile(movil, silencioso) {
+  try {
+    await cargarLib('jspdf', URL_JSPDF);
+    const x = pmCortesMoviles().find(c => c.movil === String(movil)); if (!x) { toast('No hay órdenes de esa móvil.'); return; }
+    const S = pmS, E = pmD.empresa || { nombre: 'Soluciones Red Dorada SRL' }, f = S.resumen.filas.find(r => r.moviles[x.movil]) || {};
+    const d = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4' }), M = 14, W = 210 - 2 * M, mon = v => ctMoneyPdf(v, 'CRC');
+    const cut = (t, n) => { t = String(t == null ? '' : t); return t.length > n ? t.slice(0, n - 1) + '…' : t; };
+    const cols = [['Fecha', 18, 'l'], ['N.º orden', 22, 'l'], ['Contrato', 20, 'l'], ['Cliente', 50, 'l'], ['Servicio', 50, 'l'], ['Cant.', 9, 'r'], ['Pago', 13, 'r']];
+    let y = M;
+    const enc = () => {
+      d.setFont('helvetica', 'bold'); d.setFontSize(15); d.setTextColor(15, 27, 45); d.text('Corte de la móvil ' + x.movil, M, y + 5);
+      d.setFont('helvetica', 'normal'); d.setFontSize(9); d.setTextColor(85, 95, 110);
+      d.text(E.nombre + ' · Semana ' + pmFh(S.semana.desde) + ' al ' + pmFh(S.semana.hasta), M, y + 11);
+      const tec = ((f.tecnicos || []).find(t => t.movil === x.movil) || {}).tecnico;
+      d.text((f.nombre ? 'Contratista: ' + f.nombre : '') + (tec ? ' · Técnico: ' + tec : ''), M, y + 16);
+      y += 22;
+      d.setFillColor(238, 242, 247); d.rect(M, y, W, 7, 'F'); d.setFont('helvetica', 'bold'); d.setFontSize(8); d.setTextColor(15, 27, 45);
+      let cx = M; cols.forEach(c => { d.text(c[0], c[2] === 'r' ? cx + c[1] - 1 : cx + 1, y + 4.7, { align: c[2] === 'r' ? 'right' : 'left' }); cx += c[1]; });
+      y += 8;
+    };
+    enc();
+    d.setFont('helvetica', 'normal'); d.setFontSize(7.5);
+    x.ordenes.forEach(o => {
+      if (y > 280) { d.addPage(); y = M; enc(); d.setFont('helvetica', 'normal'); d.setFontSize(7.5); }
+      const v = [pmFh(o.fecha), o.nOrden || '—', o.contrato, cut(o.cliente, 30), cut(o.tipo || o.servicios, 32), String(o.cantidad || 1), mon(o.costo)];
+      let cx = M; d.setTextColor(29, 36, 51);
+      cols.forEach((c, i) => { d.text(v[i], c[2] === 'r' ? cx + c[1] - 1 : cx + 1, y + 3.4, { align: c[2] === 'r' ? 'right' : 'left' }); cx += c[1]; });
+      d.setDrawColor(225, 230, 238); d.line(M, y + 4.6, M + W, y + 4.6); y += 5;
+    });
+    if (y > 270) { d.addPage(); y = M; }
+    y += 3; d.setFont('helvetica', 'bold'); d.setFontSize(10); d.setTextColor(15, 27, 45);
+    d.text(x.ordenes.length + ' orden(es)', M, y + 4); d.text('Total a pagar a la móvil: ' + mon(x.costo), M + W, y + 4, { align: 'right' });
+    d.save('Corte_movil_' + x.movil + '_' + S.semana.desde + '_' + S.semana.hasta + '.pdf');
+  } catch (e) { if (!silencioso) mostrarError(e, 'No se pudo generar el PDF.'); else throw e; }
+}
+/* Un archivo por cada móvil (descargas seguidas; el navegador puede pedir permiso para varias descargas) */
+async function pmCorteTodos(fmt) {
+  const L = pmCortesMoviles(); if (!L.length) return;
+  if (!confirm('Se descargarán ' + L.length + ' archivos ' + (fmt === 'pdf' ? 'PDF' : 'Excel') + ', uno por móvil. Si el navegador pregunta, permite las descargas múltiples. ¿Continuar?')) return;
+  try {
+    for (const x of L) { if (fmt === 'pdf') await pmCortePdfFile(x.movil, true); else await pmCortesExcel(x.movil); await new Promise(r => setTimeout(r, 600)); }
+    toast(L.length + ' archivos descargados.');
+  } catch (e) { mostrarError(e, 'No se pudieron descargar todos los archivos.'); }
+}
 function pmCortePdf(movil) {
   const C = pmCortesMoviles().filter(x => !movil || x.movil === String(movil)), m = pmM, S = pmS;
   if (!C.length) { toast('No hay órdenes de esa móvil.'); return; }
@@ -7271,12 +7316,12 @@ function pmHtmlMov() {
   const T = L.reduce((a, x) => ({ l: a.l + x.lineas, c: a.c + Object.keys(x.ctos).length, uf: a.uf + x.uf, co: a.co + x.costo, ca: a.ca + x.cambios, s: a.s + x.sin }), { l: 0, c: 0, uf: 0, co: 0, ca: 0, s: 0 });
   const num = v => '<td style="text-align:right;white-space:nowrap">' + v + '</td>';
   const fPorMovil = mv => pmS.resumen.filas.find(f => f.moviles[mv]) || {};
-  return '<div style="padding:8px 12px;font-size:12px;color:#667">Por cada móvil: lo que Telecable facturó (pagó a SRD) frente a lo que corresponde pagarle a la móvil. La diferencia es de la empresa. Pasa a <b>Contratos</b> u <b>Órdenes</b> para revisar línea por línea.</div>' +
-    '<table class="pmT"><thead><tr><th>Móvil</th><th>Contratista (factura)</th><th>Técnico</th><th style="text-align:right">Contratos</th><th style="text-align:right">Líneas</th><th style="text-align:right">Facturado Telecable</th><th style="text-align:right">Monto a pagar</th><th style="text-align:right">Diferencia (empresa)</th><th>Revisión</th></tr></thead><tbody>' +
+  return '<div style="padding:8px 12px;font-size:12px;color:#667">Por cada móvil: lo que Telecable facturó (pagó a SRD) frente a lo que corresponde pagarle a la móvil. La diferencia es de la empresa. Pasa a <b>Órdenes</b> para revisar línea por línea (contratos, precios, servicios). Descarga el corte de cada móvil en Excel o PDF.</div>' +
+    '<table class="pmT"><thead><tr><th>Móvil</th><th>Contratista (factura)</th><th>Técnico</th><th style="text-align:right">Contratos</th><th style="text-align:right">Líneas</th><th style="text-align:right">Facturado Telecable</th><th style="text-align:right">Monto a pagar</th><th style="text-align:right">Diferencia (empresa)</th><th>Revisión</th><th>Descargar</th></tr></thead><tbody>' +
     L.map(x => { const f = fPorMovil(x.movil), tec = ((f.tecnicos || []).find(t => t.movil === x.movil) || {}).tecnico || '';
       return '<tr><td><b>' + esc(x.movil) + '</b></td><td>' + (f.nombre ? esc(f.nombre) : '<span style="color:#9b1c1c">Sin contratista</span>') + '</td><td>' + esc(tec) + '</td>' + num(Object.keys(x.ctos).length) + num(x.lineas) + num(pmM(x.uf)) + num('<b>' + pmM(x.costo) + '</b>') +
-        '<td style="text-align:right;white-space:nowrap;color:' + (x.uf - x.costo >= 0 ? '#2d5a1b' : '#9b1c1c') + '">' + pmSgn(x.uf - x.costo) + '</td><td>' + (x.sin ? '<span class="chip rojo">' + x.sin + ' sin precio</span> ' : '') + (x.cambios ? '<span class="chip azul">' + x.cambios + ' con cambio</span>' : '') + (!x.sin && !x.cambios ? '<span class="chip verde">OK</span>' : '') + '</td></tr>'; }).join('') +
-    '<tr style="font-weight:700;background:#f3f6fa"><td colspan="3">Total (' + L.length + ' móviles)</td>' + num(T.c) + num(T.l) + num(pmM(T.uf)) + num(pmM(T.co)) + '<td style="text-align:right">' + pmSgn(T.uf - T.co) + '</td><td></td></tr></tbody></table>';
+        '<td style="text-align:right;white-space:nowrap;color:' + (x.uf - x.costo >= 0 ? '#2d5a1b' : '#9b1c1c') + '">' + pmSgn(x.uf - x.costo) + '</td><td>' + (x.sin ? '<span class="chip rojo">' + x.sin + ' sin precio</span> ' : '') + (x.cambios ? '<span class="chip azul">' + x.cambios + ' con cambio</span>' : '') + (!x.sin && !x.cambios ? '<span class="chip verde">OK</span>' : '') + '</td><td style="white-space:nowrap"><button class="btn secondary" title="Excel de esta móvil" onclick="pmCortesExcel(\'' + x.movil + '\')">⬇ Excel</button> <button class="btn secondary" title="PDF de esta móvil" onclick="pmCortePdfFile(\'' + x.movil + '\')">📄 PDF</button></td></tr>'; }).join('') +
+    '<tr style="font-weight:700;background:#f3f6fa"><td colspan="3">Total (' + L.length + ' móviles)</td>' + num(T.c) + num(T.l) + num(pmM(T.uf)) + num(pmM(T.co)) + '<td style="text-align:right">' + pmSgn(T.uf - T.co) + '</td><td></td><td style="white-space:nowrap"><button class="btn secondary" title="Un Excel por cada móvil (varias descargas)" onclick="pmCorteTodos(\'xlsx\')">⬇ Un Excel por móvil</button> <button class="btn secondary" title="Un PDF por cada móvil (varias descargas)" onclick="pmCorteTodos(\'pdf\')">📄 Un PDF por móvil</button></td></tr></tbody></table>';
 }
 
 /* ---------- Pagos pendientes (el pago llega ~15 días después de la semana) ---------- */
@@ -13873,6 +13918,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 56 · 14-oct 14:10</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 57 · 14-oct 14:40</div>
 </body>
 </html>
