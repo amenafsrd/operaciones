@@ -6530,8 +6530,8 @@ function pmRenderSemanas() {
   pmSemId = ''; pmS = null;
   let h = '<div class="toolbar"><button class="btn primary" onclick="pmImportarModal()">⬆ Importar semana de Telecable</button></div><div class="panel"><div class="panelHead"><h2>Semanas de pago</h2></div><div class="tableWrap">';
   if (!pmD.semanas.length) h += '<div class="loading">Aún no hay semanas. Importa el Excel «Pago servicios» que envía Telecable.</div>';
-  else h += '<table><thead><tr><th>Semana</th><th>Estado</th><th>Órdenes</th><th>Costo móviles (detalle)</th><th>UF Telecable</th><th></th></tr></thead><tbody>' +
-    pmD.semanas.map(s => '<tr><td><b>' + esc(pmFh(s.desde)) + ' al ' + esc(pmFh(s.hasta)) + '</b></td><td>' + (s.estado === 'Cerrada' ? '<span class="chip verde">Cerrada</span>' : '<span class="chip amar">Abierta</span>') + '</td><td>' + s.ordenes + '</td><td>' + pmM(s.costo) + '</td><td>' + pmM(s.uf) + '</td><td style="text-align:right"><button class="btn secondary" onclick="pmAbrir(\'' + s.id + '\')">Abrir</button></td></tr>').join('') + '</tbody></table>';
+  else h += '<table><thead><tr><th>Semana</th><th>Estado</th><th style="text-align:right">Órdenes</th><th style="text-align:right">Costo móviles (detalle)</th><th style="text-align:right">UF Telecable</th><th style="text-align:right">Margen</th><th></th></tr></thead><tbody>' +
+    pmD.semanas.map(s => '<tr style="cursor:pointer" onclick="pmAbrir(\'' + s.id + '\')"><td><b>' + esc(pmFh(s.desde)) + ' al ' + esc(pmFh(s.hasta)) + '</b></td><td>' + (s.estado === 'Cerrada' ? '<span class="chip verde">Cerrada</span>' : '<span class="chip amar">Abierta</span>') + '</td><td style="text-align:right">' + s.ordenes + '</td><td style="text-align:right">' + pmM(s.costo) + '</td><td style="text-align:right">' + pmM(s.uf) + '</td><td style="text-align:right"><b>' + pmM(s.uf - s.costo) + '</b></td><td style="text-align:right"><button class="btn secondary" onclick="event.stopPropagation();pmAbrir(\'' + s.id + '\')">Abrir</button></td></tr>').join('') + '</tbody></table>';
   $('pmPSem').innerHTML = h + '</div></div>';
 }
 async function pmAbrir(id) {
@@ -6565,12 +6565,74 @@ function pmRenderSemana() {
   $('pmPSem').innerHTML = h + '</div></div>';
 }
 
+/* Grupos de la tabla de pago: celdas donde se cargan valores por contratista */
+const PM_GRUPOS = {
+  apel: { t: 'Apelaciones', tipos: ['RECLAMO'], efecto: '+ Suman a la factura (antes del IVA).', color: '#2d5a1b' },
+  pen: { t: 'Penalizaciones', tipos: ['PENALIZACION'], efecto: '− Restan de la factura (antes del IVA).', color: '#9b1c1c' },
+  alq: { t: 'Alquiler / uniformes', tipos: ['ALQUILER', 'CAMISAS'], efecto: '− Restan de la factura (antes del IVA).', color: '#9b1c1c' },
+  reb: { t: 'Rebajos al depósito', tipos: ['ADELANTO', 'PRESTAMO', 'INVENTARIO', 'INS', 'HERRAMIENTAS', 'REBAJO', 'EXTRA'], efecto: 'No afectan la factura: se descuentan solo del depósito (los «Pago adicional» se suman al depósito).', color: '#9b1c1c' }
+};
+function pmAjDe(idCon, g) { return pmS.ajustes.filter(a => a.idCon === idCon && PM_GRUPOS[g].tipos.indexOf(a.tipo) >= 0); }
+function pmCelda(f, g, valor, cerr) {
+  const n = pmAjDe(f.idCon, g).length;
+  if (f.sinContratista) return '<td></td>';
+  return '<td class="pmCel" style="cursor:pointer;text-align:right;white-space:nowrap;' + (n ? 'background:#f4f9ff' : '') + '" title="Clic para ver / cargar" onclick="pmLibro(\'' + f.idCon + '\',\'' + g + '\')">' +
+    (n ? '<b style="color:' + PM_GRUPOS[g].color + '">' + (g === 'apel' ? '+' : '−') + pmM(valor).replace('₡', '₡') + '</b><div style="font-size:10px;color:#667">' + n + ' registro' + (n > 1 ? 's' : '') + '</div>' : '<span style="color:#9ab;font-size:16px">' + (cerr ? '—' : '＋') + '</span>') + '</td>';
+}
 function pmHtmlRes(cerr) {
   const R = pmS.resumen, T = R.totales;
   if (!R.filas.length) return '<div class="loading">Sin datos.</div>';
-  return '<table><thead><tr><th>Contratista</th><th>Móviles</th><th>Órd.</th><th>Detalle</th><th>Reclamos</th><th>Alquiler</th><th>Penaliz.</th><th>Camisas</th><th>Subtotal</th><th>IVA</th><th>Facturado</th><th>Rebajos</th><th>Depósito</th><th>Factura</th><th>Pagado</th><th></th></tr></thead><tbody>' +
-    R.filas.map((f, i) => '<tr' + (f.sinContratista ? ' style="background:#fdecea"' : '') + '><td><b>' + esc(f.nombre) + '</b>' + (f.fueraPlazo ? '<br><span class="chip rojo">Salió ' + esc(pmFh(f.salida)) + ': pasó el plazo de 2 semanas</span>' : (f.estadoSis === 'inactiva' ? '<br><span class="chip amar">Salió ' + esc(pmFh(f.salida)) + ' · paga hasta ' + esc(pmFh(f.plazoHasta)) + '</span>' : '')) + (f.sinContratista ? '<br><span style="font-size:11px;color:#9b1c1c">Móvil sin contratista: créalo en la pestaña Contratistas</span>' : (!/^\d{20}$/.test(f.iban || '') ? '<br><span style="font-size:11px;color:#9b1c1c">Falta IBAN</span>' : '')) + '</td><td>' + Object.keys(f.moviles).join(', ') + '</td><td>' + f.nOrdenes + '</td><td>' + pmM(f.detalle) + '</td><td>' + (f.reclamos ? pmM(f.reclamos) : '') + '</td><td>' + (f.alquileres ? pmM(f.alquileres) : '') + '</td><td>' + (f.penalizaciones ? pmM(f.penalizaciones) : '') + '</td><td>' + (f.camisas ? pmM(f.camisas) : '') + '</td><td>' + pmM(f.subtotal) + '</td><td>' + (f.aplicaIva ? pmM(f.iva) : '<span style="color:#888">sin IVA</span>') + '</td><td>' + pmM(f.totalFacturado) + '</td><td>' + (f.deducciones ? pmM(f.deducciones) : '') + '</td><td><b>' + pmM(f.deposito) + '</b></td><td>' + (f.sinContratista ? '' : '<input style="width:118px" value="' + esc(f.factura) + '" ' + (cerr ? 'disabled' : '') + ' onchange="pmGuardarFactura(\'' + f.idCon + '\',this.value)" placeholder="N.º factura">') + '</td><td>' + (f.pagado ? '<span class="chip verde">' + esc(pmFh(f.pagado)) + '</span>' : (f.sinContratista ? '' : '<span style="color:#999">—</span>')) + '</td><td>' + (f.sinContratista ? '' : '<button class="btn secondary" title="Estado de cuenta" onclick="pmEstadoCuenta(\'' + f.idCon + '\')">📄</button>') + '</td></tr>').join('') +
-    '<tr style="font-weight:700;background:#f3f6fa"><td>Total</td><td></td><td>' + T.nOrdenes + '</td><td>' + pmM(T.detalle) + '</td><td>' + pmM(T.reclamos) + '</td><td>' + pmM(T.alquileres) + '</td><td>' + pmM(T.penalizaciones) + '</td><td>' + pmM(T.camisas) + '</td><td>' + pmM(T.subtotal) + '</td><td>' + pmM(T.iva) + '</td><td>' + pmM(T.totalFacturado) + '</td><td>' + pmM(T.deducciones) + '</td><td>' + pmM(T.deposito) + '</td><td></td><td></td><td></td></tr></tbody></table>';
+  const th = (t, s) => '<th style="text-align:' + (s || 'left') + '">' + t + '</th>';
+  const num = v => '<td style="text-align:right;white-space:nowrap">' + v + '</td>';
+  return '<div style="padding:8px 12px;font-size:12px;color:#667">Haz clic en las celdas <b>Apelaciones</b>, <b>Penalizaciones</b>, <b>Alquiler</b> y <b>Rebajos</b> para ver o cargar varios valores. Apelaciones suman a la factura; penalizaciones y alquiler la restan; los rebajos solo bajan el depósito.</div>' +
+    '<table class="pmGrid"><thead><tr>' + th('Contratista (factura)') + th('Órd.', 'right') + th('Detalle', 'right') + th('Apelaciones (+)', 'right') + th('Penaliz. (−)', 'right') + th('Alquiler (−)', 'right') + th('A facturar', 'right') + th('IVA 13%', 'right') + th('Total factura', 'right') + th('Rebajos (−)', 'right') + th('A depositar', 'right') + th('N.º factura') + th('Pagado') + '<th></th></tr></thead><tbody>' +
+    R.filas.map(f => {
+      const tec = (f.tecnicos || []).map(t => 'M' + esc(t.movil) + (t.tecnico && pmNorm(t.tecnico) !== pmNorm(f.nombre) ? ' · ' + esc(t.tecnico) : '')).join(' &nbsp;|&nbsp; ');
+      return '<tr' + (f.sinContratista ? ' style="background:#fdecea"' : '') + '><td><b>' + esc(f.nombre) + '</b>' +
+        (tec ? '<div style="font-size:11px;color:#556">' + tec + '</div>' : '') +
+        (f.titular && f.titular !== f.nombre ? '<div style="font-size:11px;color:#556">Cuenta a nombre de ' + esc(f.titular) + '</div>' : '') +
+        (f.fueraPlazo ? '<div><span class="chip rojo">Salió ' + esc(pmFh(f.salida)) + ': pasó el plazo de 2 semanas</span></div>' : (f.estadoSis === 'inactiva' ? '<div><span class="chip amar">Salió ' + esc(pmFh(f.salida)) + ' · paga hasta ' + esc(pmFh(f.plazoHasta)) + '</span></div>' : '')) +
+        (f.sinContratista ? '<div style="font-size:11px;color:#9b1c1c">Móvil sin contratista: créalo en la pestaña Contratistas</div>' : (!/^\d{20}$/.test(f.iban || '') ? '<div style="font-size:11px;color:#9b1c1c">Falta IBAN</div>' : '')) + '</td>' +
+        num(f.nOrdenes) + num(pmM(f.detalle)) + pmCelda(f, 'apel', f.reclamos, cerr) + pmCelda(f, 'pen', f.penalizaciones, cerr) + pmCelda(f, 'alq', f.alquileres + f.camisas, cerr) +
+        '<td style="text-align:right;white-space:nowrap"><b>' + pmM(f.subtotal) + '</b></td>' + num(f.aplicaIva ? pmM(f.iva) : '<span style="color:#888">sin IVA</span>') + '<td style="text-align:right;white-space:nowrap"><b>' + pmM(f.totalFacturado) + '</b></td>' +
+        pmCelda(f, 'reb', f.deducciones, cerr) + '<td style="text-align:right;white-space:nowrap;background:#eef7ee"><b>' + pmM(f.deposito) + '</b></td>' +
+        '<td>' + (f.sinContratista ? '' : '<input style="width:118px" value="' + esc(f.factura) + '" ' + (cerr ? 'disabled' : '') + ' onchange="pmGuardarFactura(\'' + f.idCon + '\',this.value)" placeholder="N.º factura">') + '</td><td>' + (f.pagado ? '<span class="chip verde">' + esc(pmFh(f.pagado)) + '</span>' : (f.sinContratista ? '' : '<span style="color:#999">—</span>')) + '</td><td>' + (f.sinContratista ? '' : '<button class="btn secondary" title="Estado de cuenta" onclick="pmEstadoCuenta(\'' + f.idCon + '\')">📄</button>') + '</td></tr>';
+    }).join('') +
+    '<tr style="font-weight:700;background:#f3f6fa"><td>Total</td>' + num(T.nOrdenes) + num(pmM(T.detalle)) + num(pmM(T.reclamos)) + num(pmM(T.penalizaciones)) + num(pmM(T.alquileres + T.camisas)) + num(pmM(T.subtotal)) + num(pmM(T.iva)) + num(pmM(T.totalFacturado)) + num(pmM(T.deducciones)) + num(pmM(T.deposito)) + '<td></td><td></td><td></td></tr></tbody></table>';
+}
+function pmNorm(t) { return String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim(); }
+
+/* Libro de una celda: lista de registros y formulario para agregar varios */
+let pmLb = null;
+function pmLibro(idCon, g) {
+  pmLb = { idCon: idCon, g: g };
+  const G = PM_GRUPOS[g], f = pmS.resumen.filas.find(x => x.idCon === idCon), cerr = pmS.semana.estado === 'Cerrada';
+  const L = pmAjDe(idCon, g), tot = L.reduce((a, x) => a + ((pmD.tipos[x.tipo] || {}).signo > 0 ? x.monto : -x.monto), 0);
+  let h = '<h3>' + G.t + ' · ' + esc(f ? f.nombre : '') + '</h3><div style="font-size:12px;color:#556;margin-bottom:8px">' + esc(G.efecto) + ' Semana ' + esc(pmFh(pmS.semana.desde)) + ' al ' + esc(pmFh(pmS.semana.hasta)) + '.</div>';
+  h += L.length ? '<table><thead><tr><th>Tipo</th><th>Concepto</th><th>Contrato</th><th style="text-align:right">Monto</th><th></th></tr></thead><tbody>' + L.map(a => { const t = pmD.tipos[a.tipo] || { txt: a.tipo, signo: -1 };
+    return '<tr><td>' + esc(t.txt) + '</td><td>' + esc(a.detalle) + '</td><td>' + esc(a.contrato) + '</td><td style="text-align:right;color:' + (t.signo > 0 ? '#2d5a1b' : '#9b1c1c') + '">' + (t.signo > 0 ? '+' : '−') + pmM(a.monto) + '</td><td>' + (cerr ? '' : '<button class="btn secondary" onclick="pmLibroBorrar(\'' + a.id + '\')">✕</button>') + '</td></tr>'; }).join('') +
+    '<tr style="font-weight:700;background:#f3f6fa"><td colspan="3">Total</td><td style="text-align:right">' + (tot >= 0 ? '+' : '−') + pmM(Math.abs(tot)) + '</td><td></td></tr></tbody></table>' : '<div class="loading">Aún no hay registros.</div>';
+  if (!cerr) {
+    h += '<div style="margin-top:12px;padding:10px;background:#f7f9fc;border:1px solid #dde3ec;border-radius:8px"><b style="font-size:13px">Agregar</b><div style="display:grid;gap:8px;grid-template-columns:1fr 1fr;margin-top:6px">' +
+      (G.tipos.length > 1 ? '<label>Tipo<select id="plbTipo">' + G.tipos.map(k => '<option value="' + k + '">' + esc(pmD.tipos[k].txt) + '</option>').join('') + '</select></label>' : '<input type="hidden" id="plbTipo" value="' + G.tipos[0] + '"><label>Tipo<input disabled value="' + esc(pmD.tipos[G.tipos[0]].txt) + '"></label>') +
+      '<label>Monto (₡)<input id="plbMonto" type="number" step="0.01" min="0"></label>' +
+      (g === 'pen' ? '<label style="grid-column:1/3">Penalización de la lista (opcional)<select id="plbPen" onchange="const p=pmD.penalizaciones[+this.value];if(p){$(\'plbMonto\').value=p.monto;$(\'plbDet\').value=p.nombre}"><option value="">—</option>' + pmD.penalizaciones.map((p, i) => '<option value="' + i + '">' + esc(p.nombre) + ' · ' + pmM(p.monto) + '</option>').join('') + '</select></label>' : '') +
+      '<label style="grid-column:1/3">' + (g === 'reb' ? 'A qué corresponde el rebajo (obligatorio)' : 'Concepto / detalle') + '<input id="plbDet" maxlength="200" placeholder="' + (g === 'reb' ? 'ej. Adelanto del 12/10, cuota préstamo arnés...' : '') + '"></label>' +
+      '<label>Contrato (opcional)<input id="plbCto" maxlength="30"></label></div><div style="text-align:right;margin-top:8px"><button class="btn primary" onclick="pmLibroAgregar()">➕ Agregar</button></div></div>';
+  }
+  h += '<div style="display:flex;justify-content:flex-end;margin-top:10px"><button class="btn secondary" onclick="pmCerrar()">Cerrar</button></div>';
+  pmModal(h, 720);
+}
+async function pmLibroAgregar() {
+  const b = pmLb; if (!b) return;
+  try {
+    await api('guardarAjustePmWeb', { idSemana: pmSemId, idCon: b.idCon, tipo: $('plbTipo').value, monto: $('plbMonto').value, detalle: $('plbDet').value, contrato: $('plbCto').value });
+    await pmRecargar(); pmLibro(b.idCon, b.g); toast('Registrado.');
+  } catch (e) { mostrarError(e, 'No se pudo guardar.'); }
+}
+async function pmLibroBorrar(id) {
+  const b = pmLb; if (!confirm('¿Eliminar este registro?')) return;
+  try { await api('eliminarAjustePmWeb', id); await pmRecargar(); pmLibro(b.idCon, b.g); } catch (e) { mostrarError(e, 'No se pudo eliminar.'); }
 }
 async function pmGuardarFactura(idCon, v) {
   try { await api('guardarPagoPmWeb', { idSemana: pmSemId, idCon: idCon, factura: v }); const f = pmS.resumen.filas.find(x => x.idCon === idCon); if (f) f.factura = v.trim(); toast('Factura guardada.'); }
@@ -6752,7 +6814,7 @@ async function pmAplicarLista() {
 function pmConNombre(id) { const c = pmD.contratistas.find(x => x.id === id); return c ? c.nombre : id; }
 function pmHtmlAju(cerr) {
   const A = pmS.ajustes;
-  let h = '<div style="padding:10px 12px;display:flex;gap:8px;flex-wrap:wrap">' + (cerr ? '' : '<button class="btn primary" onclick="pmAjusteModal()">➕ Nuevo ajuste</button>') + '<span style="color:#667;font-size:12px;align-self:center">Reclamos, alquileres, penalizaciones y camisas entran antes del IVA; inventario, INS, rebajos, préstamos y herramientas se descuentan del total facturado.</span></div>';
+  let h = '<div style="padding:10px 12px;display:flex;gap:8px;flex-wrap:wrap">' + (cerr ? '' : '<button class="btn primary" onclick="pmAjusteModal()">➕ Nuevo ajuste</button>') + '<span style="color:#667;font-size:12px;align-self:center">Reclamos, alquileres, penalizaciones y camisas entran antes del IVA; adelantos, inventario, INS, rebajos, préstamos y herramientas se descuentan del depósito sin cambiar la factura.</span></div>';
   if (!A.length) return h + '<div class="loading">Sin ajustes en esta semana.</div>';
   return h + '<table><thead><tr><th>Contratista</th><th>Tipo</th><th>Detalle</th><th>Contrato</th><th>Monto</th><th></th></tr></thead><tbody>' + A.map(a => { const t = pmD.tipos[a.tipo] || { txt: a.tipo, signo: -1 };
     return '<tr><td>' + esc(pmConNombre(a.idCon)) + '</td><td>' + esc(t.txt) + '</td><td>' + esc(a.detalle) + '</td><td>' + esc(a.contrato) + '</td><td style="color:' + (t.signo > 0 ? '#2d5a1b' : '#9b1c1c') + '">' + (t.signo > 0 ? '+' : '−') + pmM(a.monto) + '</td><td>' + (cerr ? '' : '<button class="btn secondary" onclick="pmEliminarAjuste(\'' + a.id + '\')">✕</button>') + '</td></tr>'; }).join('') + '</tbody></table>';
@@ -6857,11 +6919,11 @@ async function pmImportarGuardar() {
 
 /* ---------- Contratistas ---------- */
 function pmConModal(id) {
-  const c = pmD.contratistas.find(x => x.id === id) || { nombre: '', cedula: '', iban: '', moviles: '', aplicaIva: true, telefono: '', correo: '', obs: '', activo: true };
-  pmModal('<h3>' + (id ? 'Editar' : 'Nuevo') + ' contratista</h3><div style="display:grid;gap:8px"><label>Nombre o razón social (como sale en el banco)<input id="pcNom" value="' + esc(c.nombre) + '" maxlength="100"></label><label>Móviles (separadas por coma, ej. 111,112)<input id="pcMov" value="' + esc(c.moviles) + '"></label><label>Cuenta IBAN (20 dígitos, sin «CR»)<input id="pcIban" value="' + esc(c.iban) + '" maxlength="26"></label><label>Cédula<input id="pcCed" value="' + esc(c.cedula) + '"></label><label>Teléfono<input id="pcTel" value="' + esc(c.telefono) + '"></label><label>Correo<input id="pcCor" value="' + esc(c.correo) + '"></label><label><input type="checkbox" id="pcIva"' + (c.aplicaIva ? ' checked' : '') + '> Factura con IVA (13%)</label><label><input type="checkbox" id="pcAct"' + (c.activo ? ' checked' : '') + '> Activo</label></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn secondary" onclick="pmCerrar()">Cancelar</button><button class="btn primary" onclick="pmConGuardar(\'' + (id || '') + '\')">Guardar</button></div>');
+  const c = pmD.contratistas.find(x => x.id === id) || { nombre: '', titular: '', cedula: '', iban: '', moviles: '', aplicaIva: true, telefono: '', correo: '', obs: '', activo: true };
+  pmModal('<h3>' + (id ? 'Editar' : 'Nuevo') + ' contratista</h3><div style="display:grid;gap:8px"><div style="font-size:12px;color:#556;background:#f7f9fc;padding:8px;border-radius:6px">El contratista es <b>quien factura y cobra</b>. Puede ser distinto del técnico (ej. el técnico es José Luis y factura Marta Pérez), y una misma persona puede facturar varias móviles: ponlas todas en «Móviles».</div><label>Nombre de quien factura (persona o razón social)<input id="pcNom" value="' + esc(c.nombre) + '" maxlength="100"></label><label>Móviles que factura (separadas por coma, ej. 111,112)<input id="pcMov" value="' + esc(c.moviles) + '"></label><label>Cuenta IBAN (20 dígitos, sin «CR»)<input id="pcIban" value="' + esc(c.iban) + '" maxlength="26"></label><label>Titular de la cuenta, si es distinto (sale así en el archivo del banco)<input id="pcTit" value="' + esc(c.titular || '') + '" maxlength="100" placeholder="Vacío = igual al nombre de quien factura"></label><label>Cédula de quien factura<input id="pcCed" value="' + esc(c.cedula) + '"></label><label>Teléfono<input id="pcTel" value="' + esc(c.telefono) + '"></label><label>Correo<input id="pcCor" value="' + esc(c.correo) + '"></label><label><input type="checkbox" id="pcIva"' + (c.aplicaIva ? ' checked' : '') + '> Factura con IVA (13%)</label><label><input type="checkbox" id="pcAct"' + (c.activo ? ' checked' : '') + '> Activo</label></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn secondary" onclick="pmCerrar()">Cancelar</button><button class="btn primary" onclick="pmConGuardar(\'' + (id || '') + '\')">Guardar</button></div>');
 }
 async function pmConGuardar(id) {
-  try { await api('guardarContratistaPmWeb', { id: id, nombre: $('pcNom').value, moviles: $('pcMov').value, iban: $('pcIban').value, cedula: $('pcCed').value, telefono: $('pcTel').value, correo: $('pcCor').value, aplicaIva: $('pcIva').checked, activo: $('pcAct').checked }); pmCerrar(); pmD = await api('obtenerPmWeb'); pmRenderCon(); toast('Contratista guardado.'); }
+  try { await api('guardarContratistaPmWeb', { id: id, nombre: $('pcNom').value, titular: $('pcTit').value, moviles: $('pcMov').value, iban: $('pcIban').value, cedula: $('pcCed').value, telefono: $('pcTel').value, correo: $('pcCor').value, aplicaIva: $('pcIva').checked, activo: $('pcAct').checked }); pmCerrar(); pmD = await api('obtenerPmWeb'); pmRenderCon(); toast('Contratista guardado.'); }
   catch (e) { mostrarError(e, 'No se pudo guardar.'); }
 }
 function pmImportarConModal() {
@@ -6916,7 +6978,7 @@ function pmRenderCon() {
   const C = pmD.contratistas.filter(c => pmConFiltro === 'todos' ? true : (pmConFiltro === 'vigentes' ? vig(c) : !vig(c)));
   let h = '<div class="toolbar"><button class="btn primary" onclick="pmConModal()">➕ Nuevo contratista</button><button class="btn secondary" onclick="pmSugerirModal()">📋 Traer desde Móviles</button><button class="btn secondary" onclick="pmImportarConModal()">⬆ Importar desde la hoja «Pago»</button><span style="flex:1"></span><label>Ver <select onchange="pmConFiltro=this.value;pmRenderCon()">' + [['vigentes', 'Activos y en plazo de pago'], ['fuera', 'Fuera de plazo'], ['todos', 'Todos']].map(x => '<option value="' + x[0] + '"' + (pmConFiltro === x[0] ? ' selected' : '') + '>' + x[1] + '</option>').join('') + '</select></label></div><div class="panel"><div class="panelHead"><h2>Contratistas</h2><span>' + C.length + '</span></div><div style="padding:8px 12px;font-size:12px;color:#667">El estado sale del módulo Móviles: una móvil inactiva se sigue pagando hasta 2 semanas después de su salida.</div><div class="tableWrap">';
   if (!C.length) h += '<div class="loading">No hay contratistas en esta vista. Usa «Traer desde Móviles» o importa la hoja «Pago» de tu Excel.</div>';
-  else h += '<table><thead><tr><th>Nombre</th><th>Móviles</th><th>Estado</th><th>IBAN</th><th>Cédula</th><th>IVA</th><th></th></tr></thead><tbody>' + C.map(c => '<tr><td><b>' + esc(c.nombre) + '</b></td><td>' + esc(c.moviles) + '</td><td>' + pmConEstadoHtml(c) + '</td><td>' + (c.iban ? esc(c.iban) : '<span style="color:#9b1c1c">Falta</span>') + '</td><td>' + esc(c.cedula) + '</td><td>' + (c.aplicaIva ? '13%' : 'Sin IVA') + '</td><td style="text-align:right"><button class="btn secondary" onclick="pmConModal(\'' + c.id + '\')">Editar</button></td></tr>').join('') + '</tbody></table>';
+  else h += '<table><thead><tr><th>Factura a nombre de</th><th>Móviles · técnico</th><th>Estado</th><th>Cuenta a nombre de</th><th>IBAN</th><th>Cédula</th><th>IVA</th><th></th></tr></thead><tbody>' + C.map(c => '<tr><td><b>' + esc(c.nombre) + '</b></td><td>' + (c.tecnicos && c.tecnicos.length ? c.tecnicos.map(t => '<div><b>' + esc(t.movil) + '</b>' + (t.tecnico ? ' · ' + esc(t.tecnico) : '') + '</div>').join('') : esc(c.moviles)) + '</td><td>' + pmConEstadoHtml(c) + '</td><td>' + esc(c.titular || c.nombre) + '</td><td>' + (c.iban ? esc(c.iban) : '<span style="color:#9b1c1c">Falta</span>') + '</td><td>' + esc(c.cedula) + '</td><td>' + (c.aplicaIva ? '13%' : 'Sin IVA') + '</td><td style="text-align:right"><button class="btn secondary" onclick="pmConModal(\'' + c.id + '\')">Editar</button></td></tr>').join('') + '</tbody></table>';
   $('pmPCon').innerHTML = h + '</div></div>';
 }
 async function pmSugerirModal() {
@@ -6992,8 +7054,12 @@ function pmCortePdf(movil) {
 
 /* ---------- Banco ---------- */
 function pmRenderBan() {
-  const b = pmD.banco;
-  $('pmPBan').innerHTML = '<div class="panel" style="padding:14px"><h2 style="margin:0 0 8px">Archivo de pago de planillas y proveedores (BAC)</h2><div style="font-size:13px;color:#555;margin-bottom:10px">Datos del archivo .prn que se sube al banco. Cada envío lleva un número consecutivo.</div><div style="display:grid;gap:8px;max-width:360px"><label>Código del convenio (4 caracteres)<input id="pbCod" maxlength="4" value="' + esc(b.codigo) + '"></label><label>Último número de envío usado<input id="pbEnv" type="number" value="' + b.ultimoEnvio + '"></label><label>Indicador (columna tras el período)<input id="pbFlag" maxlength="1" value="' + esc(b.flag) + '"></label></div><div style="margin-top:12px"><button class="btn primary" onclick="pmBanGuardar()">Guardar</button></div></div>';
+  const b = pmD.banco, E = pmD.empresa || { nombre: '', cedula: '', telefono: '', correo: '', direccion: '' };
+  $('pmPBan').innerHTML = '<div class="panel" style="padding:14px"><h2 style="margin:0 0 8px">Archivo de pago de planillas y proveedores (BAC)</h2><div style="font-size:13px;color:#555;margin-bottom:10px">Datos del archivo .prn que se sube al banco. Cada envío lleva un número consecutivo.</div><div style="display:grid;gap:8px;max-width:360px"><label>Código del convenio (4 caracteres)<input id="pbCod" maxlength="4" value="' + esc(b.codigo) + '"></label><label>Último número de envío usado<input id="pbEnv" type="number" value="' + b.ultimoEnvio + '"></label><label>Indicador (columna tras el período)<input id="pbFlag" maxlength="1" value="' + esc(b.flag) + '"></label></div><div style="margin-top:12px"><button class="btn primary" onclick="pmBanGuardar()">Guardar</button></div></div>' +
+    '<div class="panel" style="padding:14px;margin-top:12px"><h2 style="margin:0 0 8px">Datos de la empresa (encabezado del estado de cuenta)</h2><div style="display:grid;gap:8px;max-width:460px"><label>Nombre<input id="peeNom" value="' + esc(E.nombre) + '" maxlength="100"></label><label>Cédula jurídica<input id="peeCed" value="' + esc(E.cedula) + '"></label><label>Teléfono<input id="peeTel" value="' + esc(E.telefono) + '"></label><label>Correo<input id="peeCor" value="' + esc(E.correo) + '"></label><label>Dirección<input id="peeDir" value="' + esc(E.direccion) + '" maxlength="160"></label></div><div style="margin-top:12px"><button class="btn primary" onclick="pmEmpGuardar()">Guardar</button></div></div>';
+}
+async function pmEmpGuardar() {
+  try { await api('guardarEmpresaPmWeb', { nombre: $('peeNom').value, cedula: $('peeCed').value, telefono: $('peeTel').value, correo: $('peeCor').value, direccion: $('peeDir').value }); pmD = await api('obtenerPmWeb'); toast('Datos de la empresa guardados.'); } catch (e) { mostrarError(e, 'No se pudo guardar.'); }
 }
 async function pmBanGuardar() {
   try { await api('guardarBancoPmWeb', { codigo: $('pbCod').value, ultimoEnvio: $('pbEnv').value, flag: $('pbFlag').value }); pmD = await api('obtenerPmWeb'); toast('Datos del banco guardados.'); } catch (e) { mostrarError(e, 'No se pudo guardar.'); }
@@ -7022,8 +7088,8 @@ async function pmResumenExcel() {
     await cargarLib('xlsx', SEG_URL_XLSX);
     const S = pmS, R = S.resumen;
     const det = [['Móvil(es)', 'Técnico', 'Órdenes', 'Detalle', 'Reclamos', 'Alquileres', 'Penalizaciones', 'Camisas', 'Sub total', 'IVA', 'Total']].concat(R.filas.map(f => [Object.keys(f.moviles).join(','), f.nombre, f.nOrdenes, f.detalle, f.reclamos, f.alquileres, f.penalizaciones, f.camisas, f.subtotal, f.iva, f.totalFacturado]));
-    const pag = [['Móvil(es)', 'Referencia', 'Nombre', 'Cédula', 'Sub-total', 'IVA 13%', 'Total facturado', 'N.º factura', 'Inventarios', 'INS', 'Rebajos SRD', 'Préstamos', 'Herramientas', 'Pago adicional', 'Total depósito']].concat(R.filas.map(f => [Object.keys(f.moviles).join(','), f.iban, f.nombre, f.cedula, f.subtotal, f.iva, f.totalFacturado, f.factura, f.inventario, f.ins, f.rebajo, f.prestamo, f.herramientas, f.extra, f.deposito]))
-      .concat(S.extras.map(e => ['', e.iban, e.nombre, e.cedula, '', '', '', e.concepto, '', '', '', '', '', '', e.monto]));
+    const pag = [['Móvil(es)', 'Referencia', 'Nombre', 'Cédula', 'Sub-total', 'IVA 13%', 'Total facturado', 'N.º factura', 'Inventarios', 'INS', 'Rebajos SRD', 'Adelantos', 'Préstamos', 'Herramientas', 'Pago adicional', 'Total depósito']].concat(R.filas.map(f => [Object.keys(f.moviles).join(','), f.iban, f.titular || f.nombre, f.cedula, f.subtotal, f.iva, f.totalFacturado, f.factura, f.inventario, f.ins, f.rebajo, f.adelanto, f.prestamo, f.herramientas, f.extra, f.deposito]))
+      .concat(S.extras.map(e => ['', e.iban, e.nombre, e.cedula, '', '', '', e.concepto, '', '', '', '', '', '', '', e.monto]));
     const ord = [['Fecha', 'Móvil', 'Contrato', 'Cliente', 'Servicios', 'Costo archivo', 'Precio lista', 'Costo aplicado', 'UF costo']].concat(S.ordenes.map(o => [o.fecha, o.movil, o.contrato, o.cliente, o.servicios, o.costoArchivo, o.costoLista === null ? '' : o.costoLista, o.costo, o.ufCosto]));
     const aju = [['Contratista', 'Tipo', 'Detalle', 'Contrato', 'Monto']].concat(S.ajustes.map(a => [pmConNombre(a.idCon), (pmD.tipos[a.tipo] || {}).txt || a.tipo, a.detalle, a.contrato, a.monto]));
     const wb = XLSX.utils.book_new();
@@ -7034,21 +7100,41 @@ async function pmResumenExcel() {
 function pmEstadoCuenta(idCon) {
   const S = pmS, filas = S.resumen.filas.filter(f => !f.sinContratista && (!idCon || f.idCon === idCon));
   if (!filas.length) { toast('No hay contratistas para imprimir.'); return; }
-  const m = pmM;
+  const m = pmM, E = pmD.empresa || { nombre: 'Soluciones Red Dorada SRL' };
+  const logo = ($('hLogo') && $('hLogo').src) || '';
+  const hoy = new Date().toLocaleDateString('es-CR');
   const cuerpo = filas.map(f => {
     const movs = Object.keys(f.moviles);
     const ords = S.ordenes.filter(o => movs.indexOf(String(Number(o.movil))) >= 0);
     const aj = S.ajustes.filter(a => a.idCon === f.idCon);
-    return '<div class="pg"><h1>Estado de cuenta · ' + esc(f.nombre) + '</h1><div class="sub">Soluciones Red Dorada SRL · Semana ' + esc(pmFh(S.semana.desde)) + ' al ' + esc(pmFh(S.semana.hasta)) + ' · Móvil(es): ' + esc(movs.join(', ')) + (f.cedula ? ' · Cédula ' + esc(f.cedula) : '') + (f.factura ? ' · Factura ' + esc(f.factura) : '') + '</div>' +
-      '<table class="k"><tr><td>Órdenes<b>' + f.nOrdenes + '</b></td><td>Detalle<b>' + m(f.detalle) + '</b></td><td>Total facturado<b>' + m(f.totalFacturado) + '</b></td><td>Depósito<b>' + m(f.deposito) + '</b></td></tr></table>' +
-      '<h2>Cálculo</h2><table><tbody><tr><td>Detalle de órdenes</td><td>' + m(f.detalle) + '</td></tr>' + (f.reclamos ? '<tr><td>+ Reclamos</td><td>' + m(f.reclamos) + '</td></tr>' : '') + (f.alquileres ? '<tr><td>− Alquiler</td><td>' + m(f.alquileres) + '</td></tr>' : '') + (f.penalizaciones ? '<tr><td>− Penalizaciones</td><td>' + m(f.penalizaciones) + '</td></tr>' : '') + (f.camisas ? '<tr><td>− Camisas</td><td>' + m(f.camisas) + '</td></tr>' : '') +
-      '<tr class="t"><td>Subtotal</td><td>' + m(f.subtotal) + '</td></tr>' + (f.aplicaIva ? '<tr><td>IVA 13%</td><td>' + m(f.iva) + '</td></tr>' : '') + '<tr class="t"><td>Total facturado</td><td>' + m(f.totalFacturado) + '</td></tr>' +
-      [['inventario', 'Inventarios'], ['ins', 'INS'], ['rebajo', 'Rebajos SRD'], ['prestamo', 'Préstamos'], ['herramientas', 'Herramientas']].filter(x => f[x[0]]).map(x => '<tr><td>− ' + x[1] + '</td><td>' + m(f[x[0]]) + '</td></tr>').join('') + (f.extra ? '<tr><td>+ Pago adicional</td><td>' + m(f.extra) + '</td></tr>' : '') +
-      '<tr class="t"><td>Total a depositar</td><td>' + m(f.deposito) + '</td></tr></tbody></table>' +
-      (aj.length ? '<h2>Ajustes</h2><table><thead><tr><th>Tipo</th><th>Detalle</th><th>Contrato</th><th>Monto</th></tr></thead><tbody>' + aj.map(a => { const t = pmD.tipos[a.tipo] || { txt: a.tipo, signo: -1 }; return '<tr><td>' + esc(t.txt) + '</td><td>' + esc(a.detalle) + '</td><td>' + esc(a.contrato) + '</td><td>' + (t.signo > 0 ? '+' : '−') + m(a.monto) + '</td></tr>'; }).join('') + '</tbody></table>' : '') +
-      '<h2>Órdenes de la semana</h2><table><thead><tr><th>Fecha</th><th>Móvil</th><th>Contrato</th><th>Cliente</th><th>Servicio</th><th>Pago</th></tr></thead><tbody>' + ords.map(o => '<tr><td>' + esc(pmFh(o.fecha)) + '</td><td>' + esc(o.movil) + '</td><td>' + esc(o.contrato) + '</td><td>' + esc(o.cliente) + '</td><td>' + esc(o.servicios) + '</td><td>' + m(o.costo) + '</td></tr>').join('') + '</tbody></table></div>';
+    const grupo = tipos => aj.filter(a => tipos.indexOf(a.tipo) >= 0);
+    const con = pmD.contratistas.find(x => x.id === f.idCon) || {};
+    const tecs = (f.tecnicos || []);
+    const fila = (t, v, cls) => '<tr class="' + (cls || '') + '"><td>' + t + '</td><td class="n">' + v + '</td></tr>';
+    const rebajos = aj.filter(a => (pmD.tipos[a.tipo] || {}).fase === 'despues');
+    const antes = aj.filter(a => (pmD.tipos[a.tipo] || {}).fase !== 'despues');
+    const tabAj = (L, tit) => L.length ? '<h2>' + tit + '</h2><table><thead><tr><th>Concepto</th><th>Detalle</th><th>Contrato</th><th class="n">Monto</th></tr></thead><tbody>' + L.map(a => { const t = pmD.tipos[a.tipo] || { txt: a.tipo, signo: -1 }; return '<tr><td>' + esc(t.txt) + '</td><td>' + esc(a.detalle) + '</td><td>' + esc(a.contrato) + '</td><td class="n">' + (t.signo > 0 ? '+' : '−') + m(a.monto) + '</td></tr>'; }).join('') + '</tbody></table>' : '';
+    const ordHtml = movs.map(mv => {
+      const L = ords.filter(o => String(Number(o.movil)) === mv); if (!L.length) return '';
+      const tec = (tecs.find(t => t.movil === mv) || {}).tecnico;
+      return '<tr class="g"><td colspan="7">Móvil ' + esc(mv) + (tec ? ' · ' + esc(tec) : '') + '</td></tr>' + L.map(o => '<tr><td>' + esc(pmFh(o.fecha)) + '</td><td>' + esc(o.nOrden) + '</td><td>' + esc(o.contrato) + '</td><td>' + esc(o.cliente) + '</td><td>' + esc(o.tipo || o.servicios) + '</td><td class="n">' + (o.cantidad || 1) + '</td><td class="n">' + m(o.costo) + '</td></tr>').join('') +
+        '<tr class="s"><td colspan="6">Subtotal móvil ' + esc(mv) + ' (' + L.length + ' orden' + (L.length > 1 ? 'es' : '') + ')</td><td class="n">' + m(L.reduce((a, o) => a + o.costo, 0)) + '</td></tr>';
+    }).join('');
+    return '<div class="pg">' +
+      '<table class="enc"><tr><td style="width:150px;border:0">' + (logo ? '<img src="' + logo + '" style="max-width:140px;max-height:60px">' : '') + '</td><td style="border:0"><b style="font-size:15px">' + esc(E.nombre) + '</b><br>' + [E.cedula ? 'Céd. jurídica ' + esc(E.cedula) : '', E.telefono ? 'Tel. ' + esc(E.telefono) : '', E.correo ? esc(E.correo) : ''].filter(Boolean).join(' · ') + (E.direccion ? '<br>' + esc(E.direccion) : '') + '</td><td style="border:0;text-align:right"><b style="font-size:16px;color:#0f1b2d">ESTADO DE CUENTA</b><br>Pago a contratista<br>Semana ' + esc(pmFh(S.semana.desde)) + ' al ' + esc(pmFh(S.semana.hasta)) + '</td></tr></table>' +
+      '<table class="ct"><tr><td><span>Contratista (factura a nombre de)</span><b>' + esc(f.nombre) + '</b></td><td><span>Cédula</span><b>' + esc(f.cedula || '—') + '</b></td><td><span>N.º de factura</span><b>' + esc(f.factura || 'Pendiente') + '</b></td></tr>' +
+      '<tr><td><span>Cuenta IBAN</span><b>' + esc(f.iban ? 'CR' + f.iban : 'Sin registrar') + '</b></td><td><span>Titular de la cuenta</span><b>' + esc(f.titular || f.nombre) + '</b></td><td><span>Móviles</span><b>' + tecs.map(t => esc(t.movil) + (t.tecnico ? ' (' + esc(t.tecnico) + ')' : '')).join(', ') + '</b></td></tr></table>' +
+      '<h2>Resumen del pago</h2><table class="r"><tbody>' + fila('Detalle de órdenes (' + f.nOrdenes + ')', m(f.detalle)) + (f.reclamos ? fila('+ Apelaciones / reclamos', m(f.reclamos)) : '') + (f.penalizaciones ? fila('− Penalizaciones', m(f.penalizaciones)) : '') + (f.alquileres ? fila('− Alquiler de móvil', m(f.alquileres)) : '') + (f.camisas ? fila('− Camisas / uniformes', m(f.camisas)) : '') +
+      fila('MONTO A FACTURAR', m(f.subtotal), 't') + (f.aplicaIva ? fila('IVA 13%', m(f.iva)) : fila('IVA', 'No aplica')) + fila('TOTAL FACTURA', m(f.totalFacturado), 't') +
+      rebajos.filter(a => (pmD.tipos[a.tipo] || {}).signo < 0).map(a => fila('− ' + esc((pmD.tipos[a.tipo] || {}).txt) + (a.detalle ? ': ' + esc(a.detalle) : ''), m(a.monto))).join('') + rebajos.filter(a => (pmD.tipos[a.tipo] || {}).signo > 0).map(a => fila('+ ' + esc((pmD.tipos[a.tipo] || {}).txt) + (a.detalle ? ': ' + esc(a.detalle) : ''), m(a.monto))).join('') +
+      fila('TOTAL A DEPOSITAR', m(f.deposito), 'd') + '</tbody></table>' +
+      '<div class="nota">Los rebajos no modifican el monto de la factura: se descuentan únicamente del depósito.</div>' +
+      tabAj(antes, 'Detalle de apelaciones, penalizaciones y alquiler (afectan la factura)') + tabAj(rebajos, 'Detalle de rebajos (solo afectan el depósito)') +
+      '<h2>Órdenes de la semana</h2><table class="o"><thead><tr><th>Fecha</th><th>N.º orden</th><th>Contrato</th><th>Cliente</th><th>Servicio</th><th class="n">Cant.</th><th class="n">Pago</th></tr></thead><tbody>' + ordHtml + '<tr class="t"><td colspan="6">Total detalle de órdenes</td><td class="n">' + m(f.detalle) + '</td></tr></tbody></table>' +
+      '<div class="pie">Documento generado el ' + hoy + ' · ' + esc(E.nombre) + '</div></div>';
   }).join('');
-  const html = '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Estado de cuenta</title><style>body{font-family:Arial,Helvetica,sans-serif;color:#1d2433;margin:24px;font-size:11px}h1{font-size:18px;margin:0 0 4px;color:#0f1b2d}h2{font-size:13px;margin:14px 0 4px}.sub{color:#556;margin-bottom:8px}table{border-collapse:collapse;width:100%;margin-bottom:6px}td,th{border:1px solid #cfd6df;padding:3px 6px;text-align:left}th{background:#eef2f7}tr.t td{font-weight:700;background:#f3f6fa}table.k td{font-size:11px;color:#556}table.k b{display:block;font-size:14px;color:#0f1b2d}.pg{page-break-after:always}.pg:last-child{page-break-after:auto}</style></head><body>' + cuerpo + '</body></html>';
+  const css = 'body{font-family:Arial,Helvetica,sans-serif;color:#1d2433;margin:20px;font-size:11px}h2{font-size:12px;margin:14px 0 4px;color:#0f1b2d;border-bottom:2px solid #c9a227;padding-bottom:2px}table{border-collapse:collapse;width:100%;margin-bottom:6px}td,th{border:1px solid #cfd6df;padding:3px 6px;text-align:left;vertical-align:top}th{background:#eef2f7}.n{text-align:right;white-space:nowrap}table.enc td{padding:2px 6px}table.ct td{width:33%}table.ct span{display:block;font-size:9px;color:#667;text-transform:uppercase}table.ct b{font-size:12px}table.r td{font-size:12px}table.r tr.t td{font-weight:700;background:#f3f6fa}table.r tr.d td{font-weight:700;background:#0f1b2d;color:#fff;font-size:13px}tr.g td{background:#fff6dc;font-weight:700}tr.s td{background:#f7f9fc;font-style:italic}.o tr.t td{font-weight:700;background:#f3f6fa}.nota{font-size:10px;color:#667;margin-bottom:4px}.pie{margin-top:10px;font-size:9px;color:#889;text-align:center}.pg{page-break-after:always}.pg:last-child{page-break-after:auto}';
+  const html = '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Estado de cuenta</title><style>' + css + '</style></head><body>' + cuerpo + '</body></html>';
   const f = document.createElement('iframe'); f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0'; document.body.appendChild(f);
   f.onload = () => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { toast('No se pudo abrir la impresión.'); } setTimeout(() => f.remove(), 60000); };
   f.srcdoc = html;
@@ -13450,6 +13536,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 42 · 14-oct 09:40</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 43 · 14-oct 11:10</div>
 </body>
 </html>
