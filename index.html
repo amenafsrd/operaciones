@@ -705,6 +705,7 @@
         <button id="navCotizaciones" onclick="mostrarVista('cotizaciones')"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="7.5" width="17" height="12" rx="1.5"/><path d="M9 7.5v-2a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M3.5 12.5h17"/></svg></span><span class="nt"> Cotizaciones</span></button>
         <button id="navResumen" onclick="mostrarVista('resumen')"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20.5h16M7 17V11M12 17V6M17 17v-4.5"/></svg></span><span class="nt"> Resumen</span></button>
         <button id="navColaboradores" onclick="mostrarVista('colaboradores')" style="display:none"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="1.8"/><circle cx="9" cy="11" r="2.2"/><path d="M5.5 16c.4-1.6 1.8-2.5 3.5-2.5s3.1.9 3.5 2.5M14.5 10h4M14.5 13.5h3"/></svg></span><span class="nt"> Colaboradores</span></button>
+        <button id="navPagomov" onclick="mostrarVista('pagomov')" style="display:none"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v.01M18 14.5v.01"/></svg></span><span class="nt"> Pago a móviles</span></button>
         <button id="navUsuarios" onclick="mostrarVista('usuarios')" style="display:none"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8.5" r="3.2"/><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5M16 5.6a3.2 3.2 0 0 1 0 5.8M18 14.8c1.8.6 3 2.3 3 5.2"/></svg></span><span class="nt"> Usuarios</span></button>
       </div>
 
@@ -1282,6 +1283,20 @@
         <div id="rhPAsi" style="display:none"></div>
         <div id="rhPPag" style="display:none"></div>
         <div id="rhModalBg" class="modalBg" style="z-index:90"><div class="modal" id="rhModal" style="max-width:560px"></div></div>
+      </section>
+
+      <section id="vistaPagoMov" style="display:none">
+        <div class="subtabs" id="pmTabs">
+          <button id="pmTSem" onclick="pmTab('sem')">Semanas</button>
+          <button id="pmTCon" onclick="pmTab('con')">Contratistas</button>
+          <button id="pmTPre" onclick="pmTab('pre')">Lista de precios</button>
+          <button id="pmTBan" onclick="pmTab('ban')">Banco</button>
+        </div>
+        <div id="pmPSem"></div>
+        <div id="pmPCon" style="display:none"></div>
+        <div id="pmPPre" style="display:none"></div>
+        <div id="pmPBan" style="display:none"></div>
+        <div id="pmModalBg" class="modalBg" style="z-index:90"><div class="modal" id="pmModal" style="max-width:640px"></div></div>
       </section>
 
       <section id="vistaUsuarios" style="display:none">
@@ -2772,6 +2787,7 @@ function mostrarApp() {
   Object.keys(MODULOS_NAV).forEach(v => { $('nav' + v.charAt(0).toUpperCase() + v.slice(1)).style.display = puedeModulo(MODULOS_NAV[v]) ? '' : 'none'; });
   const primera = Object.keys(MODULOS_NAV).find(v => puedeModulo(MODULOS_NAV[v]));
   $('navColaboradores').style.display = esAdmin() ? '' : 'none';
+  $('navPagomov').style.display = esAdmin() ? '' : 'none';
   if (!primera) {
     if (esAdmin()) toast('Todavía no tienes módulos asignados. Pídele al administrador que te los active.');
     else api('miAccesoRhWeb').then(r => {
@@ -5711,13 +5727,13 @@ function sideRefrescar() {
   try {
     const bn = $('nav' + vistaActual.charAt(0).toUpperCase() + vistaActual.slice(1));
     const mod = bn ? ((bn.querySelector('.nt') || {}).textContent || '').trim() : '';
-    const sec0 = { calendario: 'vistaCalendario', moviles: 'vistaFichas', seguimiento: 'vistaSeguimiento', bodega: 'vistaBodega', cotizaciones: 'vistaCotiz', colaboradores: 'vistaColab' }[vistaActual];
+    const sec0 = { calendario: 'vistaCalendario', moviles: 'vistaFichas', seguimiento: 'vistaSeguimiento', bodega: 'vistaBodega', cotizaciones: 'vistaCotiz', colaboradores: 'vistaColab', pagomov: 'vistaPagoMov' }[vistaActual];
     const act = sec0 && $(sec0) ? $(sec0).querySelector(':scope > .subtabs button.active') : null;
     $('crumb').innerHTML = esc(mod) + (act ? ' › <b>' + esc(sinEmoji(act.textContent)) + '</b>' : '');
   } catch (e) { }
   nav.querySelectorAll('.subnav').forEach(n => n.remove());
   nav.querySelectorAll('.car').forEach(n => n.remove());
-  const mapa = { calendario: 'vistaCalendario', moviles: 'vistaFichas', seguimiento: 'vistaSeguimiento', bodega: 'vistaBodega', cotizaciones: 'vistaCotiz', colaboradores: 'vistaColab' };
+  const mapa = { calendario: 'vistaCalendario', moviles: 'vistaFichas', seguimiento: 'vistaSeguimiento', bodega: 'vistaBodega', cotizaciones: 'vistaCotiz', colaboradores: 'vistaColab', pagomov: 'vistaPagoMov' };
   const sec = $(mapa[vistaActual]); const btn = $('nav' + vistaActual.charAt(0).toUpperCase() + vistaActual.slice(1));
   if (!sec || !btn) return;
   const tabs = Array.from(sec.querySelectorAll(':scope > .subtabs button')).filter(b => b.style.display !== 'none' && !b.hidden);
@@ -6420,6 +6436,7 @@ function rhImprimir() {
 function mostrarVista(v, forzar) {
 
   if (MODULOS_NAV[v] && !puedeModulo(MODULOS_NAV[v]) && !forzar) { toast('No tienes acceso a ese módulo.'); return; }
+  if (v === 'pagomov' && !esAdmin()) { toast('No tienes acceso a ese módulo.'); return; }
 
   if (!forzar && v !== 'calendario' && Object.keys(cambios).length &&
       !confirm('Hay cambios sin guardar en el cronograma. ¿Quieres cambiar de vista sin guardarlos?')) {
@@ -6446,11 +6463,12 @@ function mostrarVista(v, forzar) {
   $('vistaResumen').style.display = v === 'resumen' ? 'block' : 'none';
   $('vistaUsuarios').style.display = v === 'usuarios' ? 'block' : 'none';
   $('vistaColab').style.display = v === 'colaboradores' ? 'block' : 'none';
+  $('vistaPagoMov').style.display = (v === 'pagomov' && admin) ? 'block' : 'none';
   $('vistaSeguimiento').style.display = v === 'seguimiento' ? 'block' : 'none';
   $('vistaBodega').style.display = v === 'bodega' ? 'block' : 'none';
   $('vistaCotiz').style.display = v === 'cotizaciones' ? 'block' : 'none';
 
-  ['calendario', 'moviles', 'resumen', 'seguimiento', 'bodega', 'cotizaciones', 'colaboradores', 'usuarios'].forEach(x => {
+  ['calendario', 'moviles', 'resumen', 'seguimiento', 'bodega', 'cotizaciones', 'colaboradores', 'pagomov', 'usuarios'].forEach(x => {
     const id = 'nav' + x.charAt(0).toUpperCase() + x.slice(1);
     $(id).classList.toggle('active', x === v);
   });
@@ -6461,6 +6479,7 @@ function mostrarVista(v, forzar) {
   if (v === 'resumen') cargarResumen();
   if (v === 'usuarios') cargarUsuarios();
   if (v === 'colaboradores') abrirColab();
+  if (v === 'pagomov') abrirPagoMov();
   if (v === 'moviles' && admin) abrirFichas();
   if (v === 'calendario' && calendarioObsoleto && !Object.keys(cambios).length) cargarCalendario();
   sideRefrescar(); setTimeout(sideRefrescar, 300);
@@ -6470,6 +6489,308 @@ function mostrarVista(v, forzar) {
 /* =========================================================
    UTILIDADES
    ========================================================= */
+
+/* =========================================================
+   PAGO A MÓVILES (solo administración)
+   ========================================================= */
+let pmD = null, pmS = null, pmSemId = '', pmVista = 'res', pmTabAct = 'sem', pmOrdFiltro = 'todas', pmImp = null;
+const pmM = n => '₡' + (Number(n) || 0).toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const pmFh = iso => iso ? iso.split('-').reverse().join('/') : '—';
+function pmModal(h, w) { $('pmModal').innerHTML = h; $('pmModal').style.maxWidth = (w || 640) + 'px'; $('pmModalBg').classList.add('show'); }
+function pmCerrar() { $('pmModalBg').classList.remove('show'); }
+function pmBajar(blob, nombre) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nombre; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500); }
+
+async function abrirPagoMov() {
+  $('pmPSem').innerHTML = '<div class="loading">Cargando...</div>';
+  try { pmD = await api('obtenerPmWeb'); pmTab(pmTabAct); }
+  catch (e) { $('pmPSem').innerHTML = ''; mostrarError(e, 'No se pudo cargar el módulo.'); }
+}
+function pmTab(t) {
+  pmTabAct = t;
+  [['sem', 'Sem'], ['con', 'Con'], ['pre', 'Pre'], ['ban', 'Ban']].forEach(x => { $('pmT' + x[1]).classList.toggle('active', x[0] === t); $('pmP' + x[1]).style.display = x[0] === t ? '' : 'none'; });
+  if (!pmD) return;
+  if (t === 'sem') { if (pmSemId) pmRenderSemana(); else pmRenderSemanas(); }
+  if (t === 'con') pmRenderCon();
+  if (t === 'pre') pmRenderPre();
+  if (t === 'ban') pmRenderBan();
+  setTimeout(sideRefrescar, 30);
+}
+
+/* ---------- Semanas ---------- */
+function pmRenderSemanas() {
+  pmSemId = ''; pmS = null;
+  let h = '<div class="toolbar"><button class="btn primary" onclick="pmImportarModal()">⬆ Importar semana de Telecable</button></div><div class="panel"><div class="panelHead"><h2>Semanas de pago</h2></div><div class="tableWrap">';
+  if (!pmD.semanas.length) h += '<div class="loading">Aún no hay semanas. Importa el Excel «Pago servicios» que envía Telecable.</div>';
+  else h += '<table><thead><tr><th>Semana</th><th>Estado</th><th>Órdenes</th><th>Costo móviles (detalle)</th><th>UF Telecable</th><th></th></tr></thead><tbody>' +
+    pmD.semanas.map(s => '<tr><td><b>' + esc(pmFh(s.desde)) + ' al ' + esc(pmFh(s.hasta)) + '</b></td><td>' + (s.estado === 'Cerrada' ? '<span class="chip verde">Cerrada</span>' : '<span class="chip amar">Abierta</span>') + '</td><td>' + s.ordenes + '</td><td>' + pmM(s.costo) + '</td><td>' + pmM(s.uf) + '</td><td style="text-align:right"><button class="btn secondary" onclick="pmAbrir(\'' + s.id + '\')">Abrir</button></td></tr>').join('') + '</tbody></table>';
+  $('pmPSem').innerHTML = h + '</div></div>';
+}
+async function pmAbrir(id) {
+  pmSemId = id; $('pmPSem').innerHTML = '<div class="loading">Cargando semana...</div>';
+  try { pmS = await api('obtenerSemanaPmWeb', id); pmRenderSemana(); }
+  catch (e) { pmSemId = ''; pmRenderSemanas(); mostrarError(e, 'No se pudo abrir la semana.'); }
+}
+async function pmRecargar() { pmS = await api('obtenerSemanaPmWeb', pmSemId); pmRenderSemana(); }
+function pmSub(v) { pmVista = v; pmRenderSemana(); }
+
+function pmRenderSemana() {
+  const S = pmS, T = S.resumen.totales, cerr = S.semana.estado === 'Cerrada';
+  const margen = T.uf - T.detalle;
+  const tb = (v, t) => '<button class="' + (pmVista === v ? 'active' : '') + '" onclick="pmSub(\'' + v + '\')">' + t + '</button>';
+  let h = '<div class="toolbar"><button class="btn secondary" onclick="pmRenderSemanas()">← Semanas</button><b style="font-size:15px">Semana ' + esc(pmFh(S.semana.desde)) + ' al ' + esc(pmFh(S.semana.hasta)) + '</b>' + (cerr ? '<span class="chip verde">Cerrada</span>' : '<span class="chip amar">Abierta</span>') +
+    '<span style="flex:1"></span><button class="btn secondary" onclick="pmCerrarSemana(' + (cerr ? 'false' : 'true') + ')">' + (cerr ? 'Reabrir' : 'Cerrar semana') + '</button><button class="btn secondary" onclick="pmEliminarSemana()">🗑 Eliminar</button></div>';
+  h += '<div class="panel"><div style="display:flex;gap:18px;flex-wrap:wrap;padding:12px 14px;font-size:13px">' +
+    [['Órdenes', T.nOrdenes], ['Costo detalle', pmM(T.detalle)], ['UF Telecable', pmM(T.uf)], ['Margen (UF − costo)', pmM(margen)], ['Total facturado', pmM(T.totalFacturado)], ['Total a depositar', pmM(T.deposito)]]
+      .map(x => '<div><div style="color:#667;font-size:11px">' + x[0] + '</div><b style="font-size:15px">' + x[1] + '</b></div>').join('') + '</div></div>';
+  if (S.diferencias || S.sinLista) h += '<div class="panel" style="padding:10px 14px;font-size:13px;background:#fff8e1">' + (S.diferencias ? '⚠ <b>' + S.diferencias + '</b> orden(es) con costo distinto a la lista de precios. ' + (cerr ? '' : '<button class="btn secondary" onclick="pmAplicarLista()">Aplicar precio de lista</button> ') : '') + (S.sinLista ? '<span style="color:#666">' + S.sinLista + ' orden(es) con un servicio que la lista no reconoce (se usa el costo del archivo).</span>' : '') + '</div>';
+  h += '<div class="subtabs">' + tb('res', 'Pago por contratista') + tb('ord', 'Órdenes') + tb('aju', 'Ajustes') + tb('ext', 'Adicionales') + tb('arc', 'Archivos') + '</div>';
+  h += '<div class="panel"><div class="tableWrap">';
+  if (pmVista === 'res') h += pmHtmlRes(cerr);
+  if (pmVista === 'ord') h += pmHtmlOrd(cerr);
+  if (pmVista === 'aju') h += pmHtmlAju(cerr);
+  if (pmVista === 'ext') h += pmHtmlExt(cerr);
+  if (pmVista === 'arc') h += pmHtmlArc();
+  $('pmPSem').innerHTML = h + '</div></div>';
+}
+
+function pmHtmlRes(cerr) {
+  const R = pmS.resumen, T = R.totales;
+  if (!R.filas.length) return '<div class="loading">Sin datos.</div>';
+  return '<table><thead><tr><th>Contratista</th><th>Móviles</th><th>Órd.</th><th>Detalle</th><th>Reclamos</th><th>Alquiler</th><th>Penaliz.</th><th>Camisas</th><th>Subtotal</th><th>IVA</th><th>Facturado</th><th>Rebajos</th><th>Depósito</th><th>Factura</th><th></th></tr></thead><tbody>' +
+    R.filas.map((f, i) => '<tr' + (f.sinContratista ? ' style="background:#fdecea"' : '') + '><td><b>' + esc(f.nombre) + '</b>' + (f.sinContratista ? '<br><span style="font-size:11px;color:#9b1c1c">Móvil sin contratista: créalo en la pestaña Contratistas</span>' : (!/^\d{20}$/.test(f.iban || '') ? '<br><span style="font-size:11px;color:#9b1c1c">Falta IBAN</span>' : '')) + '</td><td>' + Object.keys(f.moviles).join(', ') + '</td><td>' + f.nOrdenes + '</td><td>' + pmM(f.detalle) + '</td><td>' + (f.reclamos ? pmM(f.reclamos) : '') + '</td><td>' + (f.alquileres ? pmM(f.alquileres) : '') + '</td><td>' + (f.penalizaciones ? pmM(f.penalizaciones) : '') + '</td><td>' + (f.camisas ? pmM(f.camisas) : '') + '</td><td>' + pmM(f.subtotal) + '</td><td>' + (f.aplicaIva ? pmM(f.iva) : '<span style="color:#888">sin IVA</span>') + '</td><td>' + pmM(f.totalFacturado) + '</td><td>' + (f.deducciones ? pmM(f.deducciones) : '') + '</td><td><b>' + pmM(f.deposito) + '</b></td><td>' + (f.sinContratista ? '' : '<input style="width:118px" value="' + esc(f.factura) + '" ' + (cerr ? 'disabled' : '') + ' onchange="pmGuardarFactura(\'' + f.idCon + '\',this.value)" placeholder="N.º factura">') + '</td><td>' + (f.sinContratista ? '' : '<button class="btn secondary" title="Estado de cuenta" onclick="pmEstadoCuenta(\'' + f.idCon + '\')">📄</button>') + '</td></tr>').join('') +
+    '<tr style="font-weight:700;background:#f3f6fa"><td>Total</td><td></td><td>' + T.nOrdenes + '</td><td>' + pmM(T.detalle) + '</td><td>' + pmM(T.reclamos) + '</td><td>' + pmM(T.alquileres) + '</td><td>' + pmM(T.penalizaciones) + '</td><td>' + pmM(T.camisas) + '</td><td>' + pmM(T.subtotal) + '</td><td>' + pmM(T.iva) + '</td><td>' + pmM(T.totalFacturado) + '</td><td>' + pmM(T.deducciones) + '</td><td>' + pmM(T.deposito) + '</td><td></td><td></td></tr></tbody></table>';
+}
+async function pmGuardarFactura(idCon, v) {
+  try { await api('guardarPagoPmWeb', { idSemana: pmSemId, idCon: idCon, factura: v }); const f = pmS.resumen.filas.find(x => x.idCon === idCon); if (f) f.factura = v.trim(); toast('Factura guardada.'); }
+  catch (e) { mostrarError(e, 'No se pudo guardar.'); }
+}
+
+function pmHtmlOrd(cerr) {
+  const O = pmS.ordenes.filter(o => pmOrdFiltro === 'todas' || (pmOrdFiltro === 'dif' && o.costoLista !== null && Math.abs(o.costoLista - o.costo) > 0.005) || (pmOrdFiltro === 'sin' && o.costoLista === null));
+  let h = '<div style="padding:8px 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><label>Mostrar <select onchange="pmOrdFiltro=this.value;pmRenderSemana()">' + [['todas', 'Todas'], ['dif', 'Con diferencia vs lista'], ['sin', 'Servicio no reconocido']].map(x => '<option value="' + x[0] + '"' + (pmOrdFiltro === x[0] ? ' selected' : '') + '>' + x[1] + '</option>').join('') + '</select></label><span style="color:#667;font-size:12px">' + O.length + ' orden(es)</span></div>';
+  h += '<table><thead><tr><th>Fecha</th><th>Móvil</th><th>Contrato</th><th>Cliente</th><th>Servicio</th><th>Costo del archivo</th><th>Precio lista</th><th>Costo aplicado</th><th>UF</th></tr></thead><tbody>' +
+    O.slice(0, 700).map(o => { const d = o.costoLista !== null && Math.abs(o.costoLista - o.costo) > 0.005;
+      return '<tr' + (d ? ' style="background:#fff3cd"' : '') + '><td>' + esc(pmFh(o.fecha)) + '</td><td>' + esc(o.movil) + '</td><td>' + esc(o.contrato) + '</td><td>' + esc(o.cliente) + '</td><td>' + esc(o.servicios) + '</td><td>' + pmM(o.costoArchivo) + '</td><td>' + (o.costoLista === null ? '<span style="color:#999">—</span>' : pmM(o.costoLista)) + '</td><td><input type="number" step="0.01" style="width:100px" value="' + o.costo + '" ' + (cerr ? 'disabled' : '') + ' onchange="pmEditarCosto(\'' + o.id + '\',this.value)"></td><td>' + pmM(o.ufCosto) + '</td></tr>'; }).join('') + '</tbody></table>' + (O.length > 700 ? '<div class="loading">Se muestran 700 de ' + O.length + '. Usa el filtro.</div>' : '');
+  return h;
+}
+async function pmEditarCosto(id, v) {
+  try { await api('editarOrdenPmWeb', id, { costo: v }); await pmRecargar(); toast('Costo actualizado.'); } catch (e) { mostrarError(e, 'No se pudo actualizar.'); }
+}
+async function pmAplicarLista() {
+  if (!confirm('Se reemplazará el costo aplicado por el precio de la lista en las órdenes con diferencia. ¿Continuar?')) return;
+  try { const r = await api('aplicarListaPmWeb', pmSemId); await pmRecargar(); toast(r.cambiadas + ' orden(es) actualizadas.'); } catch (e) { mostrarError(e, 'No se pudo aplicar la lista.'); }
+}
+
+function pmConNombre(id) { const c = pmD.contratistas.find(x => x.id === id); return c ? c.nombre : id; }
+function pmHtmlAju(cerr) {
+  const A = pmS.ajustes;
+  let h = '<div style="padding:10px 12px;display:flex;gap:8px;flex-wrap:wrap">' + (cerr ? '' : '<button class="btn primary" onclick="pmAjusteModal()">➕ Nuevo ajuste</button>') + '<span style="color:#667;font-size:12px;align-self:center">Reclamos, alquileres, penalizaciones y camisas entran antes del IVA; inventario, INS, rebajos, préstamos y herramientas se descuentan del total facturado.</span></div>';
+  if (!A.length) return h + '<div class="loading">Sin ajustes en esta semana.</div>';
+  return h + '<table><thead><tr><th>Contratista</th><th>Tipo</th><th>Detalle</th><th>Contrato</th><th>Monto</th><th></th></tr></thead><tbody>' + A.map(a => { const t = pmD.tipos[a.tipo] || { txt: a.tipo, signo: -1 };
+    return '<tr><td>' + esc(pmConNombre(a.idCon)) + '</td><td>' + esc(t.txt) + '</td><td>' + esc(a.detalle) + '</td><td>' + esc(a.contrato) + '</td><td style="color:' + (t.signo > 0 ? '#2d5a1b' : '#9b1c1c') + '">' + (t.signo > 0 ? '+' : '−') + pmM(a.monto) + '</td><td>' + (cerr ? '' : '<button class="btn secondary" onclick="pmEliminarAjuste(\'' + a.id + '\')">✕</button>') + '</td></tr>'; }).join('') + '</tbody></table>';
+}
+function pmAjusteModal() {
+  const cons = pmD.contratistas.filter(c => c.activo);
+  pmModal('<h3>Nuevo ajuste</h3><div style="display:grid;gap:8px"><label>Contratista<select id="paCon">' + cons.map(c => '<option value="' + c.id + '">' + esc(c.nombre) + (c.moviles ? ' (' + esc(c.moviles) + ')' : '') + '</option>').join('') + '</select></label>' +
+    '<label>Tipo<select id="paTipo" onchange="pmAjusteTipo()">' + Object.keys(pmD.tipos).map(k => '<option value="' + k + '">' + esc(pmD.tipos[k].txt) + '</option>').join('') + '</select></label>' +
+    '<label id="paPenL" style="display:none">Penalización de la lista<select id="paPen" onchange="pmAjustePen()"><option value="">—</option>' + pmD.penalizaciones.map((p, i) => '<option value="' + i + '">' + esc(p.nombre) + ' · ' + pmM(p.monto) + '</option>').join('') + '</select></label>' +
+    '<label>Monto (₡)<input id="paMonto" type="number" step="0.01"></label><label>Detalle<input id="paDet" maxlength="200"></label><label>Contrato (opcional)<input id="paCto" maxlength="30"></label></div>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn secondary" onclick="pmCerrar()">Cancelar</button><button class="btn primary" onclick="pmAjusteGuardar()">Guardar</button></div>'); pmAjusteTipo();
+}
+function pmAjusteTipo() { $('paPenL').style.display = $('paTipo').value === 'PENALIZACION' ? '' : 'none'; }
+function pmAjustePen() { const i = $('paPen').value; if (i === '') return; const p = pmD.penalizaciones[+i]; $('paMonto').value = p.monto; $('paDet').value = p.nombre; }
+async function pmAjusteGuardar() {
+  try { await api('guardarAjustePmWeb', { idSemana: pmSemId, idCon: $('paCon').value, tipo: $('paTipo').value, monto: $('paMonto').value, detalle: $('paDet').value, contrato: $('paCto').value }); pmCerrar(); await pmRecargar(); toast('Ajuste guardado.'); }
+  catch (e) { mostrarError(e, 'No se pudo guardar el ajuste.'); }
+}
+async function pmEliminarAjuste(id) { if (!confirm('¿Eliminar este ajuste?')) return; try { await api('eliminarAjustePmWeb', id); await pmRecargar(); } catch (e) { mostrarError(e, 'No se pudo eliminar.'); } }
+
+function pmHtmlExt(cerr) {
+  const E = pmS.extras;
+  let h = '<div style="padding:10px 12px;display:flex;gap:8px;flex-wrap:wrap">' + (cerr ? '' : '<button class="btn primary" onclick="pmExtraModal()">➕ Nueva línea</button><button class="btn secondary" onclick="pmCopiarExtras()">Copiar de la semana anterior</button>') + '<span style="color:#667;font-size:12px;align-self:center">Otros pagos del mismo archivo del banco (internos, ahorro, cuentas propias).</span></div>';
+  if (!E.length) return h + '<div class="loading">Sin líneas adicionales.</div>';
+  return h + '<table><thead><tr><th>Nombre</th><th>IBAN</th><th>Concepto</th><th>Monto</th><th></th></tr></thead><tbody>' + E.map(e => '<tr><td>' + esc(e.nombre) + '</td><td>' + esc(e.iban) + '</td><td>' + esc(e.concepto) + '</td><td>' + pmM(e.monto) + '</td><td>' + (cerr ? '' : '<button class="btn secondary" onclick="pmEliminarExtra(\'' + e.id + '\')">✕</button>') + '</td></tr>').join('') + '<tr style="font-weight:700;background:#f3f6fa"><td colspan="3">Total</td><td>' + pmM(E.reduce((a, e) => a + e.monto, 0)) + '</td><td></td></tr></tbody></table>';
+}
+function pmExtraModal() {
+  pmModal('<h3>Nueva línea adicional</h3><div style="display:grid;gap:8px"><label>Nombre (como sale en el banco)<input id="peNom" maxlength="80"></label><label>Cuenta IBAN (20 dígitos, sin «CR»)<input id="peIban" maxlength="26"></label><label>Cédula (opcional)<input id="peCed"></label><label>Monto (₡)<input id="peMonto" type="number" step="0.01"></label><label>Concepto<input id="peCon" value="Servicios prestados" maxlength="30"></label></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn secondary" onclick="pmCerrar()">Cancelar</button><button class="btn primary" onclick="pmExtraGuardar()">Guardar</button></div>');
+}
+async function pmExtraGuardar() {
+  try { await api('guardarExtraPmWeb', { idSemana: pmSemId, nombre: $('peNom').value, iban: $('peIban').value, cedula: $('peCed').value, monto: $('peMonto').value, concepto: $('peCon').value }); pmCerrar(); await pmRecargar(); toast('Línea guardada.'); }
+  catch (e) { mostrarError(e, 'No se pudo guardar.'); }
+}
+async function pmEliminarExtra(id) { if (!confirm('¿Eliminar esta línea?')) return; try { await api('eliminarExtraPmWeb', id); await pmRecargar(); } catch (e) { mostrarError(e, 'No se pudo eliminar.'); } }
+async function pmCopiarExtras() { try { const r = await api('copiarExtrasPmWeb', pmSemId); await pmRecargar(); toast(r.copiadas + ' línea(s) copiadas.'); } catch (e) { mostrarError(e, 'No se pudo copiar.'); } }
+
+async function pmCerrarSemana(c) { try { await api('estadoSemanaPmWeb', pmSemId, c); await pmRecargar(); pmD = await api('obtenerPmWeb'); pmRenderSemana(); } catch (e) { mostrarError(e, 'No se pudo cambiar el estado.'); } }
+async function pmEliminarSemana() {
+  if (!confirm('Se eliminará la semana con todas sus órdenes, ajustes y facturas. ¿Seguro?')) return;
+  try { await api('eliminarSemanaPmWeb', pmSemId); pmD = await api('obtenerPmWeb'); pmRenderSemanas(); toast('Semana eliminada.'); } catch (e) { mostrarError(e, 'No se pudo eliminar.'); }
+}
+
+/* ---------- Importar el Excel de Telecable ---------- */
+function pmImportarModal() {
+  pmImp = null;
+  pmModal('<h3>Importar semana de Telecable</h3><div style="font-size:13px;color:#555;margin-bottom:8px">Sube el Excel «Pago servicios». Se lee la hoja <b>Ordenes</b> (Contrato, Cliente, Servicios, Costo, Móvil, Fecha, UF).</div><input type="file" id="pmFile" accept=".xlsx,.xls" onchange="pmLeerArchivo(this.files[0])"><div id="pmImpInfo" style="margin-top:10px;font-size:13px"></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn secondary" onclick="pmCerrar()">Cancelar</button><button class="btn primary" id="pmImpBtn" disabled onclick="pmImportarGuardar()">Importar</button></div>');
+}
+function pmISO(v) {
+  if (v instanceof Date) return v.getFullYear() + '-' + String(v.getMonth() + 1).padStart(2, '0') + '-' + String(v.getDate()).padStart(2, '0');
+  if (typeof v === 'number') { const d = new Date(Math.round((v - 25569) * 86400000)); return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0'); }
+  const m = String(v || '').match(/(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})/); return m ? m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0') : '';
+}
+async function pmLeerArchivo(f) {
+  if (!f) return;
+  $('pmImpInfo').textContent = 'Leyendo archivo...';
+  try {
+    await cargarLib('xlsx', SEG_URL_XLSX);
+    const wb = XLSX.read(await f.arrayBuffer(), { type: 'array', cellDates: true });
+    const nom = wb.SheetNames.find(n => n.trim().toLowerCase() === 'ordenes');
+    if (!nom) throw new Error('El archivo no tiene una hoja llamada «Ordenes».');
+    const filas = XLSX.utils.sheet_to_json(wb.Sheets[nom], { header: 1, raw: true, defval: '' });
+    const enc = filas[0].map(x => String(x).trim().toLowerCase());
+    const ix = k => enc.findIndex(x => x.indexOf(k) === 0);
+    const c = { contrato: ix('contrato'), cliente: ix('nombre'), servicios: ix('servicios'), costo: ix('costo'), movil: ix('movil'), fecha: ix('fecha'), ufS: ix('uf:_serv'), ufC: ix('uf:_costo') };
+    if (c.movil < 0 || c.costo < 0 || c.servicios < 0) throw new Error('No se reconocen las columnas de la hoja Ordenes.');
+    const ord = []; const fechas = [];
+    filas.slice(1).forEach(r => {
+      if (r[c.movil] === '' || r[c.movil] === null || (r[c.servicios] === '' && r[c.costo] === '')) return;
+      const fe = pmISO(r[c.fecha]); if (fe) fechas.push(fe);
+      ord.push({ contrato: String(r[c.contrato] || ''), cliente: r[c.cliente], servicios: r[c.servicios], costo: r[c.costo], movil: r[c.movil], fecha: fe, ufServicio: c.ufS >= 0 ? r[c.ufS] : '', ufCosto: c.ufC >= 0 ? r[c.ufC] : 0 });
+    });
+    if (!ord.length) throw new Error('No se encontraron órdenes en la hoja.');
+    fechas.sort();
+    pmImp = { ordenes: ord, desde: fechas[0] || '', hasta: fechas[fechas.length - 1] || '' };
+    const tot = ord.reduce((a, o) => a + (+o.costo || 0), 0), uf = ord.reduce((a, o) => a + (+o.ufCosto || 0), 0), mov = new Set(ord.map(o => pmMovilNum(o.movil)));
+    $('pmImpInfo').innerHTML = '<b>' + ord.length + '</b> órdenes · <b>' + mov.size + '</b> móviles · costo ' + pmM(tot) + ' · UF ' + pmM(uf) + '<div style="display:flex;gap:8px;margin-top:8px"><label>Desde<input type="date" id="pmIDesde" value="' + pmImp.desde + '"></label><label>Hasta<input type="date" id="pmIHasta" value="' + pmImp.hasta + '"></label></div>';
+    $('pmImpBtn').disabled = false;
+  } catch (e) { $('pmImpInfo').innerHTML = '<span style="color:#9b1c1c">' + esc(e.message || e) + '</span>'; }
+}
+function pmMovilNum(v) { const m = String(v).match(/(\d+)(?!.*\d)/); return m ? m[1] : String(v); }
+async function pmImportarGuardar() {
+  if (!pmImp) return;
+  $('pmImpBtn').disabled = true; $('pmImpBtn').textContent = 'Importando...';
+  try {
+    const r = await api('importarSemanaPmWeb', { desde: $('pmIDesde').value, hasta: $('pmIHasta').value, ordenes: pmImp.ordenes });
+    pmCerrar(); pmD = await api('obtenerPmWeb'); await pmAbrir(r.id); toast('Semana importada: ' + r.ordenes + ' órdenes.');
+    if (pmS.resumen.filas.some(f => f.sinContratista)) toast('Hay móviles sin contratista: créalos en la pestaña Contratistas.', 5000);
+  } catch (e) { $('pmImpBtn').disabled = false; $('pmImpBtn').textContent = 'Importar'; mostrarError(e, 'No se pudo importar.'); }
+}
+
+/* ---------- Contratistas ---------- */
+function pmRenderCon() {
+  const C = pmD.contratistas;
+  let h = '<div class="toolbar"><button class="btn primary" onclick="pmConModal()">➕ Nuevo contratista</button><button class="btn secondary" onclick="pmImportarConModal()">⬆ Importar desde la hoja «Pago»</button></div><div class="panel"><div class="panelHead"><h2>Contratistas</h2><span>' + C.length + '</span></div><div class="tableWrap">';
+  if (!C.length) h += '<div class="loading">Importa la hoja «Pago» de tu Excel para cargar nombres, IBAN y móviles de una vez.</div>';
+  else h += '<table><thead><tr><th>Nombre</th><th>Móviles</th><th>IBAN</th><th>Cédula</th><th>IVA</th><th>Estado</th><th></th></tr></thead><tbody>' + C.map(c => '<tr><td><b>' + esc(c.nombre) + '</b></td><td>' + esc(c.moviles) + '</td><td>' + (c.iban ? esc(c.iban) : '<span style="color:#9b1c1c">Falta</span>') + '</td><td>' + esc(c.cedula) + '</td><td>' + (c.aplicaIva ? '13%' : 'Sin IVA') + '</td><td>' + (c.activo ? 'Activo' : 'Inactivo') + '</td><td style="text-align:right"><button class="btn secondary" onclick="pmConModal(\'' + c.id + '\')">Editar</button></td></tr>').join('') + '</tbody></table>';
+  $('pmPCon').innerHTML = h + '</div></div>';
+}
+function pmConModal(id) {
+  const c = pmD.contratistas.find(x => x.id === id) || { nombre: '', cedula: '', iban: '', moviles: '', aplicaIva: true, telefono: '', correo: '', obs: '', activo: true };
+  pmModal('<h3>' + (id ? 'Editar' : 'Nuevo') + ' contratista</h3><div style="display:grid;gap:8px"><label>Nombre o razón social (como sale en el banco)<input id="pcNom" value="' + esc(c.nombre) + '" maxlength="100"></label><label>Móviles (separadas por coma, ej. 111,112)<input id="pcMov" value="' + esc(c.moviles) + '"></label><label>Cuenta IBAN (20 dígitos, sin «CR»)<input id="pcIban" value="' + esc(c.iban) + '" maxlength="26"></label><label>Cédula<input id="pcCed" value="' + esc(c.cedula) + '"></label><label>Teléfono<input id="pcTel" value="' + esc(c.telefono) + '"></label><label>Correo<input id="pcCor" value="' + esc(c.correo) + '"></label><label><input type="checkbox" id="pcIva"' + (c.aplicaIva ? ' checked' : '') + '> Factura con IVA (13%)</label><label><input type="checkbox" id="pcAct"' + (c.activo ? ' checked' : '') + '> Activo</label></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn secondary" onclick="pmCerrar()">Cancelar</button><button class="btn primary" onclick="pmConGuardar(\'' + (id || '') + '\')">Guardar</button></div>');
+}
+async function pmConGuardar(id) {
+  try { await api('guardarContratistaPmWeb', { id: id, nombre: $('pcNom').value, moviles: $('pcMov').value, iban: $('pcIban').value, cedula: $('pcCed').value, telefono: $('pcTel').value, correo: $('pcCor').value, aplicaIva: $('pcIva').checked, activo: $('pcAct').checked }); pmCerrar(); pmD = await api('obtenerPmWeb'); pmRenderCon(); toast('Contratista guardado.'); }
+  catch (e) { mostrarError(e, 'No se pudo guardar.'); }
+}
+function pmImportarConModal() {
+  pmModal('<h3>Importar contratistas</h3><div style="font-size:13px;color:#555;margin-bottom:8px">Sube tu Excel de pago semanal. Se lee la hoja <b>Pago</b> (Móvil, Referencia/IBAN, Nombre, Cédula). Los que ya existen se completan sin duplicarse.</div><input type="file" id="pmFileC" accept=".xlsx,.xls" onchange="pmLeerCon(this.files[0])"><div id="pmConInfo" style="margin-top:10px;font-size:13px"></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn secondary" onclick="pmCerrar()">Cancelar</button><button class="btn primary" id="pmConBtn" disabled onclick="pmImportarConGuardar()">Importar</button></div>');
+}
+let pmConLista = null;
+async function pmLeerCon(f) {
+  if (!f) return;
+  try {
+    await cargarLib('xlsx', SEG_URL_XLSX);
+    const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' });
+    const nom = wb.SheetNames.find(n => n.trim().toLowerCase() === 'pago');
+    if (!nom) throw new Error('El archivo no tiene una hoja llamada «Pago».');
+    const filas = XLSX.utils.sheet_to_json(wb.Sheets[nom], { header: 1, raw: true, defval: '' });
+    const enc = filas[0].map(x => String(x).trim().toLowerCase());
+    const ix = k => enc.findIndex(x => x.indexOf(k) === 0);
+    const c = { movil: ix('movil'), iban: ix('referencia'), nombre: ix('nombre'), ced: ix('cedula') };
+    if (c.nombre < 0 || c.iban < 0) throw new Error('No se reconocen las columnas de la hoja Pago.');
+    pmConLista = filas.slice(1).filter(r => String(r[c.nombre]).trim() && String(r[c.iban]).replace(/\D/g, '').length >= 20 && !/total/i.test(String(r[c.nombre]))).map(r => ({ movil: r[c.movil], iban: String(r[c.iban]), nombre: String(r[c.nombre]).replace(/[\t\s]+/g, ' ').trim(), cedula: c.ced >= 0 ? String(r[c.ced] || '') : '' }));
+    $('pmConInfo').textContent = pmConLista.length + ' fila(s) con cuenta encontradas.'; $('pmConBtn').disabled = !pmConLista.length;
+  } catch (e) { $('pmConInfo').innerHTML = '<span style="color:#9b1c1c">' + esc(e.message || e) + '</span>'; }
+}
+async function pmImportarConGuardar() {
+  try { const r = await api('importarContratistasPmWeb', pmConLista); pmCerrar(); pmD = await api('obtenerPmWeb'); pmRenderCon(); toast(r.nuevos + ' nuevo(s), ' + r.actualizados + ' actualizado(s).'); }
+  catch (e) { mostrarError(e, 'No se pudo importar.'); }
+}
+
+/* ---------- Lista de precios ---------- */
+function pmRenderPre() {
+  let h = '<div class="toolbar"><button class="btn secondary" onclick="pmPreAgregar()">➕ Agregar fila</button><button class="btn primary" onclick="pmPreGuardar()">💾 Guardar lista</button></div><div class="panel"><div class="panelHead"><h2>Lista de precios (lo que se paga a las móviles)</h2></div><div style="padding:8px 12px;font-size:12px;color:#667">El «alias» es el nombre con que Telecable escribe el servicio en el Excel; varios alias se separan con «|». Con eso el sistema detecta diferencias entre el costo del archivo y esta lista.</div><div class="tableWrap"><table id="pmPreTb"><thead><tr><th>Servicio</th><th>Precio</th><th>Alias en el Excel</th><th>Activo</th><th></th></tr></thead><tbody>' +
+    pmD.precios.map(p => pmPreFila(p)).join('') + '</tbody></table></div></div>';
+  $('pmPPre').innerHTML = h;
+}
+function pmPreFila(p) { return '<tr><td><input style="width:100%;min-width:220px" value="' + esc(p.servicio) + '"></td><td><input type="number" step="0.01" style="width:100px" value="' + p.precio + '"></td><td><input style="width:100%;min-width:220px" value="' + esc(p.alias) + '"></td><td><input type="checkbox"' + (p.activo ? ' checked' : '') + '></td><td><button class="btn secondary" onclick="this.closest(\'tr\').remove()">✕</button></td></tr>'; }
+function pmPreAgregar() { $('pmPreTb').tBodies[0].insertAdjacentHTML('beforeend', pmPreFila({ servicio: '', precio: 0, alias: '', activo: true })); }
+async function pmPreGuardar() {
+  const lista = Array.from($('pmPreTb').tBodies[0].rows).map(r => { const i = r.querySelectorAll('input'); return { servicio: i[0].value, precio: i[1].value, alias: i[2].value, activo: i[3].checked }; });
+  try { await api('guardarPreciosPmWeb', lista); pmD = await api('obtenerPmWeb'); pmRenderPre(); toast('Lista guardada.'); } catch (e) { mostrarError(e, 'No se pudo guardar.'); }
+}
+
+/* ---------- Banco ---------- */
+function pmRenderBan() {
+  const b = pmD.banco;
+  $('pmPBan').innerHTML = '<div class="panel" style="padding:14px"><h2 style="margin:0 0 8px">Archivo de pago de planillas y proveedores (BAC)</h2><div style="font-size:13px;color:#555;margin-bottom:10px">Datos del archivo .prn que se sube al banco. Cada envío lleva un número consecutivo.</div><div style="display:grid;gap:8px;max-width:360px"><label>Código del convenio (4 caracteres)<input id="pbCod" maxlength="4" value="' + esc(b.codigo) + '"></label><label>Último número de envío usado<input id="pbEnv" type="number" value="' + b.ultimoEnvio + '"></label><label>Indicador (columna tras el período)<input id="pbFlag" maxlength="1" value="' + esc(b.flag) + '"></label></div><div style="margin-top:12px"><button class="btn primary" onclick="pmBanGuardar()">Guardar</button></div></div>';
+}
+async function pmBanGuardar() {
+  try { await api('guardarBancoPmWeb', { codigo: $('pbCod').value, ultimoEnvio: $('pbEnv').value, flag: $('pbFlag').value }); pmD = await api('obtenerPmWeb'); toast('Datos del banco guardados.'); } catch (e) { mostrarError(e, 'No se pudo guardar.'); }
+}
+
+/* ---------- Archivos de salida ---------- */
+function pmHtmlArc() {
+  return '<div style="padding:14px;display:grid;gap:14px;max-width:760px">' +
+    '<div><h3 style="margin:0 0 4px">Archivo para el banco</h3><div style="font-size:12px;color:#667;margin-bottom:6px">Genera el .prn de pago de planillas y proveedores con los depósitos de esta semana' + (pmS.extras.length ? ' y las líneas adicionales' : '') + '. Antes de subirlo revisa el total.</div><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end"><label>Fecha de pago<input type="date" id="paFec" value="' + (pmD.hoy || '') + '"></label><label>N.º de envío<input type="number" id="paEnv" style="width:90px" value="' + (pmD.banco.ultimoEnvio + 1) + '"></label><button class="btn primary" onclick="pmBanco()">Generar archivo .prn</button></div><div id="pmBanOut" style="margin-top:8px"></div></div>' +
+    '<div><h3 style="margin:0 0 4px">Resumen semanal</h3><div style="font-size:12px;color:#667;margin-bottom:6px">Excel con las hojas Detalle (por contratista) y Pago (depósitos), más las órdenes.</div><button class="btn secondary" onclick="pmResumenExcel()">⬇ Descargar Excel</button></div>' +
+    '<div><h3 style="margin:0 0 4px">Estados de cuenta</h3><div style="font-size:12px;color:#667;margin-bottom:6px">Un estado por contratista con sus órdenes, ajustes y depósito. Se abre para imprimir o guardar como PDF (todos juntos, una página cada uno).</div><button class="btn secondary" onclick="pmEstadoCuenta(\'\')">🖨 Todos los contratistas</button></div></div>';
+}
+async function pmBanco() {
+  try {
+    const r = await api('generarBancoPmWeb', pmSemId, $('paFec').value, $('paEnv').value);
+    pmBajar(new Blob([new Uint8Array(Array.from(r.texto, ch => ch.charCodeAt(0) & 255))], { type: 'application/octet-stream' }), r.nombre);
+    pmD.banco.ultimoEnvio = r.envio;
+    $('pmBanOut').innerHTML = '<div style="font-size:13px"><b>' + r.cantidad + '</b> pagos · total <b>' + pmM(r.total) + '</b> · envío ' + r.envio + (r.avisos.length ? '<div style="color:#9b1c1c;margin-top:6px">' + r.avisos.map(esc).join('<br>') + '</div>' : '') + '</div>';
+    try { await api('guardarBancoPmWeb', { codigo: pmD.banco.codigo, ultimoEnvio: r.envio }); } catch (e) { }
+    toast('Archivo generado: ' + r.nombre);
+  } catch (e) { mostrarError(e, 'No se pudo generar el archivo.'); }
+}
+async function pmResumenExcel() {
+  try {
+    await cargarLib('xlsx', SEG_URL_XLSX);
+    const S = pmS, R = S.resumen;
+    const det = [['Móvil(es)', 'Técnico', 'Órdenes', 'Detalle', 'Reclamos', 'Alquileres', 'Penalizaciones', 'Camisas', 'Sub total', 'IVA', 'Total']].concat(R.filas.map(f => [Object.keys(f.moviles).join(','), f.nombre, f.nOrdenes, f.detalle, f.reclamos, f.alquileres, f.penalizaciones, f.camisas, f.subtotal, f.iva, f.totalFacturado]));
+    const pag = [['Móvil(es)', 'Referencia', 'Nombre', 'Cédula', 'Sub-total', 'IVA 13%', 'Total facturado', 'N.º factura', 'Inventarios', 'INS', 'Rebajos SRD', 'Préstamos', 'Herramientas', 'Pago adicional', 'Total depósito']].concat(R.filas.map(f => [Object.keys(f.moviles).join(','), f.iban, f.nombre, f.cedula, f.subtotal, f.iva, f.totalFacturado, f.factura, f.inventario, f.ins, f.rebajo, f.prestamo, f.herramientas, f.extra, f.deposito]))
+      .concat(S.extras.map(e => ['', e.iban, e.nombre, e.cedula, '', '', '', e.concepto, '', '', '', '', '', '', e.monto]));
+    const ord = [['Fecha', 'Móvil', 'Contrato', 'Cliente', 'Servicios', 'Costo archivo', 'Precio lista', 'Costo aplicado', 'UF costo']].concat(S.ordenes.map(o => [o.fecha, o.movil, o.contrato, o.cliente, o.servicios, o.costoArchivo, o.costoLista === null ? '' : o.costoLista, o.costo, o.ufCosto]));
+    const aju = [['Contratista', 'Tipo', 'Detalle', 'Contrato', 'Monto']].concat(S.ajustes.map(a => [pmConNombre(a.idCon), (pmD.tipos[a.tipo] || {}).txt || a.tipo, a.detalle, a.contrato, a.monto]));
+    const wb = XLSX.utils.book_new();
+    [['Detalle', det], ['Pago', pag], ['Ordenes', ord], ['Ajustes', aju]].forEach(x => XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(x[1]), x[0]));
+    XLSX.writeFile(wb, 'Pago_servicios_' + S.semana.desde + '_' + S.semana.hasta + '.xlsx');
+  } catch (e) { mostrarError(e, 'No se pudo generar el Excel.'); }
+}
+function pmEstadoCuenta(idCon) {
+  const S = pmS, filas = S.resumen.filas.filter(f => !f.sinContratista && (!idCon || f.idCon === idCon));
+  if (!filas.length) { toast('No hay contratistas para imprimir.'); return; }
+  const m = pmM;
+  const cuerpo = filas.map(f => {
+    const movs = Object.keys(f.moviles);
+    const ords = S.ordenes.filter(o => movs.indexOf(String(Number(o.movil))) >= 0);
+    const aj = S.ajustes.filter(a => a.idCon === f.idCon);
+    return '<div class="pg"><h1>Estado de cuenta · ' + esc(f.nombre) + '</h1><div class="sub">Soluciones Red Dorada SRL · Semana ' + esc(pmFh(S.semana.desde)) + ' al ' + esc(pmFh(S.semana.hasta)) + ' · Móvil(es): ' + esc(movs.join(', ')) + (f.cedula ? ' · Cédula ' + esc(f.cedula) : '') + (f.factura ? ' · Factura ' + esc(f.factura) : '') + '</div>' +
+      '<table class="k"><tr><td>Órdenes<b>' + f.nOrdenes + '</b></td><td>Detalle<b>' + m(f.detalle) + '</b></td><td>Total facturado<b>' + m(f.totalFacturado) + '</b></td><td>Depósito<b>' + m(f.deposito) + '</b></td></tr></table>' +
+      '<h2>Cálculo</h2><table><tbody><tr><td>Detalle de órdenes</td><td>' + m(f.detalle) + '</td></tr>' + (f.reclamos ? '<tr><td>+ Reclamos</td><td>' + m(f.reclamos) + '</td></tr>' : '') + (f.alquileres ? '<tr><td>− Alquiler</td><td>' + m(f.alquileres) + '</td></tr>' : '') + (f.penalizaciones ? '<tr><td>− Penalizaciones</td><td>' + m(f.penalizaciones) + '</td></tr>' : '') + (f.camisas ? '<tr><td>− Camisas</td><td>' + m(f.camisas) + '</td></tr>' : '') +
+      '<tr class="t"><td>Subtotal</td><td>' + m(f.subtotal) + '</td></tr>' + (f.aplicaIva ? '<tr><td>IVA 13%</td><td>' + m(f.iva) + '</td></tr>' : '') + '<tr class="t"><td>Total facturado</td><td>' + m(f.totalFacturado) + '</td></tr>' +
+      [['inventario', 'Inventarios'], ['ins', 'INS'], ['rebajo', 'Rebajos SRD'], ['prestamo', 'Préstamos'], ['herramientas', 'Herramientas']].filter(x => f[x[0]]).map(x => '<tr><td>− ' + x[1] + '</td><td>' + m(f[x[0]]) + '</td></tr>').join('') + (f.extra ? '<tr><td>+ Pago adicional</td><td>' + m(f.extra) + '</td></tr>' : '') +
+      '<tr class="t"><td>Total a depositar</td><td>' + m(f.deposito) + '</td></tr></tbody></table>' +
+      (aj.length ? '<h2>Ajustes</h2><table><thead><tr><th>Tipo</th><th>Detalle</th><th>Contrato</th><th>Monto</th></tr></thead><tbody>' + aj.map(a => { const t = pmD.tipos[a.tipo] || { txt: a.tipo, signo: -1 }; return '<tr><td>' + esc(t.txt) + '</td><td>' + esc(a.detalle) + '</td><td>' + esc(a.contrato) + '</td><td>' + (t.signo > 0 ? '+' : '−') + m(a.monto) + '</td></tr>'; }).join('') + '</tbody></table>' : '') +
+      '<h2>Órdenes de la semana</h2><table><thead><tr><th>Fecha</th><th>Móvil</th><th>Contrato</th><th>Cliente</th><th>Servicio</th><th>Pago</th></tr></thead><tbody>' + ords.map(o => '<tr><td>' + esc(pmFh(o.fecha)) + '</td><td>' + esc(o.movil) + '</td><td>' + esc(o.contrato) + '</td><td>' + esc(o.cliente) + '</td><td>' + esc(o.servicios) + '</td><td>' + m(o.costo) + '</td></tr>').join('') + '</tbody></table></div>';
+  }).join('');
+  const html = '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Estado de cuenta</title><style>body{font-family:Arial,Helvetica,sans-serif;color:#1d2433;margin:24px;font-size:11px}h1{font-size:18px;margin:0 0 4px;color:#0f1b2d}h2{font-size:13px;margin:14px 0 4px}.sub{color:#556;margin-bottom:8px}table{border-collapse:collapse;width:100%;margin-bottom:6px}td,th{border:1px solid #cfd6df;padding:3px 6px;text-align:left}th{background:#eef2f7}tr.t td{font-weight:700;background:#f3f6fa}table.k td{font-size:11px;color:#556}table.k b{display:block;font-size:14px;color:#0f1b2d}.pg{page-break-after:always}.pg:last-child{page-break-after:auto}</style></head><body>' + cuerpo + '</body></html>';
+  const f = document.createElement('iframe'); f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0'; document.body.appendChild(f);
+  f.onload = () => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { toast('No se pudo abrir la impresión.'); } setTimeout(() => f.remove(), 60000); };
+  f.srcdoc = html;
+}
 
 function esc(v) {
   return String(v == null ? '' : v).replace(/[&<>'"]/g, c => ({
@@ -12867,6 +13188,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 35 · 13-oct 21:30</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 36 · 13-oct 23:10</div>
 </body>
 </html>

@@ -9736,6 +9736,542 @@ function registrarPagosLoteRhWeb(token, lista) {
 }
 
 
+/* =========================================================
+   PAGO A MÓVILES (contratistas): semanas, órdenes, lista de precios, deducciones y archivo del banco
+   ========================================================= */
+
+const PM = {
+  HOJAS: { PRE: 'PM_PRECIOS', CON: 'PM_CONTRATISTAS', SEM: 'PM_SEMANAS', ORD: 'PM_ORDENES', AJU: 'PM_AJUSTES', PAG: 'PM_PAGOS', EXT: 'PM_EXTRAS', PAR: 'PM_PARAMETROS' },
+  HEADERS: {
+    PRE: ['ID', 'Servicio', 'Precio', 'Alias', 'Orden', 'Activo'],
+    CON: ['ID', 'Nombre', 'Cedula', 'IBAN', 'Moviles', 'Aplica_IVA', 'Telefono', 'Correo', 'Obs', 'Activo', 'Actualizado'],
+    SEM: ['ID', 'Desde', 'Hasta', 'Estado', 'Notas', 'Creado_Por', 'Creado', 'Cerrada'],
+    ORD: ['ID', 'ID_Semana', 'Contrato', 'Cliente', 'Servicios', 'Costo_Archivo', 'Costo_Aplicado', 'Movil', 'Fecha', 'UF_Servicio', 'UF_Costo', 'Obs'],
+    AJU: ['ID', 'ID_Semana', 'ID_Contratista', 'Tipo', 'Monto', 'Detalle', 'Contrato', 'Movil', 'Creado_Por', 'Creado'],
+    PAG: ['ID_Semana', 'ID_Contratista', 'Factura', 'Obs', 'Pagado', 'Actualizado'],
+    EXT: ['ID', 'ID_Semana', 'Nombre', 'Cedula', 'IBAN', 'Monto', 'Concepto', 'Creado'],
+    PAR: ['Clave', 'Valor', 'Actualizado']
+  },
+  TEXTO: {
+    PRE: ['ID'], CON: ['ID', 'Cedula', 'IBAN', 'Moviles', 'Telefono', 'Actualizado'], SEM: ['ID', 'Desde', 'Hasta', 'Creado', 'Cerrada'],
+    ORD: ['ID', 'ID_Semana', 'Contrato', 'Movil', 'Fecha'], AJU: ['ID', 'ID_Semana', 'ID_Contratista', 'Contrato', 'Movil', 'Creado'],
+    PAG: ['ID_Semana', 'ID_Contratista', 'Factura', 'Pagado', 'Actualizado'], EXT: ['ID', 'ID_Semana', 'Cedula', 'IBAN', 'Creado'], PAR: ['Clave', 'Valor', 'Actualizado']
+  },
+  IVA: 13,
+  /* signo: +1 suma al pago, -1 resta; fase: 'antes' = antes del IVA (entra en la factura), 'despues' = rebajo sobre el total facturado */
+  TIPOS: {
+    RECLAMO: { txt: 'Reclamo (suma)', signo: 1, fase: 'antes' }, ALQUILER: { txt: 'Alquiler de móvil', signo: -1, fase: 'antes' },
+    PENALIZACION: { txt: 'Penalización', signo: -1, fase: 'antes' }, CAMISAS: { txt: 'Camisas / uniformes', signo: -1, fase: 'antes' },
+    INVENTARIO: { txt: 'Diferencia de inventario', signo: -1, fase: 'despues' }, INS: { txt: 'INS', signo: -1, fase: 'despues' },
+    REBAJO: { txt: 'Rebajo SRD', signo: -1, fase: 'despues' }, PRESTAMO: { txt: 'Préstamo / cuota', signo: -1, fase: 'despues' },
+    HERRAMIENTAS: { txt: 'Herramientas / arnés / cleavers', signo: -1, fase: 'despues' }, EXTRA: { txt: 'Pago adicional (suma)', signo: 1, fase: 'despues' }
+  },
+  /* Lista de precios 2025 (Telecable). Alias = textos con que Telecable nombra el servicio en el archivo semanal */
+  PRECIOS_DEF: [
+    ['Instalación FTTH', 20000, 'Instalacion FTTH'],
+    ['Reinstalación FTTH / Cambio de acometida FTTH', 9487.5, 'Cambio de acometida FTTH // Reinstalación FTTH'],
+    ['Cambio de red interna (instalación nueva)', 6375, 'Traslado interno // cambio red interna'],
+    ['Addendum TV / Internet / Telefonía', 5735, 'Ademdum de Tv Digital // Internet // Telefonía|Addendum de Tv Digital // Internet // Telefonía'],
+    ['Visita para TV adicional', 3825, ''],
+    ['Traslado interno fuera de la OT', 6375, ''],
+    ['Reubicación de acometida del NAP', 3825, ''],
+    ['Cambio de equipo / Instalación solo router', 2550, 'Cambio Dispositivo // Router'],
+    ['Televisor adicional (a partir del 3er TV en orden de addendum)', 1910, 'TV Adicional // Cambio conectores mecánicos'],
+    ['Instalación por ducto', 4395, ''],
+    ['Trabajo especial (autorizado en la orden)', 9487.5, '']
+  ],
+  /* Multas de la lista de precios y penalizaciones 2025 (atajos al registrar una penalización) */
+  PENALIZACIONES: [
+    ['No colocar colillas en la instalación', 30000], ['Mala colocación de número de colilla', 10000], ['Inconsistencia en cierre de órdenes', 10000],
+    ['Consumo de material mayor al real (5% a 15%)', 10000], ['Consumo de material mayor al real (más de 15%)', 15000], ['No contar con herramienta, uniformes o distintivos', 15000],
+    ['Instalación fuera de las normas de calidad', 15000], ['Ausencia o falta de uso de equipos de seguridad', 15000], ['Falta de identificación del NAP', 10000],
+    ['Clientes desconectados de un NAP saturado', 100000], ['Órdenes suspendidas dirigidas a estudio que sí eran factibles', 30000], ['Garantía: no resolver en 24 horas', 25000],
+    ['Reemplazo del técnico sin notificar a Telecable', 50000], ['Reemplazo del asistente sin notificar a Telecable', 10000], ['Negativa a prestar servicios aceptados', 15000],
+    ['Ausencia de geolocalización activa', 15000], ['Abandono de rol injustificado', 20000], ['Ausencia de móvil sin respaldo para el rol diario', 75000],
+    ['Activación tardía de la móvil (30 min)', 5000], ['Llegada tardía posterior al inventario', 10000], ['Pérdida de calcomanía «obras por contrata»', 10000],
+    ['Técnico en estado de embriaguez', 75000], ['Ofrecer servicios a título personal a clientes', 75000], ['No instalar por falta de materiales ya proveídos', 30000],
+    ['Conducta inapropiada con un cliente', 100000]
+  ],
+  /* Archivo para el banco (ancho fijo, formato del envío 295): valores por defecto */
+  BANCO_DEF: { codigo: 'C6Z0', ultimoEnvio: 295, flag: '9' }
+};
+const PM_FORMATEADAS = {};
+
+function pmHoja_(clave) {
+  const ss = obtenerSpreadsheet_();
+  const sh = asegurarHoja_(ss, PM.HOJAS[clave], PM.HEADERS[clave]);
+  if (!PM_FORMATEADAS[clave]) { PM_FORMATEADAS[clave] = true; formatearColumnasTexto_(sh, PM.TEXTO[clave]); }
+  return sh;
+}
+function pmR_(n) { return Math.round(n * 100 + (n < 0 ? -1e-6 : 1e-6)) / 100; }
+function pmNorm_(t) { return sinAcentos_(String(t || '')).toLowerCase().replace(/\s+/g, ' ').trim(); }
+function pmNum_(v) { const n = Number(String(v === null || v === undefined ? '' : v).replace(/[₡\s]/g, '').replace(/,/g, '')); return isNaN(n) ? 0 : n; }
+function pmMovil_(v) { const m = String(v === null || v === undefined ? '' : v).match(/(\d+)(?!.*\d)/); return m ? String(Number(m[1])) : ''; }
+function pmIban_(v) { let t = String(v || '').replace(/[\s-]/g, '').toUpperCase(); if (t.indexOf('CR') === 0) t = t.slice(2); return t; }
+function pmId_(pref, n) { return pref + (Date.now() + (n || 0)).toString(36).toUpperCase(); }
+function pmSemanaTxt_(sem) { return fmtRh_(sem.desde) + ' al ' + fmtRh_(sem.hasta); }
+
+function pmPrecios_() {
+  const sh = pmHoja_('PRE');
+  let l = leerObjetos_(sh);
+  if (!l.length) {
+    conBloqueo_(() => {
+      if (leerObjetos_(sh).length) return;
+      PM.PRECIOS_DEF.forEach((p, i) => appendPorEncabezados_(sh, { ID: 'S' + (i + 1), Servicio: p[0], Precio: p[1], Alias: p[2], Orden: i + 1, Activo: 'Sí' }));
+    });
+    l = leerObjetos_(sh);
+  }
+  return l.map(p => ({ id: txt_(p.ID), servicio: txt_(p.Servicio), precio: pmNum_(p.Precio), alias: txt_(p.Alias), orden: pmNum_(p.Orden), activo: txt_(p.Activo) !== 'No' }))
+    .sort((a, b) => a.orden - b.orden);
+}
+
+/* Costo según la lista: cada parte del servicio (separadas por « + ») debe coincidir con un servicio o alias; si alguna no se reconoce, devuelve null */
+function pmCostoLista_(servicios, precios) {
+  const partes = String(servicios || '').split(/\s\+\s/).map(pmNorm_).filter(Boolean);
+  if (!partes.length) return null;
+  let total = 0;
+  for (let i = 0; i < partes.length; i++) {
+    const p = precios.find(x => x.activo && (pmNorm_(x.servicio) === partes[i] || x.alias.split('|').some(a => pmNorm_(a) === partes[i])));
+    if (!p) return null;
+    total += p.precio;
+  }
+  return Math.round(total * 100) / 100;
+}
+
+function pmParam_(clave, def) {
+  const f = leerObjetos_(pmHoja_('PAR')).find(r => txt_(r.Clave) === clave);
+  return f ? txt_(f.Valor) : def;
+}
+function pmSetParam_(clave, valor) {
+  const sh = pmHoja_('PAR');
+  const t = leerTabla_(sh);
+  for (let i = 1; i < t.values.length; i++) {
+    if (txt_(t.values[i][t.idx.Clave]) === clave) { sh.getRange(i + 1, t.idx.Valor + 1).setValue(String(valor)); sh.getRange(i + 1, t.idx.Actualizado + 1).setValue(segAhora_()); return; }
+  }
+  appendPorEncabezados_(sh, { Clave: clave, Valor: String(valor), Actualizado: segAhora_() });
+}
+
+function pmConInfo_(c) {
+  return { id: txt_(c.ID), nombre: txt_(c.Nombre), cedula: txt_(c.Cedula), iban: pmIban_(c.IBAN), moviles: txt_(c.Moviles), aplicaIva: txt_(c.Aplica_IVA) !== 'No',
+    telefono: txt_(c.Telefono), correo: txt_(c.Correo), obs: txt_(c.Obs), activo: txt_(c.Activo) !== 'No' };
+}
+function pmMovilesDe_(c) { return String(c.moviles || '').split(/[^0-9]+/).filter(Boolean).map(x => String(Number(x))); }
+
+function obtenerPmWeb(token) {
+
+  requerirSesion_(token, 'admin');
+  const precios = pmPrecios_();
+  const sems = leerObjetos_(pmHoja_('SEM'));
+  const agg = {};
+  leerObjetos_(pmHoja_('ORD')).forEach(o => {
+    const id = txt_(o.ID_Semana); const a = agg[id] || (agg[id] = { n: 0, costo: 0, uf: 0 });
+    a.n++; a.costo += pmNum_(o.Costo_Aplicado); a.uf += pmNum_(o.UF_Costo);
+  });
+  return {
+    admin: true, hoy: rhHoy_(), iva: PM.IVA, precios: precios, tipos: PM.TIPOS, penalizaciones: PM.PENALIZACIONES.map(p => ({ nombre: p[0], monto: p[1] })),
+    contratistas: leerObjetos_(pmHoja_('CON')).map(pmConInfo_).sort((a, b) => a.nombre.localeCompare(b.nombre)),
+    semanas: sems.map(s => { const a = agg[txt_(s.ID)] || { n: 0, costo: 0, uf: 0 };
+      return { id: txt_(s.ID), desde: segFecha_(s.Desde) || '', hasta: segFecha_(s.Hasta) || '', estado: txt_(s.Estado) || 'Abierta', notas: txt_(s.Notas), ordenes: a.n, costo: rh2_(a.costo), uf: rh2_(a.uf) }; })
+      .sort((a, b) => b.desde.localeCompare(a.desde)),
+    banco: { codigo: pmParam_('banco_codigo', PM.BANCO_DEF.codigo), ultimoEnvio: Number(pmParam_('banco_ultimo_envio', PM.BANCO_DEF.ultimoEnvio)), flag: pmParam_('banco_flag', PM.BANCO_DEF.flag) }
+  };
+}
+
+/* Calcula el pago de cada contratista (móviles agrupadas) a partir de órdenes, ajustes y facturas */
+function pmResumen_(ordenes, ajustes, contratistas, pagos) {
+  const porMovil = {};
+  contratistas.forEach(c => pmMovilesDe_(c).forEach(m => { if (!porMovil[m]) porMovil[m] = c.id; }));
+  const filas = {};
+  const nueva = (id, c) => {
+    return filas[id] = { idCon: id, nombre: c ? c.nombre : '', cedula: c ? c.cedula : '', iban: c ? c.iban : '', aplicaIva: c ? c.aplicaIva : true, moviles: {}, nOrdenes: 0, detalle: 0, uf: 0,
+      reclamos: 0, alquileres: 0, penalizaciones: 0, camisas: 0, inventario: 0, ins: 0, rebajo: 0, prestamo: 0, herramientas: 0, extra: 0, factura: '', obs: '', pagado: '', sinContratista: !c };
+  };
+  const conPorId = {}; contratistas.forEach(c => { conPorId[c.id] = c; });
+  ordenes.forEach(o => {
+    const id = porMovil[o.movil] || ('SIN-' + o.movil);
+    const f = filas[id] || nueva(id, conPorId[porMovil[o.movil]]);
+    if (f.sinContratista && !f.nombre) f.nombre = 'Móvil ' + o.movil + ' (sin contratista)';
+    f.nOrdenes++; f.detalle += o.costo; f.uf += o.ufCosto;
+    const m = f.moviles[o.movil] || (f.moviles[o.movil] = { n: 0, detalle: 0 }); m.n++; m.detalle += o.costo;
+  });
+  const campo = { RECLAMO: 'reclamos', ALQUILER: 'alquileres', PENALIZACION: 'penalizaciones', CAMISAS: 'camisas', INVENTARIO: 'inventario', INS: 'ins', REBAJO: 'rebajo', PRESTAMO: 'prestamo', HERRAMIENTAS: 'herramientas', EXTRA: 'extra' };
+  ajustes.forEach(a => {
+    if (!campo[a.tipo]) return;
+    const f = filas[a.idCon] || (conPorId[a.idCon] ? nueva(a.idCon, conPorId[a.idCon]) : null);
+    if (f) f[campo[a.tipo]] += a.monto;
+  });
+  pagos.forEach(p => { const f = filas[p.idCon]; if (f) { f.factura = p.factura; f.obs = p.obs; f.pagado = p.pagado; } });
+  const lista = Object.keys(filas).map(k => filas[k]).map(f => {
+    f.subtotal = f.detalle + f.reclamos - f.alquileres - f.penalizaciones - f.camisas;
+    f.iva = f.aplicaIva ? f.subtotal * PM.IVA / 100 : 0;
+    f.totalFacturado = f.subtotal + f.iva;
+    f.deducciones = f.inventario + f.ins + f.rebajo + f.prestamo + f.herramientas - f.extra;
+    f.deposito = f.totalFacturado - f.deducciones;
+    ['detalle', 'uf', 'reclamos', 'alquileres', 'penalizaciones', 'camisas', 'inventario', 'ins', 'rebajo', 'prestamo', 'herramientas', 'extra', 'subtotal', 'iva', 'totalFacturado', 'deducciones', 'deposito'].forEach(n => { f[n] = pmR_(f[n]); });
+    Object.keys(f.moviles).forEach(m => { f.moviles[m].detalle = pmR_(f.moviles[m].detalle); });
+    return f;
+  }).sort((a, b) => (a.sinContratista ? 1 : 0) - (b.sinContratista ? 1 : 0) || a.nombre.localeCompare(b.nombre));
+  const tot = {};
+  ['nOrdenes', 'detalle', 'uf', 'reclamos', 'alquileres', 'penalizaciones', 'camisas', 'subtotal', 'iva', 'totalFacturado', 'inventario', 'ins', 'rebajo', 'prestamo', 'herramientas', 'extra', 'deducciones', 'deposito'].forEach(n => { tot[n] = pmR_(lista.reduce((a, f) => a + f[n], 0)); });
+  return { filas: lista, totales: tot };
+}
+
+function obtenerSemanaPmWeb(token, idSemana) {
+
+  requerirSesion_(token, 'admin');
+  idSemana = txt_(idSemana);
+  const sem = leerObjetos_(pmHoja_('SEM')).find(s => txt_(s.ID) === idSemana);
+  if (!sem) throw new Error('No se encontró la semana.');
+  const precios = pmPrecios_();
+  const contratistas = leerObjetos_(pmHoja_('CON')).map(pmConInfo_);
+  const ordenes = leerObjetos_(pmHoja_('ORD')).filter(o => txt_(o.ID_Semana) === idSemana).map(o => {
+    const lista = pmCostoLista_(o.Servicios, precios);
+    return { id: txt_(o.ID), contrato: txt_(o.Contrato), cliente: txt_(o.Cliente), servicios: txt_(o.Servicios), costoArchivo: pmNum_(o.Costo_Archivo), costo: pmNum_(o.Costo_Aplicado), movil: txt_(o.Movil),
+      fecha: segFecha_(o.Fecha) || '', ufServicio: txt_(o.UF_Servicio), ufCosto: pmNum_(o.UF_Costo), obs: txt_(o.Obs), costoLista: lista };
+  }).sort((a, b) => a.fecha.localeCompare(b.fecha) || a.movil.localeCompare(b.movil, undefined, { numeric: true }));
+  const ajustes = leerObjetos_(pmHoja_('AJU')).filter(a => txt_(a.ID_Semana) === idSemana).map(a => ({ id: txt_(a.ID), idCon: txt_(a.ID_Contratista), tipo: txt_(a.Tipo), monto: pmNum_(a.Monto), detalle: txt_(a.Detalle), contrato: txt_(a.Contrato), movil: txt_(a.Movil) }));
+  const pagos = leerObjetos_(pmHoja_('PAG')).filter(p => txt_(p.ID_Semana) === idSemana).map(p => ({ idCon: txt_(p.ID_Contratista), factura: txt_(p.Factura), obs: txt_(p.Obs), pagado: txt_(p.Pagado) }));
+  const extras = leerObjetos_(pmHoja_('EXT')).filter(e => txt_(e.ID_Semana) === idSemana).map(e => ({ id: txt_(e.ID), nombre: txt_(e.Nombre), cedula: txt_(e.Cedula), iban: pmIban_(e.IBAN), monto: pmNum_(e.Monto), concepto: txt_(e.Concepto) }));
+  const resumen = pmResumen_(ordenes, ajustes, contratistas.filter(c => c.activo), pagos);
+  const dif = ordenes.filter(o => o.costoLista !== null && Math.abs(o.costoLista - o.costo) > 0.005).length;
+  return { semana: { id: txt_(sem.ID), desde: segFecha_(sem.Desde) || '', hasta: segFecha_(sem.Hasta) || '', estado: txt_(sem.Estado) || 'Abierta', notas: txt_(sem.Notas) },
+    ordenes: ordenes, ajustes: ajustes, extras: extras, resumen: resumen, diferencias: dif, sinLista: ordenes.filter(o => o.costoLista === null).length };
+}
+
+/* Importa las órdenes del Excel semanal de Telecable. ordenes: [{contrato, cliente, servicios, costo, movil, fecha, ufServicio, ufCosto}] */
+function importarSemanaPmWeb(token, d) {
+
+  const ses = requerirSesion_(token, 'admin');
+  d = d || {};
+  const lista = Array.isArray(d.ordenes) ? d.ordenes : [];
+  if (!lista.length) throw new Error('No hay órdenes para importar.');
+  if (lista.length > 3000) throw new Error('Máximo 3000 órdenes por semana.');
+  const desde = segFecha_(d.desde), hasta = segFecha_(d.hasta);
+  if (!desde || !hasta || hasta < desde) throw new Error('Indica las fechas de la semana (desde y hasta).');
+  const precios = pmPrecios_();
+  const filas = lista.map((o, i) => {
+    const movil = pmMovil_(o.movil);
+    if (!movil) throw new Error('Orden ' + (i + 1) + ': móvil no válida («' + txt_(o.movil) + '»).');
+    const cArch = o.costo === null || o.costo === undefined || o.costo === '' ? null : pmNum_(o.costo);
+    const cLista = pmCostoLista_(o.servicios, precios);
+    return { Contrato: txt_(o.contrato), Cliente: txt_(o.cliente).slice(0, 80), Servicios: txt_(o.servicios).slice(0, 250), Costo_Archivo: cArch === null ? '' : cArch,
+      Costo_Aplicado: cArch !== null ? cArch : (cLista !== null ? cLista : 0), Movil: movil, Fecha: segFecha_(o.fecha) || '', UF_Servicio: txt_(o.ufServicio).slice(0, 80), UF_Costo: pmNum_(o.ufCosto), Obs: '' };
+  });
+  return conBloqueo_(() => {
+    const ssh = pmHoja_('SEM');
+    if (leerObjetos_(ssh).some(s => segFecha_(s.Desde) === desde && segFecha_(s.Hasta) === hasta)) throw new Error('Ya existe una semana con esas fechas. Ábrela o elimínala antes de volver a importar.');
+    const id = pmId_('W');
+    appendPorEncabezados_(ssh, { ID: id, Desde: desde, Hasta: hasta, Estado: 'Abierta', Notas: txt_(d.notas).slice(0, 200), Creado_Por: ses.usuario, Creado: segAhora_() });
+    const sh = pmHoja_('ORD');
+    const encab = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(x => String(x).trim());
+    const base = Date.now();
+    const datos = filas.map((o, i) => { o.ID = 'O' + (base + i).toString(36).toUpperCase(); o.ID_Semana = id; return encab.map(n => (n in o ? o[n] : '')); });
+    const ini = sh.getLastRow() + 1;
+    if (ini + datos.length - 1 > sh.getMaxRows()) sh.insertRowsAfter(sh.getMaxRows(), datos.length);
+    sh.getRange(ini, 1, datos.length, encab.length).setValues(datos);
+    return { ok: true, id: id, ordenes: datos.length };
+  });
+}
+
+function eliminarSemanaPmWeb(token, idSemana) {
+  requerirSesion_(token, 'admin');
+  idSemana = txt_(idSemana);
+  return conBloqueo_(() => {
+    ['ORD', 'AJU', 'PAG', 'EXT', 'SEM'].forEach(k => {
+      const sh = pmHoja_(k); const t = leerTabla_(sh);
+      const col = k === 'SEM' ? t.idx.ID : t.idx.ID_Semana;
+      const quedan = t.values.slice(1).filter(r => txt_(r[col]) !== idSemana);
+      if (quedan.length === t.values.length - 1) return;
+      const n = t.values.length - 1;
+      sh.getRange(2, 1, n, t.values[0].length).clearContent();
+      if (quedan.length) sh.getRange(2, 1, quedan.length, t.values[0].length).setValues(quedan);
+    });
+    return { ok: true };
+  });
+}
+
+function estadoSemanaPmWeb(token, idSemana, cerrada) {
+  requerirSesion_(token, 'admin');
+  return conBloqueo_(() => {
+    const sh = pmHoja_('SEM'); const t = leerTabla_(sh);
+    for (let i = 1; i < t.values.length; i++) {
+      if (txt_(t.values[i][t.idx.ID]) !== txt_(idSemana)) continue;
+      sh.getRange(i + 1, t.idx.Estado + 1).setValue(cerrada ? 'Cerrada' : 'Abierta');
+      sh.getRange(i + 1, t.idx.Cerrada + 1).setValue(cerrada ? segAhora_() : '');
+      return { ok: true };
+    }
+    throw new Error('No se encontró la semana.');
+  });
+}
+
+function pmSemanaAbierta_(idSemana) {
+  const s = leerObjetos_(pmHoja_('SEM')).find(x => txt_(x.ID) === txt_(idSemana));
+  if (!s) throw new Error('No se encontró la semana.');
+  if (txt_(s.Estado) === 'Cerrada') throw new Error('La semana está cerrada. Ábrela de nuevo para hacer cambios.');
+}
+
+/* Cambia el costo (o la móvil) de una orden */
+function editarOrdenPmWeb(token, id, d) {
+  requerirSesion_(token, 'admin');
+  d = d || {};
+  return conBloqueo_(() => {
+    const sh = pmHoja_('ORD'); const t = leerTabla_(sh);
+    for (let i = 1; i < t.values.length; i++) {
+      if (txt_(t.values[i][t.idx.ID]) !== txt_(id)) continue;
+      pmSemanaAbierta_(t.values[i][t.idx.ID_Semana]);
+      if (d.costo !== undefined && d.costo !== '') sh.getRange(i + 1, t.idx.Costo_Aplicado + 1).setValue(Math.max(0, pmNum_(d.costo)));
+      if (d.movil !== undefined && d.movil !== '') { const m = pmMovil_(d.movil); if (!m) throw new Error('Móvil no válida.'); sh.getRange(i + 1, t.idx.Movil + 1).setValue(m); }
+      if (d.obs !== undefined) sh.getRange(i + 1, t.idx.Obs + 1).setValue(txt_(d.obs).slice(0, 120));
+      return { ok: true };
+    }
+    throw new Error('No se encontró la orden.');
+  });
+}
+
+/* Pone en el costo aplicado el precio de la lista en las órdenes donde difiere (solo las que la lista reconoce) */
+function aplicarListaPmWeb(token, idSemana) {
+  requerirSesion_(token, 'admin');
+  idSemana = txt_(idSemana);
+  const precios = pmPrecios_();
+  return conBloqueo_(() => {
+    pmSemanaAbierta_(idSemana);
+    const sh = pmHoja_('ORD'); const t = leerTabla_(sh);
+    let n = 0;
+    for (let i = 1; i < t.values.length; i++) {
+      const r = t.values[i];
+      if (txt_(r[t.idx.ID_Semana]) !== idSemana) continue;
+      const l = pmCostoLista_(r[t.idx.Servicios], precios);
+      if (l !== null && Math.abs(l - pmNum_(r[t.idx.Costo_Aplicado])) > 0.005) { sh.getRange(i + 1, t.idx.Costo_Aplicado + 1).setValue(l); n++; }
+    }
+    return { ok: true, cambiadas: n };
+  });
+}
+
+function guardarAjustePmWeb(token, d) {
+  const ses = requerirSesion_(token, 'admin');
+  d = d || {};
+  if (!PM.TIPOS[txt_(d.tipo)]) throw new Error('Elige el tipo de ajuste.');
+  const monto = Math.abs(pmNum_(d.monto));
+  if (!(monto > 0)) throw new Error('El monto debe ser mayor que cero.');
+  if (!leerObjetos_(pmHoja_('CON')).some(c => txt_(c.ID) === txt_(d.idCon))) throw new Error('Elige el contratista.');
+  return conBloqueo_(() => {
+    pmSemanaAbierta_(d.idSemana);
+    const id = pmId_('A');
+    appendPorEncabezados_(pmHoja_('AJU'), { ID: id, ID_Semana: txt_(d.idSemana), ID_Contratista: txt_(d.idCon), Tipo: txt_(d.tipo), Monto: rh2_(monto), Detalle: txt_(d.detalle).slice(0, 200),
+      Contrato: txt_(d.contrato).slice(0, 30), Movil: pmMovil_(d.movil), Creado_Por: ses.usuario, Creado: segAhora_() });
+    return { ok: true, id: id };
+  });
+}
+
+function eliminarAjustePmWeb(token, id) {
+  requerirSesion_(token, 'admin');
+  return conBloqueo_(() => {
+    const sh = pmHoja_('AJU'); const t = leerTabla_(sh);
+    for (let i = 1; i < t.values.length; i++) {
+      if (txt_(t.values[i][t.idx.ID]) === txt_(id)) { pmSemanaAbierta_(t.values[i][t.idx.ID_Semana]); sh.deleteRow(i + 1); return { ok: true }; }
+    }
+    throw new Error('No se encontró el ajuste.');
+  });
+}
+
+/* Factura y observaciones de un contratista en una semana */
+function guardarPagoPmWeb(token, d) {
+  requerirSesion_(token, 'admin');
+  d = d || {};
+  return conBloqueo_(() => {
+    const sh = pmHoja_('PAG'); const t = leerTabla_(sh);
+    const o = { Factura: txt_(d.factura).slice(0, 40), Obs: txt_(d.obs).slice(0, 200), Pagado: txt_(d.pagado) ? (segFecha_(d.pagado) || '') : '', Actualizado: segAhora_() };
+    for (let i = 1; i < t.values.length; i++) {
+      if (txt_(t.values[i][t.idx.ID_Semana]) === txt_(d.idSemana) && txt_(t.values[i][t.idx.ID_Contratista]) === txt_(d.idCon)) {
+        Object.keys(o).forEach(n => sh.getRange(i + 1, t.idx[n] + 1).setValue(o[n]));
+        return { ok: true };
+      }
+    }
+    appendPorEncabezados_(sh, Object.assign({ ID_Semana: txt_(d.idSemana), ID_Contratista: txt_(d.idCon) }, o));
+    return { ok: true };
+  });
+}
+
+function guardarExtraPmWeb(token, d) {
+  requerirSesion_(token, 'admin');
+  d = d || {};
+  const nombre = txt_(d.nombre).slice(0, 80);
+  if (!nombre) throw new Error('Escribe el nombre.');
+  const iban = pmIban_(d.iban);
+  if (!/^\d{20}$/.test(iban)) throw new Error('La cuenta IBAN debe tener 20 dígitos (sin «CR»).');
+  const monto = pmNum_(d.monto);
+  if (!(monto > 0)) throw new Error('El monto debe ser mayor que cero.');
+  return conBloqueo_(() => {
+    const id = pmId_('E');
+    appendPorEncabezados_(pmHoja_('EXT'), { ID: id, ID_Semana: txt_(d.idSemana), Nombre: nombre, Cedula: txt_(d.cedula).slice(0, 30), IBAN: iban, Monto: rh2_(monto), Concepto: txt_(d.concepto).slice(0, 30) || 'Servicios prestados', Creado: segAhora_() });
+    return { ok: true, id: id };
+  });
+}
+
+function eliminarExtraPmWeb(token, id) {
+  requerirSesion_(token, 'admin');
+  return conBloqueo_(() => {
+    const sh = pmHoja_('EXT'); const t = leerTabla_(sh);
+    for (let i = 1; i < t.values.length; i++) if (txt_(t.values[i][t.idx.ID]) === txt_(id)) { sh.deleteRow(i + 1); return { ok: true }; }
+    throw new Error('No se encontró la línea.');
+  });
+}
+
+/* Copia a la semana las líneas «adicionales» (internos, ahorro, etc.) de la semana anterior más reciente */
+function copiarExtrasPmWeb(token, idSemana) {
+  requerirSesion_(token, 'admin');
+  idSemana = txt_(idSemana);
+  const sems = leerObjetos_(pmHoja_('SEM')).map(s => ({ id: txt_(s.ID), desde: segFecha_(s.Desde) || '' }));
+  const act = sems.find(s => s.id === idSemana);
+  if (!act) throw new Error('No se encontró la semana.');
+  const ext = leerObjetos_(pmHoja_('EXT'));
+  const prev = sems.filter(s => s.desde < act.desde && ext.some(e => txt_(e.ID_Semana) === s.id)).sort((a, b) => b.desde.localeCompare(a.desde))[0];
+  if (!prev) throw new Error('No hay una semana anterior con líneas adicionales.');
+  if (ext.some(e => txt_(e.ID_Semana) === idSemana)) throw new Error('Esta semana ya tiene líneas adicionales.');
+  return conBloqueo_(() => {
+    const sh = pmHoja_('EXT'); let n = 0;
+    ext.filter(e => txt_(e.ID_Semana) === prev.id).forEach(e => { appendPorEncabezados_(sh, { ID: pmId_('E', n++), ID_Semana: idSemana, Nombre: txt_(e.Nombre), Cedula: txt_(e.Cedula), IBAN: pmIban_(e.IBAN), Monto: pmNum_(e.Monto), Concepto: txt_(e.Concepto), Creado: segAhora_() }); });
+    return { ok: true, copiadas: n };
+  });
+}
+
+/* ---------- Contratistas, lista de precios y banco ---------- */
+
+function guardarContratistaPmWeb(token, d) {
+  requerirSesion_(token, 'admin');
+  d = d || {};
+  const nombre = txt_(d.nombre).replace(/\s+/g, ' ').slice(0, 100);
+  if (!nombre) throw new Error('Escribe el nombre o razón social.');
+  const iban = pmIban_(d.iban);
+  if (iban && !/^\d{20}$/.test(iban)) throw new Error('La cuenta IBAN debe tener 20 dígitos (sin «CR»).');
+  const moviles = String(d.moviles || '').split(/[^0-9]+/).filter(Boolean).map(x => String(Number(x))).join(',');
+  return conBloqueo_(() => {
+    const sh = pmHoja_('CON'); const t = leerTabla_(sh); const ahora = segAhora_();
+    const o = { Nombre: nombre, Cedula: txt_(d.cedula).slice(0, 30), IBAN: iban, Moviles: moviles, Aplica_IVA: d.aplicaIva === false || txt_(d.aplicaIva) === 'No' ? 'No' : 'Sí',
+      Telefono: txt_(d.telefono).slice(0, 30), Correo: txt_(d.correo).slice(0, 80), Obs: txt_(d.obs).slice(0, 200), Activo: d.activo === false || txt_(d.activo) === 'No' ? 'No' : 'Sí', Actualizado: ahora };
+    for (let i = 1; i < t.values.length; i++) {
+      if (txt_(d.id) && txt_(t.values[i][t.idx.ID]) === txt_(d.id)) { Object.keys(o).forEach(n => sh.getRange(i + 1, t.idx[n] + 1).setValue(o[n])); return { ok: true, id: txt_(d.id) }; }
+    }
+    o.ID = pmId_('K'); appendPorEncabezados_(sh, o);
+    return { ok: true, id: o.ID };
+  });
+}
+
+/* Importa contratistas desde la hoja «Pago»: [{movil, iban, nombre, cedula}]; las filas con el mismo nombre se unen y suman sus móviles */
+function importarContratistasPmWeb(token, lista) {
+  requerirSesion_(token, 'admin');
+  lista = Array.isArray(lista) ? lista : [];
+  if (!lista.length) throw new Error('No hay filas para importar.');
+  const grupos = {};
+  lista.forEach(f => {
+    const nombre = txt_(f.nombre).replace(/\s+/g, ' ');
+    if (!nombre) return;
+    const k = pmNorm_(nombre);
+    const g = grupos[k] || (grupos[k] = { nombre: nombre, cedula: '', iban: '', moviles: [] });
+    String(f.movil === null || f.movil === undefined ? '' : f.movil).split(/[^0-9]+/).filter(x => x && x.length <= 4).forEach(x => { const m = String(Number(x)); if (g.moviles.indexOf(m) === -1) g.moviles.push(m); });
+    if (!g.iban && pmIban_(f.iban)) g.iban = pmIban_(f.iban);
+    if (!g.cedula && txt_(f.cedula)) g.cedula = txt_(f.cedula);
+  });
+  return conBloqueo_(() => {
+    const sh = pmHoja_('CON'); const existentes = leerObjetos_(sh); const ahora = segAhora_(); let nuevos = 0, actualizados = 0, n = 0;
+    const t = leerTabla_(sh);
+    Object.keys(grupos).forEach(k => {
+      const g = grupos[k];
+      const idx = existentes.findIndex(c => pmNorm_(c.Nombre) === k);
+      if (idx >= 0) {
+        const fila = existentes[idx]._fila;
+        const ivaAntes = txt_(existentes[idx].Aplica_IVA);
+        const mov = Array.from(new Set(pmMovilesDe_({ moviles: txt_(existentes[idx].Moviles) }).concat(g.moviles))).join(',');
+        const set = (n2, v) => { if (v !== '' && v !== undefined) sh.getRange(fila, t.idx[n2] + 1).setValue(v); };
+        set('Moviles', mov); set('IBAN', g.iban || pmIban_(existentes[idx].IBAN)); set('Cedula', g.cedula || txt_(existentes[idx].Cedula)); set('Actualizado', ahora);
+        actualizados++;
+      } else {
+        appendPorEncabezados_(sh, { ID: pmId_('K', n++), Nombre: g.nombre, Cedula: g.cedula, IBAN: g.iban, Moviles: g.moviles.join(','), Aplica_IVA: 'Sí', Activo: 'Sí', Actualizado: ahora });
+        nuevos++;
+      }
+    });
+    return { ok: true, nuevos: nuevos, actualizados: actualizados };
+  });
+}
+
+function guardarPreciosPmWeb(token, lista) {
+  requerirSesion_(token, 'admin');
+  lista = Array.isArray(lista) ? lista : [];
+  if (!lista.length) throw new Error('La lista de precios no puede quedar vacía.');
+  const filas = lista.map((p, i) => {
+    const servicio = txt_(p.servicio).slice(0, 120);
+    if (!servicio) throw new Error('Fila ' + (i + 1) + ': escribe el servicio.');
+    const precio = pmNum_(p.precio);
+    if (precio < 0) throw new Error('Fila ' + (i + 1) + ': precio no válido.');
+    return { ID: 'S' + (i + 1), Servicio: servicio, Precio: precio, Alias: txt_(p.alias).slice(0, 400), Orden: i + 1, Activo: p.activo === false || txt_(p.activo) === 'No' ? 'No' : 'Sí' };
+  });
+  return conBloqueo_(() => {
+    const sh = pmHoja_('PRE'); const t = leerTabla_(sh); const n = t.values.length - 1;
+    if (n > 0) sh.getRange(2, 1, n, t.values[0].length).clearContent();
+    filas.forEach(o => appendPorEncabezados_(sh, o));
+    return { ok: true };
+  });
+}
+
+function guardarBancoPmWeb(token, d) {
+  requerirSesion_(token, 'admin');
+  d = d || {};
+  const codigo = txt_(d.codigo).toUpperCase();
+  if (!/^[A-Z0-9]{4}$/.test(codigo)) throw new Error('El código del convenio debe tener 4 caracteres (ej. C6Z0).');
+  return conBloqueo_(() => {
+    pmSetParam_('banco_codigo', codigo);
+    if (d.ultimoEnvio !== undefined && d.ultimoEnvio !== '') pmSetParam_('banco_ultimo_envio', Math.max(0, Math.floor(pmNum_(d.ultimoEnvio))));
+    if (txt_(d.flag)) pmSetParam_('banco_flag', txt_(d.flag).slice(0, 1));
+    return { ok: true };
+  });
+}
+
+
+/* ---------- Archivo del banco (ancho fijo, 182 columnas, CRLF) ---------- */
+function pmCampo_(t, ancho, der) {
+  t = String(t === null || t === undefined ? '' : t);
+  if (t.length > ancho) t = t.slice(0, ancho);
+  return der ? ('                                                            ' + t).slice(-ancho) : (t + '                                                                                                    ').slice(0, ancho);
+}
+function pmNombreBanco_(n) { return sinAcentos_(String(n || '')).toUpperCase().replace(/Ñ/g, 'N').replace(/[^A-Z0-9 ._-]/g, ' ').replace(/\s+/g, ' ').trim(); }
+function pmFacturaBanco_(f) {
+  f = String(f || '').replace(/\D/g, '');
+  if (!f) return 'Servicios prestados';
+  if (f.length < 20) f = '0010000101' + ('0000000000' + f).slice(-10);
+  return 'Fact ' + f.slice(-20);
+}
+
+function generarBancoPmWeb(token, idSemana, fechaPago, envio) {
+  requerirSesion_(token, 'admin');
+  const sd = obtenerSemanaPmWeb(token, idSemana);
+  const codigo = pmParam_('banco_codigo', PM.BANCO_DEF.codigo), flag = pmParam_('banco_flag', PM.BANCO_DEF.flag);
+  const nEnvio = Math.floor(pmNum_(envio)) || (Number(pmParam_('banco_ultimo_envio', PM.BANCO_DEF.ultimoEnvio)) + 1);
+  const f = segFecha_(fechaPago) || segHoyISO_();
+  const periodo = f.slice(0, 4) + f.slice(5, 7);
+  const avisos = [];
+  const items = [];
+  sd.resumen.filas.forEach(r => {
+    if (!(r.deposito > 0)) { if (r.nOrdenes) avisos.push(r.nombre + ': depósito en cero o negativo, no se incluye.'); return; }
+    if (!/^\d{20}$/.test(r.iban || '')) { avisos.push(r.nombre + ': falta la cuenta IBAN (20 dígitos), no se incluye.'); return; }
+    items.push({ iban: r.iban, monto: r.deposito, texto: pmFacturaBanco_(r.factura), nombre: r.nombre, factura: !!r.factura });
+  });
+  sd.extras.forEach(e => items.push({ iban: e.iban, monto: e.monto, texto: e.concepto || 'Servicios prestados', nombre: e.nombre, factura: false }));
+  if (!items.length) throw new Error('No hay pagos para incluir en el archivo.');
+  const cents = it => Math.round(it.monto * 100);
+  const total = items.reduce((a, it) => a + cents(it), 0);
+  const CRLF = '\r\n';
+  const head = 'B' + codigo + '  ' + pmCampo_(nEnvio, 3);
+  let out = pmCampo_(head, 35) + periodo + ' ' + flag + pmCampo_('', 4) + pmCampo_(total, 9, true) + pmCampo_('', 3) + pmCampo_(items.length, 2, true) + CRLF;
+  items.forEach((it, i) => {
+    let l = 'T' + codigo + '  ' + pmCampo_(nEnvio, 3) + pmCampo_(it.iban, 20) + pmCampo_(i + 1, 5, true) + periodo + ' ' + flag + pmCampo_(cents(it), 13, true) + pmCampo_('', 5) +
+      pmCampo_(it.texto, 31) + pmCampo_(pmNombreBanco_(it.nombre), 30);
+    out += pmCampo_(l, 181) + '2' + CRLF;
+  });
+  return { texto: out, nombre: 'INP' + codigo + '_envio_' + nEnvio + '.prn', envio: nEnvio, total: total / 100, cantidad: items.length, avisos: avisos,
+    lineas: items.map((it, i) => ({ n: i + 1, nombre: it.nombre, iban: it.iban, monto: it.monto, texto: it.texto })) };
+}
+
+
 /* =====================================================================
    AJUSTES PARA EL NUEVO SERVIDOR (reemplazan funciones de arriba)
    ===================================================================== */
@@ -9908,7 +10444,7 @@ function prepararSistemaWeb(token) {
 
   }
 
-return {loginWeb: loginWeb, miPerfilWeb: miPerfilWeb, guardarFotoPerfilWeb: guardarFotoPerfilWeb, validarSesionWeb: validarSesionWeb, logoutWeb: logoutWeb, cambiarClaveWeb: cambiarClaveWeb, listarUsuariosWeb: listarUsuariosWeb, crearUsuarioWeb: crearUsuarioWeb, actualizarUsuarioWeb: actualizarUsuarioWeb, obtenerDatosWeb: obtenerDatosWeb, obtenerSemanasWeb: obtenerSemanasWeb, obtenerCalendarioWeb: obtenerCalendarioWeb, obtenerRotacionBackupWeb: obtenerRotacionBackupWeb, guardarCalendarioWeb: guardarCalendarioWeb, obtenerHistorialWeb: obtenerHistorialWeb, agregarMovilWeb: agregarMovilWeb, actualizarMovilWeb: actualizarMovilWeb, obtenerHistorialMovilWeb: obtenerHistorialMovilWeb, darDeBajaMovilWeb: darDeBajaMovilWeb, reactivarMovilWeb: reactivarMovilWeb, exportarCalendarioClienteExcelWeb: exportarCalendarioClienteExcelWeb, obtenerResumenWeb: obtenerResumenWeb, obtenerFichasWeb: obtenerFichasWeb, guardarFichasWeb: guardarFichasWeb, obtenerPersonalWeb: obtenerPersonalWeb, buscarPersonaWeb: buscarPersonaWeb, obtenerVehiculosWeb: obtenerVehiculosWeb, deshacerSinTecnicosWeb: deshacerSinTecnicosWeb, guardarSalidaPersonalWeb: guardarSalidaPersonalWeb, obtenerCambiosFichasWeb: obtenerCambiosFichasWeb, exportarFichasExcelWeb: exportarFichasExcelWeb, obtenerSeguimientoWeb: obtenerSeguimientoWeb, guardarJustificacionTiempoWeb: guardarJustificacionTiempoWeb, guardarSeguimientoWeb: guardarSeguimientoWeb, guardarAlmuerzoWeb: guardarAlmuerzoWeb, guardarSalidaWeb: guardarSalidaWeb, corregirCorteWeb: corregirCorteWeb, eliminarCorteWeb: eliminarCorteWeb, obtenerAusenciasWeb: obtenerAusenciasWeb, guardarAusenciaWeb: guardarAusenciaWeb, marcarPenalizacionWeb: marcarPenalizacionWeb, eliminarAusenciaWeb: eliminarAusenciaWeb, importarFinalizadasWeb: importarFinalizadasWeb, guardarSuspendidaWeb: guardarSuspendidaWeb, marcarSuspendidasWeb: marcarSuspendidasWeb, guardarEstadoOtWeb: guardarEstadoOtWeb, eliminarSuspendidaWeb: eliminarSuspendidaWeb, obtenerBodegaWeb: obtenerBodegaWeb, guardarAlistosWeb: guardarAlistosWeb, obtenerAlistosWeb: obtenerAlistosWeb, cambiarEstadoAlistoWeb: cambiarEstadoAlistoWeb, aplicarAlistoWeb: aplicarAlistoWeb, obtenerMovimientosInvWeb: obtenerMovimientosInvWeb, guardarMovimientoInvWeb: guardarMovimientoInvWeb, firmarMovimientoInvWeb: firmarMovimientoInvWeb, obtenerFirmaInvWeb: obtenerFirmaInvWeb, eliminarMovimientoInvWeb: eliminarMovimientoInvWeb, guardarObjetivosWeb: guardarObjetivosWeb, aplicarCostosAdendumWeb: aplicarCostosAdendumWeb, guardarMaterialInvWeb: guardarMaterialInvWeb, importarConsumoWeb: importarConsumoWeb, obtenerConsumoDetalleWeb: obtenerConsumoDetalleWeb, eliminarCargaConsumoWeb: eliminarCargaConsumoWeb, importarDevolucionesWeb: importarDevolucionesWeb, obtenerDevolucionesWeb: obtenerDevolucionesWeb, obtenerHistorialDevolucionWeb: obtenerHistorialDevolucionWeb, registrarDevolucionLineaWeb: registrarDevolucionLineaWeb, recibirLineasDevolucionWeb: recibirLineasDevolucionWeb, registrarBoletaDevolucionWeb: registrarBoletaDevolucionWeb, registrarEntregaMovilWeb: registrarEntregaMovilWeb, justificarDevolucionWeb: justificarDevolucionWeb, cambiarEquipoDevolucionWeb: cambiarEquipoDevolucionWeb, revertirDevolucionWeb: revertirDevolucionWeb, eliminarPeriodoDevolucionesWeb: eliminarPeriodoDevolucionesWeb, aceptarAlertasBodegaWeb: aceptarAlertasBodegaWeb, obtenerNotificacionesWeb: obtenerNotificacionesWeb, obtenerConsumoInvWeb: obtenerConsumoInvWeb, obtenerCortesInvWeb: obtenerCortesInvWeb, crearCorteInvWeb: crearCorteInvWeb, obtenerConteoInvWeb: obtenerConteoInvWeb, guardarConteoInvWeb: guardarConteoInvWeb, justificarDiferenciaInvWeb: justificarDiferenciaInvWeb, cerrarCorteInvWeb: cerrarCorteInvWeb, eliminarCorteInvWeb: eliminarCorteInvWeb, reabrirCorteInvWeb: reabrirCorteInvWeb, guardarMapeoInvWeb: guardarMapeoInvWeb, compararClienteWeb: compararClienteWeb, cargarCatalogoOficialWeb: cargarCatalogoOficialWeb, aplicarObjetivoBaseWeb: aplicarObjetivoBaseWeb, unirMaterialInvWeb: unirMaterialInvWeb, eliminarMaterialesInvWeb: eliminarMaterialesInvWeb, kardexMaterialWeb: kardexMaterialWeb, guardarClienteCotWeb: guardarClienteCotWeb, eliminarClienteCotWeb: eliminarClienteCotWeb, guardarMaterialCotWeb: guardarMaterialCotWeb, eliminarMaterialCotWeb: eliminarMaterialCotWeb, importarMaterialesCotWeb: importarMaterialesCotWeb, obtenerCotizacionesWeb: obtenerCotizacionesWeb, obtenerCotizacionWeb: obtenerCotizacionWeb, guardarCotizacionWeb: guardarCotizacionWeb, cambiarEstadoCotWeb: cambiarEstadoCotWeb, subirFotoCotWeb: subirFotoCotWeb, eliminarFotoCotWeb: eliminarFotoCotWeb, obtenerArchivoCotWeb: obtenerArchivoCotWeb, guardarInformeCotWeb: guardarInformeCotWeb, guardarGastoCotWeb: guardarGastoCotWeb, marcarPagoGastoCotWeb: marcarPagoGastoCotWeb, anularGastoCotWeb: anularGastoCotWeb, eliminarGastoCotWeb: eliminarGastoCotWeb, guardarOCCotWeb: guardarOCCotWeb, facturarCotWeb: facturarCotWeb, registrarPagoFacturaCotWeb: registrarPagoFacturaCotWeb, revertirPagoFacturaCotWeb: revertirPagoFacturaCotWeb, revertirFacturaCotWeb: revertirFacturaCotWeb, archivarCotWeb: archivarCotWeb, desarchivarCotWeb: desarchivarCotWeb, enviarCotWeb: enviarCotWeb, eliminarCotizacionWeb: eliminarCotizacionWeb, configurarConsecutivoCotWeb: configurarConsecutivoCotWeb, miAccesoRhWeb: miAccesoRhWeb, obtenerRhWeb: obtenerRhWeb, guardarColaboradorWeb: guardarColaboradorWeb, crearSolicitudRhWeb: crearSolicitudRhWeb, cancelarSolicitudRhWeb: cancelarSolicitudRhWeb, resolverSolicitudRhWeb: resolverSolicitudRhWeb, obtenerPagosRhWeb: obtenerPagosRhWeb, registrarPagoRhWeb: registrarPagoRhWeb, eliminarPagoRhWeb: eliminarPagoRhWeb, obtenerAsistenciaRhWeb: obtenerAsistenciaRhWeb, marcarAsistenciaRhWeb: marcarAsistenciaRhWeb, guardarMiFichaRhWeb: guardarMiFichaRhWeb, guardarTasasRhWeb: guardarTasasRhWeb, obtenerTasasRhWeb: obtenerTasasRhWeb, obtenerReportePagosRhWeb: obtenerReportePagosRhWeb, registrarPagosLoteRhWeb: registrarPagosLoteRhWeb, loginPaso1_: loginPaso1_, loginPaso2_: loginPaso2_, refrescarWeb: refrescarWeb, prepararSistemaWeb: prepararSistemaWeb};
+return {loginWeb: loginWeb, miPerfilWeb: miPerfilWeb, guardarFotoPerfilWeb: guardarFotoPerfilWeb, validarSesionWeb: validarSesionWeb, logoutWeb: logoutWeb, cambiarClaveWeb: cambiarClaveWeb, listarUsuariosWeb: listarUsuariosWeb, crearUsuarioWeb: crearUsuarioWeb, actualizarUsuarioWeb: actualizarUsuarioWeb, obtenerDatosWeb: obtenerDatosWeb, obtenerSemanasWeb: obtenerSemanasWeb, obtenerCalendarioWeb: obtenerCalendarioWeb, obtenerRotacionBackupWeb: obtenerRotacionBackupWeb, guardarCalendarioWeb: guardarCalendarioWeb, obtenerHistorialWeb: obtenerHistorialWeb, agregarMovilWeb: agregarMovilWeb, actualizarMovilWeb: actualizarMovilWeb, obtenerHistorialMovilWeb: obtenerHistorialMovilWeb, darDeBajaMovilWeb: darDeBajaMovilWeb, reactivarMovilWeb: reactivarMovilWeb, exportarCalendarioClienteExcelWeb: exportarCalendarioClienteExcelWeb, obtenerResumenWeb: obtenerResumenWeb, obtenerFichasWeb: obtenerFichasWeb, guardarFichasWeb: guardarFichasWeb, obtenerPersonalWeb: obtenerPersonalWeb, buscarPersonaWeb: buscarPersonaWeb, obtenerVehiculosWeb: obtenerVehiculosWeb, deshacerSinTecnicosWeb: deshacerSinTecnicosWeb, guardarSalidaPersonalWeb: guardarSalidaPersonalWeb, obtenerCambiosFichasWeb: obtenerCambiosFichasWeb, exportarFichasExcelWeb: exportarFichasExcelWeb, obtenerSeguimientoWeb: obtenerSeguimientoWeb, guardarJustificacionTiempoWeb: guardarJustificacionTiempoWeb, guardarSeguimientoWeb: guardarSeguimientoWeb, guardarAlmuerzoWeb: guardarAlmuerzoWeb, guardarSalidaWeb: guardarSalidaWeb, corregirCorteWeb: corregirCorteWeb, eliminarCorteWeb: eliminarCorteWeb, obtenerAusenciasWeb: obtenerAusenciasWeb, guardarAusenciaWeb: guardarAusenciaWeb, marcarPenalizacionWeb: marcarPenalizacionWeb, eliminarAusenciaWeb: eliminarAusenciaWeb, importarFinalizadasWeb: importarFinalizadasWeb, guardarSuspendidaWeb: guardarSuspendidaWeb, marcarSuspendidasWeb: marcarSuspendidasWeb, guardarEstadoOtWeb: guardarEstadoOtWeb, eliminarSuspendidaWeb: eliminarSuspendidaWeb, obtenerBodegaWeb: obtenerBodegaWeb, guardarAlistosWeb: guardarAlistosWeb, obtenerAlistosWeb: obtenerAlistosWeb, cambiarEstadoAlistoWeb: cambiarEstadoAlistoWeb, aplicarAlistoWeb: aplicarAlistoWeb, obtenerMovimientosInvWeb: obtenerMovimientosInvWeb, guardarMovimientoInvWeb: guardarMovimientoInvWeb, firmarMovimientoInvWeb: firmarMovimientoInvWeb, obtenerFirmaInvWeb: obtenerFirmaInvWeb, eliminarMovimientoInvWeb: eliminarMovimientoInvWeb, guardarObjetivosWeb: guardarObjetivosWeb, aplicarCostosAdendumWeb: aplicarCostosAdendumWeb, guardarMaterialInvWeb: guardarMaterialInvWeb, importarConsumoWeb: importarConsumoWeb, obtenerConsumoDetalleWeb: obtenerConsumoDetalleWeb, eliminarCargaConsumoWeb: eliminarCargaConsumoWeb, importarDevolucionesWeb: importarDevolucionesWeb, obtenerDevolucionesWeb: obtenerDevolucionesWeb, obtenerHistorialDevolucionWeb: obtenerHistorialDevolucionWeb, registrarDevolucionLineaWeb: registrarDevolucionLineaWeb, recibirLineasDevolucionWeb: recibirLineasDevolucionWeb, registrarBoletaDevolucionWeb: registrarBoletaDevolucionWeb, registrarEntregaMovilWeb: registrarEntregaMovilWeb, justificarDevolucionWeb: justificarDevolucionWeb, cambiarEquipoDevolucionWeb: cambiarEquipoDevolucionWeb, revertirDevolucionWeb: revertirDevolucionWeb, eliminarPeriodoDevolucionesWeb: eliminarPeriodoDevolucionesWeb, aceptarAlertasBodegaWeb: aceptarAlertasBodegaWeb, obtenerNotificacionesWeb: obtenerNotificacionesWeb, obtenerConsumoInvWeb: obtenerConsumoInvWeb, obtenerCortesInvWeb: obtenerCortesInvWeb, crearCorteInvWeb: crearCorteInvWeb, obtenerConteoInvWeb: obtenerConteoInvWeb, guardarConteoInvWeb: guardarConteoInvWeb, justificarDiferenciaInvWeb: justificarDiferenciaInvWeb, cerrarCorteInvWeb: cerrarCorteInvWeb, eliminarCorteInvWeb: eliminarCorteInvWeb, reabrirCorteInvWeb: reabrirCorteInvWeb, guardarMapeoInvWeb: guardarMapeoInvWeb, compararClienteWeb: compararClienteWeb, cargarCatalogoOficialWeb: cargarCatalogoOficialWeb, aplicarObjetivoBaseWeb: aplicarObjetivoBaseWeb, unirMaterialInvWeb: unirMaterialInvWeb, eliminarMaterialesInvWeb: eliminarMaterialesInvWeb, kardexMaterialWeb: kardexMaterialWeb, guardarClienteCotWeb: guardarClienteCotWeb, eliminarClienteCotWeb: eliminarClienteCotWeb, guardarMaterialCotWeb: guardarMaterialCotWeb, eliminarMaterialCotWeb: eliminarMaterialCotWeb, importarMaterialesCotWeb: importarMaterialesCotWeb, obtenerCotizacionesWeb: obtenerCotizacionesWeb, obtenerCotizacionWeb: obtenerCotizacionWeb, guardarCotizacionWeb: guardarCotizacionWeb, cambiarEstadoCotWeb: cambiarEstadoCotWeb, subirFotoCotWeb: subirFotoCotWeb, eliminarFotoCotWeb: eliminarFotoCotWeb, obtenerArchivoCotWeb: obtenerArchivoCotWeb, guardarInformeCotWeb: guardarInformeCotWeb, guardarGastoCotWeb: guardarGastoCotWeb, marcarPagoGastoCotWeb: marcarPagoGastoCotWeb, anularGastoCotWeb: anularGastoCotWeb, eliminarGastoCotWeb: eliminarGastoCotWeb, guardarOCCotWeb: guardarOCCotWeb, facturarCotWeb: facturarCotWeb, registrarPagoFacturaCotWeb: registrarPagoFacturaCotWeb, revertirPagoFacturaCotWeb: revertirPagoFacturaCotWeb, revertirFacturaCotWeb: revertirFacturaCotWeb, archivarCotWeb: archivarCotWeb, desarchivarCotWeb: desarchivarCotWeb, enviarCotWeb: enviarCotWeb, eliminarCotizacionWeb: eliminarCotizacionWeb, configurarConsecutivoCotWeb: configurarConsecutivoCotWeb, miAccesoRhWeb: miAccesoRhWeb, obtenerRhWeb: obtenerRhWeb, guardarColaboradorWeb: guardarColaboradorWeb, crearSolicitudRhWeb: crearSolicitudRhWeb, cancelarSolicitudRhWeb: cancelarSolicitudRhWeb, resolverSolicitudRhWeb: resolverSolicitudRhWeb, obtenerPagosRhWeb: obtenerPagosRhWeb, registrarPagoRhWeb: registrarPagoRhWeb, eliminarPagoRhWeb: eliminarPagoRhWeb, obtenerAsistenciaRhWeb: obtenerAsistenciaRhWeb, marcarAsistenciaRhWeb: marcarAsistenciaRhWeb, guardarMiFichaRhWeb: guardarMiFichaRhWeb, guardarTasasRhWeb: guardarTasasRhWeb, obtenerTasasRhWeb: obtenerTasasRhWeb, obtenerReportePagosRhWeb: obtenerReportePagosRhWeb, registrarPagosLoteRhWeb: registrarPagosLoteRhWeb, obtenerPmWeb: obtenerPmWeb, obtenerSemanaPmWeb: obtenerSemanaPmWeb, importarSemanaPmWeb: importarSemanaPmWeb, eliminarSemanaPmWeb: eliminarSemanaPmWeb, estadoSemanaPmWeb: estadoSemanaPmWeb, editarOrdenPmWeb: editarOrdenPmWeb, aplicarListaPmWeb: aplicarListaPmWeb, guardarAjustePmWeb: guardarAjustePmWeb, eliminarAjustePmWeb: eliminarAjustePmWeb, guardarPagoPmWeb: guardarPagoPmWeb, guardarExtraPmWeb: guardarExtraPmWeb, eliminarExtraPmWeb: eliminarExtraPmWeb, copiarExtrasPmWeb: copiarExtrasPmWeb, guardarContratistaPmWeb: guardarContratistaPmWeb, importarContratistasPmWeb: importarContratistasPmWeb, guardarPreciosPmWeb: guardarPreciosPmWeb, guardarBancoPmWeb: guardarBancoPmWeb, generarBancoPmWeb: generarBancoPmWeb, loginPaso1_: loginPaso1_, loginPaso2_: loginPaso2_, refrescarWeb: refrescarWeb, prepararSistemaWeb: prepararSistemaWeb};
 })();
 
 /* =====================================================================
