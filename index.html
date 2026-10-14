@@ -1296,12 +1296,18 @@
       <section id="vistaPagoMov" style="display:none">
         <div class="subtabs" id="pmTabs">
           <button id="pmTSem" onclick="pmTab('sem')">Semanas</button>
+          <button id="pmTPag" onclick="pmTab('pag')">Pagos pendientes</button>
           <button id="pmTCon" onclick="pmTab('con')">Contratistas</button>
+          <button id="pmTPst" onclick="pmTab('pst')">Préstamos</button>
+          <button id="pmTPnl" onclick="pmTab('pnl')">Penalizaciones</button>
           <button id="pmTPre" onclick="pmTab('pre')">Lista de precios</button>
           <button id="pmTBan" onclick="pmTab('ban')">Banco</button>
         </div>
         <div id="pmPSem"></div>
+        <div id="pmPPag" style="display:none"></div>
         <div id="pmPCon" style="display:none"></div>
+        <div id="pmPPst" style="display:none"></div>
+        <div id="pmPPnl" style="display:none"></div>
         <div id="pmPPre" style="display:none"></div>
         <div id="pmPBan" style="display:none"></div>
         <div id="pmModalBg" class="modalBg" style="z-index:90"><div class="modal" id="pmModal" style="max-width:640px"></div></div>
@@ -6509,7 +6515,7 @@ function mostrarVista(v, forzar) {
 /* =========================================================
    PAGO A MÓVILES (solo administración)
    ========================================================= */
-let pmD = null, pmS = null, pmSemId = '', pmVista = 'res', pmTabAct = 'sem', pmImp = null, pmVer = null;
+let pmD = null, pmS = null, pmSemId = '', pmVista = 'mov', pmTabAct = 'sem', pmImp = null, pmVer = null;
 const pmM = n => '₡' + (Number(n) || 0).toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const pmFh = iso => iso ? iso.split('-').reverse().join('/') : '—';
 function pmModal(h, w) { $('pmModal').innerHTML = h; $('pmModal').style.maxWidth = (w || 640) + 'px'; $('pmModal').style.width = w ? '96vw' : ''; $('pmModalBg').classList.add('show'); }
@@ -6523,10 +6529,13 @@ async function abrirPagoMov() {
 }
 function pmTab(t) {
   pmTabAct = t;
-  [['sem', 'Sem'], ['con', 'Con'], ['pre', 'Pre'], ['ban', 'Ban']].forEach(x => { $('pmT' + x[1]).classList.toggle('active', x[0] === t); $('pmP' + x[1]).style.display = x[0] === t ? '' : 'none'; });
+  [['sem', 'Sem'], ['pag', 'Pag'], ['con', 'Con'], ['pst', 'Pst'], ['pnl', 'Pnl'], ['pre', 'Pre'], ['ban', 'Ban']].forEach(x => { $('pmT' + x[1]).classList.toggle('active', x[0] === t); $('pmP' + x[1]).style.display = x[0] === t ? '' : 'none'; });
   if (!pmD) return;
   if (t === 'sem') { if (pmSemId) pmRenderSemana(); else pmRenderSemanas(); }
   if (t === 'con') pmRenderCon();
+  if (t === 'pag') pmRenderPag();
+  if (t === 'pst') pmRenderPst();
+  if (t === 'pnl') pmRenderPnl();
   if (t === 'pre') pmRenderPre();
   if (t === 'ban') pmRenderBan();
   setTimeout(sideRefrescar, 30);
@@ -6537,8 +6546,8 @@ function pmRenderSemanas() {
   pmSemId = ''; pmS = null;
   let h = '<div class="toolbar"><button class="btn primary" onclick="pmImportarModal()">⬆ Importar semana de Telecable</button></div><div class="panel"><div class="panelHead"><h2>Semanas de pago</h2></div><div class="tableWrap">';
   if (!pmD.semanas.length) h += '<div class="loading">Aún no hay semanas. Importa el Excel «Pago servicios» que envía Telecable.</div>';
-  else h += '<table class="pmT"><thead><tr><th>Semana</th><th>Estado</th><th style="text-align:right">Órdenes</th><th style="text-align:right">Contratos</th><th>Precios</th><th style="text-align:right">Costo móviles (detalle)</th><th style="text-align:right">UF Telecable</th><th style="text-align:right">Margen</th><th></th></tr></thead><tbody>' +
-    pmD.semanas.map(s => '<tr style="cursor:pointer" onclick="pmAbrir(\'' + s.id + '\')"><td><b>' + esc(pmFh(s.desde)) + ' al ' + esc(pmFh(s.hasta)) + '</b></td><td>' + (s.estado === 'Cerrada' ? '<span class="chip verde">Cerrada</span>' : '<span class="chip amar">Abierta</span>') + '</td><td style="text-align:right">' + s.ordenes + '</td><td style="text-align:right">' + (s.contratos || 0) + '</td><td>' + (s.sinPrecio ? '<span class="chip rojo" title="Líneas sin precio de pago">⚠ ' + s.sinPrecio + ' sin precio</span>' : '<span class="chip verde">Todas con precio</span>') + '</td><td style="text-align:right">' + pmM(s.costo) + '</td><td style="text-align:right">' + pmM(s.uf) + '</td><td style="text-align:right"><b>' + pmM(s.uf - s.costo) + '</b></td><td style="text-align:right;white-space:nowrap" onclick="event.stopPropagation()"><button class="btn secondary" onclick="pmVista=\'cto\';pmAbrir(\'' + s.id + '\')">Contratos</button> <button class="btn secondary" onclick="pmAbrir(\'' + s.id + '\')">Abrir</button> <button class="btn secondary" title="Eliminar este archivo de pago" onclick="pmEliminarSemanaId(\'' + s.id + '\')">🗑</button></td></tr>').join('') + '</tbody></table>';
+  else h += '<table class="pmT"><thead><tr><th>Semana</th><th>Estado</th><th>Pago estimado</th><th>Pagos hechos</th><th style="text-align:right">Depósito pendiente</th><th style="text-align:right">Órdenes</th><th style="text-align:right">Contratos</th><th>Precios</th><th style="text-align:right">Costo móviles (detalle)</th><th style="text-align:right">UF Telecable</th><th style="text-align:right">Margen</th><th></th></tr></thead><tbody>' +
+    pmD.semanas.map(s => '<tr style="cursor:pointer" onclick="pmAbrir(\'' + s.id + '\')"><td><b>' + esc(pmFh(s.desde)) + ' al ' + esc(pmFh(s.hasta)) + '</b></td><td>' + (s.estado === 'Cerrada' ? '<span class="chip verde">Cerrada</span>' : '<span class="chip amar">Abierta</span>') + '</td><td>' + esc(pmFh(s.fechaPagoEst)) + '</td><td>' + (s.pagosHechos || 0) + ' / ' + (s.pagosTotal || 0) + '</td><td style="text-align:right;white-space:nowrap">' + pmM(s.depositoPendiente || 0) + '</td><td style="text-align:right">' + s.ordenes + '</td><td style="text-align:right">' + (s.contratos || 0) + '</td><td>' + (s.sinPrecio ? '<span class="chip rojo" title="Líneas sin precio de pago">⚠ ' + s.sinPrecio + ' sin precio</span>' : '<span class="chip verde">Todas con precio</span>') + '</td><td style="text-align:right">' + pmM(s.costo) + '</td><td style="text-align:right">' + pmM(s.uf) + '</td><td style="text-align:right"><b>' + pmM(s.uf - s.costo) + '</b></td><td style="text-align:right;white-space:nowrap" onclick="event.stopPropagation()"><button class="btn secondary" onclick="pmVista=\'cto\';pmAbrir(\'' + s.id + '\')">Contratos</button> <button class="btn secondary" onclick="pmAbrir(\'' + s.id + '\')">Abrir</button> <button class="btn secondary" title="Eliminar este archivo de pago" onclick="pmEliminarSemanaId(\'' + s.id + '\')">🗑</button></td></tr>').join('') + '</tbody></table>';
   $('pmPSem').innerHTML = h + '</div></div>';
 }
 async function pmAbrir(id) {
@@ -6554,13 +6563,14 @@ function pmRenderSemana() {
   const margen = T.uf - T.detalle;
   const tb = (v, t) => '<button class="' + (pmVista === v ? 'active' : '') + '" onclick="pmSub(\'' + v + '\')">' + t + '</button>';
   let h = '<div class="toolbar"><button class="btn secondary" onclick="pmRenderSemanas()">← Semanas</button><b style="font-size:15px">Semana ' + esc(pmFh(S.semana.desde)) + ' al ' + esc(pmFh(S.semana.hasta)) + '</b>' + (cerr ? '<span class="chip verde">Cerrada</span>' : '<span class="chip amar">Abierta</span>') +
-    '<span style="flex:1"></span><button class="btn secondary" onclick="pmPagoModal()">💵 Registrar pago</button><button class="btn secondary" onclick="pmCerrarSemana(' + (cerr ? 'false' : 'true') + ')">' + (cerr ? 'Reabrir' : 'Cerrar semana') + '</button><button class="btn secondary" onclick="pmEliminarSemana()">🗑 Eliminar</button></div>';
+    '<span class="chip azul" title="Semana + días de plazo habitual">Pago estimado: ' + esc(pmFh(S.semana.fechaPagoEst)) + '</span><span style="flex:1"></span>' + (cerr || !(S.prestamosActivos || []).length ? '' : '<button class="btn secondary" title="Rebaja la cuota semanal de cada préstamo activo" onclick="pmAplicarCuotas()">🏦 Aplicar cuotas de préstamos</button>') + '<button class="btn secondary" onclick="pmPagoModal()">💵 Registrar pago</button><button class="btn secondary" onclick="pmCerrarSemana(' + (cerr ? 'false' : 'true') + ')">' + (cerr ? 'Reabrir' : 'Cerrar semana') + '</button><button class="btn secondary" onclick="pmEliminarSemana()">🗑 Eliminar</button></div>';
   h += '<div class="panel"><div style="display:flex;gap:18px;flex-wrap:wrap;padding:12px 14px;font-size:13px">' +
     [['Órdenes', T.nOrdenes], ['Costo detalle', pmM(T.detalle)], ['UF Telecable', pmM(T.uf)], ['Margen (UF − costo)', pmM(margen)], ['Total facturado', pmM(T.totalFacturado)], ['Total a depositar', pmM(T.deposito)]]
       .map(x => '<div><div style="color:#667;font-size:11px">' + x[0] + '</div><b style="font-size:15px">' + x[1] + '</b></div>').join('') + '</div></div>';
   if (S.diferencias || S.sinLista) h += '<div class="panel" style="padding:10px 14px;font-size:13px;background:#fff8e1">' + (S.diferencias ? '⚠ <b>' + S.diferencias + '</b> orden(es) con costo distinto a la lista de precios. ' + (cerr ? '' : '<button class="btn secondary" onclick="pmAplicarLista()">Aplicar precio de lista</button> ') : '') + (S.sinLista ? '⚠ <b>' + S.sinLista + '</b> orden(es) sin precio de pago (el servicio no está en la lista). ' + (cerr ? '' : '<button class="btn primary" onclick="pmSinPrecioModal()">Asignar precio</button>') : '') + '</div>';
-  h += '<div class="subtabs">' + tb('res', 'Pago por contratista') + tb('ord', 'Órdenes') + tb('cto', 'Contratos') + tb('ape', 'Apelaciones' + (S.apelaciones.some(a => a.estado === 'Pendiente') ? ' •' : '')) + tb('aju', 'Ajustes') + tb('ext', 'Adicionales') + tb('ver', 'Verificación') + tb('arc', 'Archivos') + '</div>';
+  h += '<div class="subtabs">' + tb('mov', 'Resumen por móvil') + tb('cto', 'Contratos importados') + tb('res', 'Pago por contratista') + tb('ord', 'Órdenes') + tb('ape', 'Apelaciones' + (S.apelaciones.some(a => a.estado === 'Pendiente') ? ' •' : '')) + tb('aju', 'Ajustes') + tb('ext', 'Adicionales') + tb('ver', 'Verificación') + tb('arc', 'Archivos') + '</div>';
   h += '<div class="panel"><div class="tableWrap">';
+  if (pmVista === 'mov') h += pmHtmlMov();
   if (pmVista === 'res') h += pmHtmlRes(cerr);
   if (pmVista === 'ord') h += pmHtmlOrd(cerr);
   if (pmVista === 'cto') h += pmHtmlCto();
@@ -6576,7 +6586,7 @@ function pmRenderSemana() {
 const PM_GRUPOS = {
   apel: { t: 'Apelaciones', tipos: ['RECLAMO'], efecto: '+ Suman a la factura (antes del IVA).', color: '#2d5a1b' },
   pen: { t: 'Penalizaciones', tipos: ['PENALIZACION'], efecto: '− Restan de la factura (antes del IVA).', color: '#9b1c1c' },
-  alq: { t: 'Alquiler / uniformes', tipos: ['ALQUILER', 'CAMISAS'], efecto: '− Restan de la factura (antes del IVA).', color: '#9b1c1c' },
+  alq: { t: 'Alquiler / uniformes / otros', tipos: ['ALQUILER', 'CAMISAS', 'OTROANTES'], efecto: '− Restan de la factura (antes del IVA).', color: '#9b1c1c' },
   reb: { t: 'Rebajos al depósito', tipos: ['ADELANTO', 'PRESTAMO', 'INVENTARIO', 'INS', 'HERRAMIENTAS', 'REBAJO', 'EXTRA'], efecto: 'No afectan la factura: se descuentan solo del depósito (los «Pago adicional» se suman al depósito).', color: '#9b1c1c' }
 };
 function pmAjDe(idCon, g) { return pmS.ajustes.filter(a => a.idCon === idCon && PM_GRUPOS[g].tipos.indexOf(a.tipo) >= 0); }
@@ -6592,7 +6602,7 @@ function pmHtmlRes(cerr) {
   const th = (t, s) => '<th style="text-align:' + (s || 'left') + '">' + t + '</th>';
   const num = v => '<td style="text-align:right;white-space:nowrap">' + v + '</td>';
   return '<div style="padding:8px 12px;font-size:12px;color:#667">Haz clic en las celdas <b>Apelaciones</b>, <b>Penalizaciones</b>, <b>Alquiler</b> y <b>Rebajos</b> para ver o cargar varios valores. Apelaciones suman a la factura; penalizaciones y alquiler la restan; los rebajos solo bajan el depósito.</div>' +
-    '<table class="pmT"><thead><tr>' + th('Contratista (factura)') + th('Órd.', 'right') + th('Detalle', 'right') + th('Apelaciones (+)', 'right') + th('Penaliz. (−)', 'right') + th('Alquiler (−)', 'right') + th('A facturar', 'right') + th('IVA 13%', 'right') + th('Total factura', 'right') + th('Rebajos (−)', 'right') + th('A depositar', 'right') + th('N.º factura') + th('Pagado') + '<th></th></tr></thead><tbody>' +
+    '<table class="pmT"><thead><tr><th colspan="3"></th><th colspan="3" style="text-align:center;background:#7a1a1a;color:#fff">Antes de facturar · afectan la factura</th><th colspan="3"></th><th style="text-align:center;background:#444;color:#fff">Después de facturar</th><th colspan="4"></th></tr><tr>' + th('Contratista (factura)') + th('Órd.', 'right') + th('Detalle', 'right') + th('Apelaciones (+)', 'right') + th('Penaliz. (−)', 'right') + th('Alquiler / otros (−)', 'right') + th('A facturar', 'right') + th('IVA 13%', 'right') + th('Total factura', 'right') + th('Rebajos (−)', 'right') + th('A depositar', 'right') + th('N.º factura') + th('Pagado') + '<th></th></tr></thead><tbody>' +
     R.filas.map(f => {
       const tec = (f.tecnicos || []).map(t => 'M' + esc(t.movil) + (t.tecnico && pmNorm(t.tecnico) !== pmNorm(f.nombre) ? ' · ' + esc(t.tecnico) : '')).join(' &nbsp;|&nbsp; ');
       return '<tr' + (f.sinContratista ? ' style="background:#fdecea"' : '') + '><td><b>' + esc(f.nombre) + '</b>' +
@@ -6600,12 +6610,12 @@ function pmHtmlRes(cerr) {
         (f.titular && f.titular !== f.nombre ? '<div style="font-size:11px;color:#556">Cuenta a nombre de ' + esc(f.titular) + '</div>' : '') +
         (f.fueraPlazo ? '<div><span class="chip rojo">Salió ' + esc(pmFh(f.salida)) + ': pasó el plazo de 2 semanas</span></div>' : (f.estadoSis === 'inactiva' ? '<div><span class="chip amar">Salió ' + esc(pmFh(f.salida)) + ' · paga hasta ' + esc(pmFh(f.plazoHasta)) + '</span></div>' : '')) +
         (f.sinContratista ? '<div style="font-size:11px;color:#9b1c1c">Móvil sin contratista: créalo en la pestaña Contratistas</div>' : (!/^\d{20}$/.test(f.iban || '') ? '<div style="font-size:11px;color:#9b1c1c">Falta IBAN</div>' : '')) + '</td>' +
-        num(f.nOrdenes) + num(pmM(f.detalle)) + pmCelda(f, 'apel', f.reclamos, cerr) + pmCelda(f, 'pen', f.penalizaciones, cerr) + pmCelda(f, 'alq', f.alquileres + f.camisas, cerr) +
+        num(f.nOrdenes) + num(pmM(f.detalle)) + pmCelda(f, 'apel', f.reclamos, cerr) + pmCelda(f, 'pen', f.penalizaciones, cerr) + pmCelda(f, 'alq', f.alquileres + f.camisas + f.otros, cerr) +
         '<td style="text-align:right;white-space:nowrap"><b>' + pmM(f.subtotal) + '</b></td>' + num(f.aplicaIva ? pmM(f.iva) : '<span style="color:#888">sin IVA</span>') + '<td style="text-align:right;white-space:nowrap"><b>' + pmM(f.totalFacturado) + '</b></td>' +
         pmCelda(f, 'reb', f.deducciones, cerr) + '<td style="text-align:right;white-space:nowrap;background:#eef7ee"><b>' + pmM(f.deposito) + '</b></td>' +
-        '<td>' + (f.sinContratista ? '' : '<input style="width:118px" value="' + esc(f.factura) + '" ' + (cerr ? 'disabled' : '') + ' onchange="pmGuardarFactura(\'' + f.idCon + '\',this.value)" placeholder="N.º factura">') + '</td><td>' + (f.pagado ? '<span class="chip verde">' + esc(pmFh(f.pagado)) + '</span>' : (f.sinContratista ? '' : '<span style="color:#999">—</span>')) + '</td><td>' + (f.sinContratista ? '' : '<button class="btn secondary" title="Estado de cuenta" onclick="pmEstadoCuenta(\'' + f.idCon + '\')">📄</button>') + '</td></tr>';
+        '<td>' + (f.sinContratista ? '' : '<input style="width:118px" value="' + esc(f.factura) + '" ' + (cerr ? 'disabled' : '') + ' onchange="pmGuardarFactura(\'' + f.idCon + '\',this.value)" placeholder="N.º factura">') + '</td><td>' + (f.pagado ? '<span class="chip verde">' + esc(pmFh(f.pagado)) + '</span>' : (f.sinContratista ? '' : '<span style="color:#999">—</span>')) + '</td><td style="white-space:nowrap">' + (f.sinContratista ? '' : '<button class="btn secondary" title="Estado de cuenta (imprimir / PDF)" onclick="pmEstadoCuenta(\'' + f.idCon + '\')">📄</button> <button class="btn secondary" title="Enviar por correo" onclick="pmCorreo(\'' + f.idCon + '\')">✉</button>') + '</td></tr>';
     }).join('') +
-    '<tr style="font-weight:700;background:#f3f6fa"><td>Total</td>' + num(T.nOrdenes) + num(pmM(T.detalle)) + num(pmM(T.reclamos)) + num(pmM(T.penalizaciones)) + num(pmM(T.alquileres + T.camisas)) + num(pmM(T.subtotal)) + num(pmM(T.iva)) + num(pmM(T.totalFacturado)) + num(pmM(T.deducciones)) + num(pmM(T.deposito)) + '<td></td><td></td><td></td></tr></tbody></table>';
+    '<tr style="font-weight:700;background:#f3f6fa"><td>Total</td>' + num(T.nOrdenes) + num(pmM(T.detalle)) + num(pmM(T.reclamos)) + num(pmM(T.penalizaciones)) + num(pmM(T.alquileres + T.camisas + T.otros)) + num(pmM(T.subtotal)) + num(pmM(T.iva)) + num(pmM(T.totalFacturado)) + num(pmM(T.deducciones)) + num(pmM(T.deposito)) + '<td></td><td></td><td></td></tr></tbody></table>';
 }
 function pmNorm(t) { return String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim(); }
 
@@ -6622,8 +6632,8 @@ function pmLibro(idCon, g) {
   if (!cerr) {
     h += '<div id="plbForm" style="margin-top:12px;padding:10px;background:#f7f9fc;border:1px solid #dde3ec;border-radius:8px"><b style="font-size:13px">Agregar</b><div style="display:grid;gap:8px;grid-template-columns:1fr 1fr;margin-top:6px">' +
       (g === 'pen' ? '<label style="grid-column:1/3">Penalización de la lista (opcional)<select id="plbPen" onchange="const p=pmD.penalizaciones[+this.value];if(p){$(\'plbMonto\').value=p.monto;$(\'plbDet\').value=p.nombre}"><option value="">—</option>' + pmD.penalizaciones.map((p, i) => '<option value="' + i + '">' + esc(p.nombre) + ' · ' + pmM(p.monto) + '</option>').join('') + '</select></label>' : '') +
-      (G.tipos.length > 1 ? '<label>Tipo<select id="plbTipo">' + G.tipos.map(k => '<option value="' + k + '">' + esc(pmD.tipos[k].txt) + '</option>').join('') + '</select></label>' : '<input type="hidden" id="plbTipo" value="' + G.tipos[0] + '"><label>Tipo<input disabled value="' + esc(pmD.tipos[G.tipos[0]].txt) + '"></label>') +
-      '<label>Monto (₡)<input id="plbMonto" type="number" step="0.01" min="0"></label>' +
+      (G.tipos.length > 1 ? '<label>Tipo<select id="plbTipo" onchange="pmLibroTipo()">' + G.tipos.map(k => '<option value="' + k + '">' + esc(pmD.tipos[k].txt) + '</option>').join('') + '</select></label>' : '<input type="hidden" id="plbTipo" value="' + G.tipos[0] + '"><label>Tipo<input disabled value="' + esc(pmD.tipos[G.tipos[0]].txt) + '"></label>') +
+      (g === 'reb' ? '<label id="plbPW" style="display:none;grid-column:1/3">Préstamo al que corresponde la cuota<select id="plbPr"><option value="">— sin vincular —</option>' + (pmS.prestamosActivos || []).filter(p => p.idCon === idCon).map(p => '<option value="' + p.id + '">' + esc(p.concepto || 'Préstamo') + ' · ' + esc(pmFh(p.fecha)) + ' · debe ' + pmM(p.debe) + (p.cuota ? ' · cuota ' + pmM(p.cuota) : '') + '</option>').join('') + '</select></label>' : '') + '<label>Monto (₡)<input id="plbMonto" type="number" step="0.01" min="0"></label>' +
       '<label style="grid-column:1/3"><b>Concepto' + (g === 'reb' ? ' — obligatorio: a qué corresponde el rebajo' : '') + '</b><input id="plbDet" maxlength="200" placeholder="' + (g === 'reb' ? 'ej. Adelanto del 12/10, cuota préstamo arnés...' : 'ej. Apelación OT 55238400') + '"></label>' +
       '<label>Contrato (opcional)<input id="plbCto" maxlength="30"></label></div>' + '<div style="text-align:right;margin-top:8px"><button class="btn primary" onclick="pmLibroAgregar()">➕ Agregar</button></div></div>';
   }
@@ -6635,10 +6645,11 @@ async function pmLibroAgregar() {
   if (!(+$('plbMonto').value > 0)) { toast('Escribe el monto.'); $('plbMonto').focus(); return; }
   if (PM_GRUPOS[b.g].tipos.some(k => pmD.tipos[k].fase === 'despues') && $('plbDet').value.trim().length < 3) { toast('Escribe el concepto: a qué corresponde el rebajo.'); $('plbDet').style.outline = '2px solid #c0392b'; $('plbDet').focus(); return; }
   try {
-    await api('guardarAjustePmWeb', { idSemana: pmSemId, idCon: b.idCon, tipo: $('plbTipo').value, monto: $('plbMonto').value, detalle: $('plbDet').value, contrato: $('plbCto').value });
+    await api('guardarAjustePmWeb', { idSemana: pmSemId, idCon: b.idCon, tipo: $('plbTipo').value, monto: $('plbMonto').value, detalle: $('plbDet').value, contrato: $('plbCto').value, idPrestamo: ($('plbTipo').value === 'PRESTAMO' && $('plbPr')) ? $('plbPr').value : '' });
     await pmRecargar(); pmLibro(b.idCon, b.g); toast('Registrado.');
   } catch (e) { mostrarError(e, 'No se pudo guardar.'); }
 }
+function pmLibroTipo() { const w = $('plbPW'); if (w) w.style.display = $('plbTipo').value === 'PRESTAMO' ? '' : 'none'; }
 async function pmLibroBorrar(id) {
   const b = pmLb; if (!confirm('¿Eliminar este registro?')) return;
   try { await api('eliminarAjustePmWeb', id); await pmRecargar(); pmLibro(b.idCon, b.g); } catch (e) { mostrarError(e, 'No se pudo eliminar.'); }
@@ -6964,7 +6975,7 @@ async function pmImportarGuardar() {
   $('pmImpBtn').disabled = true; $('pmImpBtn').textContent = 'Importando...';
   try {
     const r = await api('importarSemanaPmWeb', { desde: $('pmIDesde').value, hasta: $('pmIHasta').value, ordenes: pmImp.ordenes, penalizaciones: pmImp.penalizaciones });
-    pmCerrar(); pmD = await api('obtenerPmWeb'); await pmAbrir(r.id); toast('Semana importada: ' + r.ordenes + ' órdenes' + (r.penalizaciones ? ' y ' + r.penalizaciones + ' penalización(es)' : '') + '.');
+    pmCerrar(); pmD = await api('obtenerPmWeb'); pmVista = 'mov'; await pmAbrir(r.id); toast('Semana importada: ' + r.ordenes + ' órdenes' + (r.penalizaciones ? ' y ' + r.penalizaciones + ' penalización(es)' : '') + '.');
     if (pmS.resumen.filas.some(f => f.sinContratista)) toast('Hay móviles sin contratista: créalos en la pestaña Contratistas.', 5000);
   } catch (e) { $('pmImpBtn').disabled = false; $('pmImpBtn').textContent = 'Importar'; mostrarError(e, 'No se pudo importar.'); }
 }
@@ -7141,7 +7152,7 @@ function pmHtmlArc() {
     '<div><h3 style="margin:0 0 4px">Archivo para el banco</h3><div style="font-size:12px;color:#667;margin-bottom:6px">Genera el .prn de pago de planillas y proveedores con los depósitos de esta semana' + (pmS.extras.length ? ' y las líneas adicionales' : '') + '. Antes de subirlo revisa el total.</div><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end"><label>Fecha de pago<input type="date" id="paFec" value="' + (pmD.hoy || '') + '"></label><label>N.º de envío<input type="number" id="paEnv" style="width:90px" value="' + (pmD.banco.ultimoEnvio + 1) + '"></label><button class="btn primary" onclick="pmBanco()">Generar archivo .prn</button></div><div id="pmBanOut" style="margin-top:8px"></div></div>' +
     '<div><h3 style="margin:0 0 4px">Resumen semanal</h3><div style="font-size:12px;color:#667;margin-bottom:6px">Excel con las hojas Detalle (por contratista) y Pago (depósitos), más las órdenes.</div><button class="btn secondary" onclick="pmResumenExcel()">⬇ Descargar Excel</button></div>' +
     '<div><h3 style="margin:0 0 4px">Corte por móvil</h3><div style="font-size:12px;color:#667;margin-bottom:6px">Detalle de las órdenes de cada móvil con su pago (sin ajustes del contratista). Excel con una hoja por móvil, o PDF para imprimir.</div><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end"><label>Móvil<select id="pmCorteM"><option value="">Todas</option>' + pmCortesMoviles().map(x => '<option value="' + x.movil + '">' + x.movil + '</option>').join('') + '</select></label><button class="btn secondary" onclick="pmCortesExcel($(\'pmCorteM\').value)">⬇ Excel</button><button class="btn secondary" onclick="pmCortePdf($(\'pmCorteM\').value)">🖨 PDF</button></div></div>' +
-    '<div><h3 style="margin:0 0 4px">Estados de cuenta</h3><div style="font-size:12px;color:#667;margin-bottom:6px">Un estado por contratista con sus órdenes, ajustes y depósito. Se abre para imprimir o guardar como PDF (todos juntos, una página cada uno).</div><button class="btn secondary" onclick="pmEstadoCuenta(\'\')">🖨 Todos los contratistas</button></div></div>';
+    '<div><h3 style="margin:0 0 4px">Estados de cuenta</h3><div style="font-size:12px;color:#667;margin-bottom:6px">Un estado por contratista con sus órdenes, ajustes y depósito. Se abre para imprimir o guardar como PDF (todos juntos, una página cada uno).</div><button class="btn secondary" onclick="pmEstadoCuenta(\'\')">🖨 Todos los contratistas</button></div><div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:end"><label>Reporte individual<select id="pmEcCon">' + pmS.resumen.filas.filter(f => !f.sinContratista).map(f => '<option value="' + f.idCon + '">' + esc(f.nombre) + '</option>').join('') + '</select></label><button class="btn secondary" onclick="pmEstadoCuenta($(\'pmEcCon\').value)">🖨 Imprimir / PDF</button><button class="btn secondary" onclick="pmEstadoCuenta($(\'pmEcCon\').value,\'html\')">⬇ Descargar</button><button class="btn secondary" onclick="pmCorreo($(\'pmEcCon\').value)">✉ Correo</button></div></div></div>';
 }
 async function pmBanco() {
   try {
@@ -7157,7 +7168,7 @@ async function pmResumenExcel() {
   try {
     await cargarLib('xlsx', SEG_URL_XLSX);
     const S = pmS, R = S.resumen;
-    const det = [['Móvil(es)', 'Técnico', 'Órdenes', 'Detalle', 'Reclamos', 'Alquileres', 'Penalizaciones', 'Camisas', 'Sub total', 'IVA', 'Total']].concat(R.filas.map(f => [Object.keys(f.moviles).join(','), f.nombre, f.nOrdenes, f.detalle, f.reclamos, f.alquileres, f.penalizaciones, f.camisas, f.subtotal, f.iva, f.totalFacturado]));
+    const det = [['Móvil(es)', 'Técnico', 'Órdenes', 'Detalle', 'Reclamos', 'Alquileres', 'Penalizaciones', 'Camisas', 'Otros antes', 'Sub total', 'IVA', 'Total']].concat(R.filas.map(f => [Object.keys(f.moviles).join(','), f.nombre, f.nOrdenes, f.detalle, f.reclamos, f.alquileres, f.penalizaciones, f.camisas, f.otros, f.subtotal, f.iva, f.totalFacturado]));
     const pag = [['Móvil(es)', 'Referencia', 'Nombre', 'Cédula', 'Sub-total', 'IVA 13%', 'Total facturado', 'N.º factura', 'Inventarios', 'INS', 'Rebajos SRD', 'Adelantos', 'Préstamos', 'Herramientas', 'Pago adicional', 'Total depósito']].concat(R.filas.map(f => [Object.keys(f.moviles).join(','), f.iban, f.titular || f.nombre, f.cedula, f.subtotal, f.iva, f.totalFacturado, f.factura, f.inventario, f.ins, f.rebajo, f.adelanto, f.prestamo, f.herramientas, f.extra, f.deposito]))
       .concat(S.extras.map(e => ['', e.iban, e.nombre, e.cedula, '', '', '', e.concepto, '', '', '', '', '', '', '', e.monto]));
     const ord = [['Fecha', 'Móvil', 'Contrato', 'Cliente', 'Servicios', 'Costo archivo', 'Precio lista', 'Costo aplicado', 'UF costo']].concat(S.ordenes.map(o => [o.fecha, o.movil, o.contrato, o.cliente, o.servicios, o.costoArchivo, o.costoLista === null ? '' : o.costoLista, o.costo, o.ufCosto]));
@@ -7167,7 +7178,7 @@ async function pmResumenExcel() {
     XLSX.writeFile(wb, 'Pago_servicios_' + S.semana.desde + '_' + S.semana.hasta + '.xlsx');
   } catch (e) { mostrarError(e, 'No se pudo generar el Excel.'); }
 }
-function pmEstadoCuenta(idCon) {
+function pmEstadoCuenta(idCon, modo) {
   const S = pmS, filas = S.resumen.filas.filter(f => !f.sinContratista && (!idCon || f.idCon === idCon));
   if (!filas.length) { toast('No hay contratistas para imprimir.'); return; }
   const m = pmM, E = pmD.empresa || { nombre: 'Soluciones Red Dorada SRL' };
@@ -7196,19 +7207,185 @@ function pmEstadoCuenta(idCon) {
       '<table class="ct"><tr><td><span>Contratista (factura a nombre de)</span><b>' + esc(f.nombre) + '</b></td><td><span>Cédula</span><b>' + esc(f.cedula || '—') + '</b></td><td><span>N.º de factura</span><b>' + esc(f.factura || 'Pendiente') + '</b></td></tr>' +
       '<tr><td><span>Cuenta IBAN</span><b>' + esc(f.iban ? 'CR' + f.iban : 'Sin registrar') + '</b></td><td><span>Titular de la cuenta</span><b>' + esc(f.titular || f.nombre) + '</b></td><td><span>Móviles</span><b>' + tecs.map(t => esc(t.movil) + (t.tecnico ? ' (' + esc(t.tecnico) + ')' : '')).join(', ') + '</b></td></tr></table>' +
       '<h2>Resumen del pago</h2><table class="r"><tbody>' + fila('Detalle de órdenes (' + f.nOrdenes + ')', m(f.detalle)) + (f.reclamos ? fila('+ Apelaciones / reclamos', m(f.reclamos)) : '') + (f.penalizaciones ? fila('− Penalizaciones', m(f.penalizaciones)) : '') + (f.alquileres ? fila('− Alquiler de móvil', m(f.alquileres)) : '') + (f.camisas ? fila('− Camisas / uniformes', m(f.camisas)) : '') +
-      fila('MONTO A FACTURAR', m(f.subtotal), 't') + (f.aplicaIva ? fila('IVA 13%', m(f.iva)) : fila('IVA', 'No aplica')) + fila('TOTAL FACTURA', m(f.totalFacturado), 't') +
+      (f.otros ? fila('− Otros rebajos que aplican a la factura', m(f.otros)) : '') + fila('MONTO A FACTURAR', m(f.subtotal), 't') + (f.aplicaIva ? fila('IVA 13%', m(f.iva)) : fila('IVA', 'No aplica')) + fila('TOTAL FACTURA', m(f.totalFacturado), 't') +
       rebajos.filter(a => (pmD.tipos[a.tipo] || {}).signo < 0).map(a => fila('− ' + esc((pmD.tipos[a.tipo] || {}).txt) + (a.detalle ? ': ' + esc(a.detalle) : ''), m(a.monto))).join('') + rebajos.filter(a => (pmD.tipos[a.tipo] || {}).signo > 0).map(a => fila('+ ' + esc((pmD.tipos[a.tipo] || {}).txt) + (a.detalle ? ': ' + esc(a.detalle) : ''), m(a.monto))).join('') +
       fila('TOTAL A DEPOSITAR', m(f.deposito), 'd') + '</tbody></table>' +
-      '<div class="nota">Los rebajos no modifican el monto de la factura: se descuentan únicamente del depósito.</div>' +
+      '<div class="nota">Fecha estimada de pago: <b>' + esc(pmFh(S.semana.fechaPagoEst)) + '</b>' + ((S.saldosPrestamo || {})[f.idCon] > 0.005 ? ' · Saldo pendiente de préstamo después de esta semana: <b>' + m(S.saldosPrestamo[f.idCon]) + '</b>' : '') + '</div><div class="nota">Los rebajos no modifican el monto de la factura: se descuentan únicamente del depósito.</div>' +
       tabAj(antes, 'Detalle de apelaciones, penalizaciones y alquiler (afectan la factura)') + tabAj(rebajos, 'Detalle de rebajos (solo afectan el depósito)') +
       '<h2>Órdenes de la semana</h2>' + ordHtml + '<table class="o"><tbody><tr class="t"><td>Total detalle de órdenes (' + f.nOrdenes + ')</td><td class="n" style="width:140px">' + m(f.detalle) + '</td></tr></tbody></table>' +
       '<div class="pie">Documento generado el ' + hoy + ' · ' + esc(E.nombre) + '</div></div>';
   }).join('');
   const css = 'body{font-family:Arial,Helvetica,sans-serif;color:#1d2433;margin:20px;font-size:11px}h2{font-size:12px;margin:14px 0 4px;color:#0f1b2d;border-bottom:2px solid #c9a227;padding-bottom:2px}table{border-collapse:collapse;width:100%;margin-bottom:6px}td,th{border:1px solid #cfd6df;padding:3px 6px;text-align:left;vertical-align:top}th{background:#eef2f7}.n{text-align:right;white-space:nowrap}table.enc td{padding:2px 6px}table.ct td{width:33%}table.ct span{display:block;font-size:9px;color:#667;text-transform:uppercase}table.ct b{font-size:12px}table.r td{font-size:12px}table.r tr.t td{font-weight:700;background:#f3f6fa}table.r tr.d td{font-weight:700;background:#0f1b2d;color:#fff;font-size:13px}div.mv{background:#fff6dc;font-weight:700;border:1px solid #cfd6df;border-bottom:0;padding:4px 6px;margin-top:8px;font-size:12px}tr.s td{background:#f7f9fc;font-style:italic}.o tr.t td{font-weight:700;background:#f3f6fa}.nota{font-size:10px;color:#667;margin-bottom:4px}.pie{margin-top:10px;font-size:9px;color:#889;text-align:center}.pg{page-break-after:always}.pg:last-child{page-break-after:auto}';
   const html = '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Estado de cuenta</title><style>' + css + '</style></head><body>' + cuerpo + '</body></html>';
+  if (modo === 'html') { pmBajar(new Blob([html], { type: 'text/html' }), 'Estado_cuenta_' + filas[0].nombre.replace(/[^\w]+/g, '_') + '_' + S.semana.desde + '.html'); return; }
   const f = document.createElement('iframe'); f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0'; document.body.appendChild(f);
   f.onload = () => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { toast('No se pudo abrir la impresión.'); } setTimeout(() => f.remove(), 60000); };
   f.srcdoc = html;
+}
+
+/* =========================================================
+   Pago a móviles · rediseño: resumen por móvil, pagos pendientes, penalizaciones y préstamos
+   ========================================================= */
+const pmSgn = n => (n > 0.005 ? '+' : '') + pmM(n);
+
+/* ---------- Resumen por móvil: facturado a Telecable vs monto a pagar ---------- */
+function pmHtmlMov() {
+  const m = {};
+  pmS.ordenes.forEach(o => {
+    const k = String(Number(o.movil)); const x = m[k] || (m[k] = { movil: k, lineas: 0, ctos: {}, uf: 0, costo: 0, cambios: 0, sin: 0 });
+    x.lineas++; x.ctos[o.contrato] = 1; x.uf += o.ufCosto; x.costo += o.costo; if (o.tipo || o.manual) x.cambios++; if (!o.manual && o.costoLista === null) x.sin++;
+  });
+  const L = Object.keys(m).map(k => m[k]).sort((a, b) => a.movil - b.movil);
+  const T = L.reduce((a, x) => ({ l: a.l + x.lineas, c: a.c + Object.keys(x.ctos).length, uf: a.uf + x.uf, co: a.co + x.costo, ca: a.ca + x.cambios, s: a.s + x.sin }), { l: 0, c: 0, uf: 0, co: 0, ca: 0, s: 0 });
+  const num = v => '<td style="text-align:right;white-space:nowrap">' + v + '</td>';
+  const fPorMovil = mv => pmS.resumen.filas.find(f => f.moviles[mv]) || {};
+  return '<div style="padding:8px 12px;font-size:12px;color:#667">Por cada móvil: lo que Telecable facturó (pagó a SRD) frente a lo que corresponde pagarle a la móvil. La diferencia es de la empresa. Pasa a <b>Contratos</b> u <b>Órdenes</b> para revisar línea por línea.</div>' +
+    '<table class="pmT"><thead><tr><th>Móvil</th><th>Contratista (factura)</th><th>Técnico</th><th style="text-align:right">Contratos</th><th style="text-align:right">Líneas</th><th style="text-align:right">Facturado Telecable</th><th style="text-align:right">Monto a pagar</th><th style="text-align:right">Diferencia (empresa)</th><th>Revisión</th></tr></thead><tbody>' +
+    L.map(x => { const f = fPorMovil(x.movil), tec = ((f.tecnicos || []).find(t => t.movil === x.movil) || {}).tecnico || '';
+      return '<tr><td><b>' + esc(x.movil) + '</b></td><td>' + (f.nombre ? esc(f.nombre) : '<span style="color:#9b1c1c">Sin contratista</span>') + '</td><td>' + esc(tec) + '</td>' + num(Object.keys(x.ctos).length) + num(x.lineas) + num(pmM(x.uf)) + num('<b>' + pmM(x.costo) + '</b>') +
+        '<td style="text-align:right;white-space:nowrap;color:' + (x.uf - x.costo >= 0 ? '#2d5a1b' : '#9b1c1c') + '">' + pmSgn(x.uf - x.costo) + '</td><td>' + (x.sin ? '<span class="chip rojo">' + x.sin + ' sin precio</span> ' : '') + (x.cambios ? '<span class="chip azul">' + x.cambios + ' con cambio</span>' : '') + (!x.sin && !x.cambios ? '<span class="chip verde">OK</span>' : '') + '</td></tr>'; }).join('') +
+    '<tr style="font-weight:700;background:#f3f6fa"><td colspan="3">Total (' + L.length + ' móviles)</td>' + num(T.c) + num(T.l) + num(pmM(T.uf)) + num(pmM(T.co)) + '<td style="text-align:right">' + pmSgn(T.uf - T.co) + '</td><td></td></tr></tbody></table>';
+}
+
+/* ---------- Pagos pendientes (el pago llega ~15 días después de la semana) ---------- */
+let pmPg = null, pmPgF = { est: 'pend', inact: false, q: '' }, pmPgSel = new Set();
+async function pmRenderPag() {
+  $('pmPPag').innerHTML = '<div class="loading">Cargando pagos...</div>';
+  try { pmPg = await api('pagosPmWeb'); pmPgSel.clear(); pmDibujarPag(); } catch (e) { $('pmPPag').innerHTML = ''; mostrarError(e, 'No se pudieron cargar los pagos.'); }
+}
+function pmPgFiltradas() {
+  const q = pmNorm(pmPgF.q);
+  return pmPg.filas.filter(f => f.deposito > 0 && (pmPgF.est === 'todos' || (pmPgF.est === 'pend' ? !f.pagado : !!f.pagado)) && (!pmPgF.inact || f.estadoSis === 'inactiva') && (!q || pmNorm(f.nombre + ' ' + f.factura).indexOf(q) >= 0));
+}
+function pmDibujarPag() {
+  const hoy = pmPg.hoy, F = pmPgFiltradas(), pend = pmPg.filas.filter(f => f.deposito > 0 && !f.pagado);
+  const totPend = pend.reduce((a, f) => a + f.deposito, 0), inact = pend.filter(f => f.estadoSis === 'inactiva');
+  const atr = f => f.fechaEst && f.fechaEst < hoy ? Math.round((Date.parse(hoy) - Date.parse(f.fechaEst)) / 86400000) : 0;
+  let h = '<div class="panel"><div style="display:flex;gap:22px;flex-wrap:wrap;padding:12px 14px;font-size:13px">' +
+    [['Pendiente de pago', pmM(totPend)], ['Pagos pendientes', pend.length], ['Técnicos inactivos con pago pendiente', inact.length + (inact.length ? ' · ' + pmM(inact.reduce((a, f) => a + f.deposito, 0)) : '')], ['Plazo habitual', 'semana + ' + pmPg.diasPago + ' días']].map(x => '<div><div style="color:#667;font-size:11px">' + x[0] + '</div><b style="font-size:15px">' + x[1] + '</b></div>').join('') + '</div></div>';
+  h += '<div class="toolbar" style="flex-wrap:wrap"><input placeholder="Buscar contratista o factura" style="min-width:220px" value="' + esc(pmPgF.q) + '" onchange="pmPgF.q=this.value;pmDibujarPag()">' +
+    '<select onchange="pmPgF.est=this.value;pmDibujarPag()">' + [['pend', 'Pendientes de pago'], ['pag', 'Ya pagados'], ['todos', 'Todos']].map(x => '<option value="' + x[0] + '"' + (pmPgF.est === x[0] ? ' selected' : '') + '>' + x[1] + '</option>').join('') + '</select>' +
+    '<label style="font-size:12px"><input type="checkbox" ' + (pmPgF.inact ? 'checked' : '') + ' onchange="pmPgF.inact=this.checked;pmDibujarPag()"> Solo técnicos inactivos</label><span style="flex:1"></span>' +
+    '<span style="font-size:12px;color:#667">' + pmPgSel.size + ' seleccionado(s)</span><label style="font-size:12px">Fecha de pago <input type="date" id="pgFec" value="' + hoy + '"></label><button class="btn primary" ' + (pmPgSel.size ? '' : 'disabled') + ' onclick="pmPgMarcar(true)">💵 Marcar como pagado</button><button class="btn secondary" ' + (pmPgSel.size ? '' : 'disabled') + ' onclick="pmPgMarcar(false)">Quitar pago</button></div>';
+  h += '<div class="panel"><div class="tableWrap">' + (F.length ? '<table class="pmT"><thead><tr><th><input type="checkbox" onclick="pmPgTodos(this.checked)"></th><th>Semana</th><th>Pago estimado</th><th>Contratista</th><th>Móvil / estado</th><th>N.º factura</th><th style="text-align:right">Total factura</th><th style="text-align:right">A depositar</th><th>Pagado</th><th></th></tr></thead><tbody>' +
+    F.map(f => { const k = f.idSemana + '|' + f.idCon, a = atr(f);
+      return '<tr' + (f.estadoSis === 'inactiva' && !f.pagado ? ' style="background:#fff3cd"' : '') + '><td><input type="checkbox" ' + (pmPgSel.has(k) ? 'checked' : '') + ' onclick="pmPgUno(\'' + k + '\',this.checked)"></td><td>' + esc(pmFh(f.desde)) + ' al ' + esc(pmFh(f.hasta)) + '</td><td>' + esc(pmFh(f.fechaEst)) + (!f.pagado && a > 0 ? '<div style="font-size:11px;color:#9b1c1c">' + a + ' día(s) de atraso</div>' : '') + '</td><td><b>' + esc(f.nombre) + '</b>' + (f.titular && f.titular !== f.nombre ? '<div style="font-size:11px;color:#556">Cuenta: ' + esc(f.titular) + '</div>' : '') + (!f.tieneIban ? '<div style="font-size:11px;color:#9b1c1c">Falta IBAN</div>' : '') + '</td><td>' +
+        (f.estadoSis === 'activa' ? '<span class="chip verde">Activa</span>' : (f.estadoSis === 'inactiva' ? '<span class="chip amar">Inactiva' + (f.salida ? ' · salió ' + esc(pmFh(f.salida)) : '') + '</span>' : '<span class="chip azul">Sin vínculo</span>')) + '</td><td>' + esc(f.factura || '—') + '</td><td style="text-align:right;white-space:nowrap">' + pmM(f.totalFacturado) + '</td><td style="text-align:right;white-space:nowrap"><b>' + pmM(f.deposito) + '</b></td><td>' + (f.pagado ? '<span class="chip verde">' + esc(pmFh(f.pagado)) + '</span>' : '<span style="color:#999">—</span>') + '</td><td><button class="btn secondary" onclick="pmVista=\'res\';pmTab(\'sem\');pmAbrir(\'' + f.idSemana + '\')">Abrir semana</button></td></tr>'; }).join('') +
+    '<tr style="font-weight:700;background:#f3f6fa"><td colspan="7">Total (' + F.length + ')</td><td style="text-align:right">' + pmM(F.reduce((a, f) => a + f.deposito, 0)) + '</td><td colspan="2"></td></tr></tbody></table>' : '<div class="loading">No hay pagos en esta vista.</div>') + '</div></div>';
+  $('pmPPag').innerHTML = h;
+}
+function pmPgUno(k, on) { on ? pmPgSel.add(k) : pmPgSel.delete(k); pmDibujarPag(); }
+function pmPgTodos(on) { pmPgFiltradas().forEach(f => { const k = f.idSemana + '|' + f.idCon; on ? pmPgSel.add(k) : pmPgSel.delete(k); }); pmDibujarPag(); }
+async function pmPgMarcar(pagar) {
+  const por = {}; pmPgSel.forEach(k => { const [s, c] = k.split('|'); (por[s] = por[s] || []).push(c); });
+  const fec = pagar ? $('pgFec').value : '';
+  if (pagar && !fec) { toast('Indica la fecha de pago.'); return; }
+  try { for (const s of Object.keys(por)) await api('registrarPagoPmWeb', s, fec, por[s]); toast(pagar ? 'Pagos registrados.' : 'Pagos revertidos.'); await pmRenderPag(); pmD = await api('obtenerPmWeb'); }
+  catch (e) { mostrarError(e, 'No se pudo registrar.'); }
+}
+
+/* ---------- Registro de penalizaciones (independiente de incidencias) ---------- */
+let pmPn = null, pmPnF = { q: '', movil: '', origen: '' };
+async function pmRenderPnl() {
+  $('pmPPnl').innerHTML = '<div class="loading">Cargando...</div>';
+  try { pmPn = await api('listarPenalizacionesPmWeb'); pmDibujarPnl(); } catch (e) { $('pmPPnl').innerHTML = ''; mostrarError(e, 'No se pudo cargar.'); }
+}
+function pmPnFiltradas() {
+  const q = pmNorm(pmPnF.q);
+  return pmPn.filas.filter(f => (!pmPnF.movil || f.movil === pmPnF.movil) && (!pmPnF.origen || f.origen === pmPnF.origen) && (!q || pmNorm(f.contratista + ' ' + f.detalle + ' ' + f.contrato).indexOf(q) >= 0));
+}
+function pmDibujarPnl() {
+  const F = pmPnFiltradas(), mov = Array.from(new Set(pmPn.filas.map(f => f.movil).filter(Boolean))).sort((a, b) => a - b);
+  $('pmPPnl').innerHTML = '<div class="toolbar" style="flex-wrap:wrap"><input placeholder="Buscar contratista, contrato o motivo" style="min-width:240px" value="' + esc(pmPnF.q) + '" onchange="pmPnF.q=this.value;pmDibujarPnl()"><select onchange="pmPnF.movil=this.value;pmDibujarPnl()"><option value="">Todas las móviles</option>' + mov.map(m => '<option value="' + m + '"' + (pmPnF.movil === m ? ' selected' : '') + '>Móvil ' + m + '</option>').join('') + '</select>' +
+    '<select onchange="pmPnF.origen=this.value;pmDibujarPnl()">' + [['', 'Todas las fuentes'], ['Telecable', 'Cargadas por Telecable'], ['Manual', 'Registradas por nosotros']].map(x => '<option value="' + x[0] + '"' + (pmPnF.origen === x[0] ? ' selected' : '') + '>' + x[1] + '</option>').join('') + '</select><span style="flex:1"></span><button class="btn secondary" onclick="pmPnExcel()">⬇ Excel</button><button class="btn primary" onclick="pmPnModal()">➕ Registrar penalización</button></div>' +
+    '<div class="panel"><div class="panelHead"><h2>Penalizaciones cobradas</h2><span>' + F.length + ' · total ' + pmM(F.reduce((a, f) => a + f.monto, 0)) + '</span></div><div style="padding:6px 12px;font-size:12px;color:#667">Registro propio del pago a móviles: no se relaciona con el módulo de incidencias. Cada penalización resta de la factura del contratista en su semana.</div><div class="tableWrap">' +
+    (F.length ? '<table class="pmT"><thead><tr><th>Semana</th><th>Móvil</th><th>Contratista</th><th>Contrato</th><th>Motivo</th><th>Fuente</th><th style="text-align:right">Monto</th><th></th></tr></thead><tbody>' + F.map(f => '<tr><td>' + esc(pmFh(f.desde)) + ' al ' + esc(pmFh(f.hasta)) + '</td><td>' + esc(f.movil) + '</td><td>' + esc(f.contratista || '—') + '</td><td>' + esc(f.contrato) + '</td><td style="max-width:380px">' + esc(f.detalle) + '</td><td>' + (f.origen === 'Telecable' ? '<span class="chip azul">Telecable</span>' : '<span class="chip amar">Manual</span>') + '</td><td style="text-align:right;white-space:nowrap"><b>' + pmM(f.monto) + '</b></td><td><button class="btn secondary" onclick="pmVista=\'res\';pmTab(\'sem\');pmAbrir(\'' + f.idSemana + '\')">Abrir semana</button></td></tr>').join('') + '</tbody></table>' : '<div class="loading">Aún no hay penalizaciones registradas.</div>') + '</div></div>';
+}
+function pmPnModal() {
+  const ab = pmD.semanas.filter(s => s.estado !== 'Cerrada');
+  if (!ab.length) { toast('No hay semanas abiertas para cargar la penalización.'); return; }
+  pmModal('<h3>Registrar penalización</h3><div style="display:grid;gap:8px"><label>Semana (abierta)<select id="ppSem">' + ab.map(s => '<option value="' + s.id + '">' + esc(pmFh(s.desde)) + ' al ' + esc(pmFh(s.hasta)) + '</option>').join('') + '</select></label><label>Contratista<select id="ppCon">' + pmD.contratistas.filter(c => c.activo).map(c => '<option value="' + c.id + '">' + esc(c.nombre) + (c.moviles ? ' (' + esc(c.moviles) + ')' : '') + '</option>').join('') + '</select></label>' +
+    '<label>Penalización de la lista (opcional)<select id="ppLista" onchange="const p=pmD.penalizaciones[+this.value];if(p){$(\'ppMonto\').value=p.monto;$(\'ppDet\').value=p.nombre}"><option value="">—</option>' + pmD.penalizaciones.map((p, i) => '<option value="' + i + '">' + esc(p.nombre) + ' · ' + pmM(p.monto) + '</option>').join('') + '</select></label><label>Monto (₡)<input id="ppMonto" type="number" step="0.01" min="0"></label><label>Motivo<input id="ppDet" maxlength="200"></label><label>Contrato (opcional)<input id="ppCto" maxlength="30"></label></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn secondary" onclick="pmCerrar()">Cancelar</button><button class="btn primary" onclick="pmPnGuardar()">Guardar</button></div>');
+}
+async function pmPnGuardar() {
+  try { await api('guardarAjustePmWeb', { idSemana: $('ppSem').value, idCon: $('ppCon').value, tipo: 'PENALIZACION', monto: $('ppMonto').value, detalle: $('ppDet').value, contrato: $('ppCto').value }); pmCerrar(); await pmRenderPnl(); toast('Penalización registrada.'); }
+  catch (e) { mostrarError(e, 'No se pudo guardar.'); }
+}
+async function pmPnExcel() {
+  try {
+    await cargarLib('xlsx', SEG_URL_XLSX);
+    const F = pmPnFiltradas(), wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['Semana desde', 'Semana hasta', 'Móvil', 'Contratista', 'Contrato', 'Motivo', 'Fuente', 'Monto']].concat(F.map(f => [f.desde, f.hasta, f.movil, f.contratista, f.contrato, f.detalle, f.origen, f.monto]))), 'Penalizaciones');
+    XLSX.writeFile(wb, 'Penalizaciones_moviles.xlsx');
+  } catch (e) { mostrarError(e, 'No se pudo generar el Excel.'); }
+}
+
+/* ---------- Préstamos a las móviles ---------- */
+let pmPr = null, pmPrF = 'saldo';
+async function pmRenderPst() {
+  $('pmPPst').innerHTML = '<div class="loading">Cargando...</div>';
+  try { pmPr = await api('obtenerPrestamosPmWeb'); pmDibujarPst(); } catch (e) { $('pmPPst').innerHTML = ''; mostrarError(e, 'No se pudieron cargar los préstamos.'); }
+}
+function pmDibujarPst() {
+  const P = pmPr.prestamos.filter(p => pmPrF === 'todos' || (pmPrF === 'saldo' ? p.estadoCalc.debe > 0.005 : p.estadoCalc.debe <= 0.005));
+  const tot = P.reduce((a, p) => ({ pr: a.pr + p.estadoCalc.prestado, ab: a.ab + p.estadoCalc.abonadoCapital + p.estadoCalc.abonadoInteres, ig: a.ig + p.estadoCalc.interesGenerado, cap: a.cap + p.estadoCalc.capital, int: a.int + p.estadoCalc.interes, d: a.d + p.estadoCalc.debe }), { pr: 0, ab: 0, ig: 0, cap: 0, int: 0, d: 0 });
+  const num = v => '<td style="text-align:right;white-space:nowrap">' + v + '</td>';
+  $('pmPPst').innerHTML = '<div class="toolbar"><button class="btn primary" onclick="pmPrestamoModal()">➕ Nuevo préstamo</button><span style="flex:1"></span><label>Ver <select onchange="pmPrF=this.value;pmDibujarPst()">' + [['saldo', 'Con saldo pendiente'], ['pagados', 'Pagados'], ['todos', 'Todos']].map(x => '<option value="' + x[0] + '"' + (pmPrF === x[0] ? ' selected' : '') + '>' + x[1] + '</option>').join('') + '</select></label></div>' +
+    '<div class="panel"><div style="display:flex;gap:22px;flex-wrap:wrap;padding:12px 14px;font-size:13px">' + [['Prestado', pmM(tot.pr)], ['Abonado (capital + interés)', pmM(tot.ab)], ['Interés generado', pmM(tot.ig)], ['Saldo de capital', pmM(tot.cap)], ['Interés pendiente', pmM(tot.int)], ['Nos deben', pmM(tot.d)]].map(x => '<div><div style="color:#667;font-size:11px">' + x[0] + '</div><b style="font-size:15px">' + x[1] + '</b></div>').join('') + '</div></div>' +
+    '<div class="panel"><div class="panelHead"><h2>Préstamos</h2><span>' + P.length + '</span></div><div style="padding:6px 12px;font-size:12px;color:#667">Interés simple mensual sobre el saldo de capital. Cada abono (rebajo del pago semanal o aporte directo) paga primero el interés y luego el capital.</div><div class="tableWrap">' +
+    (P.length ? '<table class="pmT"><thead><tr><th>Contratista</th><th>Fecha</th><th>Concepto</th><th style="text-align:right">Prestado</th><th style="text-align:right">Interés mensual</th><th style="text-align:right">Cuota semanal</th><th style="text-align:right">Abonado</th><th style="text-align:right">Saldo capital</th><th style="text-align:right">Interés pend.</th><th style="text-align:right">Nos debe</th><th></th></tr></thead><tbody>' +
+      P.map(p => { const e = p.estadoCalc; return '<tr><td><b>' + esc(p.contratista) + '</b>' + (p.estado === 'Cancelado' ? ' <span class="chip rojo">Cancelado</span>' : (e.debe <= 0.005 ? ' <span class="chip verde">Pagado</span>' : '')) + '</td><td>' + esc(pmFh(p.fecha)) + '</td><td>' + esc(p.concepto) + '</td>' + num(pmM(e.prestado)) + num(p.tasa + ' %') + num(p.cuota ? pmM(p.cuota) : '—') + num(pmM(e.abonadoCapital + e.abonadoInteres)) + num(pmM(e.capital)) + num(pmM(e.interes)) + num('<b>' + pmM(e.debe) + '</b>') +
+        '<td style="white-space:nowrap"><button class="btn secondary" onclick="pmPrestamoDetalle(\'' + p.id + '\')">Detalle</button> <button class="btn secondary" onclick="pmPrestamoModal(\'' + p.id + '\')">Editar</button></td></tr>'; }).join('') + '</tbody></table>' : '<div class="loading">No hay préstamos en esta vista.</div>') + '</div></div>';
+}
+function pmPrestamoModal(id) {
+  const p = id ? pmPr.prestamos.find(x => x.id === id) : { idCon: '', fecha: pmD.hoy, monto: '', tasa: 0, cuota: '', concepto: '', estado: 'Activo' };
+  pmModal('<h3>' + (id ? 'Editar' : 'Nuevo') + ' préstamo</h3><div style="display:grid;gap:8px;grid-template-columns:1fr 1fr"><label style="grid-column:1/3">Contratista<select id="prCon">' + pmD.contratistas.map(c => '<option value="' + c.id + '"' + (c.id === p.idCon ? ' selected' : '') + '>' + esc(c.nombre) + (c.moviles ? ' (' + esc(c.moviles) + ')' : '') + (c.activo ? '' : ' · inactivo') + '</option>').join('') + '</select></label>' +
+    '<label>Fecha en que se prestó<input type="date" id="prFec" value="' + esc(p.fecha) + '"></label><label>Monto prestado (₡)<input type="number" id="prMon" step="0.01" min="0" value="' + esc(p.monto) + '"></label><label>Interés mensual (%)<input type="number" id="prTasa" step="0.01" min="0" value="' + esc(p.tasa) + '"></label><label>Cuota semanal a rebajar (₡, opcional)<input type="number" id="prCuo" step="0.01" min="0" value="' + esc(p.cuota || '') + '"></label>' +
+    '<label style="grid-column:1/3">Concepto<input id="prCon2" maxlength="160" value="' + esc(p.concepto) + '" placeholder="ej. Adelanto para herramientas"></label>' + (id ? '<label>Estado<select id="prEst"><option' + (p.estado === 'Activo' ? ' selected' : '') + '>Activo</option><option' + (p.estado === 'Cancelado' ? ' selected' : '') + '>Cancelado</option></select></label>' : '') + '</div>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">' + (id ? '<button class="btn secondary" onclick="pmPrestamoBorrar(\'' + id + '\')">🗑 Eliminar</button>' : '') + '<span style="flex:1"></span><button class="btn secondary" onclick="pmCerrar()">Cancelar</button><button class="btn primary" onclick="pmPrestamoGuardar(\'' + (id || '') + '\')">Guardar</button></div>');
+}
+async function pmPrestamoGuardar(id) {
+  try { await api('guardarPrestamoPmWeb', { id: id, idCon: $('prCon').value, fecha: $('prFec').value, monto: $('prMon').value, tasa: $('prTasa').value, cuota: $('prCuo').value, concepto: $('prCon2').value, estado: id ? $('prEst').value : 'Activo' }); pmCerrar(); await pmRenderPst(); toast('Préstamo guardado.'); }
+  catch (e) { mostrarError(e, 'No se pudo guardar.'); }
+}
+async function pmPrestamoBorrar(id) { if (!confirm('Se eliminará el préstamo con sus abonos registrados. ¿Seguro?')) return; try { await api('eliminarPrestamoPmWeb', id); pmCerrar(); await pmRenderPst(); toast('Préstamo eliminado.'); } catch (e) { mostrarError(e, 'No se pudo eliminar.'); } }
+function pmPrestamoDetalle(id) {
+  const p = pmPr.prestamos.find(x => x.id === id); if (!p) return; const e = p.estadoCalc;
+  pmModal('<h3>Préstamo · ' + esc(p.contratista) + '</h3><div style="font-size:12px;color:#556;margin-bottom:8px">' + esc(p.concepto) + ' · prestado el ' + esc(pmFh(p.fecha)) + ' · ' + p.tasa + ' % mensual' + (p.cuota ? ' · cuota semanal ' + pmM(p.cuota) : '') + '</div>' +
+    '<div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:8px">' + [['Prestado', pmM(e.prestado)], ['Abonado a capital', pmM(e.abonadoCapital)], ['Interés pagado', pmM(e.abonadoInteres)], ['Saldo capital', pmM(e.capital)], ['Interés pendiente', pmM(e.interes)], ['Nos debe a hoy', pmM(e.debe)]].map(x => '<div><div style="color:#667;font-size:11px">' + x[0] + '</div><b>' + x[1] + '</b></div>').join('') + '</div>' +
+    '<table class="pmT"><thead><tr><th>Fecha</th><th>Movimiento</th><th>Origen</th><th>Nota</th><th style="text-align:right">Monto</th><th></th></tr></thead><tbody><tr><td>' + esc(pmFh(p.fecha)) + '</td><td>Préstamo inicial</td><td>—</td><td>' + esc(p.concepto) + '</td><td style="text-align:right;color:#9b1c1c">' + pmM(p.monto) + '</td><td></td></tr>' +
+    p.movs.map(m => '<tr' + (m.fecha > pmPr.hoy ? ' style="color:#888"' : '') + '><td>' + esc(pmFh(m.fecha)) + (m.fecha > pmPr.hoy ? ' <span class="chip amar">programado</span>' : '') + '</td><td>' + (m.tipo === 'ABONO' ? 'Abono / aporte' : 'Nuevo adelanto') + '</td><td>' + esc(m.origen) + '</td><td>' + esc(m.nota) + '</td><td style="text-align:right;color:' + (m.tipo === 'ABONO' ? '#2d5a1b' : '#9b1c1c') + '">' + (m.tipo === 'ABONO' ? '−' : '+') + pmM(m.monto) + '</td><td>' + (m.origen === 'Manual' ? '<button class="btn secondary" onclick="pmMovBorrar(\'' + m.id + '\',\'' + id + '\')">✕</button>' : '') + '</td></tr>').join('') + '</tbody></table>' +
+    '<div style="margin-top:10px;padding:10px;background:#f7f9fc;border:1px solid #dde3ec;border-radius:8px"><b style="font-size:13px">Registrar movimiento</b><div style="display:grid;gap:8px;grid-template-columns:1fr 1fr 1fr;margin-top:6px"><label>Tipo<select id="pvTipo"><option value="ABONO">Abono / aporte del contratista</option><option value="DESEMBOLSO">Nuevo adelanto (más préstamo)</option></select></label><label>Fecha<input type="date" id="pvFec" value="' + pmPr.hoy + '"></label><label>Monto (₡)<input type="number" id="pvMon" step="0.01" min="0"></label><label style="grid-column:1/4">Nota<input id="pvNota" maxlength="200" placeholder="ej. transferencia, efectivo"></label></div><div style="text-align:right;margin-top:8px"><button class="btn primary" onclick="pmMovGuardar(\'' + id + '\')">Registrar</button></div></div>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px"><button class="btn secondary" onclick="pmPrestamoImprimir(\'' + id + '\')">🖨 Estado del préstamo</button><button class="btn secondary" onclick="pmCerrar()">Cerrar</button></div>', 860);
+}
+async function pmMovGuardar(id) {
+  try { await api('registrarMovPrestamoPmWeb', { idPrestamo: id, tipo: $('pvTipo').value, fecha: $('pvFec').value, monto: $('pvMon').value, nota: $('pvNota').value }); await pmRenderPst(); pmPrestamoDetalle(id); toast('Movimiento registrado.'); }
+  catch (e) { mostrarError(e, 'No se pudo registrar.'); }
+}
+async function pmMovBorrar(mid, id) { if (!confirm('¿Eliminar este movimiento?')) return; try { await api('eliminarMovPrestamoPmWeb', mid); await pmRenderPst(); pmPrestamoDetalle(id); } catch (e) { mostrarError(e, 'No se pudo eliminar.'); } }
+function pmPrestamoImprimir(id) {
+  const p = pmPr.prestamos.find(x => x.id === id); if (!p) return; const e = p.estadoCalc, E = pmD.empresa || { nombre: 'Soluciones Red Dorada SRL' }, logo = ($('hLogo') && $('hLogo').src) || '';
+  const html = '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Estado de préstamo</title><style>body{font-family:Arial,sans-serif;color:#1d2433;margin:24px;font-size:12px}h2{font-size:13px;border-bottom:2px solid #c9a227;padding-bottom:2px;margin:14px 0 6px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #cfd6df;padding:4px 6px;text-align:left}th{background:#eef2f7}.n{text-align:right}</style></head><body><table style="border:0"><tr><td style="border:0;width:150px">' + (logo ? '<img src="' + logo + '" style="max-width:140px">' : '') + '</td><td style="border:0"><b style="font-size:15px">' + esc(E.nombre) + '</b></td><td style="border:0;text-align:right"><b style="font-size:16px">ESTADO DE PRÉSTAMO</b><br>' + esc(new Date().toLocaleDateString('es-CR')) + '</td></tr></table>' +
+    '<h2>Datos</h2><table><tr><td>Contratista</td><td><b>' + esc(p.contratista) + '</b></td><td>Fecha del préstamo</td><td>' + esc(pmFh(p.fecha)) + '</td></tr><tr><td>Concepto</td><td>' + esc(p.concepto) + '</td><td>Interés mensual</td><td>' + p.tasa + ' %</td></tr></table>' +
+    '<h2>Resumen</h2><table><tr><td>Prestado</td><td class="n">' + pmM(e.prestado) + '</td></tr><tr><td>Abonado a capital</td><td class="n">' + pmM(e.abonadoCapital) + '</td></tr><tr><td>Interés generado</td><td class="n">' + pmM(e.interesGenerado) + '</td></tr><tr><td>Interés pagado</td><td class="n">' + pmM(e.abonadoInteres) + '</td></tr><tr><td>Saldo de capital</td><td class="n">' + pmM(e.capital) + '</td></tr><tr><td>Interés pendiente</td><td class="n">' + pmM(e.interes) + '</td></tr><tr><td><b>Total adeudado a la fecha</b></td><td class="n"><b>' + pmM(e.debe) + '</b></td></tr></table>' +
+    '<h2>Movimientos</h2><table><thead><tr><th>Fecha</th><th>Movimiento</th><th>Nota</th><th class="n">Monto</th></tr></thead><tbody><tr><td>' + esc(pmFh(p.fecha)) + '</td><td>Préstamo inicial</td><td>' + esc(p.concepto) + '</td><td class="n">' + pmM(p.monto) + '</td></tr>' + p.movs.map(m => '<tr><td>' + esc(pmFh(m.fecha)) + '</td><td>' + (m.tipo === 'ABONO' ? 'Abono' : 'Nuevo adelanto') + '</td><td>' + esc(m.nota) + '</td><td class="n">' + (m.tipo === 'ABONO' ? '−' : '+') + pmM(m.monto) + '</td></tr>').join('') + '</tbody></table></body></html>';
+  const f = document.createElement('iframe'); f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0'; document.body.appendChild(f);
+  f.onload = () => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (x) { toast('No se pudo abrir la impresión.'); } setTimeout(() => f.remove(), 60000); };
+  f.srcdoc = html;
+}
+async function pmAplicarCuotas() {
+  try { const r = await api('aplicarCuotasPrestamosPmWeb', pmSemId); await pmRecargar(); toast(r.aplicadas ? r.aplicadas + ' cuota(s) de préstamo aplicadas en Rebajos.' : 'No hay cuotas por aplicar (sin préstamos activos con cuota o ya aplicadas).', 5000); }
+  catch (e) { mostrarError(e, 'No se pudieron aplicar las cuotas.'); }
+}
+
+function pmCorreo(idCon) {
+  const f = pmS.resumen.filas.find(x => x.idCon === idCon); if (!f) return;
+  const c = pmD.contratistas.find(x => x.id === idCon) || {}, S = pmS.semana;
+  if (!c.correo) toast('Este contratista no tiene correo registrado; se abre el mensaje en blanco.', 5000);
+  const asunto = 'Estado de cuenta SRD · semana ' + pmFh(S.desde) + ' al ' + pmFh(S.hasta);
+  const cuerpo = 'Estimado(a) ' + f.nombre + ':\n\nAdjuntamos su estado de cuenta de la semana ' + pmFh(S.desde) + ' al ' + pmFh(S.hasta) + '.\n\n' +
+    'Monto a facturar: ' + pmM(f.subtotal) + (f.aplicaIva ? '\nIVA 13%: ' + pmM(f.iva) : '') + '\nTotal de la factura: ' + pmM(f.totalFacturado) + '\nRebajos al depósito: ' + pmM(f.deducciones) + '\nTotal a depositar: ' + pmM(f.deposito) + '\nFecha estimada de pago: ' + pmFh(S.fechaPagoEst) + '\n\nPor favor envíe su factura por el monto indicado y confirme el número.\n\n(Adjunte aquí el PDF del estado de cuenta)\n\nSoluciones Red Dorada SRL';
+  location.href = 'mailto:' + encodeURIComponent(c.correo || '') + '?subject=' + encodeURIComponent(asunto) + '&body=' + encodeURIComponent(cuerpo);
 }
 
 function esc(v) {
@@ -13607,6 +13784,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 49 · 14-oct 14:40</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 50 · 14-oct 16:10</div>
 </body>
 </html>
