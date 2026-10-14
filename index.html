@@ -698,12 +698,12 @@
 
     <aside id="side">
       <div class="nav" id="sideNav">
-        <button id="navCalendario" class="active" onclick="mostrarVista('calendario')"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="1.5"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/></svg></span><span class="nt"> Cronograma</span></button>
+        <button id="navResumen" onclick="mostrarVista('resumen')"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 11 12 4l8.5 7M5.5 9.5V20h13V9.5M10 20v-5.5h4V20"/></svg></span><span class="nt"> Inicio</span></button>
+        <button id="navCalendario" onclick="mostrarVista('calendario')"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="1.5"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/></svg></span><span class="nt"> Cronograma</span></button>
         <button id="navMoviles" onclick="mostrarVista('moviles')"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 16.5V7.5a1 1 0 0 1 1-1h10v10M13.5 10h4l3 3.5v3h-7"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/></svg></span><span class="nt"> Móviles</span></button>
         <button id="navSeguimiento" onclick="mostrarVista('seguimiento')"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4.5" width="14" height="16.5" rx="1.5"/><path d="M9 4.5V3.5h6v1M9 12.5l2 2 4-4.5"/></svg></span><span class="nt"> Seguimiento</span></button>
         <button id="navBodega" onclick="mostrarVista('bodega')"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 7.5 12 3.5l8.5 4v9L12 20.5l-8.5-4z"/><path d="M3.5 7.5 12 11.5l8.5-4M12 11.5v9"/></svg></span><span class="nt"> Bodega</span></button>
         <button id="navCotizaciones" onclick="mostrarVista('cotizaciones')"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="7.5" width="17" height="12" rx="1.5"/><path d="M9 7.5v-2a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M3.5 12.5h17"/></svg></span><span class="nt"> Cotizaciones</span></button>
-        <button id="navResumen" onclick="mostrarVista('resumen')"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20.5h16M7 17V11M12 17V6M17 17v-4.5"/></svg></span><span class="nt"> Resumen</span></button>
         <button id="navColaboradores" onclick="mostrarVista('colaboradores')" style="display:none"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="1.8"/><circle cx="9" cy="11" r="2.2"/><path d="M5.5 16c.4-1.6 1.8-2.5 3.5-2.5s3.1.9 3.5 2.5M14.5 10h4M14.5 13.5h3"/></svg></span><span class="nt"> Colaboradores</span></button>
         <button id="navPagomov" onclick="mostrarVista('pagomov')" style="display:none"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v.01M18 14.5v.01"/></svg></span><span class="nt"> Pago a móviles</span></button>
         <button id="navUsuarios" onclick="mostrarVista('usuarios')" style="display:none"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8.5" r="3.2"/><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5M16 5.6a3.2 3.2 0 0 1 0 5.8M18 14.8c1.8.6 3 2.3 3 5.2"/></svg></span><span class="nt"> Usuarios</span></button>
@@ -806,6 +806,7 @@
 
       <!-- RESUMEN -->
       <section id="vistaResumen" style="display:none">
+        <div id="inicioTarjetas" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;margin-bottom:14px"></div>
         <div class="toolbar">
           <div class="field">
             <label>Día a consultar</label>
@@ -2571,7 +2572,7 @@ function puedeEditar() { return !!sesion && sesion.rol !== 'consulta'; }
 function esAdmin() { return !!sesion && sesion.rol === 'admin'; }
 
 /* Módulos que el administrador le asignó al usuario (el administrador entra a todos) */
-const MODULOS_NAV = { calendario: 'cronograma', moviles: 'moviles', seguimiento: 'seguimiento', bodega: 'bodega', cotizaciones: 'cotizaciones', resumen: 'resumen' };
+const MODULOS_NAV = { resumen: 'resumen', calendario: 'cronograma', moviles: 'moviles', seguimiento: 'seguimiento', bodega: 'bodega', cotizaciones: 'cotizaciones' };
 function puedeModulo(m) { return !!sesion && (sesion.rol === 'admin' || (m === 'colaboradores' ? !!sesion.rh : (sesion.modulos || []).indexOf(m) !== -1)); }
 
 
@@ -3795,7 +3796,15 @@ function cerrarModal() { $('modalBg').classList.remove('show'); }
    RESUMEN
    ========================================================= */
 
+function cargarInicio() {
+  api('obtenerInicioWeb').then(r => {
+    if (!r || !$('inicioTarjetas')) return;
+    $('inicioTarjetas').innerHTML = (r.tarjetas || []).map(t => '<div onclick="mostrarVista(\'' + t.vista + '\')" style="cursor:pointer;background:var(--panel,#fff);border:1px solid ' + (t.alerta ? '#e0a030' : '#d8dee8') + ';border-left:4px solid ' + (t.alerta ? '#e65100' : '#1e40af') + ';border-radius:10px;padding:12px 14px"><div style="font-size:12px;color:#667">' + t.icono + ' ' + esc(t.titulo) + '</div><div style="font-size:22px;font-weight:700;margin:2px 0">' + esc(String(t.principal)) + '</div><div style="font-size:12px;color:#667">' + esc(t.detalle) + '</div></div>').join('');
+  }).catch(() => { });
+}
+
 function cargarResumen() {
+  cargarInicio();
 
   const fecha = $('resFecha').value || '';
 
@@ -13417,6 +13426,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 40 · 14-oct 01:20</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 41 · 14-oct 01:50</div>
 </body>
 </html>
