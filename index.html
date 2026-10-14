@@ -609,6 +609,9 @@
       /* ---- Usuarios: todo alineado a la izquierda ---- */
     .tblUsuarios th, .tblUsuarios td { text-align: left !important; vertical-align: middle; padding-left: 12px; padding-right: 12px; }
     .tblUsuarios td:first-child b { display: inline-block; }
+      /* ---- Colaboradores ---- */
+    .tblRh th, .tblRh td { text-align: left; vertical-align: middle; }
+    #rhModal .field { margin-bottom: 8px; }
   </style>
 </head>
 
@@ -699,6 +702,7 @@
         <button id="navBodega" onclick="mostrarVista('bodega')"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 7.5 12 3.5l8.5 4v9L12 20.5l-8.5-4z"/><path d="M3.5 7.5 12 11.5l8.5-4M12 11.5v9"/></svg></span><span class="nt"> Bodega</span></button>
         <button id="navCotizaciones" onclick="mostrarVista('cotizaciones')"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="7.5" width="17" height="12" rx="1.5"/><path d="M9 7.5v-2a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M3.5 12.5h17"/></svg></span><span class="nt"> Cotizaciones</span></button>
         <button id="navResumen" onclick="mostrarVista('resumen')"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20.5h16M7 17V11M12 17V6M17 17v-4.5"/></svg></span><span class="nt"> Resumen</span></button>
+        <button id="navColaboradores" onclick="mostrarVista('colaboradores')" style="display:none"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="1.8"/><circle cx="9" cy="11" r="2.2"/><path d="M5.5 16c.4-1.6 1.8-2.5 3.5-2.5s3.1.9 3.5 2.5M14.5 10h4M14.5 13.5h3"/></svg></span><span class="nt"> Colaboradores</span></button>
         <button id="navUsuarios" onclick="mostrarVista('usuarios')" style="display:none"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8.5" r="3.2"/><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5M16 5.6a3.2 3.2 0 0 1 0 5.8M18 14.8c1.8.6 3 2.3 3 5.2"/></svg></span><span class="nt"> Usuarios</span></button>
       </div>
 
@@ -1260,6 +1264,20 @@
             <div style="font-size:12px;color:#777;margin-top:3px">Costo por unidad. Si el costo no incluye IVA y está marcado «+IVA», al cotizar se le suma el 13 %. En la cotización los materiales se pasan a la moneda de la cotización con el tipo de cambio.</div></div></div>
             <div id="mtTabla" class="tableWrap"></div></div>
         </div>
+      </section>
+
+      <section id="vistaColab" style="display:none">
+        <div class="subtabs" id="rhTabs">
+          <button id="rhTMis" onclick="rhTab('mis')">Mis vacaciones y permisos</button>
+          <button id="rhTSol" onclick="rhTab('sol')">Solicitudes</button>
+          <button id="rhTCol" onclick="rhTab('col')">Colaboradores</button>
+          <button id="rhTPag" onclick="rhTab('pag')">Pagos</button>
+        </div>
+        <div id="rhPMis"></div>
+        <div id="rhPSol" style="display:none"></div>
+        <div id="rhPCol" style="display:none"></div>
+        <div id="rhPPag" style="display:none"></div>
+        <div id="rhModalBg" class="modalBg" style="z-index:90"><div class="modal" id="rhModal" style="max-width:560px"></div></div>
       </section>
 
       <section id="vistaUsuarios" style="display:none">
@@ -2519,7 +2537,7 @@ function esAdmin() { return !!sesion && sesion.rol === 'admin'; }
 
 /* Módulos que el administrador le asignó al usuario (el administrador entra a todos) */
 const MODULOS_NAV = { calendario: 'cronograma', moviles: 'moviles', seguimiento: 'seguimiento', bodega: 'bodega', cotizaciones: 'cotizaciones', resumen: 'resumen' };
-function puedeModulo(m) { return !!sesion && (sesion.rol === 'admin' || (sesion.modulos || []).indexOf(m) !== -1); }
+function puedeModulo(m) { return !!sesion && (sesion.rol === 'admin' || (m === 'colaboradores' ? !!sesion.rh : (sesion.modulos || []).indexOf(m) !== -1)); }
 
 
 /* =========================================================
@@ -2733,7 +2751,16 @@ function mostrarApp() {
 
   Object.keys(MODULOS_NAV).forEach(v => { $('nav' + v.charAt(0).toUpperCase() + v.slice(1)).style.display = puedeModulo(MODULOS_NAV[v]) ? '' : 'none'; });
   const primera = Object.keys(MODULOS_NAV).find(v => puedeModulo(MODULOS_NAV[v]));
-  if (!primera) toast('Todavía no tienes módulos asignados. Pídele al administrador que te los active.');
+  $('navColaboradores').style.display = esAdmin() ? '' : 'none';
+  if (!primera) {
+    if (esAdmin()) toast('Todavía no tienes módulos asignados. Pídele al administrador que te los active.');
+    else api('miAccesoRhWeb').then(r => {
+      if (r && r.colaborador) { sesion.rh = true; $('navColaboradores').style.display = ''; mostrarVista('colaboradores', true); }
+      else toast('Todavía no tienes módulos asignados. Pídele al administrador que te los active.');
+    }).catch(() => { });
+  } else if (!esAdmin()) {
+    api('miAccesoRhWeb').then(r => { if (r && r.colaborador) { sesion.rh = true; $('navColaboradores').style.display = ''; } }).catch(() => { });
+  }
 
   mostrarVista(primera || 'calendario', true);
   cargarDatos();
@@ -5649,13 +5676,13 @@ function sideRefrescar() {
   try {
     const bn = $('nav' + vistaActual.charAt(0).toUpperCase() + vistaActual.slice(1));
     const mod = bn ? ((bn.querySelector('.nt') || {}).textContent || '').trim() : '';
-    const sec0 = { calendario: 'vistaCalendario', moviles: 'vistaFichas', seguimiento: 'vistaSeguimiento', bodega: 'vistaBodega', cotizaciones: 'vistaCotiz' }[vistaActual];
+    const sec0 = { calendario: 'vistaCalendario', moviles: 'vistaFichas', seguimiento: 'vistaSeguimiento', bodega: 'vistaBodega', cotizaciones: 'vistaCotiz', colaboradores: 'vistaColab' }[vistaActual];
     const act = sec0 && $(sec0) ? $(sec0).querySelector(':scope > .subtabs button.active') : null;
     $('crumb').innerHTML = esc(mod) + (act ? ' › <b>' + esc(sinEmoji(act.textContent)) + '</b>' : '');
   } catch (e) { }
   nav.querySelectorAll('.subnav').forEach(n => n.remove());
   nav.querySelectorAll('.car').forEach(n => n.remove());
-  const mapa = { calendario: 'vistaCalendario', moviles: 'vistaFichas', seguimiento: 'vistaSeguimiento', bodega: 'vistaBodega', cotizaciones: 'vistaCotiz' };
+  const mapa = { calendario: 'vistaCalendario', moviles: 'vistaFichas', seguimiento: 'vistaSeguimiento', bodega: 'vistaBodega', cotizaciones: 'vistaCotiz', colaboradores: 'vistaColab' };
   const sec = $(mapa[vistaActual]); const btn = $('nav' + vistaActual.charAt(0).toUpperCase() + vistaActual.slice(1));
   if (!sec || !btn) return;
   const tabs = Array.from(sec.querySelectorAll(':scope > .subtabs button')).filter(b => b.style.display !== 'none' && !b.hidden);
@@ -5672,6 +5699,310 @@ function sideRefrescar() {
     caja.appendChild(x);
   });
   btn.insertAdjacentElement('afterend', caja);
+}
+
+
+/* =========================================================
+   COLABORADORES (vacaciones, permisos y pagos)
+   ========================================================= */
+
+let rhDatos = null, rhTabAct = '', rhColSel = '', rhPagos = null, rhFiltroSol = 'Pendiente', rhFiltroColSol = '';
+
+const rhTxt = { Pendiente: ['#8a6100', '#fff3cd'], Aprobada: ['#1b6b3a', '#d6f0e0'], Denegada: ['#a31616', '#fde8e8'], Cancelada: ['#666', '#eee'] };
+function rhBadge(e) { const c = rhTxt[e] || ['#444', '#eee']; return '<span class="segBadge" style="color:' + c[0] + ';background:' + c[1] + '">' + esc(e) + '</span>'; }
+function rhModal(html) { $('rhModal').innerHTML = html; $('rhModalBg').classList.add('show'); }
+function rhCerrar() { $('rhModalBg').classList.remove('show'); $('rhModal').style.maxWidth = '560px'; }
+function rhFecha(iso) { return iso ? fmtFechaSeg(iso) : '—'; }
+function rhRango(x) { return x.desde === x.hasta ? rhFecha(x.desde) : rhFecha(x.desde) + ' al ' + rhFecha(x.hasta); }
+
+/* Días laborables entre dos fechas (igual que en el servidor): lun-vie, o lun-sáb si la semana es de 6 días */
+function rhDiasCli(desde, hasta, ds) {
+  if (!desde || !hasta || hasta < desde) return 0;
+  let n = 0;
+  for (let t = Date.parse(desde + 'T12:00:00Z'); t <= Date.parse(hasta + 'T12:00:00Z'); t += 86400000) {
+    const d = new Date(t).getUTCDay();
+    if (d === 0 || (d === 6 && ds !== 6)) continue;
+    n++;
+  }
+  return n;
+}
+
+async function abrirColab() {
+  try { rhDatos = await api('obtenerRhWeb'); }
+  catch (e) { mostrarError(e, 'No se pudo cargar el módulo de Colaboradores.'); return; }
+  const adm = rhDatos.admin, mio = !!rhDatos.mio;
+  $('rhTMis').style.display = mio ? '' : 'none';
+  ['Sol', 'Col', 'Pag'].forEach(x => { $('rhT' + x).style.display = adm ? '' : 'none'; });
+  let t = rhTabAct;
+  if (!t || (t === 'mis' && !mio) || (t !== 'mis' && !adm)) t = adm ? ((rhDatos.solicitudes || []).some(x => x.estado === 'Pendiente') ? 'sol' : (mio ? 'mis' : 'sol')) : 'mis';
+  rhTab(t);
+}
+
+function rhTab(t) {
+  rhTabAct = t;
+  ['mis', 'sol', 'col', 'pag'].forEach(x => {
+    $('rhP' + x.charAt(0).toUpperCase() + x.slice(1)).style.display = x === t ? 'block' : 'none';
+    $('rhT' + x.charAt(0).toUpperCase() + x.slice(1)).classList.toggle('active', x === t);
+  });
+  if (t === 'mis') rhRenderMis();
+  if (t === 'sol') rhRenderSol();
+  if (t === 'col') rhRenderCol();
+  if (t === 'pag') rhRenderPag();
+  sideRefrescar();
+}
+
+/* ---------- Mis vacaciones y permisos ---------- */
+
+function rhRenderMis() {
+  const m = rhDatos.mio; if (!m) return;
+  const sd = m.saldo;
+  const card = (n, t, cl) => '<div class="card ' + (cl || '') + '"><div class="n">' + fmtN(n) + '</div><div class="t">' + t + '</div></div>';
+  let h = '<div class="toolbar"><div style="flex:1"><b>' + esc(m.nombre) + '</b>' + (m.puesto ? ' · ' + esc(m.puesto) : '') +
+    '<div style="font-size:12px;color:#777">Ingreso: ' + esc(rhFecha(m.ingreso)) + ' · Vacaciones: ' + fmtN(m.diasPeriodo) + ' días por cada ' + rhDatos.semanasPeriodo + ' semanas laboradas (ley de Costa Rica)</div></div>' +
+    '<button class="btn primary" onclick="rhNuevaSol()">➕ Nueva solicitud</button></div>' +
+    (sd.exigibles > 0 ? '<div class="segAviso warn" style="margin:0 0 10px">' + (sd.vencidos > 0 ? '⏰ <b>Tienes ' + fmtN(sd.vencidos) + ' día(s) de vacaciones con el plazo vencido.</b> ' : '🏖️ <b>Tienes ' + fmtN(sd.exigibles) + ' día(s) de vacaciones pendientes de tomar.</b> ') +
+      'Solicita las fechas para tomarlas: el patrono debe concederlas dentro de las 15 semanas siguientes a que se cumple el período.</div>' : '') +
+    '<div class="cards">' + card(sd.disponible, 'Días disponibles', 'f') + card(sd.exigibles, 'Pendientes de períodos cumplidos', sd.exigibles > 0 ? 's' : '') + card(sd.devengado, 'Días devengados') + card(sd.tomadas, 'Días tomados') +
+    card(sd.programadas, 'Aprobados por tomar') + card(sd.pendientes, 'Por aprobar') + '</div>' +
+    '<div class="panel" style="margin-bottom:12px"><div class="panelHead"><h2>Mis vacaciones por período</h2></div><div class="tableWrap">' + rhTablaPeriodos(sd) + '</div></div>' +
+    '<div class="panel"><div class="panelHead"><h2>Mis solicitudes</h2></div><div class="tableWrap">' + rhTablaSol(rhDatos.misSolicitudes, false) + '</div></div>';
+  $('rhPMis').innerHTML = h;
+}
+
+function rhTablaPeriodos(sd) {
+  if (!sd.periodos.length) return '<div class="empty">Aún no cumple su primer período de ' + rhDatos.semanasPeriodo + ' semanas. Lleva ' + fmtN(sd.devengado) + ' días devengados.</div>';
+  return '<table class="table tblRh"><thead><tr><th>Período</th><th>Se cumplió</th><th>Plazo para concederlo</th><th>Días</th><th>Tomados / programados</th><th>Pendientes</th><th></th></tr></thead><tbody>' +
+    sd.periodos.map(x => '<tr><td><b>' + x.n + '</b></td><td>' + esc(rhFecha(x.cumple)) + '</td><td>' + esc(rhFecha(x.limite)) + '</td><td>' + fmtN(x.dias) + '</td><td>' + fmtN(x.usados) + '</td>' +
+      '<td><b style="color:' + (x.vencido ? '#a31616' : (x.pendientes > 0 ? '#b8860b' : '#2c6b3c')) + '">' + fmtN(x.pendientes) + '</b></td>' +
+      '<td>' + (x.pendientes <= 0 ? '<span class="tag tag-active">Completo</span>' : (x.vencido ? '<span class="segBadge" style="background:#fde8e8;color:#a31616">Plazo vencido</span>' : '<span class="segBadge" style="background:#fff3cd;color:#8a6100">Por conceder</span>')) + '</td></tr>').join('') + '</tbody></table>' +
+    (sd.enCurso > 0 ? '<div style="padding:8px 14px;font-size:12px;color:#666">Período en curso: ' + fmtN(sd.enCurso) + ' días devengados hasta hoy.</div>' : '');
+}
+
+function rhVerPeriodos(id) {
+  const c = rhDatos.colaboradores.find(x => x.id === id) || rhDatos.mio; if (!c) return;
+  rhModal('<h3>Vacaciones por período · ' + esc(c.nombre) + '</h3>' + rhTablaPeriodos(c.saldo) +
+    '<div style="font-size:12px;color:#777;margin:8px 0">Las vacaciones tomadas se descuentan del período más antiguo. Pasadas 15 semanas de cumplido el período, los días pendientes se marcan como vencidos.</div>' +
+    '<div style="text-align:right"><button class="btn secondary" onclick="rhCerrar()">Cerrar</button></div>');
+  $('rhModal').style.maxWidth = '760px';
+}
+
+/* Colaboradores con días de períodos ya cumplidos sin tomar: el administrador debe programarlos */
+function rhAvisoExigibles() {
+  const l = (rhDatos.colaboradores || []).filter(c => c.activo && c.saldo.exigibles > 0).sort((a, b) => b.saldo.vencidos - a.saldo.vencidos || b.saldo.exigibles - a.saldo.exigibles);
+  if (!l.length) return '';
+  return '<div class="segAviso warn" style="margin:0 0 10px"><b>🏖️ Vacaciones por programar (' + l.length + '):</b> ' +
+    l.map(c => '<span class="segChip' + (c.saldo.vencidos > 0 ? ' mal' : '') + '" style="cursor:pointer" onclick="rhVerPeriodos(\'' + escJs(c.id) + '\')">' + esc(c.nombre) + ' · <b>' + fmtN(c.saldo.exigibles) + '</b> días' + (c.saldo.vencidos > 0 ? ' · plazo vencido' : '') + '</span>').join('') +
+    '</div>';
+}
+
+function rhTablaSol(l, admin) {
+  if (!l.length) return '<div class="empty">No hay solicitudes.</div>';
+  return '<table class="table tblRh"><thead><tr>' + (admin ? '<th>Colaborador</th>' : '') + '<th>Tipo</th><th>Fechas</th><th>Días</th><th>Motivo</th><th>Estado</th><th>Respuesta</th><th></th></tr></thead><tbody>' +
+    l.map(x => '<tr>' + (admin ? '<td><b>' + esc(x.nombre) + '</b></td>' : '') + '<td>' + esc(x.tipoTxt) + '</td><td>' + esc(rhRango(x)) + '</td><td>' + fmtN(x.dias) + '</td>' +
+      '<td>' + esc(x.motivo) + '</td><td>' + rhBadge(x.estado) + '</td>' +
+      '<td style="font-size:12px">' + (x.resueltoPor ? esc(x.resueltoPor) + (x.comentario ? '<div style="color:#666">' + esc(x.comentario) + '</div>' : '') : '—') + '</td>' +
+      '<td style="white-space:nowrap">' + rhAcciones(x, admin) + '</td></tr>').join('') + '</tbody></table>';
+}
+
+function rhAcciones(x, admin) {
+  const id = escJs(x.id);
+  if (admin) {
+    if (x.estado === 'Pendiente') return '<button class="btnMini" style="color:#1b6b3a" onclick="rhResolver(\'' + id + '\',\'Aprobada\')">✔ Aprobar</button> <button class="btnMini" style="color:#a31616" onclick="rhResolver(\'' + id + '\',\'Denegada\')">✖ Denegar</button>';
+    if (x.estado === 'Aprobada') return '<button class="btnMini" onclick="rhCancelar(\'' + id + '\',true)">Revocar</button>';
+    return '';
+  }
+  return x.estado === 'Pendiente' ? '<button class="btnMini" onclick="rhCancelar(\'' + id + '\',false)">Cancelar</button>' : '';
+}
+
+function rhNuevaSol() {
+  const adm = rhDatos.admin;
+  const col = rhDatos.mio;
+  const opciones = Object.keys(rhDatos.tiposSol).map(k => '<option value="' + k + '">' + esc(rhDatos.tiposSol[k]) + '</option>').join('');
+  const quien = adm && !col ? '' : '';
+  rhModal('<h3>Nueva solicitud</h3>' +
+    (adm ? '<div class="field"><label>Colaborador</label><select id="rhSColab" onchange="rhCalcDias()">' + rhDatos.colaboradores.filter(c => c.activo).map(c => '<option value="' + esc(c.id) + '"' + (col && col.id === c.id ? ' selected' : '') + '>' + esc(c.nombre) + '</option>').join('') + '</select></div>' : '') +
+    '<div class="field"><label>Tipo</label><select id="rhSTipo">' + opciones + '</select></div>' +
+    '<div style="display:flex;gap:10px"><div class="field" style="flex:1"><label>Desde</label><input type="date" id="rhSDesde" value="' + esc(rhDatos.hoy) + '" onchange="rhSincHasta();rhCalcDias()"></div>' +
+    '<div class="field" style="flex:1"><label>Hasta</label><input type="date" id="rhSHasta" value="' + esc(rhDatos.hoy) + '" onchange="rhCalcDias()"></div></div>' +
+    '<div id="rhSInfo" style="font-size:13px;margin:4px 0 8px"></div>' +
+    '<div class="field"><label>Motivo (obligatorio en permisos e incapacidades)</label><input id="rhSMotivo" maxlength="300" autocomplete="off"></div>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button class="btn secondary" onclick="rhCerrar()">Cancelar</button><button class="btn primary" id="rhSBtn" onclick="rhGuardarSol()">Enviar solicitud</button></div>');
+  rhCalcDias();
+}
+
+function rhSincHasta() { if ($('rhSHasta').value < $('rhSDesde').value) $('rhSHasta').value = $('rhSDesde').value; }
+
+function rhColSol() {
+  if (rhDatos.admin && $('rhSColab')) return rhDatos.colaboradores.find(c => c.id === $('rhSColab').value) || null;
+  return rhDatos.mio;
+}
+
+function rhCalcDias() {
+  const c = rhColSol(); if (!c) return;
+  const n = rhDiasCli($('rhSDesde').value, $('rhSHasta').value, c.diasSemana);
+  const sd = c.saldo;
+  $('rhSInfo').innerHTML = 'Días laborables: <b>' + n + '</b> · Saldo de vacaciones disponible: <b>' + fmtN(sd.disponible) + '</b>';
+}
+
+async function rhGuardarSol() {
+  const b = $('rhSBtn'); b.disabled = true;
+  try {
+    const r = await api('crearSolicitudRhWeb', { idColab: $('rhSColab') ? $('rhSColab').value : '', tipo: $('rhSTipo').value, desde: $('rhSDesde').value, hasta: $('rhSHasta').value, motivo: $('rhSMotivo').value });
+    rhCerrar();
+    toast('Solicitud enviada (' + r.dias + (r.dias === 1 ? ' día' : ' días') + ').');
+    await abrirColab();
+  } catch (e) { b.disabled = false; mostrarError(e, 'No se pudo enviar la solicitud.'); }
+}
+
+async function rhCancelar(id, revocar) {
+  if (!confirm(revocar ? '¿Revocar esta solicitud aprobada? Los días vuelven al saldo.' : '¿Cancelar esta solicitud?')) return;
+  try { await api('cancelarSolicitudRhWeb', id); toast('Solicitud cancelada.'); await abrirColab(); }
+  catch (e) { mostrarError(e, 'No se pudo cancelar.'); }
+}
+
+/* ---------- Solicitudes (administrador) ---------- */
+
+function rhRenderSol() {
+  const d = rhDatos;
+  const pend = d.solicitudes.filter(x => x.estado === 'Pendiente').length;
+  const nombres = Array.from(new Set(d.solicitudes.map(x => x.nombre))).sort();
+  let l = d.solicitudes.filter(x => (!rhFiltroSol || x.estado === rhFiltroSol) && (!rhFiltroColSol || x.nombre === rhFiltroColSol));
+  $('rhPSol').innerHTML = rhAvisoExigibles() + '<div class="toolbar"><div class="field"><label>Estado</label><select onchange="rhFiltroSol=this.value;rhRenderSol()">' +
+    ['Pendiente', 'Aprobada', 'Denegada', 'Cancelada', ''].map(e => '<option value="' + e + '"' + (e === rhFiltroSol ? ' selected' : '') + '>' + (e ? e + 's' : 'Todas') + '</option>').join('').replace('Pendientes', 'Pendientes') + '</select></div>' +
+    '<div class="field"><label>Colaborador</label><select onchange="rhFiltroColSol=this.value;rhRenderSol()"><option value="">Todos</option>' + nombres.map(n => '<option' + (n === rhFiltroColSol ? ' selected' : '') + '>' + esc(n) + '</option>').join('') + '</select></div>' +
+    '<span style="flex:1"></span><button class="btn secondary" onclick="rhNuevaSol()">➕ Registrar solicitud a nombre de un colaborador</button></div>' +
+    '<div class="panel"><div class="panelHead"><h2>Solicitudes <span class="colBadge ' + (pend ? 'mal' : 'ok') + '">' + (pend ? pend + ' por resolver' : 'al día') + '</span></h2></div><div class="tableWrap">' + rhTablaSol(l, true) + '</div></div>';
+}
+
+function rhResolver(id, decision) {
+  const x = rhDatos.solicitudes.find(s => s.id === id); if (!x) return;
+  const col = rhDatos.colaboradores.find(c => c.id === x.idColab);
+  const ap = decision === 'Aprobada';
+  rhModal('<h3>' + (ap ? 'Aprobar' : 'Denegar') + ' solicitud</h3>' +
+    '<div style="font-size:14px;margin-bottom:8px"><b>' + esc(x.nombre) + '</b> · ' + esc(x.tipoTxt) + '<br>' + esc(rhRango(x)) + (x.motivo ? '<br><i>' + esc(x.motivo) + '</i>' : '') +
+    (x.tipo === 'VAC' && col ? '<br>Saldo disponible: <b>' + fmtN(col.saldo.disponible + x.dias) + '</b> días (incluye esta solicitud)' : '') + '</div>' +
+    (ap ? '<div class="field"><label>Días que se descuentan (ajústelo si hay feriados)</label><input type="number" id="rhRDias" min="0.5" step="0.5" value="' + x.dias + '"></div>' : '') +
+    '<div class="field"><label>Comentario' + (ap ? ' (opcional)' : ' (obligatorio)') + '</label><input id="rhRCom" maxlength="300" autocomplete="off"></div>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button class="btn secondary" onclick="rhCerrar()">Cancelar</button><button class="btn ' + (ap ? 'success' : 'danger') + '" id="rhRBtn" onclick="rhConfirmarRes(\'' + escJs(id) + '\',\'' + decision + '\')">' + (ap ? 'Aprobar' : 'Denegar') + '</button></div>');
+}
+
+async function rhConfirmarRes(id, decision) {
+  const b = $('rhRBtn'); b.disabled = true;
+  try {
+    await api('resolverSolicitudRhWeb', id, decision, $('rhRCom').value, $('rhRDias') ? $('rhRDias').value : '');
+    rhCerrar(); toast('Solicitud ' + (decision === 'Aprobada' ? 'aprobada' : 'denegada') + '.');
+    await abrirColab(); notifRefrescarSiExiste();
+  } catch (e) { b.disabled = false; mostrarError(e, 'No se pudo resolver la solicitud.'); }
+}
+
+function notifRefrescarSiExiste() { try { if (typeof notifCargar === 'function') notifCargar(); } catch (e) { } }
+
+/* ---------- Colaboradores (fichas) ---------- */
+
+function rhRenderCol() {
+  const l = rhDatos.colaboradores;
+  $('rhPCol').innerHTML = rhAvisoExigibles() + '<div class="toolbar"><button class="btn primary" onclick="rhEditarCol(\'\')">➕ Nuevo colaborador</button>' +
+    '<span style="font-size:12px;color:#777;margin-left:8px">Vacaciones: ' + rhDatos.semanasPeriodo + ' semanas laboradas = 2 semanas de vacaciones (10 días en semana de 5 días, 12 en semana de 6). Los salarios solo los ve el administrador.</span></div>' +
+    '<div class="panel"><div class="panelHead"><h2>Colaboradores internos</h2><span style="font-size:12px;color:#777">' + l.length + '</span></div><div class="tableWrap">' +
+    (!l.length ? '<div class="empty">Aún no hay colaboradores. Agrega el primero con su fecha de ingreso.</div>' :
+      '<table class="table tblRh"><thead><tr><th>Colaborador</th><th>Usuario</th><th>Puesto</th><th>Ingreso</th><th>Salario</th><th>Devengadas</th><th>Tomadas</th><th>Saldo</th><th>Por programar</th><th>Estado</th><th></th></tr></thead><tbody>' +
+      l.map(c => '<tr' + (c.activo ? '' : ' style="opacity:.55"') + '><td><b>' + esc(c.nombre) + '</b></td><td>' + (c.usuario ? esc(c.usuario) : '<span class="muted">sin usuario</span>') + '</td><td>' + esc(c.puesto) + '</td>' +
+        '<td>' + esc(rhFecha(c.ingreso)) + '</td><td>' + colones(c.salario) + '<div style="font-size:11px;color:#888">' + esc(c.periodicidad) + '</div></td>' +
+        '<td>' + fmtN(c.saldo.devengado) + '</td><td>' + fmtN(c.saldo.tomadas + c.saldo.programadas) + '</td><td><b>' + fmtN(c.saldo.saldo) + '</b></td>' +
+        '<td>' + (c.saldo.exigibles > 0 ? '<b style="color:' + (c.saldo.vencidos > 0 ? '#a31616' : '#b8860b') + '">' + fmtN(c.saldo.exigibles) + '</b>' + (c.saldo.vencidos > 0 ? '<div style="font-size:11px;color:#a31616">plazo vencido</div>' : '') : '<span class="segSinCarga">—</span>') + '</td>' +
+        '<td>' + (c.activo ? '<span class="tag tag-active">Activo</span>' : '<span class="tag tag-inactive">Retirado</span>') + '</td>' +
+        '<td style="white-space:nowrap"><button class="btnMini" onclick="rhVerPeriodos(\'' + escJs(c.id) + '\')">📅 Períodos</button> <button class="btnMini" onclick="rhEditarCol(\'' + escJs(c.id) + '\')">✏️ Editar</button></td></tr>').join('') + '</tbody></table>') +
+    '</div></div>';
+}
+
+function rhEditarCol(id) {
+  const c = id ? rhDatos.colaboradores.find(x => x.id === id) : { id: '', usuario: '', nombre: '', puesto: '', ingreso: '', salario: '', periodicidad: 'Quincenal', diasSemana: 5, diasPeriodo: 10, previos: 0, activo: true, salida: '', obs: '' };
+  const ocupados = {}; rhDatos.colaboradores.forEach(x => { if (x.usuario && x.id !== c.id) ocupados[x.usuario] = 1; });
+  const usu = '<option value="">Sin usuario (no se autogestiona)</option>' + rhDatos.usuarios.filter(u => !ocupados[u.usuario]).map(u => '<option value="' + esc(u.usuario) + '"' + (u.usuario === c.usuario ? ' selected' : '') + '>' + esc(u.nombre || u.usuario) + ' (' + esc(u.usuario) + ')</option>').join('');
+  rhModal('<h3>' + (id ? 'Editar colaborador' : 'Nuevo colaborador') + '</h3><input type="hidden" id="rcId" value="' + esc(c.id) + '">' +
+    '<div class="field"><label>Nombre completo</label><input id="rcNombre" value="' + esc(c.nombre) + '" maxlength="80"></div>' +
+    '<div class="field"><label>Usuario del sistema (para que pida sus permisos)</label><select id="rcUsuario">' + usu + '</select></div>' +
+    '<div style="display:flex;gap:10px"><div class="field" style="flex:1"><label>Puesto</label><input id="rcPuesto" value="' + esc(c.puesto) + '" maxlength="60"></div>' +
+    '<div class="field" style="flex:1"><label>Fecha de ingreso</label><input type="date" id="rcIngreso" value="' + esc(c.ingreso) + '"></div></div>' +
+    '<div style="display:flex;gap:10px"><div class="field" style="flex:1"><label>Salario base (₡)</label><input type="number" id="rcSalario" min="0" value="' + esc(c.salario) + '"></div>' +
+    '<div class="field" style="flex:1"><label>Pago</label><select id="rcPeriodicidad"><option' + (c.periodicidad === 'Quincenal' ? ' selected' : '') + '>Quincenal</option><option' + (c.periodicidad === 'Mensual' ? ' selected' : '') + '>Mensual</option></select></div></div>' +
+    '<div style="display:flex;gap:10px"><div class="field" style="flex:1"><label>Semana laboral</label><select id="rcDiasSemana" onchange="rhSugPeriodo()"><option value="5"' + (c.diasSemana === 5 ? ' selected' : '') + '>5 días (lun-vie)</option><option value="6"' + (c.diasSemana === 6 ? ' selected' : '') + '>6 días (lun-sáb)</option></select></div>' +
+    '<div class="field" style="flex:1"><label>Días de vacaciones por cada 50 semanas</label><input type="number" id="rcDiasPeriodo" min="1" step="0.5" value="' + esc(c.diasPeriodo) + '"></div></div>' +
+    '<div class="field"><label>Días de vacaciones ya tomados antes de usar el sistema</label><input type="number" id="rcPrevios" min="0" step="0.5" value="' + esc(c.previos) + '"></div>' +
+    '<div style="display:flex;gap:10px"><div class="field" style="flex:1"><label>Estado</label><select id="rcActivo"><option value="1"' + (c.activo ? ' selected' : '') + '>Activo</option><option value="0"' + (!c.activo ? ' selected' : '') + '>Retirado</option></select></div>' +
+    '<div class="field" style="flex:1"><label>Fecha de salida (si aplica)</label><input type="date" id="rcSalida" value="' + esc(c.salida) + '"></div></div>' +
+    '<div class="field"><label>Observaciones</label><input id="rcObs" value="' + esc(c.obs) + '" maxlength="300"></div>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button class="btn secondary" onclick="rhCerrar()">Cancelar</button><button class="btn primary" id="rcBtn" onclick="rhGuardarCol()">Guardar</button></div>');
+}
+
+function rhSugPeriodo() { $('rcDiasPeriodo').value = $('rcDiasSemana').value === '6' ? 12 : 10; }
+
+async function rhGuardarCol() {
+  const b = $('rcBtn'); b.disabled = true;
+  try {
+    await api('guardarColaboradorWeb', { id: $('rcId').value, nombre: $('rcNombre').value, usuario: $('rcUsuario').value, puesto: $('rcPuesto').value, ingreso: $('rcIngreso').value,
+      salario: $('rcSalario').value, periodicidad: $('rcPeriodicidad').value, diasSemana: $('rcDiasSemana').value, diasPeriodo: $('rcDiasPeriodo').value, previos: $('rcPrevios').value,
+      activo: $('rcActivo').value === '1', salida: $('rcSalida').value, obs: $('rcObs').value });
+    rhCerrar(); toast('Colaborador guardado.'); await abrirColab();
+  } catch (e) { b.disabled = false; mostrarError(e, 'No se pudo guardar el colaborador.'); }
+}
+
+/* ---------- Pagos ---------- */
+
+async function rhRenderPag() {
+  const cols = rhDatos.colaboradores;
+  if (!cols.length) { $('rhPPag').innerHTML = '<div class="empty">Primero agrega colaboradores en la pestaña «Colaboradores».</div>'; return; }
+  if (!rhColSel || !cols.find(c => c.id === rhColSel)) rhColSel = cols[0].id;
+  $('rhPPag').innerHTML = '<div class="toolbar"><div class="field" style="min-width:260px"><label>Colaborador</label><select onchange="rhColSel=this.value;rhRenderPag()">' +
+    cols.map(c => '<option value="' + esc(c.id) + '"' + (c.id === rhColSel ? ' selected' : '') + '>' + esc(c.nombre) + (c.activo ? '' : ' (retirado)') + '</option>').join('') + '</select></div>' +
+    '<span style="flex:1"></span><button class="btn primary" onclick="rhNuevoPago()">➕ Registrar pago</button></div><div id="rhPagBody"><div class="loading">Cargando...</div></div>';
+  try { rhPagos = await api('obtenerPagosRhWeb', rhColSel); }
+  catch (e) { mostrarError(e, 'No se pudieron cargar los pagos.'); return; }
+  const P = rhPagos, A = P.aguinaldo[0], A2 = P.aguinaldo[1], L = P.liquidacion;
+  const card = (n, t, cl, money) => '<div class="card ' + (cl || '') + '"><div class="n">' + (money ? colones(n) : fmtN(n)) + '</div><div class="t">' + t + '</div></div>';
+  const totalLiq = L.vacacionesMonto + L.aguinaldoProporcional;
+  $('rhPagBody').innerHTML =
+    '<div class="cards">' + card(A.base, 'Salarial acumulado ' + A.desde.slice(0, 7) + ' a ' + A.hasta.slice(0, 7), '', true) + card(A.estimado, 'Aguinaldo estimado del ciclo (÷ 12)', 'f', true) +
+    card(A.pagado, 'Aguinaldo ya pagado en este ciclo', '', true) + card(A2.estimado, 'Aguinaldo del ciclo anterior (' + A2.desde.slice(0, 4) + '–' + A2.hasta.slice(0, 4) + ')', '', true) + '</div>' +
+    '<div class="panel" style="margin-bottom:12px"><div class="panelHead"><h2>Liquidación estimada (referencia)</h2></div><div style="padding:12px 16px;font-size:14px;line-height:1.7">' +
+    'Vacaciones pendientes: <b>' + fmtN(L.vacacionesDias) + '</b> días × salario diario promedio ' + colones(L.salarioDiario) + ' = <b>' + colones(L.vacacionesMonto) + '</b><br>' +
+    'Aguinaldo proporcional (desde el 1 de diciembre): <b>' + colones(L.aguinaldoProporcional) + '</b><br>' +
+    '<span style="font-size:16px">Subtotal estimado: <b>' + colones(totalLiq) + '</b></span>' +
+    '<div style="font-size:12px;color:#777;margin-top:6px">Es una referencia: usa el promedio mensual salarial de los últimos 6 meses (' + colones(L.promedioMensual) + ') ÷ 30. No incluye preaviso ni cesantía, que dependen de la causa y de los años de servicio; consúltelo con su asesor legal antes de liquidar.</div></div></div>' +
+    '<div class="panel"><div class="panelHead"><h2>Pagos registrados</h2><span style="font-size:12px;color:#777">' + P.pagos.length + '</span></div><div class="tableWrap">' +
+    (!P.pagos.length ? '<div class="empty">Aún no hay pagos registrados para este colaborador.</div>' :
+      '<table class="table tblRh"><thead><tr><th>Fecha</th><th>Período</th><th>Tipo</th><th>Bruto</th><th>Deducciones</th><th>Neto</th><th>Nota</th><th>Registró</th><th></th></tr></thead><tbody>' +
+      P.pagos.map(p => '<tr><td>' + esc(rhFecha(p.fecha)) + '</td><td>' + esc(p.periodo) + '</td><td>' + esc(p.tipoTxt) + (rhDatos.salariales.indexOf(p.tipo) !== -1 ? ' <span title="Cuenta para el aguinaldo" style="color:#2c6b3c">●</span>' : '') + '</td><td>' + colones(p.bruto) + '</td><td>' + colones(p.deducciones) + '</td><td><b>' + colones(p.neto) + '</b></td><td>' + esc(p.obs) + '</td><td>' + esc(p.por) +
+        '</td><td><button class="btnMini" style="color:#a31616" onclick="rhEliminarPago(\'' + escJs(p.id) + '\')">🗑️</button></td></tr>').join('') + '</tbody></table>') + '</div></div>';
+}
+
+function rhNuevoPago() {
+  const c = rhDatos.colaboradores.find(x => x.id === rhColSel); if (!c) return;
+  rhModal('<h3>Registrar pago · ' + esc(c.nombre) + '</h3>' +
+    '<div style="display:flex;gap:10px"><div class="field" style="flex:1"><label>Fecha del pago</label><input type="date" id="rpFecha" value="' + esc(rhDatos.hoy) + '"></div>' +
+    '<div class="field" style="flex:1"><label>Período (ej. 2026-10 1Q)</label><input id="rpPeriodo" maxlength="40" autocomplete="off"></div></div>' +
+    '<div class="field"><label>Tipo</label><select id="rpTipo">' + Object.keys(rhDatos.tiposPago).map(k => '<option value="' + k + '">' + esc(rhDatos.tiposPago[k]) + (rhDatos.salariales.indexOf(k) !== -1 ? ' (cuenta para aguinaldo)' : '') + '</option>').join('') + '</select></div>' +
+    '<div style="display:flex;gap:10px"><div class="field" style="flex:1"><label>Monto bruto (₡)</label><input type="number" id="rpBruto" min="0" step="0.01" value="' + (c.salario ? (c.periodicidad === 'Mensual' ? c.salario : c.salario / 2) : '') + '" oninput="rhNeto()"></div>' +
+    '<div class="field" style="flex:1"><label>Deducciones (CCSS, renta, otras) (₡)</label><input type="number" id="rpDed" min="0" step="0.01" value="0" oninput="rhNeto()"></div></div>' +
+    '<div id="rpNeto" style="font-size:14px;margin:4px 0 8px"></div><div class="field"><label>Nota (opcional)</label><input id="rpObs" maxlength="200" autocomplete="off"></div>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button class="btn secondary" onclick="rhCerrar()">Cancelar</button><button class="btn primary" id="rpBtn" onclick="rhGuardarPago()">Registrar</button></div>');
+  rhNeto();
+}
+
+function rhNeto() { $('rpNeto').innerHTML = 'Neto: <b>' + colones((+$('rpBruto').value || 0) - (+$('rpDed').value || 0)) + '</b>'; }
+
+async function rhGuardarPago() {
+  const b = $('rpBtn'); b.disabled = true;
+  try {
+    await api('registrarPagoRhWeb', { idColab: rhColSel, fecha: $('rpFecha').value, periodo: $('rpPeriodo').value, tipo: $('rpTipo').value, bruto: $('rpBruto').value, deducciones: $('rpDed').value, obs: $('rpObs').value });
+    rhCerrar(); toast('Pago registrado.'); rhRenderPag();
+  } catch (e) { b.disabled = false; mostrarError(e, 'No se pudo registrar el pago.'); }
+}
+
+async function rhEliminarPago(id) {
+  if (!confirm('¿Eliminar este pago? Cambia el aguinaldo estimado.')) return;
+  try { await api('eliminarPagoRhWeb', id); toast('Pago eliminado.'); rhRenderPag(); }
+  catch (e) { mostrarError(e, 'No se pudo eliminar.'); }
 }
 
 function mostrarVista(v, forzar) {
@@ -5702,11 +6033,12 @@ function mostrarVista(v, forzar) {
   $('vistaFichas').style.display = (v === 'moviles' && admin) ? 'block' : 'none';
   $('vistaResumen').style.display = v === 'resumen' ? 'block' : 'none';
   $('vistaUsuarios').style.display = v === 'usuarios' ? 'block' : 'none';
+  $('vistaColab').style.display = v === 'colaboradores' ? 'block' : 'none';
   $('vistaSeguimiento').style.display = v === 'seguimiento' ? 'block' : 'none';
   $('vistaBodega').style.display = v === 'bodega' ? 'block' : 'none';
   $('vistaCotiz').style.display = v === 'cotizaciones' ? 'block' : 'none';
 
-  ['calendario', 'moviles', 'resumen', 'seguimiento', 'bodega', 'cotizaciones', 'usuarios'].forEach(x => {
+  ['calendario', 'moviles', 'resumen', 'seguimiento', 'bodega', 'cotizaciones', 'colaboradores', 'usuarios'].forEach(x => {
     const id = 'nav' + x.charAt(0).toUpperCase() + x.slice(1);
     $(id).classList.toggle('active', x === v);
   });
@@ -5716,6 +6048,7 @@ function mostrarVista(v, forzar) {
   if (v === 'cotizaciones') abrirCotizaciones();
   if (v === 'resumen') cargarResumen();
   if (v === 'usuarios') cargarUsuarios();
+  if (v === 'colaboradores') abrirColab();
   if (v === 'moviles' && admin) abrirFichas();
   if (v === 'calendario' && calendarioObsoleto && !Object.keys(cambios).length) cargarCalendario();
   sideRefrescar(); setTimeout(sideRefrescar, 300);
@@ -12122,6 +12455,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 28 · 13-oct 15:10</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 30 · 13-oct 18:50</div>
 </body>
 </html>

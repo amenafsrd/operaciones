@@ -7375,6 +7375,38 @@ function obtenerNotificacionesWeb(token) {
     } catch (e) { /* idem */ }
   }
 
+  /* Colaboradores: el administrador ve las solicitudes por resolver; el colaborador ve cómo se resolvieron las suyas */
+  try {
+    const admin = ses.rol === 'admin';
+    const mio = rhMiColab_(ses);
+    if (admin || mio) {
+      const d14 = desde(14);
+      const colabs = leerObjetos_(rhHoja_('COLAB'));
+      const nombres = {};
+      colabs.forEach(c => { nombres[txt_(c.ID)] = txt_(c.Nombre); });
+      leerObjetos_(rhHoja_('SOL')).forEach(r => {
+        const x = rhSolInfo_(r, nombres);
+        const rango = fmtRh_(x.desde) + (x.hasta !== x.desde ? ' al ' + fmtRh_(x.hasta) : '') + ' (' + x.dias + (x.dias === 1 ? ' día' : ' días') + ')';
+        if (admin && x.estado === 'Pendiente' && x.creadoPor !== ses.usuario)
+          eventos.push({ id: 'rhp|' + x.id, tipo: 'colaboradores', icono: '🗓️', titulo: 'Solicitud pendiente: ' + x.nombre, detalle: x.tipoTxt + ' · ' + rango + (x.motivo ? ' · ' + x.motivo : ''),
+            fecha: x.creado, vista: 'colaboradores', propio: false });
+        if (mio && x.idColab === mio.id && (x.estado === 'Aprobada' || x.estado === 'Denegada') && x.resuelto >= d14 && x.resueltoPor !== ses.usuario)
+          eventos.push({ id: 'rhr|' + x.id + '|' + x.estado, tipo: 'colaboradores', icono: x.estado === 'Aprobada' ? '✅' : '❌', titulo: 'Tu solicitud fue ' + (x.estado === 'Aprobada' ? 'aprobada' : 'denegada'),
+            detalle: x.tipoTxt + ' · ' + rango + (x.comentario ? ' · ' + x.comentario : ''), fecha: x.resuelto, vista: 'colaboradores', propio: false });
+      });
+    }
+    try {
+      if (ses.rol === 'admin' || rhMiColab_(ses)) {
+        const solsTodas = leerObjetos_(rhHoja_('SOL')), hoyS = rhHoy_(), mio2 = rhMiColab_(ses);
+        leerObjetos_(rhHoja_('COLAB')).map(rhColabInfo_).filter(c => c.activo && (ses.rol === 'admin' || (mio2 && c.id === mio2.id))).forEach(c => {
+          const sd = rhSaldo_(c, solsTodas, hoyS);
+          if (sd.vencidos > 0) eventos.push({ id: 'rhv|' + c.id + '|' + hoyS.slice(0, 7), tipo: 'colaboradores', icono: '⏰', titulo: (ses.rol === 'admin' && !(mio2 && mio2.id === c.id) ? c.nombre + ' tiene' : 'Tienes') + ' vacaciones vencidas por tomar',
+            detalle: sd.vencidos + ' día(s) de un período que ya pasó el plazo de 15 semanas para concederse. Hay que programarlos.', fecha: hoyS + ' 08:00:00', vista: 'colaboradores', propio: false });
+        });
+      }
+    } catch (e) { /* idem */ }
+  } catch (e) { /* idem */ }
+
   /* Corte pendiente: dentro del horario de cortes, si pasó más de MIN_CORTE desde el último corte subido (o desde el inicio del horario) */
   if (tiene('seguimiento')) {
     try {
@@ -9002,6 +9034,389 @@ function configurarConsecutivoCotWeb(token, ultimo) {
 }
 
 
+/* =========================================================
+   COLABORADORES (RR. HH. interno)
+   - Ficha del colaborador interno (ligada o no a un usuario del sistema).
+   - Vacaciones según la ley de Costa Rica: 2 semanas por cada 50 semanas laboradas.
+   - Solicitudes de vacaciones / permisos / incapacidades: el colaborador las pide, el administrador aprueba o deniega.
+   - Registro de pagos (para aguinaldo y liquidación). Los salarios y pagos solo los ve el administrador.
+   ========================================================= */
+
+const RH = {
+  HOJAS: { COLAB: 'RH_COLABORADORES', SOL: 'RH_SOLICITUDES', PAG: 'RH_PAGOS' },
+  HEADERS: {
+    COLAB: ['ID', 'Usuario', 'Nombre', 'Puesto', 'Fecha_Ingreso', 'Salario_Base', 'Periodicidad', 'Dias_Semana', 'Dias_Por_Periodo',
+      'Dias_Tomados_Previos', 'Activo', 'Fecha_Salida', 'Obs', 'Creado', 'Actualizado'],
+    SOL: ['ID', 'ID_Colab', 'Tipo', 'Desde', 'Hasta', 'Dias', 'Motivo', 'Estado', 'Comentario_Admin', 'Resuelto_Por', 'Resuelto', 'Creado_Por', 'Creado'],
+    PAG: ['ID', 'ID_Colab', 'Fecha', 'Periodo', 'Tipo', 'Bruto', 'Deducciones', 'Neto', 'Obs', 'Registrado_Por', 'Creado']
+  },
+  TEXTO: {
+    COLAB: ['ID', 'Usuario', 'Fecha_Ingreso', 'Fecha_Salida', 'Creado', 'Actualizado'],
+    SOL: ['ID', 'ID_Colab', 'Desde', 'Hasta', 'Resuelto', 'Creado'],
+    PAG: ['ID', 'ID_Colab', 'Fecha', 'Periodo', 'Creado']
+  },
+  TIPOS_SOL: { VAC: 'Vacaciones', PCG: 'Permiso con goce', PSG: 'Permiso sin goce', INC: 'Incapacidad' },
+  /* Tipos de pago; los marcados "salarial" entran en la base del aguinaldo */
+  TIPOS_PAGO: { SALARIO: 'Salario', EXTRAS: 'Horas extra', BONO: 'Comisión / bono salarial', VACPAG: 'Vacaciones pagadas', AGUINALDO: 'Aguinaldo',
+    LIQ: 'Liquidación', INCENT: 'Incentivo no salarial', VIAT: 'Viáticos / reembolso', OTRO: 'Otro' },
+  SALARIALES: ['SALARIO', 'EXTRAS', 'BONO', 'VACPAG'],
+  SEMANAS_PERIODO: 50
+};
+
+const RH_FORMATEADAS = {};
+
+function rhHoja_(clave) {
+  const ss = obtenerSpreadsheet_();
+  const sh = asegurarHoja_(ss, RH.HOJAS[clave], RH.HEADERS[clave]);
+  if (!RH_FORMATEADAS[clave]) {
+    RH_FORMATEADAS[clave] = true;
+    formatearColumnasTexto_(sh, RH.TEXTO[clave]);
+  }
+  return sh;
+}
+
+function rhNum_(v) { const n = Number(String(v === null || v === undefined ? '' : v).replace(/,/g, '')); return isNaN(n) ? 0 : n; }
+function rh2_(n) { return Math.round(n * 100) / 100; }
+function rhMs_(iso) { return Date.parse(iso + 'T12:00:00Z'); }
+function rhHoy_() { return segHoyISO_(); }
+
+/* Días que cuentan entre dos fechas: lunes a viernes (o a sábado si la semana es de 6 días); el domingo nunca */
+function rhDias_(desde, hasta, diasSemana) {
+  let n = 0;
+  for (let t = rhMs_(desde); t <= rhMs_(hasta); t += 86400000) {
+    const d = new Date(t).getUTCDay();
+    if (d === 0) continue;
+    if (d === 6 && Number(diasSemana) !== 6) continue;
+    n++;
+  }
+  return n;
+}
+
+function rhColabInfo_(c) {
+  const ds = Number(c.Dias_Semana) === 6 ? 6 : 5;
+  return {
+    id: txt_(c.ID), usuario: txt_(c.Usuario), nombre: txt_(c.Nombre), puesto: txt_(c.Puesto), ingreso: segFecha_(c.Fecha_Ingreso) || '',
+    salario: rhNum_(c.Salario_Base), periodicidad: txt_(c.Periodicidad) === 'Mensual' ? 'Mensual' : 'Quincenal', diasSemana: ds,
+    diasPeriodo: rhNum_(c.Dias_Por_Periodo) > 0 ? rhNum_(c.Dias_Por_Periodo) : 2 * ds,
+    previos: rhNum_(c.Dias_Tomados_Previos), activo: txt_(c.Activo) !== 'No', salida: segFecha_(c.Fecha_Salida) || '', obs: txt_(c.Obs)
+  };
+}
+
+/* Saldo de vacaciones: devengado (por semanas desde el ingreso) menos lo ya tomado */
+function rhSaldo_(col, sols, hoy) {
+  hoy = hoy || rhHoy_();
+  const fin = col.salida && col.salida < hoy ? col.salida : hoy;
+  const semanas = col.ingreso && fin >= col.ingreso ? (rhMs_(fin) - rhMs_(col.ingreso)) / (7 * 86400000) : 0;
+  const devengado = rh2_(semanas / RH.SEMANAS_PERIODO * col.diasPeriodo);
+  let tomadas = col.previos, pendientes = 0, programadas = 0;
+  sols.forEach(s => {
+    if (txt_(s.ID_Colab) !== col.id || txt_(s.Tipo) !== 'VAC') return;
+    const e = txt_(s.Estado), d = rhNum_(s.Dias);
+    if (e === 'Aprobada') { if (segFecha_(s.Desde) <= hoy) tomadas += d; else programadas += d; }
+    else if (e === 'Pendiente') pendientes += d;
+  });
+  /* Períodos de 50 semanas: lo tomado y lo programado se descuenta del período más antiguo primero. Un período cumplido con días sin tomar es «exigible»:
+     la ley da 15 semanas después de cumplirse para concederlo; pasado ese plazo se marca vencido. */
+  const periodos = [];
+  const cumplidos = Math.floor(semanas / RH.SEMANAS_PERIODO + 1e-9);
+  let uso = tomadas + programadas, exigibles = 0, vencidos = 0;
+  for (let k = 1; k <= cumplidos; k++) {
+    const cumple = formatearFechaISO_(sumarDias_(convertirFecha_(col.ingreso), k * RH.SEMANAS_PERIODO * 7));
+    const limite = formatearFechaISO_(sumarDias_(convertirFecha_(cumple), 15 * 7));
+    const usado = Math.min(col.diasPeriodo, Math.max(0, uso));
+    uso -= usado;
+    const pend = rh2_(col.diasPeriodo - usado);
+    const vencido = pend > 0 && limite < hoy;
+    if (pend > 0) exigibles += pend;
+    if (vencido) vencidos += pend;
+    periodos.push({ n: k, cumple: cumple, limite: limite, dias: col.diasPeriodo, usados: rh2_(usado), pendientes: pend, vencido: vencido });
+  }
+  return { semanas: rh2_(semanas), devengado: devengado, tomadas: rh2_(tomadas), programadas: rh2_(programadas), pendientes: rh2_(pendientes),
+    saldo: rh2_(devengado - tomadas - programadas), disponible: rh2_(devengado - tomadas - programadas - pendientes),
+    periodos: periodos, exigibles: rh2_(exigibles), vencidos: rh2_(vencidos),
+    enCurso: rh2_(Math.max(0, devengado - cumplidos * col.diasPeriodo)) };
+}
+
+function rhSolInfo_(s, nombres) {
+  return { id: txt_(s.ID), idColab: txt_(s.ID_Colab), nombre: nombres[txt_(s.ID_Colab)] || '', tipo: txt_(s.Tipo), tipoTxt: RH.TIPOS_SOL[txt_(s.Tipo)] || txt_(s.Tipo),
+    desde: segFecha_(s.Desde) || '', hasta: segFecha_(s.Hasta) || '', dias: rhNum_(s.Dias), motivo: txt_(s.Motivo), estado: txt_(s.Estado) || 'Pendiente',
+    comentario: txt_(s.Comentario_Admin), resueltoPor: txt_(s.Resuelto_Por), resuelto: txt_(s.Resuelto), creadoPor: txt_(s.Creado_Por), creado: txt_(s.Creado) };
+}
+
+function rhMiColab_(ses) {
+  const f = leerObjetos_(rhHoja_('COLAB')).find(c => txt_(c.Usuario) && txt_(c.Usuario) === ses.usuario && txt_(c.Activo) !== 'No');
+  return f ? rhColabInfo_(f) : null;
+}
+
+/* ¿Debe ver el módulo? Administrador siempre; el resto solo si está ligado a una ficha de colaborador */
+function miAccesoRhWeb(token) {
+  const ses = requerirSesion_(token, 'consulta');
+  return { admin: ses.rol === 'admin', colaborador: !!rhMiColab_(ses) };
+}
+
+function obtenerRhWeb(token) {
+
+  const ses = requerirSesion_(token, 'consulta');
+  const admin = ses.rol === 'admin';
+  const hoy = rhHoy_();
+  const colabs = leerObjetos_(rhHoja_('COLAB'));
+  const sols = leerObjetos_(rhHoja_('SOL'));
+  const mio = rhMiColab_(ses);
+  if (!admin && !mio) throw new Error('No tienes acceso a este módulo.');
+
+  const nombres = {};
+  colabs.forEach(c => { nombres[txt_(c.ID)] = txt_(c.Nombre); });
+  const lim = formatearFechaISO_(sumarDias_(convertirFecha_(hoy), -400));
+
+  const out = { admin: admin, hoy: hoy, tiposSol: RH.TIPOS_SOL, tiposPago: RH.TIPOS_PAGO, salariales: RH.SALARIALES, semanasPeriodo: RH.SEMANAS_PERIODO };
+
+  if (mio) {
+    out.mio = Object.assign({}, mio, { saldo: rhSaldo_(mio, sols, hoy) });
+    if (!admin) delete out.mio.salario;
+    out.misSolicitudes = sols.filter(s => txt_(s.ID_Colab) === mio.id).map(s => rhSolInfo_(s, nombres)).sort((a, b) => b.creado.localeCompare(a.creado));
+  }
+
+  if (admin) {
+    out.colaboradores = colabs.map(rhColabInfo_).map(c => Object.assign(c, { saldo: rhSaldo_(c, sols, hoy) }));
+    out.solicitudes = sols.map(s => rhSolInfo_(s, nombres)).filter(s => s.estado === 'Pendiente' || s.hasta >= lim || s.creado >= lim)
+      .sort((a, b) => (a.estado === 'Pendiente' ? 0 : 1) - (b.estado === 'Pendiente' ? 0 : 1) || b.desde.localeCompare(a.desde));
+    const us = leerObjetos_(obtenerHoja_(CONFIG.HOJAS.USUARIOS));
+    out.usuarios = us.filter(u => txt_(u.Usuario)).map(u => ({ usuario: txt_(u.Usuario), nombre: txt_(u.Nombre) }));
+  }
+  return out;
+}
+
+function guardarColaboradorWeb(token, d) {
+
+  const ses = requerirSesion_(token, 'admin');
+  d = d || {};
+  const nombre = txt_(d.nombre).replace(/\s+/g, ' ').slice(0, 80);
+  if (!nombre) throw new Error('Escribe el nombre del colaborador.');
+  const ingreso = segFecha_(d.ingreso);
+  if (!ingreso) throw new Error('Indica la fecha de ingreso (de ahí se calculan las vacaciones).');
+  const salida = segFecha_(d.salida) || '';
+  if (salida && salida < ingreso) throw new Error('La fecha de salida no puede ser anterior al ingreso.');
+  const ds = Number(d.diasSemana) === 6 ? 6 : 5;
+  const usuario = txt_(d.usuario);
+
+  return conBloqueo_(() => {
+    const sh = rhHoja_('COLAB');
+    const t = leerTabla_(sh);
+    const ahora = segAhora_();
+    let fila = -1;
+    for (let i = 1; i < t.values.length; i++) {
+      if (txt_(t.values[i][t.idx.ID]) === txt_(d.id)) fila = i;
+      if (usuario && txt_(t.values[i][t.idx.Usuario]) === usuario && txt_(t.values[i][t.idx.ID]) !== txt_(d.id))
+        throw new Error('Ese usuario ya está ligado a otro colaborador.');
+    }
+    const o = {
+      Usuario: usuario, Nombre: nombre, Puesto: txt_(d.puesto).slice(0, 60), Fecha_Ingreso: ingreso, Salario_Base: Math.max(0, rhNum_(d.salario)),
+      Periodicidad: txt_(d.periodicidad) === 'Mensual' ? 'Mensual' : 'Quincenal', Dias_Semana: ds,
+      Dias_Por_Periodo: rhNum_(d.diasPeriodo) > 0 ? rhNum_(d.diasPeriodo) : 2 * ds, Dias_Tomados_Previos: Math.max(0, rhNum_(d.previos)),
+      Activo: d.activo === false || txt_(d.activo) === 'No' ? 'No' : 'Sí', Fecha_Salida: salida, Obs: txt_(d.obs).slice(0, 300), Actualizado: ahora
+    };
+    if (fila < 0) {
+      o.ID = 'C' + Date.now().toString(36).toUpperCase(); o.Creado = ahora;
+      appendPorEncabezados_(sh, o);
+      return { ok: true, id: o.ID };
+    }
+    Object.keys(o).forEach(n => { if (t.idx[n] !== undefined) sh.getRange(fila + 1, t.idx[n] + 1).setValue(o[n]); });
+    return { ok: true, id: txt_(d.id) };
+  });
+}
+
+function crearSolicitudRhWeb(token, d) {
+
+  const ses = requerirSesion_(token, 'consulta');
+  d = d || {};
+  const admin = ses.rol === 'admin';
+  const tipo = txt_(d.tipo);
+  if (!RH.TIPOS_SOL[tipo]) throw new Error('Elige el tipo de solicitud.');
+  const desde = segFecha_(d.desde), hasta = segFecha_(d.hasta) || desde;
+  if (!desde) throw new Error('Indica la fecha de inicio.');
+  if (hasta < desde) throw new Error('La fecha final no puede ser anterior a la de inicio.');
+  const motivo = txt_(d.motivo).slice(0, 300);
+  if (tipo !== 'VAC' && !motivo) throw new Error('Escribe el motivo.');
+
+  return conBloqueo_(() => {
+    const colabs = leerObjetos_(rhHoja_('COLAB'));
+    const sols = leerObjetos_(rhHoja_('SOL'));
+    let colF;
+    if (admin && txt_(d.idColab)) colF = colabs.find(c => txt_(c.ID) === txt_(d.idColab));
+    else colF = colabs.find(c => txt_(c.Usuario) && txt_(c.Usuario) === ses.usuario && txt_(c.Activo) !== 'No');
+    if (!colF) throw new Error('No hay un colaborador ligado a tu usuario.');
+    const col = rhColabInfo_(colF);
+
+    if (!admin && desde < formatearFechaISO_(sumarDias_(convertirFecha_(rhHoy_()), -7)) && tipo !== 'INC')
+      throw new Error('No se pueden pedir fechas de hace más de una semana. Habla con el administrador.');
+
+    const dias = rhDias_(desde, hasta, col.diasSemana);
+    if (dias < 1) throw new Error('Ese rango no incluye días laborables.');
+
+    const choque = sols.find(s => txt_(s.ID_Colab) === col.id && ['Pendiente', 'Aprobada'].indexOf(txt_(s.Estado)) !== -1 &&
+      segFecha_(s.Desde) <= hasta && segFecha_(s.Hasta) >= desde);
+    if (choque) throw new Error('Ya tienes una solicitud (' + (RH.TIPOS_SOL[txt_(choque.Tipo)] || '') + ') que se cruza con esas fechas.');
+
+    if (tipo === 'VAC') {
+      const sd = rhSaldo_(col, sols, rhHoy_());
+      if (dias > sd.disponible + 1e-9)
+        throw new Error('Pides ' + dias + ' día(s) de vacaciones y tu saldo disponible es de ' + sd.disponible + '. Ajusta las fechas o habla con el administrador.');
+    }
+
+    const o = { ID: 'S' + Date.now().toString(36).toUpperCase(), ID_Colab: col.id, Tipo: tipo, Desde: desde, Hasta: hasta, Dias: dias, Motivo: motivo,
+      Estado: 'Pendiente', Creado_Por: ses.usuario, Creado: segAhora_() };
+    appendPorEncabezados_(rhHoja_('SOL'), o);
+    return { ok: true, id: o.ID, dias: dias };
+  });
+}
+
+/* El colaborador cancela la suya mientras está pendiente; el administrador puede cancelar (revocar) cualquiera */
+function cancelarSolicitudRhWeb(token, id) {
+
+  const ses = requerirSesion_(token, 'consulta');
+  const admin = ses.rol === 'admin';
+  id = txt_(id);
+
+  return conBloqueo_(() => {
+    const sh = rhHoja_('SOL');
+    const t = leerTabla_(sh);
+    for (let i = 1; i < t.values.length; i++) {
+      if (txt_(t.values[i][t.idx.ID]) !== id) continue;
+      const est = txt_(t.values[i][t.idx.Estado]);
+      if (est !== 'Pendiente' && !(admin && est === 'Aprobada')) throw new Error('Solo se pueden cancelar solicitudes pendientes' + (admin ? ' o aprobadas.' : '.'));
+      if (!admin) {
+        const mio = rhMiColab_(ses);
+        if (!mio || mio.id !== txt_(t.values[i][t.idx.ID_Colab])) throw new Error('Esa solicitud no es tuya.');
+      }
+      sh.getRange(i + 1, t.idx.Estado + 1).setValue('Cancelada');
+      sh.getRange(i + 1, t.idx.Resuelto_Por + 1).setValue(ses.usuario);
+      sh.getRange(i + 1, t.idx.Resuelto + 1).setValue(segAhora_());
+      return { ok: true };
+    }
+    throw new Error('No se encontró la solicitud.');
+  });
+}
+
+function resolverSolicitudRhWeb(token, id, decision, comentario, dias) {
+
+  const ses = requerirSesion_(token, 'admin');
+  id = txt_(id);
+  decision = decision === 'Aprobada' ? 'Aprobada' : 'Denegada';
+  comentario = txt_(comentario).slice(0, 300);
+  if (decision === 'Denegada' && !comentario) throw new Error('Escribe el motivo por el que se deniega.');
+
+  return conBloqueo_(() => {
+    const sh = rhHoja_('SOL');
+    const t = leerTabla_(sh);
+    const colabs = leerObjetos_(rhHoja_('COLAB'));
+    for (let i = 1; i < t.values.length; i++) {
+      if (txt_(t.values[i][t.idx.ID]) !== id) continue;
+      if (txt_(t.values[i][t.idx.Estado]) !== 'Pendiente') throw new Error('Esta solicitud ya fue resuelta.');
+      let d = rhNum_(dias);
+      if (decision === 'Aprobada') {
+        if (!(d > 0)) d = rhNum_(t.values[i][t.idx.Dias]);
+        if (txt_(t.values[i][t.idx.Tipo]) === 'VAC') {
+          const cf = colabs.find(c => txt_(c.ID) === txt_(t.values[i][t.idx.ID_Colab]));
+          if (cf) {
+            const otras = leerObjetos_(sh).filter(s => txt_(s.ID) !== id);
+            const sd = rhSaldo_(rhColabInfo_(cf), otras, rhHoy_());
+            if (d > sd.disponible + 1e-9) throw new Error('El saldo disponible del colaborador es de ' + sd.disponible + ' día(s) y esta solicitud descuenta ' + d + '. Ajusta los días o su saldo previo.');
+          }
+        }
+        sh.getRange(i + 1, t.idx.Dias + 1).setValue(d);
+      }
+      sh.getRange(i + 1, t.idx.Estado + 1).setValue(decision);
+      sh.getRange(i + 1, t.idx.Comentario_Admin + 1).setValue(comentario);
+      sh.getRange(i + 1, t.idx.Resuelto_Por + 1).setValue(ses.usuario);
+      sh.getRange(i + 1, t.idx.Resuelto + 1).setValue(segAhora_());
+      return { ok: true };
+    }
+    throw new Error('No se encontró la solicitud.');
+  });
+}
+
+/* ---------- Pagos ---------- */
+
+function rhCicloAguinaldo_(hoy, atras) {
+  const y = Number(hoy.slice(0, 4)), m = Number(hoy.slice(5, 7));
+  let ini = m >= 12 ? y : y - 1;
+  ini -= (atras || 0);
+  return { desde: ini + '-12-01', hasta: (ini + 1) + '-11-30' };
+}
+
+function obtenerPagosRhWeb(token, idColab) {
+
+  requerirSesion_(token, 'admin');
+  idColab = txt_(idColab);
+  const hoy = rhHoy_();
+  const colF = leerObjetos_(rhHoja_('COLAB')).find(c => txt_(c.ID) === idColab);
+  if (!colF) throw new Error('No se encontró el colaborador.');
+  const col = rhColabInfo_(colF);
+  const pagos = leerObjetos_(rhHoja_('PAG')).filter(p => txt_(p.ID_Colab) === idColab).map(p => ({
+    id: txt_(p.ID), fecha: segFecha_(p.Fecha) || '', periodo: txt_(p.Periodo), tipo: txt_(p.Tipo), tipoTxt: RH.TIPOS_PAGO[txt_(p.Tipo)] || txt_(p.Tipo),
+    bruto: rhNum_(p.Bruto), deducciones: rhNum_(p.Deducciones), neto: rhNum_(p.Neto), obs: txt_(p.Obs), por: txt_(p.Registrado_Por)
+  })).sort((a, b) => b.fecha.localeCompare(a.fecha));
+
+  const aguinaldo = [0, 1].map(k => {
+    const c = rhCicloAguinaldo_(hoy, k);
+    const base = pagos.filter(p => RH.SALARIALES.indexOf(p.tipo) !== -1 && p.fecha >= c.desde && p.fecha <= c.hasta).reduce((a, p) => a + p.bruto, 0);
+    const tope = formatearFechaISO_(sumarDias_(convertirFecha_(c.hasta), 40));
+    const pagado = pagos.filter(p => p.tipo === 'AGUINALDO' && p.fecha >= c.desde && p.fecha <= tope).reduce((a, p) => a + p.bruto, 0);
+    return { desde: c.desde, hasta: c.hasta, base: rh2_(base), estimado: rh2_(base / 12), pagado: rh2_(pagado) };
+  });
+
+  /* Promedio mensual de lo salarial de los últimos 6 meses (referencia para valorar los días de vacaciones pendientes) */
+  const d6 = formatearFechaISO_(sumarDias_(convertirFecha_(hoy), -183));
+  const suma6 = pagos.filter(p => RH.SALARIALES.indexOf(p.tipo) !== -1 && p.fecha >= d6 && p.fecha <= hoy).reduce((a, p) => a + p.bruto, 0);
+  const saldoCol = rhSaldo_(col, leerObjetos_(rhHoja_('SOL')), hoy);
+  const promMensual = suma6 / Math.max(1, Math.min(6, saldoCol.semanas / 4.345));
+
+  const sols = leerObjetos_(rhHoja_('SOL'));
+  const saldo = rhSaldo_(col, sols, hoy);
+  return { colaborador: col, pagos: pagos, aguinaldo: aguinaldo, saldo: saldo,
+    liquidacion: { promedioMensual: rh2_(promMensual), salarioDiario: rh2_(promMensual / 30), vacacionesDias: saldo.saldo,
+      vacacionesMonto: rh2_(Math.max(0, saldo.saldo) * promMensual / 30), aguinaldoProporcional: aguinaldo[0].estimado } };
+}
+
+function registrarPagoRhWeb(token, d) {
+
+  const ses = requerirSesion_(token, 'admin');
+  d = d || {};
+  const colF = leerObjetos_(rhHoja_('COLAB')).find(c => txt_(c.ID) === txt_(d.idColab));
+  if (!colF) throw new Error('Elige el colaborador.');
+  const fecha = segFecha_(d.fecha);
+  if (!fecha) throw new Error('Indica la fecha del pago.');
+  const tipo = txt_(d.tipo);
+  if (!RH.TIPOS_PAGO[tipo]) throw new Error('Elige el tipo de pago.');
+  const bruto = rhNum_(d.bruto), ded = Math.max(0, rhNum_(d.deducciones));
+  if (!(bruto > 0)) throw new Error('El monto bruto debe ser mayor que cero.');
+  if (ded > bruto) throw new Error('Las deducciones no pueden superar el monto bruto.');
+
+  return conBloqueo_(() => {
+    const o = { ID: 'P' + Date.now().toString(36).toUpperCase(), ID_Colab: txt_(d.idColab), Fecha: fecha, Periodo: txt_(d.periodo).slice(0, 40), Tipo: tipo,
+      Bruto: rh2_(bruto), Deducciones: rh2_(ded), Neto: rh2_(bruto - ded), Obs: txt_(d.obs).slice(0, 200), Registrado_Por: ses.usuario, Creado: segAhora_() };
+    appendPorEncabezados_(rhHoja_('PAG'), o);
+    return { ok: true, id: o.ID };
+  });
+}
+
+function eliminarPagoRhWeb(token, id) {
+
+  requerirSesion_(token, 'admin');
+  id = txt_(id);
+  return conBloqueo_(() => {
+    const sh = rhHoja_('PAG');
+    const t = leerTabla_(sh);
+    for (let i = 1; i < t.values.length; i++) {
+      if (txt_(t.values[i][t.idx.ID]) === id) { sh.deleteRow(i + 1); return { ok: true }; }
+    }
+    throw new Error('No se encontró el pago.');
+  });
+}
+
+function fmtRh_(iso) { const p = String(iso || '').split('-'); return p.length === 3 ? p[2] + '/' + p[1] : String(iso || ''); }
+
+
 /* =====================================================================
    AJUSTES PARA EL NUEVO SERVIDOR (reemplazan funciones de arriba)
    ===================================================================== */
@@ -9174,7 +9589,7 @@ function prepararSistemaWeb(token) {
 
   }
 
-return {loginWeb: loginWeb, miPerfilWeb: miPerfilWeb, guardarFotoPerfilWeb: guardarFotoPerfilWeb, validarSesionWeb: validarSesionWeb, logoutWeb: logoutWeb, cambiarClaveWeb: cambiarClaveWeb, listarUsuariosWeb: listarUsuariosWeb, crearUsuarioWeb: crearUsuarioWeb, actualizarUsuarioWeb: actualizarUsuarioWeb, obtenerDatosWeb: obtenerDatosWeb, obtenerSemanasWeb: obtenerSemanasWeb, obtenerCalendarioWeb: obtenerCalendarioWeb, obtenerRotacionBackupWeb: obtenerRotacionBackupWeb, guardarCalendarioWeb: guardarCalendarioWeb, obtenerHistorialWeb: obtenerHistorialWeb, agregarMovilWeb: agregarMovilWeb, actualizarMovilWeb: actualizarMovilWeb, obtenerHistorialMovilWeb: obtenerHistorialMovilWeb, darDeBajaMovilWeb: darDeBajaMovilWeb, reactivarMovilWeb: reactivarMovilWeb, exportarCalendarioClienteExcelWeb: exportarCalendarioClienteExcelWeb, obtenerResumenWeb: obtenerResumenWeb, obtenerFichasWeb: obtenerFichasWeb, guardarFichasWeb: guardarFichasWeb, obtenerPersonalWeb: obtenerPersonalWeb, buscarPersonaWeb: buscarPersonaWeb, obtenerVehiculosWeb: obtenerVehiculosWeb, deshacerSinTecnicosWeb: deshacerSinTecnicosWeb, guardarSalidaPersonalWeb: guardarSalidaPersonalWeb, obtenerCambiosFichasWeb: obtenerCambiosFichasWeb, exportarFichasExcelWeb: exportarFichasExcelWeb, obtenerSeguimientoWeb: obtenerSeguimientoWeb, guardarJustificacionTiempoWeb: guardarJustificacionTiempoWeb, guardarSeguimientoWeb: guardarSeguimientoWeb, guardarAlmuerzoWeb: guardarAlmuerzoWeb, guardarSalidaWeb: guardarSalidaWeb, corregirCorteWeb: corregirCorteWeb, eliminarCorteWeb: eliminarCorteWeb, obtenerAusenciasWeb: obtenerAusenciasWeb, guardarAusenciaWeb: guardarAusenciaWeb, marcarPenalizacionWeb: marcarPenalizacionWeb, eliminarAusenciaWeb: eliminarAusenciaWeb, importarFinalizadasWeb: importarFinalizadasWeb, guardarSuspendidaWeb: guardarSuspendidaWeb, marcarSuspendidasWeb: marcarSuspendidasWeb, guardarEstadoOtWeb: guardarEstadoOtWeb, eliminarSuspendidaWeb: eliminarSuspendidaWeb, obtenerBodegaWeb: obtenerBodegaWeb, guardarAlistosWeb: guardarAlistosWeb, obtenerAlistosWeb: obtenerAlistosWeb, cambiarEstadoAlistoWeb: cambiarEstadoAlistoWeb, aplicarAlistoWeb: aplicarAlistoWeb, obtenerMovimientosInvWeb: obtenerMovimientosInvWeb, guardarMovimientoInvWeb: guardarMovimientoInvWeb, firmarMovimientoInvWeb: firmarMovimientoInvWeb, obtenerFirmaInvWeb: obtenerFirmaInvWeb, eliminarMovimientoInvWeb: eliminarMovimientoInvWeb, guardarObjetivosWeb: guardarObjetivosWeb, aplicarCostosAdendumWeb: aplicarCostosAdendumWeb, guardarMaterialInvWeb: guardarMaterialInvWeb, importarConsumoWeb: importarConsumoWeb, obtenerConsumoDetalleWeb: obtenerConsumoDetalleWeb, eliminarCargaConsumoWeb: eliminarCargaConsumoWeb, importarDevolucionesWeb: importarDevolucionesWeb, obtenerDevolucionesWeb: obtenerDevolucionesWeb, obtenerHistorialDevolucionWeb: obtenerHistorialDevolucionWeb, registrarDevolucionLineaWeb: registrarDevolucionLineaWeb, recibirLineasDevolucionWeb: recibirLineasDevolucionWeb, registrarBoletaDevolucionWeb: registrarBoletaDevolucionWeb, registrarEntregaMovilWeb: registrarEntregaMovilWeb, justificarDevolucionWeb: justificarDevolucionWeb, cambiarEquipoDevolucionWeb: cambiarEquipoDevolucionWeb, revertirDevolucionWeb: revertirDevolucionWeb, eliminarPeriodoDevolucionesWeb: eliminarPeriodoDevolucionesWeb, aceptarAlertasBodegaWeb: aceptarAlertasBodegaWeb, obtenerNotificacionesWeb: obtenerNotificacionesWeb, obtenerConsumoInvWeb: obtenerConsumoInvWeb, obtenerCortesInvWeb: obtenerCortesInvWeb, crearCorteInvWeb: crearCorteInvWeb, obtenerConteoInvWeb: obtenerConteoInvWeb, guardarConteoInvWeb: guardarConteoInvWeb, justificarDiferenciaInvWeb: justificarDiferenciaInvWeb, cerrarCorteInvWeb: cerrarCorteInvWeb, eliminarCorteInvWeb: eliminarCorteInvWeb, reabrirCorteInvWeb: reabrirCorteInvWeb, guardarMapeoInvWeb: guardarMapeoInvWeb, compararClienteWeb: compararClienteWeb, cargarCatalogoOficialWeb: cargarCatalogoOficialWeb, aplicarObjetivoBaseWeb: aplicarObjetivoBaseWeb, unirMaterialInvWeb: unirMaterialInvWeb, eliminarMaterialesInvWeb: eliminarMaterialesInvWeb, kardexMaterialWeb: kardexMaterialWeb, guardarClienteCotWeb: guardarClienteCotWeb, eliminarClienteCotWeb: eliminarClienteCotWeb, guardarMaterialCotWeb: guardarMaterialCotWeb, eliminarMaterialCotWeb: eliminarMaterialCotWeb, importarMaterialesCotWeb: importarMaterialesCotWeb, obtenerCotizacionesWeb: obtenerCotizacionesWeb, obtenerCotizacionWeb: obtenerCotizacionWeb, guardarCotizacionWeb: guardarCotizacionWeb, cambiarEstadoCotWeb: cambiarEstadoCotWeb, subirFotoCotWeb: subirFotoCotWeb, eliminarFotoCotWeb: eliminarFotoCotWeb, obtenerArchivoCotWeb: obtenerArchivoCotWeb, guardarInformeCotWeb: guardarInformeCotWeb, guardarGastoCotWeb: guardarGastoCotWeb, marcarPagoGastoCotWeb: marcarPagoGastoCotWeb, anularGastoCotWeb: anularGastoCotWeb, eliminarGastoCotWeb: eliminarGastoCotWeb, guardarOCCotWeb: guardarOCCotWeb, facturarCotWeb: facturarCotWeb, registrarPagoFacturaCotWeb: registrarPagoFacturaCotWeb, revertirPagoFacturaCotWeb: revertirPagoFacturaCotWeb, revertirFacturaCotWeb: revertirFacturaCotWeb, archivarCotWeb: archivarCotWeb, desarchivarCotWeb: desarchivarCotWeb, enviarCotWeb: enviarCotWeb, eliminarCotizacionWeb: eliminarCotizacionWeb, configurarConsecutivoCotWeb: configurarConsecutivoCotWeb, loginPaso1_: loginPaso1_, loginPaso2_: loginPaso2_, refrescarWeb: refrescarWeb, prepararSistemaWeb: prepararSistemaWeb};
+return {loginWeb: loginWeb, miPerfilWeb: miPerfilWeb, guardarFotoPerfilWeb: guardarFotoPerfilWeb, validarSesionWeb: validarSesionWeb, logoutWeb: logoutWeb, cambiarClaveWeb: cambiarClaveWeb, listarUsuariosWeb: listarUsuariosWeb, crearUsuarioWeb: crearUsuarioWeb, actualizarUsuarioWeb: actualizarUsuarioWeb, obtenerDatosWeb: obtenerDatosWeb, obtenerSemanasWeb: obtenerSemanasWeb, obtenerCalendarioWeb: obtenerCalendarioWeb, obtenerRotacionBackupWeb: obtenerRotacionBackupWeb, guardarCalendarioWeb: guardarCalendarioWeb, obtenerHistorialWeb: obtenerHistorialWeb, agregarMovilWeb: agregarMovilWeb, actualizarMovilWeb: actualizarMovilWeb, obtenerHistorialMovilWeb: obtenerHistorialMovilWeb, darDeBajaMovilWeb: darDeBajaMovilWeb, reactivarMovilWeb: reactivarMovilWeb, exportarCalendarioClienteExcelWeb: exportarCalendarioClienteExcelWeb, obtenerResumenWeb: obtenerResumenWeb, obtenerFichasWeb: obtenerFichasWeb, guardarFichasWeb: guardarFichasWeb, obtenerPersonalWeb: obtenerPersonalWeb, buscarPersonaWeb: buscarPersonaWeb, obtenerVehiculosWeb: obtenerVehiculosWeb, deshacerSinTecnicosWeb: deshacerSinTecnicosWeb, guardarSalidaPersonalWeb: guardarSalidaPersonalWeb, obtenerCambiosFichasWeb: obtenerCambiosFichasWeb, exportarFichasExcelWeb: exportarFichasExcelWeb, obtenerSeguimientoWeb: obtenerSeguimientoWeb, guardarJustificacionTiempoWeb: guardarJustificacionTiempoWeb, guardarSeguimientoWeb: guardarSeguimientoWeb, guardarAlmuerzoWeb: guardarAlmuerzoWeb, guardarSalidaWeb: guardarSalidaWeb, corregirCorteWeb: corregirCorteWeb, eliminarCorteWeb: eliminarCorteWeb, obtenerAusenciasWeb: obtenerAusenciasWeb, guardarAusenciaWeb: guardarAusenciaWeb, marcarPenalizacionWeb: marcarPenalizacionWeb, eliminarAusenciaWeb: eliminarAusenciaWeb, importarFinalizadasWeb: importarFinalizadasWeb, guardarSuspendidaWeb: guardarSuspendidaWeb, marcarSuspendidasWeb: marcarSuspendidasWeb, guardarEstadoOtWeb: guardarEstadoOtWeb, eliminarSuspendidaWeb: eliminarSuspendidaWeb, obtenerBodegaWeb: obtenerBodegaWeb, guardarAlistosWeb: guardarAlistosWeb, obtenerAlistosWeb: obtenerAlistosWeb, cambiarEstadoAlistoWeb: cambiarEstadoAlistoWeb, aplicarAlistoWeb: aplicarAlistoWeb, obtenerMovimientosInvWeb: obtenerMovimientosInvWeb, guardarMovimientoInvWeb: guardarMovimientoInvWeb, firmarMovimientoInvWeb: firmarMovimientoInvWeb, obtenerFirmaInvWeb: obtenerFirmaInvWeb, eliminarMovimientoInvWeb: eliminarMovimientoInvWeb, guardarObjetivosWeb: guardarObjetivosWeb, aplicarCostosAdendumWeb: aplicarCostosAdendumWeb, guardarMaterialInvWeb: guardarMaterialInvWeb, importarConsumoWeb: importarConsumoWeb, obtenerConsumoDetalleWeb: obtenerConsumoDetalleWeb, eliminarCargaConsumoWeb: eliminarCargaConsumoWeb, importarDevolucionesWeb: importarDevolucionesWeb, obtenerDevolucionesWeb: obtenerDevolucionesWeb, obtenerHistorialDevolucionWeb: obtenerHistorialDevolucionWeb, registrarDevolucionLineaWeb: registrarDevolucionLineaWeb, recibirLineasDevolucionWeb: recibirLineasDevolucionWeb, registrarBoletaDevolucionWeb: registrarBoletaDevolucionWeb, registrarEntregaMovilWeb: registrarEntregaMovilWeb, justificarDevolucionWeb: justificarDevolucionWeb, cambiarEquipoDevolucionWeb: cambiarEquipoDevolucionWeb, revertirDevolucionWeb: revertirDevolucionWeb, eliminarPeriodoDevolucionesWeb: eliminarPeriodoDevolucionesWeb, aceptarAlertasBodegaWeb: aceptarAlertasBodegaWeb, obtenerNotificacionesWeb: obtenerNotificacionesWeb, obtenerConsumoInvWeb: obtenerConsumoInvWeb, obtenerCortesInvWeb: obtenerCortesInvWeb, crearCorteInvWeb: crearCorteInvWeb, obtenerConteoInvWeb: obtenerConteoInvWeb, guardarConteoInvWeb: guardarConteoInvWeb, justificarDiferenciaInvWeb: justificarDiferenciaInvWeb, cerrarCorteInvWeb: cerrarCorteInvWeb, eliminarCorteInvWeb: eliminarCorteInvWeb, reabrirCorteInvWeb: reabrirCorteInvWeb, guardarMapeoInvWeb: guardarMapeoInvWeb, compararClienteWeb: compararClienteWeb, cargarCatalogoOficialWeb: cargarCatalogoOficialWeb, aplicarObjetivoBaseWeb: aplicarObjetivoBaseWeb, unirMaterialInvWeb: unirMaterialInvWeb, eliminarMaterialesInvWeb: eliminarMaterialesInvWeb, kardexMaterialWeb: kardexMaterialWeb, guardarClienteCotWeb: guardarClienteCotWeb, eliminarClienteCotWeb: eliminarClienteCotWeb, guardarMaterialCotWeb: guardarMaterialCotWeb, eliminarMaterialCotWeb: eliminarMaterialCotWeb, importarMaterialesCotWeb: importarMaterialesCotWeb, obtenerCotizacionesWeb: obtenerCotizacionesWeb, obtenerCotizacionWeb: obtenerCotizacionWeb, guardarCotizacionWeb: guardarCotizacionWeb, cambiarEstadoCotWeb: cambiarEstadoCotWeb, subirFotoCotWeb: subirFotoCotWeb, eliminarFotoCotWeb: eliminarFotoCotWeb, obtenerArchivoCotWeb: obtenerArchivoCotWeb, guardarInformeCotWeb: guardarInformeCotWeb, guardarGastoCotWeb: guardarGastoCotWeb, marcarPagoGastoCotWeb: marcarPagoGastoCotWeb, anularGastoCotWeb: anularGastoCotWeb, eliminarGastoCotWeb: eliminarGastoCotWeb, guardarOCCotWeb: guardarOCCotWeb, facturarCotWeb: facturarCotWeb, registrarPagoFacturaCotWeb: registrarPagoFacturaCotWeb, revertirPagoFacturaCotWeb: revertirPagoFacturaCotWeb, revertirFacturaCotWeb: revertirFacturaCotWeb, archivarCotWeb: archivarCotWeb, desarchivarCotWeb: desarchivarCotWeb, enviarCotWeb: enviarCotWeb, eliminarCotizacionWeb: eliminarCotizacionWeb, configurarConsecutivoCotWeb: configurarConsecutivoCotWeb, miAccesoRhWeb: miAccesoRhWeb, obtenerRhWeb: obtenerRhWeb, guardarColaboradorWeb: guardarColaboradorWeb, crearSolicitudRhWeb: crearSolicitudRhWeb, cancelarSolicitudRhWeb: cancelarSolicitudRhWeb, resolverSolicitudRhWeb: resolverSolicitudRhWeb, obtenerPagosRhWeb: obtenerPagosRhWeb, registrarPagoRhWeb: registrarPagoRhWeb, eliminarPagoRhWeb: eliminarPagoRhWeb, loginPaso1_: loginPaso1_, loginPaso2_: loginPaso2_, refrescarWeb: refrescarWeb, prepararSistemaWeb: prepararSistemaWeb};
 })();
 
 /* =====================================================================
