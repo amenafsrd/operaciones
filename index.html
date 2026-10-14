@@ -6493,7 +6493,7 @@ function mostrarVista(v, forzar) {
 /* =========================================================
    PAGO A MÓVILES (solo administración)
    ========================================================= */
-let pmD = null, pmS = null, pmSemId = '', pmVista = 'res', pmTabAct = 'sem', pmOrdFiltro = 'todas', pmImp = null;
+let pmD = null, pmS = null, pmSemId = '', pmVista = 'res', pmTabAct = 'sem', pmImp = null;
 const pmM = n => '₡' + (Number(n) || 0).toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const pmFh = iso => iso ? iso.split('-').reverse().join('/') : '—';
 function pmModal(h, w) { $('pmModal').innerHTML = h; $('pmModal').style.maxWidth = (w || 640) + 'px'; $('pmModalBg').classList.add('show'); }
@@ -6538,15 +6538,16 @@ function pmRenderSemana() {
   const margen = T.uf - T.detalle;
   const tb = (v, t) => '<button class="' + (pmVista === v ? 'active' : '') + '" onclick="pmSub(\'' + v + '\')">' + t + '</button>';
   let h = '<div class="toolbar"><button class="btn secondary" onclick="pmRenderSemanas()">← Semanas</button><b style="font-size:15px">Semana ' + esc(pmFh(S.semana.desde)) + ' al ' + esc(pmFh(S.semana.hasta)) + '</b>' + (cerr ? '<span class="chip verde">Cerrada</span>' : '<span class="chip amar">Abierta</span>') +
-    '<span style="flex:1"></span><button class="btn secondary" onclick="pmCerrarSemana(' + (cerr ? 'false' : 'true') + ')">' + (cerr ? 'Reabrir' : 'Cerrar semana') + '</button><button class="btn secondary" onclick="pmEliminarSemana()">🗑 Eliminar</button></div>';
+    '<span style="flex:1"></span><button class="btn secondary" onclick="pmPagoModal()">💵 Registrar pago</button><button class="btn secondary" onclick="pmCerrarSemana(' + (cerr ? 'false' : 'true') + ')">' + (cerr ? 'Reabrir' : 'Cerrar semana') + '</button><button class="btn secondary" onclick="pmEliminarSemana()">🗑 Eliminar</button></div>';
   h += '<div class="panel"><div style="display:flex;gap:18px;flex-wrap:wrap;padding:12px 14px;font-size:13px">' +
     [['Órdenes', T.nOrdenes], ['Costo detalle', pmM(T.detalle)], ['UF Telecable', pmM(T.uf)], ['Margen (UF − costo)', pmM(margen)], ['Total facturado', pmM(T.totalFacturado)], ['Total a depositar', pmM(T.deposito)]]
       .map(x => '<div><div style="color:#667;font-size:11px">' + x[0] + '</div><b style="font-size:15px">' + x[1] + '</b></div>').join('') + '</div></div>';
   if (S.diferencias || S.sinLista) h += '<div class="panel" style="padding:10px 14px;font-size:13px;background:#fff8e1">' + (S.diferencias ? '⚠ <b>' + S.diferencias + '</b> orden(es) con costo distinto a la lista de precios. ' + (cerr ? '' : '<button class="btn secondary" onclick="pmAplicarLista()">Aplicar precio de lista</button> ') : '') + (S.sinLista ? '<span style="color:#666">' + S.sinLista + ' orden(es) con un servicio que la lista no reconoce (se usa el costo del archivo).</span>' : '') + '</div>';
-  h += '<div class="subtabs">' + tb('res', 'Pago por contratista') + tb('ord', 'Órdenes') + tb('aju', 'Ajustes') + tb('ext', 'Adicionales') + tb('arc', 'Archivos') + '</div>';
+  h += '<div class="subtabs">' + tb('res', 'Pago por contratista') + tb('ord', 'Órdenes') + tb('ape', 'Apelaciones' + (S.apelaciones.some(a => a.estado === 'Pendiente') ? ' •' : '')) + tb('aju', 'Ajustes') + tb('ext', 'Adicionales') + tb('arc', 'Archivos') + '</div>';
   h += '<div class="panel"><div class="tableWrap">';
   if (pmVista === 'res') h += pmHtmlRes(cerr);
   if (pmVista === 'ord') h += pmHtmlOrd(cerr);
+  if (pmVista === 'ape') h += pmHtmlApe(cerr);
   if (pmVista === 'aju') h += pmHtmlAju(cerr);
   if (pmVista === 'ext') h += pmHtmlExt(cerr);
   if (pmVista === 'arc') h += pmHtmlArc();
@@ -6556,26 +6557,116 @@ function pmRenderSemana() {
 function pmHtmlRes(cerr) {
   const R = pmS.resumen, T = R.totales;
   if (!R.filas.length) return '<div class="loading">Sin datos.</div>';
-  return '<table><thead><tr><th>Contratista</th><th>Móviles</th><th>Órd.</th><th>Detalle</th><th>Reclamos</th><th>Alquiler</th><th>Penaliz.</th><th>Camisas</th><th>Subtotal</th><th>IVA</th><th>Facturado</th><th>Rebajos</th><th>Depósito</th><th>Factura</th><th></th></tr></thead><tbody>' +
-    R.filas.map((f, i) => '<tr' + (f.sinContratista ? ' style="background:#fdecea"' : '') + '><td><b>' + esc(f.nombre) + '</b>' + (f.sinContratista ? '<br><span style="font-size:11px;color:#9b1c1c">Móvil sin contratista: créalo en la pestaña Contratistas</span>' : (!/^\d{20}$/.test(f.iban || '') ? '<br><span style="font-size:11px;color:#9b1c1c">Falta IBAN</span>' : '')) + '</td><td>' + Object.keys(f.moviles).join(', ') + '</td><td>' + f.nOrdenes + '</td><td>' + pmM(f.detalle) + '</td><td>' + (f.reclamos ? pmM(f.reclamos) : '') + '</td><td>' + (f.alquileres ? pmM(f.alquileres) : '') + '</td><td>' + (f.penalizaciones ? pmM(f.penalizaciones) : '') + '</td><td>' + (f.camisas ? pmM(f.camisas) : '') + '</td><td>' + pmM(f.subtotal) + '</td><td>' + (f.aplicaIva ? pmM(f.iva) : '<span style="color:#888">sin IVA</span>') + '</td><td>' + pmM(f.totalFacturado) + '</td><td>' + (f.deducciones ? pmM(f.deducciones) : '') + '</td><td><b>' + pmM(f.deposito) + '</b></td><td>' + (f.sinContratista ? '' : '<input style="width:118px" value="' + esc(f.factura) + '" ' + (cerr ? 'disabled' : '') + ' onchange="pmGuardarFactura(\'' + f.idCon + '\',this.value)" placeholder="N.º factura">') + '</td><td>' + (f.sinContratista ? '' : '<button class="btn secondary" title="Estado de cuenta" onclick="pmEstadoCuenta(\'' + f.idCon + '\')">📄</button>') + '</td></tr>').join('') +
-    '<tr style="font-weight:700;background:#f3f6fa"><td>Total</td><td></td><td>' + T.nOrdenes + '</td><td>' + pmM(T.detalle) + '</td><td>' + pmM(T.reclamos) + '</td><td>' + pmM(T.alquileres) + '</td><td>' + pmM(T.penalizaciones) + '</td><td>' + pmM(T.camisas) + '</td><td>' + pmM(T.subtotal) + '</td><td>' + pmM(T.iva) + '</td><td>' + pmM(T.totalFacturado) + '</td><td>' + pmM(T.deducciones) + '</td><td>' + pmM(T.deposito) + '</td><td></td><td></td></tr></tbody></table>';
+  return '<table><thead><tr><th>Contratista</th><th>Móviles</th><th>Órd.</th><th>Detalle</th><th>Reclamos</th><th>Alquiler</th><th>Penaliz.</th><th>Camisas</th><th>Subtotal</th><th>IVA</th><th>Facturado</th><th>Rebajos</th><th>Depósito</th><th>Factura</th><th>Pagado</th><th></th></tr></thead><tbody>' +
+    R.filas.map((f, i) => '<tr' + (f.sinContratista ? ' style="background:#fdecea"' : '') + '><td><b>' + esc(f.nombre) + '</b>' + (f.sinContratista ? '<br><span style="font-size:11px;color:#9b1c1c">Móvil sin contratista: créalo en la pestaña Contratistas</span>' : (!/^\d{20}$/.test(f.iban || '') ? '<br><span style="font-size:11px;color:#9b1c1c">Falta IBAN</span>' : '')) + '</td><td>' + Object.keys(f.moviles).join(', ') + '</td><td>' + f.nOrdenes + '</td><td>' + pmM(f.detalle) + '</td><td>' + (f.reclamos ? pmM(f.reclamos) : '') + '</td><td>' + (f.alquileres ? pmM(f.alquileres) : '') + '</td><td>' + (f.penalizaciones ? pmM(f.penalizaciones) : '') + '</td><td>' + (f.camisas ? pmM(f.camisas) : '') + '</td><td>' + pmM(f.subtotal) + '</td><td>' + (f.aplicaIva ? pmM(f.iva) : '<span style="color:#888">sin IVA</span>') + '</td><td>' + pmM(f.totalFacturado) + '</td><td>' + (f.deducciones ? pmM(f.deducciones) : '') + '</td><td><b>' + pmM(f.deposito) + '</b></td><td>' + (f.sinContratista ? '' : '<input style="width:118px" value="' + esc(f.factura) + '" ' + (cerr ? 'disabled' : '') + ' onchange="pmGuardarFactura(\'' + f.idCon + '\',this.value)" placeholder="N.º factura">') + '</td><td>' + (f.pagado ? '<span class="chip verde">' + esc(pmFh(f.pagado)) + '</span>' : (f.sinContratista ? '' : '<span style="color:#999">—</span>')) + '</td><td>' + (f.sinContratista ? '' : '<button class="btn secondary" title="Estado de cuenta" onclick="pmEstadoCuenta(\'' + f.idCon + '\')">📄</button>') + '</td></tr>').join('') +
+    '<tr style="font-weight:700;background:#f3f6fa"><td>Total</td><td></td><td>' + T.nOrdenes + '</td><td>' + pmM(T.detalle) + '</td><td>' + pmM(T.reclamos) + '</td><td>' + pmM(T.alquileres) + '</td><td>' + pmM(T.penalizaciones) + '</td><td>' + pmM(T.camisas) + '</td><td>' + pmM(T.subtotal) + '</td><td>' + pmM(T.iva) + '</td><td>' + pmM(T.totalFacturado) + '</td><td>' + pmM(T.deducciones) + '</td><td>' + pmM(T.deposito) + '</td><td></td><td></td><td></td></tr></tbody></table>';
 }
 async function pmGuardarFactura(idCon, v) {
   try { await api('guardarPagoPmWeb', { idSemana: pmSemId, idCon: idCon, factura: v }); const f = pmS.resumen.filas.find(x => x.idCon === idCon); if (f) f.factura = v.trim(); toast('Factura guardada.'); }
   catch (e) { mostrarError(e, 'No se pudo guardar.'); }
 }
 
+let pmOF = { q: '', movil: '', serv: '', est: 'todas' }, pmSel = new Set(), pmPag = 0;
+function pmOrdFiltradas() {
+  const q = pmOF.q.trim().toLowerCase();
+  return pmS.ordenes.filter(o => {
+    if (pmOF.movil && String(Number(o.movil)) !== pmOF.movil) return false;
+    if (pmOF.serv && (o.tipo || o.servicios) !== pmOF.serv) return false;
+    if (q && (o.contrato + ' ' + o.cliente + ' ' + o.servicios + ' ' + o.tipo).toLowerCase().indexOf(q) < 0) return false;
+    const dif = !o.manual && o.costoLista !== null && Math.abs(o.costoLista - o.costo) > 0.005;
+    if (pmOF.est === 'dif' && !dif) return false;
+    if (pmOF.est === 'sin' && o.costoLista !== null) return false;
+    if (pmOF.est === 'manual' && !o.manual) return false;
+    if (pmOF.est === 'sel' && !pmSel.has(o.id)) return false;
+    return true;
+  });
+}
 function pmHtmlOrd(cerr) {
-  const O = pmS.ordenes.filter(o => pmOrdFiltro === 'todas' || (pmOrdFiltro === 'dif' && o.costoLista !== null && Math.abs(o.costoLista - o.costo) > 0.005) || (pmOrdFiltro === 'sin' && o.costoLista === null));
-  let h = '<div style="padding:8px 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><label>Mostrar <select onchange="pmOrdFiltro=this.value;pmRenderSemana()">' + [['todas', 'Todas'], ['dif', 'Con diferencia vs lista'], ['sin', 'Servicio no reconocido']].map(x => '<option value="' + x[0] + '"' + (pmOrdFiltro === x[0] ? ' selected' : '') + '>' + x[1] + '</option>').join('') + '</select></label><span style="color:#667;font-size:12px">' + O.length + ' orden(es)</span></div>';
-  h += '<table><thead><tr><th>Fecha</th><th>Móvil</th><th>Contrato</th><th>Cliente</th><th>Servicio</th><th>Costo del archivo</th><th>Precio lista</th><th>Costo aplicado</th><th>UF</th></tr></thead><tbody>' +
-    O.slice(0, 700).map(o => { const d = o.costoLista !== null && Math.abs(o.costoLista - o.costo) > 0.005;
-      return '<tr' + (d ? ' style="background:#fff3cd"' : '') + '><td>' + esc(pmFh(o.fecha)) + '</td><td>' + esc(o.movil) + '</td><td>' + esc(o.contrato) + '</td><td>' + esc(o.cliente) + '</td><td>' + esc(o.servicios) + '</td><td>' + pmM(o.costoArchivo) + '</td><td>' + (o.costoLista === null ? '<span style="color:#999">—</span>' : pmM(o.costoLista)) + '</td><td><input type="number" step="0.01" style="width:100px" value="' + o.costo + '" ' + (cerr ? 'disabled' : '') + ' onchange="pmEditarCosto(\'' + o.id + '\',this.value)"></td><td>' + pmM(o.ufCosto) + '</td></tr>'; }).join('') + '</tbody></table>' + (O.length > 700 ? '<div class="loading">Se muestran 700 de ' + O.length + '. Usa el filtro.</div>' : '');
+  const O = pmOrdFiltradas(), PG = 250, pags = Math.max(1, Math.ceil(O.length / PG)); if (pmPag >= pags) pmPag = pags - 1;
+  const vis = O.slice(pmPag * PG, pmPag * PG + PG);
+  const moviles = Array.from(new Set(pmS.ordenes.map(o => String(Number(o.movil))))).sort((a, b) => a - b);
+  const servs = Array.from(new Set(pmS.ordenes.map(o => o.tipo || o.servicios))).sort();
+  const sel = (id, ops, val, fn) => '<select id="' + id + '" onchange="' + fn + '">' + ops.map(x => '<option value="' + esc(x[0]) + '"' + (val === x[0] ? ' selected' : '') + '>' + esc(x[1]) + '</option>').join('') + '</select>';
+  let h = '<div style="padding:8px 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
+    '<input id="pmFq" placeholder="Buscar contrato, cliente o servicio" style="min-width:220px" value="' + esc(pmOF.q) + '" onkeydown="if(event.key===\'Enter\'){pmOF.q=this.value;pmPag=0;pmRenderSemana()}" onchange="pmOF.q=this.value;pmPag=0;pmRenderSemana()">' +
+    sel('pmFm', [['', 'Todas las móviles']].concat(moviles.map(m => [m, 'Móvil ' + m])), pmOF.movil, "pmOF.movil=this.value;pmPag=0;pmRenderSemana()") +
+    sel('pmFs', [['', 'Todos los servicios']].concat(servs.map(m => [m, m])), pmOF.serv, "pmOF.serv=this.value;pmPag=0;pmRenderSemana()") +
+    sel('pmFe', [['todas', 'Todas'], ['dif', 'Con diferencia vs lista'], ['sin', 'Sin precio en lista'], ['manual', 'Precio manual'], ['sel', 'Solo seleccionadas']], pmOF.est, "pmOF.est=this.value;pmPag=0;pmRenderSemana()") +
+    '<span style="color:#667;font-size:12px">' + O.length + ' orden(es)</span>' + (cerr ? '' : '<span style="flex:1"></span><button class="btn secondary" onclick="pmOrdenModal()">➕ Agregar orden</button>') + '</div>';
+  if (!cerr) {
+    h += '<div style="padding:8px 12px;background:#eef4ff;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px"><b>' + pmSel.size + ' seleccionada(s)</b>' +
+      '<button class="btn secondary" onclick="pmSelTodas()">Seleccionar las ' + O.length + ' filtradas</button><button class="btn secondary" onclick="pmSel.clear();pmRenderSemana()">Quitar selección</button>' +
+      '<span style="flex:1"></span><button class="btn primary" ' + (pmSel.size ? '' : 'disabled') + ' onclick="pmLoteModal()">Cambiar tipo / precio de la selección</button></div>';
+  }
+  h += '<table><thead><tr>' + (cerr ? '' : '<th><input type="checkbox" onclick="pmSelPag(this.checked)"></th>') + '<th>Fecha</th><th>Móvil</th><th>Contrato</th><th>Cliente</th><th>Servicio (Telecable)</th><th>Tipo aplicado</th><th>Cant.</th><th>Precio lista</th><th>Costo aplicado</th><th>UF</th><th></th></tr></thead><tbody>' +
+    vis.map(o => { const d = !o.manual && o.costoLista !== null && Math.abs(o.costoLista - o.costo) > 0.005;
+      return '<tr' + (d ? ' style="background:#fff3cd"' : (o.manual ? ' style="background:#eaf6ea"' : '')) + '>' + (cerr ? '' : '<td><input type="checkbox" ' + (pmSel.has(o.id) ? 'checked' : '') + ' onclick="pmSelUno(\'' + o.id + '\',this.checked)"></td>') + '<td>' + esc(pmFh(o.fecha)) + '</td><td>' + esc(o.movil) + '</td><td>' + esc(o.contrato) + '</td><td>' + esc(o.cliente) + '</td><td>' + esc(o.servicios) + (o.obs ? '<br><span style="font-size:11px;color:#667">' + esc(o.obs) + '</span>' : '') + '</td><td>' + (o.tipo ? esc(o.tipo) : '<span style="color:#999">según archivo</span>') + '</td><td>' + (o.cantidad || 1) + '</td><td>' + (o.costoLista === null ? '<span style="color:#999">—</span>' : pmM(o.costoLista)) + '</td><td>' + pmM(o.costo) + (o.manual ? ' <span class="chip verde">manual</span>' : '') + '</td><td>' + pmM(o.ufCosto) + '</td><td>' + (!cerr && /^Agregada manualmente/.test(o.obs) ? '<button class="btn secondary" onclick="pmQuitarOrden(\'' + o.id + '\')">✕</button>' : '') + '</td></tr>'; }).join('') + '</tbody></table>' +
+    (pags > 1 ? '<div style="padding:8px 12px;display:flex;gap:8px;align-items:center"><button class="btn secondary" ' + (pmPag ? '' : 'disabled') + ' onclick="pmPag--;pmRenderSemana()">←</button> Página ' + (pmPag + 1) + ' de ' + pags + ' <button class="btn secondary" ' + (pmPag < pags - 1 ? '' : 'disabled') + ' onclick="pmPag++;pmRenderSemana()">→</button></div>' : '');
   return h;
 }
-async function pmEditarCosto(id, v) {
-  try { await api('editarOrdenPmWeb', id, { costo: v }); await pmRecargar(); toast('Costo actualizado.'); } catch (e) { mostrarError(e, 'No se pudo actualizar.'); }
+function pmSelUno(id, on) { on ? pmSel.add(id) : pmSel.delete(id); pmRenderSemana(); }
+function pmSelPag(on) { const O = pmOrdFiltradas().slice(pmPag * 250, pmPag * 250 + 250); O.forEach(o => on ? pmSel.add(o.id) : pmSel.delete(o.id)); pmRenderSemana(); }
+function pmSelTodas() { pmOrdFiltradas().forEach(o => pmSel.add(o.id)); pmRenderSemana(); }
+function pmLoteModal() {
+  const act = pmD.precios.filter(p => p.activo);
+  const sel = pmS.ordenes.filter(o => pmSel.has(o.id));
+  pmModal('<h3>Cambiar ' + sel.length + ' orden(es)</h3><div style="display:grid;gap:10px"><label>Tipo de OT (usa el precio de la lista × cantidad)<select id="plTipo"><option value="">— No cambiar —</option><option value="__lista__">Volver a lo que dice el archivo de Telecable</option>' + act.map(p => '<option value="' + esc(p.servicio) + '">' + esc(p.servicio) + ' · ' + pmM(p.precio) + '</option>').join('') + '</select></label>' +
+    '<label>Precio manual por orden (₡) — reemplaza el de la lista<input id="plCosto" type="number" step="0.01" placeholder="Dejar vacío para no cambiar"></label><label>Mover a la móvil (opcional)<input id="plMovil" placeholder="ej. 111"></label><label>Nota (opcional)<input id="plObs" maxlength="120"></label></div>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn secondary" onclick="pmCerrar()">Cancelar</button><button class="btn primary" onclick="pmLoteGuardar()">Aplicar</button></div>');
 }
+async function pmLoteGuardar() {
+  const d = { tipo: $('plTipo').value, costo: $('plCosto').value, movil: $('plMovil').value };
+  if ($('plObs').value.trim()) d.obs = $('plObs').value.trim();
+  try { const r = await api('editarOrdenesPmWeb', Array.from(pmSel), d); pmCerrar(); pmSel.clear(); await pmRecargar(); toast(r.cambiadas + ' orden(es) actualizadas.'); }
+  catch (e) { mostrarError(e, 'No se pudo aplicar el cambio.'); }
+}
+function pmOrdenModal() {
+  const act = pmD.precios.filter(p => p.activo);
+  pmModal('<h3>Agregar orden que no está en el archivo</h3><div style="display:grid;gap:8px"><label>Móvil<input id="poMovil" placeholder="ej. 111"></label><label>Contrato<input id="poCto"></label><label>Cliente<input id="poCli"></label><label>Fecha<input type="date" id="poFec" value="' + esc(pmS.semana.hasta) + '"></label><label>Tipo de OT<select id="poTipo"><option value="">—</option>' + act.map(p => '<option value="' + esc(p.servicio) + '">' + esc(p.servicio) + ' · ' + pmM(p.precio) + '</option>').join('') + '</select></label><label>Cantidad<input id="poCant" type="number" value="1" min="1"></label><label>Precio manual total (opcional)<input id="poCosto" type="number" step="0.01"></label><label>Nota<input id="poObs" maxlength="100"></label></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn secondary" onclick="pmCerrar()">Cancelar</button><button class="btn primary" onclick="pmOrdenGuardar()">Agregar</button></div>');
+}
+async function pmOrdenGuardar() {
+  try { await api('agregarOrdenPmWeb', { idSemana: pmSemId, movil: $('poMovil').value, contrato: $('poCto').value, cliente: $('poCli').value, fecha: $('poFec').value, tipo: $('poTipo').value, cantidad: $('poCant').value, costo: $('poCosto').value, obs: $('poObs').value }); pmCerrar(); await pmRecargar(); toast('Orden agregada.'); }
+  catch (e) { mostrarError(e, 'No se pudo agregar.'); }
+}
+async function pmQuitarOrden(id) { if (!confirm('¿Quitar esta orden agregada?')) return; try { await api('eliminarOrdenPmWeb', id); await pmRecargar(); } catch (e) { mostrarError(e, 'No se pudo quitar.'); } }
+
+/* ---------- Apelaciones ---------- */
+function pmHtmlApe(cerr) {
+  const A = pmS.apelaciones, pend = A.filter(a => a.estado === 'Pendiente').length;
+  let h = '<div style="padding:10px 12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">' + (cerr ? '' : '<button class="btn primary" onclick="pmApeModal(\'PRECIO\')">➕ Apelar precio de una orden</button><button class="btn secondary" onclick="pmApeModal(\'FALTANTE\')">➕ Orden que no está en el archivo</button>') + '<span style="color:#667;font-size:12px">' + pend + ' pendiente(s). Al aprobar, el monto se suma al pago de la móvil como reclamo.</span></div>';
+  if (!A.length) return h + '<div class="loading">Sin apelaciones en esta semana.</div>';
+  return h + '<table><thead><tr><th>Tipo</th><th>Contratista</th><th>Contrato</th><th>Servicio</th><th>Monto</th><th>Motivo</th><th>Estado</th><th></th></tr></thead><tbody>' + A.map(a => '<tr><td>' + (a.tipo === 'FALTANTE' ? 'Orden faltante' : 'Precio') + '</td><td>' + esc(pmConNombre(a.idCon)) + (a.movil ? ' · M' + esc(a.movil) : '') + '</td><td>' + esc(a.contrato) + '</td><td>' + esc(a.servicio) + (a.cantidad > 1 ? ' ×' + a.cantidad : '') + '</td><td>' + pmM(a.monto) + '</td><td>' + esc(a.motivo) + '<br><span style="font-size:11px;color:#667">' + esc(a.creadoPor) + '</span></td><td>' + (a.estado === 'Pendiente' ? '<span class="chip amar">Pendiente</span>' : a.estado === 'Aprobada' ? '<span class="chip verde">Aprobada ' + pmM(a.montoAprobado) + '</span>' : '<span class="chip rojo">Rechazada</span>') + (a.resolucion ? '<br><span style="font-size:11px;color:#667">' + esc(a.resolucion) + '</span>' : '') + '</td><td>' + (a.estado === 'Pendiente' && !cerr ? '<button class="btn secondary" onclick="pmApeResolver(\'' + a.id + '\',' + a.monto + ')">Resolver</button>' : '') + '</td></tr>').join('') + '</tbody></table>';
+}
+function pmApeModal(tipo) {
+  const cons = pmD.contratistas.filter(c => c.activo);
+  const act = pmD.precios.filter(p => p.activo);
+  pmModal('<h3>' + (tipo === 'FALTANTE' ? 'Orden que no está en el archivo' : 'Apelar precio de una orden') + '</h3><input type="hidden" id="paTipoA" value="' + tipo + '"><div style="display:grid;gap:8px"><label>Contratista<select id="paCon2">' + cons.map(c => '<option value="' + c.id + '">' + esc(c.nombre) + (c.moviles ? ' (' + esc(c.moviles) + ')' : '') + '</option>').join('') + '</select></label><label>Móvil<input id="paMov2"></label><label>Contrato<input id="paCto2"></label><label>Servicio / tipo de OT<select id="paSrv2"><option value="">—</option>' + act.map(p => '<option value="' + esc(p.servicio) + '">' + esc(p.servicio) + ' · ' + pmM(p.precio) + '</option>').join('') + '</select></label><label>Monto que se reclama (₡)<input id="paMon2" type="number" step="0.01"></label><label>Motivo<textarea id="paMot2" rows="3" maxlength="400"></textarea></label></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn secondary" onclick="pmCerrar()">Cancelar</button><button class="btn primary" onclick="pmApeGuardar()">Crear apelación</button></div>');
+  $('paSrv2').onchange = () => { const p = pmD.precios.find(x => x.servicio === $('paSrv2').value); if (p && !$('paMon2').value) $('paMon2').value = p.precio; };
+}
+async function pmApeGuardar() {
+  try { await api('crearApelacionPmWeb', { idSemana: pmSemId, tipo: $('paTipoA').value, idCon: $('paCon2').value, movil: $('paMov2').value, contrato: $('paCto2').value, servicio: $('paSrv2').value, monto: $('paMon2').value, motivo: $('paMot2').value }); pmCerrar(); await pmRecargar(); toast('Apelación creada.'); }
+  catch (e) { mostrarError(e, 'No se pudo crear.'); }
+}
+function pmApeResolver(id, monto) {
+  pmModal('<h3>Resolver apelación</h3><div style="display:grid;gap:8px"><label>Monto aprobado (₡)<input id="prMon" type="number" step="0.01" value="' + monto + '"></label><label>Nota de resolución<input id="prNota" maxlength="300"></label></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn secondary" onclick="pmCerrar()">Cancelar</button><button class="btn secondary" onclick="pmApeFin(\'' + id + '\',\'Rechazada\')">Rechazar</button><button class="btn primary" onclick="pmApeFin(\'' + id + '\',\'Aprobada\')">Aprobar</button></div>');
+}
+async function pmApeFin(id, est) {
+  try { await api('resolverApelacionPmWeb', id, est, $('prNota').value, $('prMon').value); pmCerrar(); await pmRecargar(); toast('Apelación ' + est.toLowerCase() + '.'); }
+  catch (e) { mostrarError(e, 'No se pudo resolver.'); }
+}
+
+/* ---------- Registro de pago ---------- */
+function pmPagoModal() {
+  const F = pmS.resumen.filas.filter(f => !f.sinContratista && f.deposito > 0);
+  pmModal('<h3>Registrar pago de la semana</h3><div style="font-size:13px;color:#555;margin-bottom:8px">Marca los contratistas que ya se pagaron y la fecha del depósito.</div><label>Fecha de pago<input type="date" id="rpFec" value="' + esc(pmD.hoy || '') + '"></label><div style="max-height:46vh;overflow:auto;margin-top:8px">' + F.map(f => '<label style="display:flex;gap:8px;align-items:center;padding:3px 0"><input type="checkbox" class="rpChk" value="' + f.idCon + '" ' + (f.pagado ? '' : 'checked') + '> <span style="flex:1">' + esc(f.nombre) + '</span><span>' + pmM(f.deposito) + '</span>' + (f.pagado ? '<span class="chip verde">pagado ' + esc(pmFh(f.pagado)) + '</span>' : '') + '</label>').join('') + '</div><div style="display:flex;gap:8px;justify-content:space-between;margin-top:12px;flex-wrap:wrap"><button class="btn secondary" onclick="pmPagoGuardar(true)">Quitar la fecha a los marcados</button><span><button class="btn secondary" onclick="pmCerrar()">Cancelar</button> <button class="btn primary" onclick="pmPagoGuardar(false)">Registrar pago</button></span></div>');
+}
+async function pmPagoGuardar(quitar) {
+  const ids = Array.from(document.querySelectorAll('.rpChk:checked')).map(x => x.value);
+  if (!ids.length) { toast('Marca al menos un contratista.'); return; }
+  try { await api('registrarPagoPmWeb', pmSemId, quitar ? '' : $('rpFec').value, ids); pmCerrar(); await pmRecargar(); toast(quitar ? 'Fecha de pago quitada.' : 'Pago registrado.'); }
+  catch (e) { mostrarError(e, 'No se pudo registrar.'); }
+}
+
 async function pmAplicarLista() {
   if (!confirm('Se reemplazará el costo aplicado por el precio de la lista en las órdenes con diferencia. ¿Continuar?')) return;
   try { const r = await api('aplicarListaPmWeb', pmSemId); await pmRecargar(); toast(r.cambiadas + ' orden(es) actualizadas.'); } catch (e) { mostrarError(e, 'No se pudo aplicar la lista.'); }
@@ -6630,7 +6721,7 @@ async function pmEliminarSemana() {
 /* ---------- Importar el Excel de Telecable ---------- */
 function pmImportarModal() {
   pmImp = null;
-  pmModal('<h3>Importar semana de Telecable</h3><div style="font-size:13px;color:#555;margin-bottom:8px">Sube el Excel «Pago servicios». Se lee la hoja <b>Ordenes</b> (Contrato, Cliente, Servicios, Costo, Móvil, Fecha, UF).</div><input type="file" id="pmFile" accept=".xlsx,.xls" onchange="pmLeerArchivo(this.files[0])"><div id="pmImpInfo" style="margin-top:10px;font-size:13px"></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn secondary" onclick="pmCerrar()">Cancelar</button><button class="btn primary" id="pmImpBtn" disabled onclick="pmImportarGuardar()">Importar</button></div>');
+  pmModal('<h3>Importar semana de Telecable</h3><div style="font-size:13px;color:#555;margin-bottom:8px">Sube el Excel que envía Telecable (facturación de la semana: Contrato, Cliente, Fecha, Móvil, Servicio, Monto). El pago a cada móvil se calcula con tu lista de precios; también acepta tu Excel «Pago servicios» (hoja Ordenes).</div><input type="file" id="pmFile" accept=".xlsx,.xls" onchange="pmLeerArchivo(this.files[0])"><div id="pmImpInfo" style="margin-top:10px;font-size:13px"></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn secondary" onclick="pmCerrar()">Cancelar</button><button class="btn primary" id="pmImpBtn" disabled onclick="pmImportarGuardar()">Importar</button></div>');
 }
 function pmISO(v) {
   if (v instanceof Date) return v.getFullYear() + '-' + String(v.getMonth() + 1).padStart(2, '0') + '-' + String(v.getDate()).padStart(2, '0');
@@ -6643,24 +6734,36 @@ async function pmLeerArchivo(f) {
   try {
     await cargarLib('xlsx', SEG_URL_XLSX);
     const wb = XLSX.read(await f.arrayBuffer(), { type: 'array', cellDates: true });
-    const nom = wb.SheetNames.find(n => n.trim().toLowerCase() === 'ordenes');
-    if (!nom) throw new Error('El archivo no tiene una hoja llamada «Ordenes».');
-    const filas = XLSX.utils.sheet_to_json(wb.Sheets[nom], { header: 1, raw: true, defval: '' });
-    const enc = filas[0].map(x => String(x).trim().toLowerCase());
-    const ix = k => enc.findIndex(x => x.indexOf(k) === 0);
-    const c = { contrato: ix('contrato'), cliente: ix('nombre'), servicios: ix('servicios'), costo: ix('costo'), movil: ix('movil'), fecha: ix('fecha'), ufS: ix('uf:_serv'), ufC: ix('uf:_costo') };
-    if (c.movil < 0 || c.costo < 0 || c.servicios < 0) throw new Error('No se reconocen las columnas de la hoja Ordenes.');
-    const ord = []; const fechas = [];
-    filas.slice(1).forEach(r => {
-      if (r[c.movil] === '' || r[c.movil] === null || (r[c.servicios] === '' && r[c.costo] === '')) return;
-      const fe = pmISO(r[c.fecha]); if (fe) fechas.push(fe);
-      ord.push({ contrato: String(r[c.contrato] || ''), cliente: r[c.cliente], servicios: r[c.servicios], costo: r[c.costo], movil: r[c.movil], fecha: fe, ufServicio: c.ufS >= 0 ? r[c.ufS] : '', ufCosto: c.ufC >= 0 ? r[c.ufC] : 0 });
-    });
-    if (!ord.length) throw new Error('No se encontraron órdenes en la hoja.');
+    const hojaDe = fn => { for (const n of wb.SheetNames) { const fl = XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: true, defval: '' }); const k = fl.findIndex((r, i) => i < 15 && fn(r.map(x => String(x).trim().toLowerCase()))); if (k >= 0) return { filas: fl.slice(k), nombre: n }; } return null; };
+    const ix = (enc, k) => enc.findIndex(x => x.indexOf(k) === 0);
+    const ord = []; const fechas = []; let formato = '';
+    const tFact = hojaDe(e => ix(e, 'contrato') >= 0 && ix(e, 'servicio') >= 0 && ix(e, 'monto') >= 0 && (ix(e, 'móvil') >= 0 || ix(e, 'movil') >= 0));
+    if (tFact) {
+      formato = 'facturación de Telecable (costo según tu lista de precios)';
+      const enc = tFact.filas[0].map(x => String(x).trim().toLowerCase());
+      const c = { contrato: ix(enc, 'contrato'), cliente: ix(enc, 'cliente'), fecha: ix(enc, 'fecha'), serv: ix(enc, 'servicio'), cant: ix(enc, 'cantidad'), monto: ix(enc, 'monto'), movil: ix(enc, 'móvil') >= 0 ? ix(enc, 'móvil') : ix(enc, 'movil') };
+      tFact.filas.slice(1).forEach(r => {
+        if (r[c.contrato] === '' || !String(r[c.movil]).trim() || !String(r[c.serv]).trim()) return;
+        const fe = pmISO(r[c.fecha]); if (fe) fechas.push(fe);
+        ord.push({ contrato: String(r[c.contrato]), cliente: r[c.cliente], servicios: String(r[c.serv]).trim(), cantidad: c.cant >= 0 ? r[c.cant] : 1, costo: '', movil: r[c.movil], fecha: fe, ufServicio: String(r[c.serv]).trim(), ufCosto: +r[c.monto] || 0 });
+      });
+    } else {
+      const tOrd = hojaDe(e => ix(e, 'contrato') >= 0 && ix(e, 'servicios') >= 0 && ix(e, 'costo') >= 0 && ix(e, 'movil') >= 0);
+      if (!tOrd) throw new Error('No se reconoce el archivo. Sube el Excel de facturación que envía Telecable (columnas Contrato, Cliente, Fecha, Móvil, Servicio, Monto) o tu Excel «Pago servicios» con la hoja Ordenes.');
+      formato = 'Pago servicios (hoja ' + tOrd.nombre + ', con costo por orden)';
+      const enc = tOrd.filas[0].map(x => String(x).trim().toLowerCase());
+      const c = { contrato: ix(enc, 'contrato'), cliente: ix(enc, 'nombre'), servicios: ix(enc, 'servicios'), costo: ix(enc, 'costo'), movil: ix(enc, 'movil'), fecha: ix(enc, 'fecha'), ufS: ix(enc, 'uf:_serv'), ufC: ix(enc, 'uf:_costo') };
+      tOrd.filas.slice(1).forEach(r => {
+        if (r[c.movil] === '' || r[c.movil] === null || (r[c.servicios] === '' && r[c.costo] === '')) return;
+        const fe = pmISO(r[c.fecha]); if (fe) fechas.push(fe);
+        ord.push({ contrato: String(r[c.contrato] || ''), cliente: r[c.cliente], servicios: r[c.servicios], costo: r[c.costo], movil: r[c.movil], fecha: fe, ufServicio: c.ufS >= 0 ? r[c.ufS] : '', ufCosto: c.ufC >= 0 ? r[c.ufC] : 0 });
+      });
+    }
+    if (!ord.length) throw new Error('No se encontraron órdenes en el archivo.');
     fechas.sort();
     pmImp = { ordenes: ord, desde: fechas[0] || '', hasta: fechas[fechas.length - 1] || '' };
-    const tot = ord.reduce((a, o) => a + (+o.costo || 0), 0), uf = ord.reduce((a, o) => a + (+o.ufCosto || 0), 0), mov = new Set(ord.map(o => pmMovilNum(o.movil)));
-    $('pmImpInfo').innerHTML = '<b>' + ord.length + '</b> órdenes · <b>' + mov.size + '</b> móviles · costo ' + pmM(tot) + ' · UF ' + pmM(uf) + '<div style="display:flex;gap:8px;margin-top:8px"><label>Desde<input type="date" id="pmIDesde" value="' + pmImp.desde + '"></label><label>Hasta<input type="date" id="pmIHasta" value="' + pmImp.hasta + '"></label></div>';
+    const uf = ord.reduce((a, o) => a + (+o.ufCosto || 0), 0), mov = new Set(ord.map(o => pmMovilNum(o.movil)));
+    $('pmImpInfo').innerHTML = 'Formato: <b>' + formato + '</b><br><b>' + ord.length + '</b> líneas · <b>' + mov.size + '</b> móviles · UF ' + pmM(uf) + '<div style="display:flex;gap:8px;margin-top:8px"><label>Desde<input type="date" id="pmIDesde" value="' + pmImp.desde + '"></label><label>Hasta<input type="date" id="pmIHasta" value="' + pmImp.hasta + '"></label></div>';
     $('pmImpBtn').disabled = false;
   } catch (e) { $('pmImpInfo').innerHTML = '<span style="color:#9b1c1c">' + esc(e.message || e) + '</span>'; }
 }
@@ -13188,6 +13291,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 36 · 13-oct 23:10</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 38 · 14-oct 00:20</div>
 </body>
 </html>
