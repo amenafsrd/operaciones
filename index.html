@@ -6505,7 +6505,7 @@ function mostrarVista(v, forzar) {
 let pmD = null, pmS = null, pmSemId = '', pmVista = 'res', pmTabAct = 'sem', pmImp = null, pmVer = null;
 const pmM = n => '₡' + (Number(n) || 0).toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const pmFh = iso => iso ? iso.split('-').reverse().join('/') : '—';
-function pmModal(h, w) { $('pmModal').innerHTML = h; $('pmModal').style.maxWidth = (w || 640) + 'px'; $('pmModalBg').classList.add('show'); }
+function pmModal(h, w) { $('pmModal').innerHTML = h; $('pmModal').style.maxWidth = (w || 640) + 'px'; $('pmModal').style.width = w ? '96vw' : ''; $('pmModalBg').classList.add('show'); }
 function pmCerrar() { $('pmModalBg').classList.remove('show'); }
 function pmBajar(blob, nombre) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nombre; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500); }
 
@@ -6976,10 +6976,28 @@ function pmRenderCon() {
   const hoy = pmD.hoy || '';
   const vig = c => c.estadoSis === 'activa' || (c.estadoSis === 'inactiva' && c.plazoHasta >= hoy) || c.estadoSis === 'desconocida';
   const C = pmD.contratistas.filter(c => pmConFiltro === 'todos' ? true : (pmConFiltro === 'vigentes' ? vig(c) : !vig(c)));
-  let h = '<div class="toolbar"><button class="btn primary" onclick="pmConModal()">➕ Nuevo contratista</button><button class="btn secondary" onclick="pmSugerirModal()">📋 Traer desde Móviles</button><button class="btn secondary" onclick="pmImportarConModal()">⬆ Importar desde la hoja «Pago»</button><span style="flex:1"></span><label>Ver <select onchange="pmConFiltro=this.value;pmRenderCon()">' + [['vigentes', 'Activos y en plazo de pago'], ['fuera', 'Fuera de plazo'], ['todos', 'Todos']].map(x => '<option value="' + x[0] + '"' + (pmConFiltro === x[0] ? ' selected' : '') + '>' + x[1] + '</option>').join('') + '</select></label></div><div class="panel"><div class="panelHead"><h2>Contratistas</h2><span>' + C.length + '</span></div><div style="padding:8px 12px;font-size:12px;color:#667">El estado sale del módulo Móviles: una móvil inactiva se sigue pagando hasta 2 semanas después de su salida.</div><div class="tableWrap">';
+  let h = '<div class="toolbar"><button class="btn primary" onclick="pmConModal()">➕ Nuevo contratista</button><button class="btn secondary" onclick="pmSugerirModal()">📋 Traer desde Móviles</button><button class="btn secondary" onclick="pmLimpiarDup()">🧹 Unir duplicados</button><button class="btn secondary" onclick="pmImportarConModal()">⬆ Importar desde la hoja «Pago»</button><span style="flex:1"></span><label>Ver <select onchange="pmConFiltro=this.value;pmRenderCon()">' + [['vigentes', 'Activos y en plazo de pago'], ['fuera', 'Fuera de plazo'], ['todos', 'Todos']].map(x => '<option value="' + x[0] + '"' + (pmConFiltro === x[0] ? ' selected' : '') + '>' + x[1] + '</option>').join('') + '</select></label></div><div class="panel"><div class="panelHead"><h2>Contratistas</h2><span>' + C.length + '</span></div><div style="padding:8px 12px;font-size:12px;color:#667">El estado sale del módulo Móviles: una móvil inactiva se sigue pagando hasta 2 semanas después de su salida.</div><div class="tableWrap">';
   if (!C.length) h += '<div class="loading">No hay contratistas en esta vista. Usa «Traer desde Móviles» o importa la hoja «Pago» de tu Excel.</div>';
-  else h += '<table><thead><tr><th>Factura a nombre de</th><th>Móviles · técnico</th><th>Estado</th><th>Cuenta a nombre de</th><th>IBAN</th><th>Cédula</th><th>IVA</th><th></th></tr></thead><tbody>' + C.map(c => '<tr><td><b>' + esc(c.nombre) + '</b></td><td>' + (c.tecnicos && c.tecnicos.length ? c.tecnicos.map(t => '<div><b>' + esc(t.movil) + '</b>' + (t.tecnico ? ' · ' + esc(t.tecnico) : '') + '</div>').join('') : esc(c.moviles)) + '</td><td>' + pmConEstadoHtml(c) + '</td><td>' + esc(c.titular || c.nombre) + '</td><td>' + (c.iban ? esc(c.iban) : '<span style="color:#9b1c1c">Falta</span>') + '</td><td>' + esc(c.cedula) + '</td><td>' + (c.aplicaIva ? '13%' : 'Sin IVA') + '</td><td style="text-align:right"><button class="btn secondary" onclick="pmConModal(\'' + c.id + '\')">Editar</button></td></tr>').join('') + '</tbody></table>';
+  else h += '<table><thead><tr><th>Factura a nombre de</th><th>Móviles · técnico</th><th>Estado</th><th>Cuenta a nombre de</th><th>IBAN</th><th>Cédula</th><th>IVA</th><th></th></tr></thead><tbody>' + C.map(c => '<tr><td><b>' + esc(c.nombre) + '</b></td><td>' + (c.tecnicos && c.tecnicos.length ? c.tecnicos.map(t => '<div><b>' + esc(t.movil) + '</b>' + (t.tecnico ? ' · ' + esc(t.tecnico) : '') + '</div>').join('') : esc(c.moviles)) + '</td><td>' + pmConEstadoHtml(c) + '</td><td>' + esc(c.titular || c.nombre) + '</td><td>' + (c.iban ? esc(c.iban) : '<span style="color:#9b1c1c">Falta</span>') + '</td><td>' + esc(c.cedula) + '</td><td>' + (c.aplicaIva ? '13%' : 'Sin IVA') + '</td><td style="text-align:right;white-space:nowrap"><button class="btn secondary" onclick="pmHistorial(\'' + c.id + '\')">Historial</button> <button class="btn secondary" onclick="pmConModal(\'' + c.id + '\')">Editar</button></td></tr>').join('') + '</tbody></table>';
   $('pmPCon').innerHTML = h + '</div></div>';
+}
+async function pmHistorial(id) {
+  try {
+    const H = await api('historialContratistaPmWeb', id), c = pmD.contratistas.find(x => x.id === id) || {};
+    const td = v => '<td style="text-align:right;white-space:nowrap">' + v + '</td>';
+    pmModal('<h3>Historial de pagos · ' + esc(c.nombre) + '</h3><div style="font-size:12px;color:#556;margin-bottom:8px">Una fila por semana de pago, de la más reciente a la más antigua.</div>' +
+      (H.filas.length ? '<div style="max-height:60vh;overflow:auto"><table><thead><tr><th>Semana</th><th style="text-align:right">Órd.</th><th style="text-align:right">Detalle</th><th style="text-align:right">Apel. (+)</th><th style="text-align:right">Penaliz. (−)</th><th style="text-align:right">Alquiler (−)</th><th style="text-align:right">Total factura</th><th style="text-align:right">Rebajos (−)</th><th style="text-align:right">Depositado</th><th>N.º factura</th><th>Pagado</th><th></th></tr></thead><tbody>' +
+        H.filas.map(f => '<tr><td><b>' + esc(pmFh(f.desde)) + ' al ' + esc(pmFh(f.hasta)) + '</b></td>' + td(f.nOrdenes) + td(pmM(f.detalle)) + td(f.reclamos ? pmM(f.reclamos) : '') + td(f.penalizaciones ? pmM(f.penalizaciones) : '') + td(f.alquileres ? pmM(f.alquileres) : '') + td(pmM(f.totalFacturado)) + td(f.deducciones ? pmM(f.deducciones) : '') + '<td style="text-align:right;white-space:nowrap"><b>' + pmM(f.deposito) + '</b></td><td>' + esc(f.factura) + '</td><td>' + (f.pagado ? '<span class="chip verde">' + esc(pmFh(f.pagado)) + '</span>' : '<span style="color:#999">—</span>') + '</td><td><button class="btn secondary" onclick="pmCerrar();pmTab(\'sem\');pmAbrir(\'' + f.idSemana + '\')">Abrir</button></td></tr>').join('') +
+        '<tr style="font-weight:700;background:#f3f6fa"><td>Total (' + H.filas.length + ' semanas)</td>' + td(H.totales.nOrdenes) + td(pmM(H.totales.detalle)) + '<td></td><td></td><td></td>' + td(pmM(H.totales.totalFacturado)) + td(pmM(H.totales.deducciones)) + td(pmM(H.totales.deposito)) + '<td></td><td></td><td></td></tr></tbody></table></div>' : '<div class="loading">Este contratista aún no tiene pagos registrados.</div>') +
+      '<div style="display:flex;justify-content:flex-end;margin-top:10px"><button class="btn secondary" onclick="pmCerrar()">Cerrar</button></div>', 980);
+  } catch (e) { mostrarError(e, 'No se pudo cargar el historial.'); }
+}
+async function pmLimpiarDup() {
+  const n = {}; pmD.contratistas.filter(c => c.activo).forEach(c => { const k = pmNorm(c.nombre); n[k] = (n[k] || 0) + 1; });
+  const d = Object.keys(n).filter(k => n[k] > 1).length;
+  if (!d) { toast('No hay contratistas con nombre repetido.'); return; }
+  if (!confirm('Hay ' + d + ' nombre(s) repetido(s). Se conserva el más completo (con IBAN y móviles) y los demás se desactivan. ¿Continuar?')) return;
+  try { const r = await api('limpiarDuplicadosPmWeb'); pmD = await api('obtenerPmWeb'); pmRenderCon(); toast(r.desactivados + ' duplicado(s) desactivados.'); } catch (e) { mostrarError(e, 'No se pudo limpiar.'); }
 }
 async function pmSugerirModal() {
   try {
@@ -13536,6 +13554,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 43 · 14-oct 11:10</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 44 · 14-oct 12:00</div>
 </body>
 </html>
