@@ -6864,13 +6864,13 @@ async function pmAplicarLista() {
   try { const r = await api('aplicarListaPmWeb', pmSemId); await pmRecargar(); toast(r.cambiadas + ' orden(es) actualizadas.'); } catch (e) { mostrarError(e, 'No se pudo aplicar la lista.'); }
 }
 
-function pmConNombre(id) { const c = pmD.contratistas.find(x => x.id === id); return c ? c.nombre : id; }
+function pmConNombre(id) { if (id === 'EMPRESA') return 'Empresa (SRD asume)'; const c = pmD.contratistas.find(x => x.id === id); return c ? c.nombre : id; }
 function pmHtmlAju(cerr) {
   const A = pmS.ajustes;
   let h = '<div style="padding:10px 12px;display:flex;gap:8px;flex-wrap:wrap">' + (cerr ? '' : '<button class="btn primary" onclick="pmAjusteModal()">➕ Nuevo ajuste</button>') + '<span style="color:#667;font-size:12px;align-self:center">Reclamos, alquileres, penalizaciones y camisas entran antes del IVA; adelantos, inventario, INS, rebajos, préstamos y herramientas se descuentan del depósito sin cambiar la factura.</span></div>';
   if (!A.length) return h + '<div class="loading">Sin ajustes en esta semana.</div>';
   return h + '<table class="pmT"><thead><tr><th>Contratista</th><th>Tipo</th><th>Detalle</th><th>Contrato</th><th>Monto</th><th></th></tr></thead><tbody>' + A.map(a => { const t = pmD.tipos[a.tipo] || { txt: a.tipo, signo: -1 };
-    return '<tr><td>' + esc(pmConNombre(a.idCon)) + '</td><td>' + esc(t.txt) + '</td><td>' + esc(a.detalle) + '</td><td>' + esc(a.contrato) + '</td><td style="color:' + (t.signo > 0 ? '#2d5a1b' : '#9b1c1c') + '">' + (t.signo > 0 ? '+' : '−') + pmM(a.monto) + '</td><td>' + (cerr ? '' : '<button class="btn secondary" onclick="pmEliminarAjuste(\'' + a.id + '\')">✕</button>') + '</td></tr>'; }).join('') + '</tbody></table>';
+    return '<tr><td>' + esc(pmConNombre(a.idCon)) + '</td><td>' + esc(t.txt) + '</td><td>' + esc(a.detalle) + '</td><td>' + esc(a.contrato) + '</td><td style="color:' + (t.signo > 0 ? '#2d5a1b' : '#9b1c1c') + '">' + (t.signo > 0 ? '+' : '−') + pmM(a.monto) + '</td><td>' + (cerr ? '' : (a.tipo === 'PENALIZACION' ? '<button class="btn secondary" onclick="pmAjReasignar(\'' + a.id + '\')">Reasignar</button> ' : '') + '<button class="btn secondary" onclick="pmEliminarAjuste(\'' + a.id + '\')">✕</button>') + '</td></tr>'; }).join('') + '</tbody></table>';
 }
 function pmAjusteModal() {
   const cons = pmD.contratistas;
@@ -7374,8 +7374,21 @@ function pmDibujarPnl() {
   const F = pmPnFiltradas(), mov = Array.from(new Set(pmPn.filas.map(f => f.movil).filter(Boolean))).sort((a, b) => a - b);
   $('pmPPnl').innerHTML = '<div class="toolbar" style="flex-wrap:wrap"><input placeholder="Buscar contratista, contrato o motivo" style="min-width:240px" value="' + esc(pmPnF.q) + '" onchange="pmPnF.q=this.value;pmDibujarPnl()"><select onchange="pmPnF.movil=this.value;pmDibujarPnl()"><option value="">Todas las móviles</option>' + mov.map(m => '<option value="' + m + '"' + (pmPnF.movil === m ? ' selected' : '') + '>Móvil ' + m + '</option>').join('') + '</select>' +
     '<select onchange="pmPnF.origen=this.value;pmDibujarPnl()">' + [['', 'Todas las fuentes'], ['Telecable', 'Cargadas por Telecable'], ['Manual', 'Registradas por nosotros']].map(x => '<option value="' + x[0] + '"' + (pmPnF.origen === x[0] ? ' selected' : '') + '>' + x[1] + '</option>').join('') + '</select><span style="flex:1"></span><button class="btn secondary" onclick="pmPnExcel()">⬇ Excel</button><button class="btn primary" onclick="pmPnModal()">➕ Registrar penalización</button></div>' +
-    '<div class="panel"><div class="panelHead"><h2>Penalizaciones cobradas</h2><span>' + F.length + ' · total ' + pmM(F.reduce((a, f) => a + f.monto, 0)) + '</span></div><div style="padding:6px 12px;font-size:12px;color:#667">Registro propio del pago a móviles: no se relaciona con el módulo de incidencias. Cada penalización resta de la factura del contratista en su semana.</div><div class="tableWrap">' +
-    (F.length ? '<table class="pmT"><thead><tr><th>Semana</th><th>Móvil</th><th>Contratista</th><th>Contrato</th><th>Motivo</th><th>Fuente</th><th style="text-align:right">Monto</th><th></th></tr></thead><tbody>' + F.map(f => '<tr><td>' + esc(pmFh(f.desde)) + ' al ' + esc(pmFh(f.hasta)) + '</td><td>' + esc(f.movil) + '</td><td>' + esc(f.contratista || '—') + '</td><td>' + esc(f.contrato) + '</td><td style="max-width:380px">' + esc(f.detalle) + '</td><td>' + (f.origen === 'Telecable' ? '<span class="chip azul">Telecable</span>' : '<span class="chip amar">Manual</span>') + '</td><td style="text-align:right;white-space:nowrap"><b>' + pmM(f.monto) + '</b></td><td><button class="btn secondary" onclick="pmVista=\'res\';pmTab(\'sem\');pmAbrir(\'' + f.idSemana + '\')">Abrir semana</button></td></tr>').join('') + '</tbody></table>' : '<div class="loading">Aún no hay penalizaciones registradas.</div>') + '</div></div>';
+    '<div class="panel"><div class="panelHead"><h2>Penalizaciones cobradas</h2><span>' + F.length + ' · total ' + pmM(F.reduce((a, f) => a + f.monto, 0)) + ' · a contratistas ' + pmM(F.filter(f => !f.empresa).reduce((a, f) => a + f.monto, 0)) + ' · asumidas por la empresa ' + pmM(F.filter(f => f.empresa).reduce((a, f) => a + f.monto, 0)) + '</span></div><div style="padding:6px 12px;font-size:12px;color:#667">Registro propio del pago a móviles: no se relaciona con el módulo de incidencias. Cada penalización resta de la factura del contratista en su semana. Si Telecable la cargó a la móvil equivocada, usa <b>Reasignar</b> para pasarla a otro técnico, o a «Empresa asume» para que no se le cobre a nadie.</div><div class="tableWrap">' +
+    (F.length ? '<table class="pmT"><thead><tr><th>Semana</th><th>Móvil</th><th>Contratista</th><th>Contrato</th><th>Motivo</th><th>Fuente</th><th style="text-align:right">Monto</th><th></th></tr></thead><tbody>' + F.map(f => '<tr' + (f.empresa ? ' style="background:#fff8e1"' : '') + '><td>' + esc(pmFh(f.desde)) + ' al ' + esc(pmFh(f.hasta)) + '</td><td>' + esc(f.movil) + '</td><td>' + (f.empresa ? '<span class="chip amar">Empresa asume</span>' : esc(f.contratista || '—')) + '</td><td>' + esc(f.contrato) + '</td><td style="max-width:380px">' + esc(f.detalle) + '</td><td>' + (f.origen === 'Telecable' ? '<span class="chip azul">Telecable</span>' : '<span class="chip amar">Manual</span>') + '</td><td style="text-align:right;white-space:nowrap"><b>' + pmM(f.monto) + '</b></td><td style="white-space:nowrap"><button class="btn secondary" onclick="pmPnReasignar(\'' + f.id + '\')">Reasignar</button> <button class="btn secondary" onclick="pmVista=\'res\';pmTab(\'sem\');pmAbrir(\'' + f.idSemana + '\')">Abrir semana</button></td></tr>').join('') + '</tbody></table>' : '<div class="loading">Aún no hay penalizaciones registradas.</div>') + '</div></div>';
+}
+async function pmAjReasignar(id) { try { pmPn = await api('listarPenalizacionesPmWeb'); } catch (e) { mostrarError(e, 'No se pudo cargar.'); return; } pmPnReasignar(id); }
+function pmPnReasignar(id) {
+  const f = pmPn.filas.find(x => x.id === id); if (!f) return;
+  const op = [['EMPRESA|', '🏢 Empresa asume (no se cobra al contratista)']];
+  pmD.contratistas.filter(c => c.activo).forEach(c => { const ms = String(c.moviles || '').split(/[^0-9]+/).filter(Boolean).map(x => String(Number(x))); if (!ms.length) op.push([c.id + '|', c.nombre]); ms.forEach(m => op.push([c.id + '|' + m, 'Móvil ' + m + ' · ' + c.nombre])); });
+  const act = f.empresa ? 'EMPRESA|' : f.idCon + '|' + f.movil;
+  pmModal('<h3>Reasignar penalización</h3><div style="font-size:12px;color:#556;margin-bottom:8px">' + esc(f.detalle) + ' · <b>' + pmM(f.monto) + '</b> · Telecable/origen: móvil ' + esc(f.movil || '—') + (f.contrato ? ' · contrato ' + esc(f.contrato) : '') + '</div><label>Asignar a<select id="prAs">' + op.map(o => '<option value="' + o[0] + '"' + (o[0] === act ? ' selected' : '') + '>' + esc(o[1]) + '</option>').join('') + '</select></label><div style="font-size:11px;color:#778;margin-top:6px">Solo se puede cambiar mientras la semana esté abierta. Si la asume la empresa, no resta de ninguna factura.</div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn secondary" onclick="pmCerrar()">Cancelar</button><button class="btn primary" onclick="pmPnReasignarOk(\'' + id + '\')">Guardar</button></div>', 460);
+}
+async function pmPnReasignarOk(id) {
+  const v = $('prAs').value.split('|');
+  try { await api('reasignarPenalizacionPmWeb', id, v[0], v[1] || ''); pmCerrar(); if ($('pmPPnl') && $('pmPPnl').innerHTML) await pmRenderPnl(); if (pmSemId) await pmRecargar(); toast(v[0] === 'EMPRESA' ? 'Penalización asumida por la empresa.' : 'Penalización reasignada.'); }
+  catch (e) { mostrarError(e, 'No se pudo reasignar.'); }
 }
 function pmPnModal() {
   const ab = pmD.semanas.filter(s => s.estado !== 'Cerrada');
@@ -14102,6 +14115,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 60 · 14-oct 15:23</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 61 · 14-oct 15:27</div>
 </body>
 </html>
