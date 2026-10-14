@@ -6551,7 +6551,7 @@ function pmRenderSemana() {
   h += '<div class="panel"><div style="display:flex;gap:18px;flex-wrap:wrap;padding:12px 14px;font-size:13px">' +
     [['Órdenes', T.nOrdenes], ['Costo detalle', pmM(T.detalle)], ['UF Telecable', pmM(T.uf)], ['Margen (UF − costo)', pmM(margen)], ['Total facturado', pmM(T.totalFacturado)], ['Total a depositar', pmM(T.deposito)]]
       .map(x => '<div><div style="color:#667;font-size:11px">' + x[0] + '</div><b style="font-size:15px">' + x[1] + '</b></div>').join('') + '</div></div>';
-  if (S.diferencias || S.sinLista) h += '<div class="panel" style="padding:10px 14px;font-size:13px;background:#fff8e1">' + (S.diferencias ? '⚠ <b>' + S.diferencias + '</b> orden(es) con costo distinto a la lista de precios. ' + (cerr ? '' : '<button class="btn secondary" onclick="pmAplicarLista()">Aplicar precio de lista</button> ') : '') + (S.sinLista ? '<span style="color:#666">' + S.sinLista + ' orden(es) con un servicio que la lista no reconoce (se usa el costo del archivo).</span>' : '') + '</div>';
+  if (S.diferencias || S.sinLista) h += '<div class="panel" style="padding:10px 14px;font-size:13px;background:#fff8e1">' + (S.diferencias ? '⚠ <b>' + S.diferencias + '</b> orden(es) con costo distinto a la lista de precios. ' + (cerr ? '' : '<button class="btn secondary" onclick="pmAplicarLista()">Aplicar precio de lista</button> ') : '') + (S.sinLista ? '⚠ <b>' + S.sinLista + '</b> orden(es) sin precio de pago (el servicio no está en la lista). ' + (cerr ? '' : '<button class="btn primary" onclick="pmSinPrecioModal()">Asignar precio</button>') : '') + '</div>';
   h += '<div class="subtabs">' + tb('res', 'Pago por contratista') + tb('ord', 'Órdenes') + tb('cto', 'Contratos') + tb('ape', 'Apelaciones' + (S.apelaciones.some(a => a.estado === 'Pendiente') ? ' •' : '')) + tb('aju', 'Ajustes') + tb('ext', 'Adicionales') + tb('ver', 'Verificación') + tb('arc', 'Archivos') + '</div>';
   h += '<div class="panel"><div class="tableWrap">';
   if (pmVista === 'res') h += pmHtmlRes(cerr);
@@ -6706,6 +6706,30 @@ async function pmVerExcel() {
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(filas), 'Reclamo');
     XLSX.writeFile(wb, 'Reclamo_OT_no_pagadas_' + pmS.semana.desde + '_' + pmS.semana.hasta + '.xlsx');
   } catch (e) { mostrarError(e, 'No se pudo generar el Excel.'); }
+}
+
+
+/* ---------- Órdenes sin precio: asignarlo en el momento ---------- */
+function pmSinPrecioModal() {
+  const g = {};
+  pmS.ordenes.filter(o => o.costoLista === null && !o.manual && !o.tipo).forEach(o => {
+    const x = g[o.servicios] || (g[o.servicios] = { nombre: o.servicios, n: 0, uf: 0, cant: 0, actual: o.costo }); x.n++; x.uf += o.ufCosto; x.cant += (o.cantidad || 1);
+  });
+  const L = Object.keys(g).map(k => g[k]); window._pmSP = L;
+  if (!L.length) { toast('No hay órdenes sin precio.'); return; }
+  pmModal('<h3>Órdenes sin precio de pago</h3><div style="font-size:13px;color:#555;margin-bottom:8px">Escribe cuánto se le paga a la móvil <b>por unidad</b> de cada servicio. Marca «Guardar en la lista» para que quede registrado y se reconozca en las próximas semanas.</div><div style="max-height:52vh;overflow:auto">' + L.map((x, i) => '<div style="border:1px solid #d8dee8;border-radius:8px;padding:8px 10px;margin-bottom:8px"><div><b>' + esc(x.nombre) + '</b> <span style="color:#667;font-size:12px">· ' + x.n + ' orden(es) · Telecable paga ' + pmM(x.uf / Math.max(1, x.cant)) + ' por unidad</span></div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px"><label>Pago a la móvil (₡)<input type="number" step="0.01" class="spP" data-i="' + i + '" style="width:120px"></label><label><input type="checkbox" class="spG" data-i="' + i + '" checked> Guardar en la lista de precios</label></div></div>').join('') + '</div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn secondary" onclick="pmCerrar()">Cancelar</button><button class="btn primary" onclick="pmSinPrecioGuardar()">Aplicar</button></div>', 680);
+}
+async function pmSinPrecioGuardar() {
+  const L = window._pmSP || []; let n = 0;
+  try {
+    for (let i = 0; i < L.length; i++) {
+      const v = document.querySelector('.spP[data-i="' + i + '"]').value;
+      if (v === '') continue;
+      const guardar = document.querySelector('.spG[data-i="' + i + '"]').checked;
+      const r = await api('asignarPrecioServicioPmWeb', pmSemId, L[i].nombre, v, guardar, L[i].uf / Math.max(1, L[i].cant)); n += r.cambiadas;
+    }
+    pmCerrar(); pmD = await api('obtenerPmWeb'); await pmRecargar(); toast(n + ' orden(es) con precio asignado.');
+  } catch (e) { mostrarError(e, 'No se pudo asignar el precio.'); }
 }
 
 /* ---------- Registro de pago ---------- */
@@ -13426,6 +13450,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 41 · 14-oct 01:50</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 42 · 14-oct 09:40</div>
 </body>
 </html>
