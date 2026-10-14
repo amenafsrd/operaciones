@@ -5768,9 +5768,9 @@ async function abrirColab() {
   const adm = rhDatos.admin, mio = !!rhDatos.mio;
   $('rhTMis').style.display = mio ? '' : 'none';
   ['Sol', 'Col', 'Pag'].forEach(x => { $('rhT' + x).style.display = adm ? '' : 'none'; });
-  $('rhTAsi').style.display = (adm || mio) ? '' : 'none';
+  $('rhTAsi').style.display = adm ? '' : 'none';
   let t = rhTabAct;
-  if (!t || (t === 'mis' && !mio) || (t !== 'mis' && t !== 'asi' && !adm) || (t === 'asi' && !adm && !mio)) t = adm ? ((rhDatos.solicitudes || []).some(x => x.estado === 'Pendiente') ? 'sol' : (mio ? 'mis' : 'sol')) : 'mis';
+  if (!t || (t === 'mis' && !mio) || (t !== 'mis' && !adm)) t = adm ? ((rhDatos.solicitudes || []).some(x => x.estado === 'Pendiente') ? 'sol' : (mio ? 'mis' : 'sol')) : 'mis';
   rhTab(t);
 }
 
@@ -12654,6 +12654,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 33 · 13-oct 20:30</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 34 · 13-oct 20:45</div>
 </body>
 </html>
