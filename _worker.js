@@ -865,6 +865,7 @@ function listarUsuariosWeb(token) {
 
   requerirSesion_(token, 'admin');
 
+  rhSincronizarUsuarios_();
   const fichas = {};
   leerObjetos_(rhHoja_('COLAB')).forEach(c => { if (txt_(c.Usuario)) fichas[normalizarUsuario_(c.Usuario)] = rhColabInfo_(c); });
 
@@ -997,7 +998,7 @@ function crearUsuarioWeb(token, datos) {
     usuario: usuario, nombre: nombre, correo: correo, rol: rol,
     clave: clave, activo: true, debeCambiar: true, modulos: datos.modulos
   });
-  if (ficha) rhGuardarFichaUsuario_(usuario, nombre, ficha);
+  rhGuardarFichaUsuario_(usuario, nombre, ficha || rhFichaLimpia_({}));
 
   return { ok: true, usuario: usuario, clave: clave, nombre: nombre, correo: correo, rol: rol };
 }
@@ -9167,8 +9168,32 @@ function rhMiColab_(ses) {
 }
 
 /* ¿Debe ver el módulo? Administrador siempre; el resto solo si está ligado a una ficha de colaborador */
+/* Cada usuario activo es un colaborador: si no tiene ficha, se crea (sin fecha de ingreso ni salario; el administrador los completa) */
+function rhSincronizarUsuarios_() {
+  const us = leerObjetos_(obtenerHoja_(CONFIG.HOJAS.USUARIOS)).filter(u => txt_(u.Usuario) && String(u.Activo) === 'SI');
+  if (!us.length) return 0;
+  const tiene = {};
+  leerObjetos_(rhHoja_('COLAB')).forEach(c => { if (txt_(c.Usuario)) tiene[normalizarUsuario_(c.Usuario)] = 1; });
+  if (!us.some(u => !tiene[normalizarUsuario_(u.Usuario)])) return 0;
+  return conBloqueo_(() => {
+    const sh = rhHoja_('COLAB');
+    const ya = {};
+    leerObjetos_(sh).forEach(c => { if (txt_(c.Usuario)) ya[normalizarUsuario_(c.Usuario)] = 1; });
+    const ahora = segAhora_();
+    let n = 0;
+    us.forEach(u => {
+      const k = normalizarUsuario_(u.Usuario);
+      if (ya[k]) return;
+      appendPorEncabezados_(sh, { ID: 'C' + Date.now().toString(36).toUpperCase() + (n++), Usuario: k, Nombre: txt_(u.Nombre) || k, Puesto: '', Fecha_Ingreso: '',
+        Salario_Base: 0, Periodicidad: 'Quincenal', Dias_Semana: 5, Dias_Por_Periodo: 10, Dias_Tomados_Previos: 0, Activo: 'Sí', Creado: ahora, Actualizado: ahora });
+    });
+    return n;
+  });
+}
+
 function miAccesoRhWeb(token) {
   const ses = requerirSesion_(token, 'consulta');
+  rhSincronizarUsuarios_();
   return { admin: ses.rol === 'admin', colaborador: !!rhMiColab_(ses) };
 }
 
@@ -9177,6 +9202,7 @@ function obtenerRhWeb(token) {
   const ses = requerirSesion_(token, 'consulta');
   const admin = ses.rol === 'admin';
   const hoy = rhHoy_();
+  rhSincronizarUsuarios_();
   const colabs = leerObjetos_(rhHoja_('COLAB'));
   const sols = leerObjetos_(rhHoja_('SOL'));
   const mio = rhMiColab_(ses);
@@ -9210,10 +9236,9 @@ function guardarColaboradorWeb(token, d) {
   d = d || {};
   const nombre = txt_(d.nombre).replace(/\s+/g, ' ').slice(0, 80);
   if (!nombre) throw new Error('Escribe el nombre del colaborador.');
-  const ingreso = segFecha_(d.ingreso);
-  if (!ingreso) throw new Error('Indica la fecha de ingreso (de ahí se calculan las vacaciones).');
+  const ingreso = segFecha_(d.ingreso) || '';
   const salida = segFecha_(d.salida) || '';
-  if (salida && salida < ingreso) throw new Error('La fecha de salida no puede ser anterior al ingreso.');
+  if (salida && ingreso && salida < ingreso) throw new Error('La fecha de salida no puede ser anterior al ingreso.');
   const ds = Number(d.diasSemana) === 6 ? 6 : 5;
   const usuario = txt_(d.usuario);
 
@@ -9527,10 +9552,9 @@ function rhFichaCols_(f) {
     Direccion: f.direccion, Contacto_Emergencia: f.contactoEmergencia, Tel_Emergencia: f.telEmergencia };
 }
 
-/* Crea o actualiza la ficha del colaborador ligada a un usuario. Sin fecha de ingreso no se puede crear una ficha nueva. */
+/* Crea o actualiza la ficha del colaborador ligada a un usuario (todo usuario es colaborador) */
 function rhGuardarFichaUsuario_(usuario, nombre, f) {
   const u = normalizarUsuario_(usuario);
-  const hayDatos = Object.keys(f).some(k => f[k]);
   return conBloqueo_(() => {
     const sh = rhHoja_('COLAB');
     const t = leerTabla_(sh);
@@ -9538,8 +9562,6 @@ function rhGuardarFichaUsuario_(usuario, nombre, f) {
     for (let i = 1; i < t.values.length; i++) if (normalizarUsuario_(t.values[i][t.idx.Usuario]) === u) { fila = i; break; }
     const ahora = segAhora_();
     if (fila < 0) {
-      if (!hayDatos) return { ok: true, creada: false };
-      if (!f.ingreso) throw new Error('Para crear la ficha de la persona indica su fecha de ingreso.');
       const o = Object.assign({ ID: 'C' + Date.now().toString(36).toUpperCase(), Usuario: u, Nombre: nombre, Puesto: f.puesto, Fecha_Ingreso: f.ingreso,
         Salario_Base: 0, Periodicidad: 'Quincenal', Dias_Semana: 5, Dias_Por_Periodo: 10, Dias_Tomados_Previos: 0, Activo: 'Sí', Creado: ahora, Actualizado: ahora }, rhFichaCols_(f));
       appendPorEncabezados_(sh, o);

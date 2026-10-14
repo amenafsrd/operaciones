@@ -3843,7 +3843,7 @@ function cargarUsuarios() {
           '<td><span style="display:inline-flex;align-items:center;gap:8px">' + avatarHtml(u.foto, u.nombre || u.usuario, 'sm') + '<b>' + esc(u.usuario) + '</b></span></td>' +
           '<td class="left">' + esc(u.nombre) + '</td>' +
           '<td class="left">' + (u.correo ? esc(u.correo) : '<span class="muted">—</span>') + '</td>' +
-          '<td class="left" style="font-size:12px">' + (u.ficha && u.ficha.ingreso ? 'Ingreso ' + esc(fmtFechaSeg(u.ficha.ingreso)) + (u.ficha.telefono ? '<br>' + esc(u.ficha.telefono) : '') : '<span class="muted">Sin ficha</span>') + '</td>' +
+          '<td class="left" style="font-size:12px">' + (u.ficha && u.ficha.ingreso ? 'Ingreso ' + esc(fmtFechaSeg(u.ficha.ingreso)) + (u.ficha.telefono ? '<br>' + esc(u.ficha.telefono) : '') : '<span class="muted">' + (u.ficha ? 'Falta fecha de ingreso' : 'Sin ficha') + '</span>') + '</td>' +
           '<td>' + esc(ETIQUETA_ROL[u.rol] || u.rol) + '</td>' +
           '<td class="left" style="font-size:12px">' + (u.rol === 'admin' ? 'Todos' : esc((u.modulos || []).map(m => ({ cronograma: 'Cronograma', moviles: 'Móviles', seguimiento: 'Seguimiento', bodega: 'Bodega', cotizaciones: 'Cotizaciones', resumen: 'Resumen' })[m] || m).join(', ') || 'Ninguno')) + '</td>' +
           '<td><span class="tag ' + (u.activo ? 'tag-active' : 'tag-inactive') + '">' +
@@ -5977,6 +5977,14 @@ function rhVerPeriodos(id) {
 }
 
 /* Colaboradores con días de períodos ya cumplidos sin tomar: el administrador debe programarlos */
+function rhAvisoSinFicha() {
+  if (!rhDatos.admin) return '';
+  const l = (rhDatos.colaboradores || []).filter(c => c.activo && (!c.ingreso || !c.salario));
+  if (!l.length) return '';
+  return '<div class="segAviso" style="margin:0 0 10px"><b>📝 Fichas por completar (' + l.length + '):</b> falta fecha de ingreso (para calcular vacaciones) y/o salario. ' +
+    l.map(c => '<span class="segChip" style="cursor:pointer" onclick="rhEditarCol(\'' + escJs(c.id) + '\')">' + esc(c.nombre) + (!c.ingreso ? ' · sin ingreso' : '') + (!c.salario ? ' · sin salario' : '') + '</span>').join('') + '</div>';
+}
+
 function rhAvisoExigibles() {
   const l = (rhDatos.colaboradores || []).filter(c => c.activo && c.saldo.exigibles > 0).sort((a, b) => b.saldo.vencidos - a.saldo.vencidos || b.saldo.exigibles - a.saldo.exigibles);
   if (!l.length) return '';
@@ -6091,13 +6099,13 @@ function notifRefrescarSiExiste() { try { if (typeof notifCargar === 'function')
 
 function rhRenderCol() {
   const l = rhDatos.colaboradores;
-  $('rhPCol').innerHTML = rhAvisoExigibles() + '<div class="toolbar"><button class="btn primary" onclick="rhEditarCol(\'\')">➕ Nuevo colaborador</button>' +
+  $('rhPCol').innerHTML = rhAvisoSinFicha() + rhAvisoExigibles() + '<div class="toolbar"><button class="btn primary" onclick="rhEditarCol(\'\')">➕ Nuevo colaborador</button>' +
     '<span style="font-size:12px;color:#777;margin-left:8px">Vacaciones: ' + rhDatos.semanasPeriodo + ' semanas laboradas = 2 semanas de vacaciones (10 días en semana de 5 días, 12 en semana de 6). Los salarios solo los ve el administrador.</span></div>' +
     '<div class="panel"><div class="panelHead"><h2>Colaboradores internos</h2><span style="font-size:12px;color:#777">' + l.length + '</span></div><div class="tableWrap">' +
     (!l.length ? '<div class="empty">Aún no hay colaboradores. Agrega el primero con su fecha de ingreso.</div>' :
       '<table class="table tblRh"><thead><tr><th>Colaborador</th><th>Usuario</th><th>Puesto</th><th>Ingreso</th><th>Salario</th><th>Devengadas</th><th>Tomadas</th><th>Saldo</th><th>Por programar</th><th>Estado</th><th></th></tr></thead><tbody>' +
       l.map(c => '<tr' + (c.activo ? '' : ' style="opacity:.55"') + '><td><b>' + esc(c.nombre) + '</b></td><td>' + (c.usuario ? esc(c.usuario) : '<span class="muted">sin usuario</span>') + '</td><td>' + esc(c.puesto) + '</td>' +
-        '<td>' + esc(rhFecha(c.ingreso)) + '</td><td>' + colones(c.salario) + '<div style="font-size:11px;color:#888">' + esc(c.periodicidad) + '</div></td>' +
+        '<td>' + (c.ingreso ? esc(rhFecha(c.ingreso)) : '<span class="segBadge" style="background:#fff3cd;color:#8a6100">Falta ingreso</span>') + '</td><td>' + (c.salario ? colones(c.salario) : '<span class="segSinCarga">sin salario</span>') + '<div style="font-size:11px;color:#888">' + esc(c.periodicidad) + '</div></td>' +
         '<td>' + fmtN(c.saldo.devengado) + '</td><td>' + fmtN(c.saldo.tomadas + c.saldo.programadas) + '</td><td><b>' + fmtN(c.saldo.saldo) + '</b></td>' +
         '<td>' + (c.saldo.exigibles > 0 ? '<b style="color:' + (c.saldo.vencidos > 0 ? '#a31616' : '#b8860b') + '">' + fmtN(c.saldo.exigibles) + '</b>' + (c.saldo.vencidos > 0 ? '<div style="font-size:11px;color:#a31616">plazo vencido</div>' : '') : '<span class="segSinCarga">—</span>') + '</td>' +
         '<td>' + (c.activo ? '<span class="tag tag-active">Activo</span>' : '<span class="tag tag-inactive">Retirado</span>') + '</td>' +
@@ -12646,6 +12654,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 32 · 13-oct 20:00</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 33 · 13-oct 20:30</div>
 </body>
 </html>
