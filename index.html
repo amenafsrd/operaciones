@@ -6493,7 +6493,7 @@ function mostrarVista(v, forzar) {
 /* =========================================================
    PAGO A MÓVILES (solo administración)
    ========================================================= */
-let pmD = null, pmS = null, pmSemId = '', pmVista = 'res', pmTabAct = 'sem', pmImp = null;
+let pmD = null, pmS = null, pmSemId = '', pmVista = 'res', pmTabAct = 'sem', pmImp = null, pmVer = null;
 const pmM = n => '₡' + (Number(n) || 0).toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const pmFh = iso => iso ? iso.split('-').reverse().join('/') : '—';
 function pmModal(h, w) { $('pmModal').innerHTML = h; $('pmModal').style.maxWidth = (w || 640) + 'px'; $('pmModalBg').classList.add('show'); }
@@ -6526,7 +6526,7 @@ function pmRenderSemanas() {
   $('pmPSem').innerHTML = h + '</div></div>';
 }
 async function pmAbrir(id) {
-  pmSemId = id; $('pmPSem').innerHTML = '<div class="loading">Cargando semana...</div>';
+  pmSemId = id; pmVer = null; $('pmPSem').innerHTML = '<div class="loading">Cargando semana...</div>';
   try { pmS = await api('obtenerSemanaPmWeb', id); pmRenderSemana(); }
   catch (e) { pmSemId = ''; pmRenderSemanas(); mostrarError(e, 'No se pudo abrir la semana.'); }
 }
@@ -6543,13 +6543,15 @@ function pmRenderSemana() {
     [['Órdenes', T.nOrdenes], ['Costo detalle', pmM(T.detalle)], ['UF Telecable', pmM(T.uf)], ['Margen (UF − costo)', pmM(margen)], ['Total facturado', pmM(T.totalFacturado)], ['Total a depositar', pmM(T.deposito)]]
       .map(x => '<div><div style="color:#667;font-size:11px">' + x[0] + '</div><b style="font-size:15px">' + x[1] + '</b></div>').join('') + '</div></div>';
   if (S.diferencias || S.sinLista) h += '<div class="panel" style="padding:10px 14px;font-size:13px;background:#fff8e1">' + (S.diferencias ? '⚠ <b>' + S.diferencias + '</b> orden(es) con costo distinto a la lista de precios. ' + (cerr ? '' : '<button class="btn secondary" onclick="pmAplicarLista()">Aplicar precio de lista</button> ') : '') + (S.sinLista ? '<span style="color:#666">' + S.sinLista + ' orden(es) con un servicio que la lista no reconoce (se usa el costo del archivo).</span>' : '') + '</div>';
-  h += '<div class="subtabs">' + tb('res', 'Pago por contratista') + tb('ord', 'Órdenes') + tb('ape', 'Apelaciones' + (S.apelaciones.some(a => a.estado === 'Pendiente') ? ' •' : '')) + tb('aju', 'Ajustes') + tb('ext', 'Adicionales') + tb('arc', 'Archivos') + '</div>';
+  h += '<div class="subtabs">' + tb('res', 'Pago por contratista') + tb('ord', 'Órdenes') + tb('cto', 'Contratos') + tb('ape', 'Apelaciones' + (S.apelaciones.some(a => a.estado === 'Pendiente') ? ' •' : '')) + tb('aju', 'Ajustes') + tb('ext', 'Adicionales') + tb('ver', 'Verificación') + tb('arc', 'Archivos') + '</div>';
   h += '<div class="panel"><div class="tableWrap">';
   if (pmVista === 'res') h += pmHtmlRes(cerr);
   if (pmVista === 'ord') h += pmHtmlOrd(cerr);
+  if (pmVista === 'cto') h += pmHtmlCto();
   if (pmVista === 'ape') h += pmHtmlApe(cerr);
   if (pmVista === 'aju') h += pmHtmlAju(cerr);
   if (pmVista === 'ext') h += pmHtmlExt(cerr);
+  if (pmVista === 'ver') h += pmHtmlVer();
   if (pmVista === 'arc') h += pmHtmlArc();
   $('pmPSem').innerHTML = h + '</div></div>';
 }
@@ -6558,7 +6560,7 @@ function pmHtmlRes(cerr) {
   const R = pmS.resumen, T = R.totales;
   if (!R.filas.length) return '<div class="loading">Sin datos.</div>';
   return '<table><thead><tr><th>Contratista</th><th>Móviles</th><th>Órd.</th><th>Detalle</th><th>Reclamos</th><th>Alquiler</th><th>Penaliz.</th><th>Camisas</th><th>Subtotal</th><th>IVA</th><th>Facturado</th><th>Rebajos</th><th>Depósito</th><th>Factura</th><th>Pagado</th><th></th></tr></thead><tbody>' +
-    R.filas.map((f, i) => '<tr' + (f.sinContratista ? ' style="background:#fdecea"' : '') + '><td><b>' + esc(f.nombre) + '</b>' + (f.sinContratista ? '<br><span style="font-size:11px;color:#9b1c1c">Móvil sin contratista: créalo en la pestaña Contratistas</span>' : (!/^\d{20}$/.test(f.iban || '') ? '<br><span style="font-size:11px;color:#9b1c1c">Falta IBAN</span>' : '')) + '</td><td>' + Object.keys(f.moviles).join(', ') + '</td><td>' + f.nOrdenes + '</td><td>' + pmM(f.detalle) + '</td><td>' + (f.reclamos ? pmM(f.reclamos) : '') + '</td><td>' + (f.alquileres ? pmM(f.alquileres) : '') + '</td><td>' + (f.penalizaciones ? pmM(f.penalizaciones) : '') + '</td><td>' + (f.camisas ? pmM(f.camisas) : '') + '</td><td>' + pmM(f.subtotal) + '</td><td>' + (f.aplicaIva ? pmM(f.iva) : '<span style="color:#888">sin IVA</span>') + '</td><td>' + pmM(f.totalFacturado) + '</td><td>' + (f.deducciones ? pmM(f.deducciones) : '') + '</td><td><b>' + pmM(f.deposito) + '</b></td><td>' + (f.sinContratista ? '' : '<input style="width:118px" value="' + esc(f.factura) + '" ' + (cerr ? 'disabled' : '') + ' onchange="pmGuardarFactura(\'' + f.idCon + '\',this.value)" placeholder="N.º factura">') + '</td><td>' + (f.pagado ? '<span class="chip verde">' + esc(pmFh(f.pagado)) + '</span>' : (f.sinContratista ? '' : '<span style="color:#999">—</span>')) + '</td><td>' + (f.sinContratista ? '' : '<button class="btn secondary" title="Estado de cuenta" onclick="pmEstadoCuenta(\'' + f.idCon + '\')">📄</button>') + '</td></tr>').join('') +
+    R.filas.map((f, i) => '<tr' + (f.sinContratista ? ' style="background:#fdecea"' : '') + '><td><b>' + esc(f.nombre) + '</b>' + (f.fueraPlazo ? '<br><span class="chip rojo">Salió ' + esc(pmFh(f.salida)) + ': pasó el plazo de 2 semanas</span>' : (f.estadoSis === 'inactiva' ? '<br><span class="chip amar">Salió ' + esc(pmFh(f.salida)) + ' · paga hasta ' + esc(pmFh(f.plazoHasta)) + '</span>' : '')) + (f.sinContratista ? '<br><span style="font-size:11px;color:#9b1c1c">Móvil sin contratista: créalo en la pestaña Contratistas</span>' : (!/^\d{20}$/.test(f.iban || '') ? '<br><span style="font-size:11px;color:#9b1c1c">Falta IBAN</span>' : '')) + '</td><td>' + Object.keys(f.moviles).join(', ') + '</td><td>' + f.nOrdenes + '</td><td>' + pmM(f.detalle) + '</td><td>' + (f.reclamos ? pmM(f.reclamos) : '') + '</td><td>' + (f.alquileres ? pmM(f.alquileres) : '') + '</td><td>' + (f.penalizaciones ? pmM(f.penalizaciones) : '') + '</td><td>' + (f.camisas ? pmM(f.camisas) : '') + '</td><td>' + pmM(f.subtotal) + '</td><td>' + (f.aplicaIva ? pmM(f.iva) : '<span style="color:#888">sin IVA</span>') + '</td><td>' + pmM(f.totalFacturado) + '</td><td>' + (f.deducciones ? pmM(f.deducciones) : '') + '</td><td><b>' + pmM(f.deposito) + '</b></td><td>' + (f.sinContratista ? '' : '<input style="width:118px" value="' + esc(f.factura) + '" ' + (cerr ? 'disabled' : '') + ' onchange="pmGuardarFactura(\'' + f.idCon + '\',this.value)" placeholder="N.º factura">') + '</td><td>' + (f.pagado ? '<span class="chip verde">' + esc(pmFh(f.pagado)) + '</span>' : (f.sinContratista ? '' : '<span style="color:#999">—</span>')) + '</td><td>' + (f.sinContratista ? '' : '<button class="btn secondary" title="Estado de cuenta" onclick="pmEstadoCuenta(\'' + f.idCon + '\')">📄</button>') + '</td></tr>').join('') +
     '<tr style="font-weight:700;background:#f3f6fa"><td>Total</td><td></td><td>' + T.nOrdenes + '</td><td>' + pmM(T.detalle) + '</td><td>' + pmM(T.reclamos) + '</td><td>' + pmM(T.alquileres) + '</td><td>' + pmM(T.penalizaciones) + '</td><td>' + pmM(T.camisas) + '</td><td>' + pmM(T.subtotal) + '</td><td>' + pmM(T.iva) + '</td><td>' + pmM(T.totalFacturado) + '</td><td>' + pmM(T.deducciones) + '</td><td>' + pmM(T.deposito) + '</td><td></td><td></td><td></td></tr></tbody></table>';
 }
 async function pmGuardarFactura(idCon, v) {
@@ -6578,6 +6580,8 @@ function pmOrdFiltradas() {
     if (pmOF.est === 'sin' && o.costoLista !== null) return false;
     if (pmOF.est === 'manual' && !o.manual) return false;
     if (pmOF.est === 'sel' && !pmSel.has(o.id)) return false;
+    if (pmOF.est === 'sinseg' && pmVer && pmVer.porOrden[o.id] && pmVer.porOrden[o.id].seg) return false;
+    if (pmOF.est === 'sinmat' && pmVer && pmVer.porOrden[o.id] && pmVer.porOrden[o.id].mat) return false;
     return true;
   });
 }
@@ -6591,16 +6595,16 @@ function pmHtmlOrd(cerr) {
     '<input id="pmFq" placeholder="Buscar contrato, cliente o servicio" style="min-width:220px" value="' + esc(pmOF.q) + '" onkeydown="if(event.key===\'Enter\'){pmOF.q=this.value;pmPag=0;pmRenderSemana()}" onchange="pmOF.q=this.value;pmPag=0;pmRenderSemana()">' +
     sel('pmFm', [['', 'Todas las móviles']].concat(moviles.map(m => [m, 'Móvil ' + m])), pmOF.movil, "pmOF.movil=this.value;pmPag=0;pmRenderSemana()") +
     sel('pmFs', [['', 'Todos los servicios']].concat(servs.map(m => [m, m])), pmOF.serv, "pmOF.serv=this.value;pmPag=0;pmRenderSemana()") +
-    sel('pmFe', [['todas', 'Todas'], ['dif', 'Con diferencia vs lista'], ['sin', 'Sin precio en lista'], ['manual', 'Precio manual'], ['sel', 'Solo seleccionadas']], pmOF.est, "pmOF.est=this.value;pmPag=0;pmRenderSemana()") +
+    sel('pmFe', [['todas', 'Todas'], ['dif', 'Con diferencia vs lista'], ['sin', 'Sin precio en lista'], ['manual', 'Precio manual'], ['sel', 'Solo seleccionadas']].concat(pmVer ? [['sinseg', 'Sin seguimiento'], ['sinmat', 'Sin materiales']] : []), pmOF.est, "pmOF.est=this.value;pmPag=0;pmRenderSemana()") +
     '<span style="color:#667;font-size:12px">' + O.length + ' orden(es)</span>' + (cerr ? '' : '<span style="flex:1"></span><button class="btn secondary" onclick="pmOrdenModal()">➕ Agregar orden</button>') + '</div>';
   if (!cerr) {
     h += '<div style="padding:8px 12px;background:#eef4ff;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px"><b>' + pmSel.size + ' seleccionada(s)</b>' +
       '<button class="btn secondary" onclick="pmSelTodas()">Seleccionar las ' + O.length + ' filtradas</button><button class="btn secondary" onclick="pmSel.clear();pmRenderSemana()">Quitar selección</button>' +
       '<span style="flex:1"></span><button class="btn primary" ' + (pmSel.size ? '' : 'disabled') + ' onclick="pmLoteModal()">Cambiar tipo / precio de la selección</button></div>';
   }
-  h += '<table><thead><tr>' + (cerr ? '' : '<th><input type="checkbox" onclick="pmSelPag(this.checked)"></th>') + '<th>Fecha</th><th>Móvil</th><th>Contrato</th><th>Cliente</th><th>Servicio (Telecable)</th><th>Tipo aplicado</th><th>Cant.</th><th>Precio lista</th><th>Costo aplicado</th><th>UF</th><th></th></tr></thead><tbody>' +
+  h += '<table><thead><tr>' + (cerr ? '' : '<th><input type="checkbox" onclick="pmSelPag(this.checked)"></th>') + '<th>Fecha</th><th>Móvil</th><th>Contrato</th><th>Cliente</th><th>Servicio (Telecable)</th><th>Tipo aplicado</th><th>Cant.</th><th>Precio lista</th><th>Costo aplicado</th><th>UF</th>' + (pmVer ? '<th>Seguim.</th><th>Mat.</th>' : '') + '<th></th></tr></thead><tbody>' +
     vis.map(o => { const d = !o.manual && o.costoLista !== null && Math.abs(o.costoLista - o.costo) > 0.005;
-      return '<tr' + (d ? ' style="background:#fff3cd"' : (o.manual ? ' style="background:#eaf6ea"' : '')) + '>' + (cerr ? '' : '<td><input type="checkbox" ' + (pmSel.has(o.id) ? 'checked' : '') + ' onclick="pmSelUno(\'' + o.id + '\',this.checked)"></td>') + '<td>' + esc(pmFh(o.fecha)) + '</td><td>' + esc(o.movil) + '</td><td>' + esc(o.contrato) + '</td><td>' + esc(o.cliente) + '</td><td>' + esc(o.servicios) + (o.obs ? '<br><span style="font-size:11px;color:#667">' + esc(o.obs) + '</span>' : '') + '</td><td>' + (o.tipo ? esc(o.tipo) : '<span style="color:#999">según archivo</span>') + '</td><td>' + (o.cantidad || 1) + '</td><td>' + (o.costoLista === null ? '<span style="color:#999">—</span>' : pmM(o.costoLista)) + '</td><td>' + pmM(o.costo) + (o.manual ? ' <span class="chip verde">manual</span>' : '') + '</td><td>' + pmM(o.ufCosto) + '</td><td>' + (!cerr && /^Agregada manualmente/.test(o.obs) ? '<button class="btn secondary" onclick="pmQuitarOrden(\'' + o.id + '\')">✕</button>' : '') + '</td></tr>'; }).join('') + '</tbody></table>' +
+      return '<tr' + (d ? ' style="background:#fff3cd"' : (o.manual ? ' style="background:#eaf6ea"' : '')) + '>' + (cerr ? '' : '<td><input type="checkbox" ' + (pmSel.has(o.id) ? 'checked' : '') + ' onclick="pmSelUno(\'' + o.id + '\',this.checked)"></td>') + '<td>' + esc(pmFh(o.fecha)) + '</td><td>' + esc(o.movil) + '</td><td>' + esc(o.contrato) + '</td><td>' + esc(o.cliente) + '</td><td>' + esc(o.servicios) + (o.obs ? '<br><span style="font-size:11px;color:#667">' + esc(o.obs) + '</span>' : '') + '</td><td>' + (o.tipo ? esc(o.tipo) : '<span style="color:#999">según archivo</span>') + '</td><td>' + (o.cantidad || 1) + '</td><td>' + (o.costoLista === null ? '<span style="color:#999">—</span>' : pmM(o.costoLista)) + '</td><td>' + pmM(o.costo) + (o.manual ? ' <span class="chip verde">manual</span>' : '') + '</td><td>' + pmM(o.ufCosto) + '</td>' + (pmVer ? pmCeldasVer(o) : '') + '<td>' + (!cerr && /^Agregada manualmente/.test(o.obs) ? '<button class="btn secondary" onclick="pmQuitarOrden(\'' + o.id + '\')">✕</button>' : '') + '</td></tr>'; }).join('') + '</tbody></table>' +
     (pags > 1 ? '<div style="padding:8px 12px;display:flex;gap:8px;align-items:center"><button class="btn secondary" ' + (pmPag ? '' : 'disabled') + ' onclick="pmPag--;pmRenderSemana()">←</button> Página ' + (pmPag + 1) + ' de ' + pags + ' <button class="btn secondary" ' + (pmPag < pags - 1 ? '' : 'disabled') + ' onclick="pmPag++;pmRenderSemana()">→</button></div>' : '');
   return h;
 }
@@ -6638,7 +6642,7 @@ function pmHtmlApe(cerr) {
   return h + '<table><thead><tr><th>Tipo</th><th>Contratista</th><th>Contrato</th><th>Servicio</th><th>Monto</th><th>Motivo</th><th>Estado</th><th></th></tr></thead><tbody>' + A.map(a => '<tr><td>' + (a.tipo === 'FALTANTE' ? 'Orden faltante' : 'Precio') + '</td><td>' + esc(pmConNombre(a.idCon)) + (a.movil ? ' · M' + esc(a.movil) : '') + '</td><td>' + esc(a.contrato) + '</td><td>' + esc(a.servicio) + (a.cantidad > 1 ? ' ×' + a.cantidad : '') + '</td><td>' + pmM(a.monto) + '</td><td>' + esc(a.motivo) + '<br><span style="font-size:11px;color:#667">' + esc(a.creadoPor) + '</span></td><td>' + (a.estado === 'Pendiente' ? '<span class="chip amar">Pendiente</span>' : a.estado === 'Aprobada' ? '<span class="chip verde">Aprobada ' + pmM(a.montoAprobado) + '</span>' : '<span class="chip rojo">Rechazada</span>') + (a.resolucion ? '<br><span style="font-size:11px;color:#667">' + esc(a.resolucion) + '</span>' : '') + '</td><td>' + (a.estado === 'Pendiente' && !cerr ? '<button class="btn secondary" onclick="pmApeResolver(\'' + a.id + '\',' + a.monto + ')">Resolver</button>' : '') + '</td></tr>').join('') + '</tbody></table>';
 }
 function pmApeModal(tipo) {
-  const cons = pmD.contratistas.filter(c => c.activo);
+  const cons = pmD.contratistas;
   const act = pmD.precios.filter(p => p.activo);
   pmModal('<h3>' + (tipo === 'FALTANTE' ? 'Orden que no está en el archivo' : 'Apelar precio de una orden') + '</h3><input type="hidden" id="paTipoA" value="' + tipo + '"><div style="display:grid;gap:8px"><label>Contratista<select id="paCon2">' + cons.map(c => '<option value="' + c.id + '">' + esc(c.nombre) + (c.moviles ? ' (' + esc(c.moviles) + ')' : '') + '</option>').join('') + '</select></label><label>Móvil<input id="paMov2"></label><label>Contrato<input id="paCto2"></label><label>Servicio / tipo de OT<select id="paSrv2"><option value="">—</option>' + act.map(p => '<option value="' + esc(p.servicio) + '">' + esc(p.servicio) + ' · ' + pmM(p.precio) + '</option>').join('') + '</select></label><label>Monto que se reclama (₡)<input id="paMon2" type="number" step="0.01"></label><label>Motivo<textarea id="paMot2" rows="3" maxlength="400"></textarea></label></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn secondary" onclick="pmCerrar()">Cancelar</button><button class="btn primary" onclick="pmApeGuardar()">Crear apelación</button></div>');
   $('paSrv2').onchange = () => { const p = pmD.precios.find(x => x.servicio === $('paSrv2').value); if (p && !$('paMon2').value) $('paMon2').value = p.precio; };
@@ -6653,6 +6657,46 @@ function pmApeResolver(id, monto) {
 async function pmApeFin(id, est) {
   try { await api('resolverApelacionPmWeb', id, est, $('prNota').value, $('prMon').value); pmCerrar(); await pmRecargar(); toast('Apelación ' + est.toLowerCase() + '.'); }
   catch (e) { mostrarError(e, 'No se pudo resolver.'); }
+}
+
+
+/* ---------- Verificación contra Seguimiento y materiales ---------- */
+function pmCeldasVer(o) {
+  const v = pmVer.porOrden[o.id] || { seg: '', mat: false };
+  const sg = v.seg ? (v.seg === 'FINALIZADA' ? '<span style="color:#2d5a1b">✔</span>' : '<span title="' + esc(v.seg) + '" style="color:#b26a00">' + esc(v.seg.slice(0, 5).toLowerCase()) + '</span>') : '<span style="color:#9b1c1c">✖</span>';
+  return '<td>' + sg + '</td><td>' + (v.mat ? '<span style="color:#2d5a1b">✔</span>' : '<span style="color:#9b1c1c">✖</span>') + '</td>';
+}
+function pmHtmlVer() {
+  let h = '<div style="padding:12px;display:grid;gap:10px"><div style="font-size:13px;color:#555">Cruza las órdenes de esta semana con <b>Seguimiento</b> y con el <b>reporte de consumo de materiales</b> (por número de orden; si el archivo no lo trae, por contrato). También muestra las OT finalizadas en Seguimiento o con materiales que <b>no vienen en el pago</b>, para reclamarlas a Telecable.</div><div><button class="btn primary" onclick="pmVerificar()">🔍 Verificar semana ' + esc(pmFh(pmS.semana.desde)) + ' al ' + esc(pmFh(pmS.semana.hasta)) + '</button></div>';
+  if (!pmVer) return h + '</div>';
+  const R = pmVer.resumen;
+  h += '<div style="display:flex;gap:18px;flex-wrap:wrap">' + [['Órdenes del pago', R.ordenes, ''], ['Sin seguimiento', R.sinSeguimiento, R.sinSeguimiento ? 'rojo' : ''], ['En seguimiento sin finalizar', R.noFinalizadasEnSeg, R.noFinalizadasEnSeg ? 'amar' : ''], ['Sin materiales', R.sinMateriales, R.sinMateriales ? 'amar' : ''], ['Posibles reclamos (no pagadas)', R.noPagadas, R.noPagadas ? 'rojo' : 'verde']]
+    .map(x => '<div><div style="color:#667;font-size:11px">' + x[0] + '</div><b style="font-size:17px">' + x[1] + '</b></div>').join('') + '</div>';
+  if (!pmVer.usaNumeroOrden) h += '<div style="font-size:12px;background:#fff8e1;padding:8px;border-radius:6px">Este archivo no trae el número de orden, así que se cruzó por contrato (menos preciso). Con el archivo de facturación de Telecable se cruza por número de orden.</div>';
+  h += '<h3 style="margin:6px 0 0">OT finalizadas o con materiales que no están en el pago</h3>';
+  if (!pmVer.noPagadas.length) h += '<div style="color:#2d5a1b">No se encontraron: todo lo finalizado en Seguimiento y con materiales viene en el pago.</div>';
+  else h += '<div><button class="btn secondary" onclick="pmVerExcel()">⬇ Descargar para el reclamo (Excel)</button></div><div class="tableWrap"><table><thead><tr><th>Fecha</th><th>Móvil</th><th>N.º orden</th><th>Contrato</th><th>Servicio</th><th>Seguimiento</th><th>Materiales</th><th></th></tr></thead><tbody>' + pmVer.noPagadas.map((o, i) => '<tr><td>' + esc(pmFh(o.fecha)) + '</td><td>' + esc(o.movil) + '</td><td>' + esc(o.nOrden) + '</td><td>' + esc(o.contrato) + '</td><td>' + esc(o.servicio) + '</td><td>' + (o.enSeg ? esc((o.estado || '').toLowerCase()) : '<span style="color:#9b1c1c">no</span>') + '</td><td>' + (o.enMat ? '✔' : '—') + '</td><td>' + (pmS.semana.estado === 'Cerrada' ? '' : '<button class="btn secondary" onclick="pmVerApelar(' + i + ')">Apelar</button>') + '</td></tr>').join('') + '</tbody></table></div>';
+  return h + '</div>';
+}
+async function pmVerificar() {
+  try { toast('Verificando...'); pmVer = await api('verificarSemanaPmWeb', pmSemId); pmRenderSemana(); }
+  catch (e) { mostrarError(e, 'No se pudo verificar.'); }
+}
+function pmVerApelar(i) {
+  const o = pmVer.noPagadas[i], m = String(Number(o.movil) || o.movil);
+  pmApeModal('FALTANTE');
+  const c = pmD.contratistas.find(x => String(x.moviles || '').split(',').indexOf(m) >= 0); if (c) $('paCon2').value = c.id;
+  $('paMov2').value = m; $('paCto2').value = o.contrato;
+  const p = pmD.precios.find(x => x.servicio.toLowerCase() === String(o.servicio).toLowerCase()); if (p) { $('paSrv2').value = p.servicio; $('paMon2').value = p.precio; }
+  $('paMot2').value = 'OT ' + (o.nOrden || o.contrato) + ' finalizada en Seguimiento' + (o.enMat ? ' y con materiales reportados' : '') + ' que no viene en el pago.';
+}
+async function pmVerExcel() {
+  try {
+    await cargarLib('xlsx', SEG_URL_XLSX);
+    const filas = [['Fecha', 'Móvil', 'N.º orden', 'Contrato', 'Servicio', 'En seguimiento', 'Con materiales']].concat(pmVer.noPagadas.map(o => [o.fecha, o.movil, o.nOrden, o.contrato, o.servicio, o.enSeg ? o.estado : 'No', o.enMat ? 'Sí' : 'No']));
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(filas), 'Reclamo');
+    XLSX.writeFile(wb, 'Reclamo_OT_no_pagadas_' + pmS.semana.desde + '_' + pmS.semana.hasta + '.xlsx');
+  } catch (e) { mostrarError(e, 'No se pudo generar el Excel.'); }
 }
 
 /* ---------- Registro de pago ---------- */
@@ -6681,7 +6725,7 @@ function pmHtmlAju(cerr) {
     return '<tr><td>' + esc(pmConNombre(a.idCon)) + '</td><td>' + esc(t.txt) + '</td><td>' + esc(a.detalle) + '</td><td>' + esc(a.contrato) + '</td><td style="color:' + (t.signo > 0 ? '#2d5a1b' : '#9b1c1c') + '">' + (t.signo > 0 ? '+' : '−') + pmM(a.monto) + '</td><td>' + (cerr ? '' : '<button class="btn secondary" onclick="pmEliminarAjuste(\'' + a.id + '\')">✕</button>') + '</td></tr>'; }).join('') + '</tbody></table>';
 }
 function pmAjusteModal() {
-  const cons = pmD.contratistas.filter(c => c.activo);
+  const cons = pmD.contratistas;
   pmModal('<h3>Nuevo ajuste</h3><div style="display:grid;gap:8px"><label>Contratista<select id="paCon">' + cons.map(c => '<option value="' + c.id + '">' + esc(c.nombre) + (c.moviles ? ' (' + esc(c.moviles) + ')' : '') + '</option>').join('') + '</select></label>' +
     '<label>Tipo<select id="paTipo" onchange="pmAjusteTipo()">' + Object.keys(pmD.tipos).map(k => '<option value="' + k + '">' + esc(pmD.tipos[k].txt) + '</option>').join('') + '</select></label>' +
     '<label id="paPenL" style="display:none">Penalización de la lista<select id="paPen" onchange="pmAjustePen()"><option value="">—</option>' + pmD.penalizaciones.map((p, i) => '<option value="' + i + '">' + esc(p.nombre) + ' · ' + pmM(p.monto) + '</option>').join('') + '</select></label>' +
@@ -6741,11 +6785,11 @@ async function pmLeerArchivo(f) {
     if (tFact) {
       formato = 'facturación de Telecable (costo según tu lista de precios)';
       const enc = tFact.filas[0].map(x => String(x).trim().toLowerCase());
-      const c = { contrato: ix(enc, 'contrato'), cliente: ix(enc, 'cliente'), fecha: ix(enc, 'fecha'), serv: ix(enc, 'servicio'), cant: ix(enc, 'cantidad'), monto: ix(enc, 'monto'), movil: ix(enc, 'móvil') >= 0 ? ix(enc, 'móvil') : ix(enc, 'movil') };
+      const c = { contrato: ix(enc, 'contrato'), cliente: ix(enc, 'cliente'), fecha: ix(enc, 'fecha'), serv: ix(enc, 'servicio'), cant: ix(enc, 'cantidad'), monto: ix(enc, 'monto'), orden: ix(enc, 'orden'), movil: ix(enc, 'móvil') >= 0 ? ix(enc, 'móvil') : ix(enc, 'movil') };
       tFact.filas.slice(1).forEach(r => {
         if (r[c.contrato] === '' || !String(r[c.movil]).trim() || !String(r[c.serv]).trim()) return;
         const fe = pmISO(r[c.fecha]); if (fe) fechas.push(fe);
-        ord.push({ contrato: String(r[c.contrato]), cliente: r[c.cliente], servicios: String(r[c.serv]).trim(), cantidad: c.cant >= 0 ? r[c.cant] : 1, costo: '', movil: r[c.movil], fecha: fe, ufServicio: String(r[c.serv]).trim(), ufCosto: +r[c.monto] || 0 });
+        ord.push({ contrato: String(r[c.contrato]), orden: c.orden >= 0 ? String(r[c.orden] || '') : '', cliente: r[c.cliente], servicios: String(r[c.serv]).trim(), cantidad: c.cant >= 0 ? r[c.cant] : 1, costo: '', movil: r[c.movil], fecha: fe, ufServicio: String(r[c.serv]).trim(), ufCosto: +r[c.monto] || 0 });
       });
     } else {
       const tOrd = hojaDe(e => ix(e, 'contrato') >= 0 && ix(e, 'servicios') >= 0 && ix(e, 'costo') >= 0 && ix(e, 'movil') >= 0);
@@ -6779,13 +6823,6 @@ async function pmImportarGuardar() {
 }
 
 /* ---------- Contratistas ---------- */
-function pmRenderCon() {
-  const C = pmD.contratistas;
-  let h = '<div class="toolbar"><button class="btn primary" onclick="pmConModal()">➕ Nuevo contratista</button><button class="btn secondary" onclick="pmImportarConModal()">⬆ Importar desde la hoja «Pago»</button></div><div class="panel"><div class="panelHead"><h2>Contratistas</h2><span>' + C.length + '</span></div><div class="tableWrap">';
-  if (!C.length) h += '<div class="loading">Importa la hoja «Pago» de tu Excel para cargar nombres, IBAN y móviles de una vez.</div>';
-  else h += '<table><thead><tr><th>Nombre</th><th>Móviles</th><th>IBAN</th><th>Cédula</th><th>IVA</th><th>Estado</th><th></th></tr></thead><tbody>' + C.map(c => '<tr><td><b>' + esc(c.nombre) + '</b></td><td>' + esc(c.moviles) + '</td><td>' + (c.iban ? esc(c.iban) : '<span style="color:#9b1c1c">Falta</span>') + '</td><td>' + esc(c.cedula) + '</td><td>' + (c.aplicaIva ? '13%' : 'Sin IVA') + '</td><td>' + (c.activo ? 'Activo' : 'Inactivo') + '</td><td style="text-align:right"><button class="btn secondary" onclick="pmConModal(\'' + c.id + '\')">Editar</button></td></tr>').join('') + '</tbody></table>';
-  $('pmPCon').innerHTML = h + '</div></div>';
-}
 function pmConModal(id) {
   const c = pmD.contratistas.find(x => x.id === id) || { nombre: '', cedula: '', iban: '', moviles: '', aplicaIva: true, telefono: '', correo: '', obs: '', activo: true };
   pmModal('<h3>' + (id ? 'Editar' : 'Nuevo') + ' contratista</h3><div style="display:grid;gap:8px"><label>Nombre o razón social (como sale en el banco)<input id="pcNom" value="' + esc(c.nombre) + '" maxlength="100"></label><label>Móviles (separadas por coma, ej. 111,112)<input id="pcMov" value="' + esc(c.moviles) + '"></label><label>Cuenta IBAN (20 dígitos, sin «CR»)<input id="pcIban" value="' + esc(c.iban) + '" maxlength="26"></label><label>Cédula<input id="pcCed" value="' + esc(c.cedula) + '"></label><label>Teléfono<input id="pcTel" value="' + esc(c.telefono) + '"></label><label>Correo<input id="pcCor" value="' + esc(c.correo) + '"></label><label><input type="checkbox" id="pcIva"' + (c.aplicaIva ? ' checked' : '') + '> Factura con IVA (13%)</label><label><input type="checkbox" id="pcAct"' + (c.activo ? ' checked' : '') + '> Activo</label></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn secondary" onclick="pmCerrar()">Cancelar</button><button class="btn primary" onclick="pmConGuardar(\'' + (id || '') + '\')">Guardar</button></div>');
@@ -6819,17 +6856,105 @@ async function pmImportarConGuardar() {
   catch (e) { mostrarError(e, 'No se pudo importar.'); }
 }
 
-/* ---------- Lista de precios ---------- */
+/* ---------- Lista de precios (costo TC y costo para el contratista) ---------- */
 function pmRenderPre() {
-  let h = '<div class="toolbar"><button class="btn secondary" onclick="pmPreAgregar()">➕ Agregar fila</button><button class="btn primary" onclick="pmPreGuardar()">💾 Guardar lista</button></div><div class="panel"><div class="panelHead"><h2>Lista de precios (lo que se paga a las móviles)</h2></div><div style="padding:8px 12px;font-size:12px;color:#667">El «alias» es el nombre con que Telecable escribe el servicio en el Excel; varios alias se separan con «|». Con eso el sistema detecta diferencias entre el costo del archivo y esta lista.</div><div class="tableWrap"><table id="pmPreTb"><thead><tr><th>Servicio</th><th>Precio</th><th>Alias en el Excel</th><th>Activo</th><th></th></tr></thead><tbody>' +
+  let h = '<div class="toolbar"><button class="btn secondary" onclick="pmPreAgregar()">➕ Agregar fila</button><button class="btn primary" onclick="pmPreGuardar()">💾 Guardar lista</button></div><div class="panel"><div class="panelHead"><h2>Lista de precios</h2></div><div style="padding:8px 12px;font-size:12px;color:#667"><b>Costo TC</b> es lo que Telecable le paga a SRD; <b>Costo contratista</b> es lo que SRD le paga a la móvil. El «alias» es el nombre con que Telecable escribe el servicio en su Excel (varios se separan con «|»); con eso el sistema reconoce el servicio y detecta diferencias.</div><div class="tableWrap"><table id="pmPreTb"><thead><tr><th>Servicio</th><th>Costo TC</th><th>Costo contratista</th><th>Margen</th><th>Alias en el Excel</th><th>Activo</th><th></th></tr></thead><tbody>' +
     pmD.precios.map(p => pmPreFila(p)).join('') + '</tbody></table></div></div>';
   $('pmPPre').innerHTML = h;
 }
-function pmPreFila(p) { return '<tr><td><input style="width:100%;min-width:220px" value="' + esc(p.servicio) + '"></td><td><input type="number" step="0.01" style="width:100px" value="' + p.precio + '"></td><td><input style="width:100%;min-width:220px" value="' + esc(p.alias) + '"></td><td><input type="checkbox"' + (p.activo ? ' checked' : '') + '></td><td><button class="btn secondary" onclick="this.closest(\'tr\').remove()">✕</button></td></tr>'; }
-function pmPreAgregar() { $('pmPreTb').tBodies[0].insertAdjacentHTML('beforeend', pmPreFila({ servicio: '', precio: 0, alias: '', activo: true })); }
+function pmPreFila(p) { return '<tr><td><input style="width:100%;min-width:220px" value="' + esc(p.servicio) + '"></td><td><input type="number" step="0.01" style="width:100px" value="' + (p.precioTc || 0) + '" oninput="pmPreMargen(this)"></td><td><input type="number" step="0.01" style="width:100px" value="' + p.precio + '" oninput="pmPreMargen(this)"></td><td class="pmMg" style="white-space:nowrap">' + ((p.precioTc || 0) > 0 ? pmM((p.precioTc || 0) - p.precio) : '—') + '</td><td><input style="width:100%;min-width:200px" value="' + esc(p.alias) + '"></td><td><input type="checkbox"' + (p.activo ? ' checked' : '') + '></td><td><button class="btn secondary" onclick="this.closest(\'tr\').remove()">✕</button></td></tr>'; }
+function pmPreMargen(el) { const i = el.closest('tr').querySelectorAll('input'); el.closest('tr').querySelector('.pmMg').textContent = (+i[1].value || 0) > 0 ? pmM((+i[1].value || 0) - (+i[2].value || 0)) : '—'; }
+function pmPreAgregar() { $('pmPreTb').tBodies[0].insertAdjacentHTML('beforeend', pmPreFila({ servicio: '', precio: 0, precioTc: 0, alias: '', activo: true })); }
 async function pmPreGuardar() {
-  const lista = Array.from($('pmPreTb').tBodies[0].rows).map(r => { const i = r.querySelectorAll('input'); return { servicio: i[0].value, precio: i[1].value, alias: i[2].value, activo: i[3].checked }; });
+  const lista = Array.from($('pmPreTb').tBodies[0].rows).map(r => { const i = r.querySelectorAll('input'); return { servicio: i[0].value, precioTc: i[1].value, precio: i[2].value, alias: i[3].value, activo: i[4].checked }; });
   try { await api('guardarPreciosPmWeb', lista); pmD = await api('obtenerPmWeb'); pmRenderPre(); toast('Lista guardada.'); } catch (e) { mostrarError(e, 'No se pudo guardar.'); }
+}
+
+/* ---------- Contratistas (ligados a las móviles del sistema) ---------- */
+let pmConFiltro = 'vigentes';
+function pmConEstadoHtml(c) {
+  if (c.estadoSis === 'activa') return '<span class="chip verde">Móvil activa</span>';
+  if (c.estadoSis === 'inactiva') return c.plazoHasta >= (pmD.hoy || '') ? '<span class="chip amar">Salió ' + esc(pmFh(c.salida)) + ' · paga hasta ' + esc(pmFh(c.plazoHasta)) + '</span>' : '<span class="chip rojo">Salió ' + esc(pmFh(c.salida)) + ' · plazo vencido</span>';
+  return '<span class="chip azul" title="Ninguna de sus móviles está en el módulo Móviles">Sin vínculo</span>';
+}
+function pmRenderCon() {
+  const hoy = pmD.hoy || '';
+  const vig = c => c.estadoSis === 'activa' || (c.estadoSis === 'inactiva' && c.plazoHasta >= hoy) || c.estadoSis === 'desconocida';
+  const C = pmD.contratistas.filter(c => pmConFiltro === 'todos' ? true : (pmConFiltro === 'vigentes' ? vig(c) : !vig(c)));
+  let h = '<div class="toolbar"><button class="btn primary" onclick="pmConModal()">➕ Nuevo contratista</button><button class="btn secondary" onclick="pmSugerirModal()">📋 Traer desde Móviles</button><button class="btn secondary" onclick="pmImportarConModal()">⬆ Importar desde la hoja «Pago»</button><span style="flex:1"></span><label>Ver <select onchange="pmConFiltro=this.value;pmRenderCon()">' + [['vigentes', 'Activos y en plazo de pago'], ['fuera', 'Fuera de plazo'], ['todos', 'Todos']].map(x => '<option value="' + x[0] + '"' + (pmConFiltro === x[0] ? ' selected' : '') + '>' + x[1] + '</option>').join('') + '</select></label></div><div class="panel"><div class="panelHead"><h2>Contratistas</h2><span>' + C.length + '</span></div><div style="padding:8px 12px;font-size:12px;color:#667">El estado sale del módulo Móviles: una móvil inactiva se sigue pagando hasta 2 semanas después de su salida.</div><div class="tableWrap">';
+  if (!C.length) h += '<div class="loading">No hay contratistas en esta vista. Usa «Traer desde Móviles» o importa la hoja «Pago» de tu Excel.</div>';
+  else h += '<table><thead><tr><th>Nombre</th><th>Móviles</th><th>Estado</th><th>IBAN</th><th>Cédula</th><th>IVA</th><th></th></tr></thead><tbody>' + C.map(c => '<tr><td><b>' + esc(c.nombre) + '</b></td><td>' + esc(c.moviles) + '</td><td>' + pmConEstadoHtml(c) + '</td><td>' + (c.iban ? esc(c.iban) : '<span style="color:#9b1c1c">Falta</span>') + '</td><td>' + esc(c.cedula) + '</td><td>' + (c.aplicaIva ? '13%' : 'Sin IVA') + '</td><td style="text-align:right"><button class="btn secondary" onclick="pmConModal(\'' + c.id + '\')">Editar</button></td></tr>').join('') + '</tbody></table>';
+  $('pmPCon').innerHTML = h + '</div></div>';
+}
+async function pmSugerirModal() {
+  try {
+    const L = await api('sugerirContratistasPmWeb');
+    if (!L.length) { toast('Todas las móviles activas ya tienen contratista.'); return; }
+    pmModal('<h3>Móviles sin contratista</h3><div style="font-size:13px;color:#555;margin-bottom:8px">Marca las que quieres crear. Se usa el nombre del técnico de la ficha; luego completa el IBAN en Editar.</div><div style="max-height:50vh;overflow:auto">' + L.map((m, i) => '<label style="display:flex;gap:8px;align-items:center;padding:3px 0"><input type="checkbox" class="psChk" data-i="' + i + '" checked> <b>Móvil ' + esc(m.movil) + '</b> <input class="psNom" data-i="' + i + '" style="flex:1" value="' + esc(m.tecnico || m.contrata) + '">' + (m.activa ? '' : '<span class="chip amar">salió ' + esc(pmFh(m.salida)) + '</span>') + '</label>').join('') + '</div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn secondary" onclick="pmCerrar()">Cancelar</button><button class="btn primary" onclick="pmSugerirCrear()">Crear los marcados</button></div>', 680);
+    window._pmSug = L;
+  } catch (e) { mostrarError(e, 'No se pudieron leer las móviles.'); }
+}
+async function pmSugerirCrear() {
+  const L = window._pmSug || []; let n = 0;
+  try {
+    for (const chk of Array.from(document.querySelectorAll('.psChk:checked'))) {
+      const i = +chk.dataset.i, m = L[i], nom = document.querySelector('.psNom[data-i="' + i + '"]').value.trim();
+      if (!nom) continue;
+      await api('guardarContratistaPmWeb', { nombre: nom, moviles: m.movil, cedula: m.cedula, aplicaIva: true }); n++;
+    }
+    pmCerrar(); pmD = await api('obtenerPmWeb'); pmRenderCon(); toast(n + ' contratista(s) creados. Completa su IBAN.');
+  } catch (e) { mostrarError(e, 'No se pudieron crear.'); }
+}
+
+/* ---------- Lista de contratos y corte por móvil ---------- */
+let pmCtoMovil = '', pmCtoQ = '';
+const pmR2 = n => Math.round((Number(n) || 0) * 100) / 100;
+function pmContratos() {
+  const m = {};
+  pmS.ordenes.forEach(o => {
+    if (pmCtoMovil && String(Number(o.movil)) !== pmCtoMovil) return;
+    const k = o.contrato + '|' + String(Number(o.movil));
+    const x = m[k] || (m[k] = { contrato: o.contrato, movil: String(Number(o.movil)), cliente: o.cliente, fecha: o.fecha, lineas: 0, servicios: [], costo: 0, uf: 0, ordenes: [] });
+    x.lineas++; x.servicios.push((o.tipo || o.servicios) + (o.cantidad > 1 ? ' ×' + o.cantidad : '')); x.costo += o.costo; x.uf += o.ufCosto; x.ordenes.push(o.nOrden || '');
+  });
+  const q = pmCtoQ.trim().toLowerCase();
+  return Object.keys(m).map(k => m[k]).filter(x => !q || (x.contrato + ' ' + x.cliente + ' ' + x.servicios.join(' ')).toLowerCase().indexOf(q) >= 0)
+    .sort((a, b) => Number(a.movil) - Number(b.movil) || a.fecha.localeCompare(b.fecha));
+}
+function pmHtmlCto() {
+  const L = pmContratos(), moviles = Array.from(new Set(pmS.ordenes.map(o => String(Number(o.movil))))).sort((a, b) => a - b);
+  const tc = L.reduce((a, x) => a + x.costo, 0), uf = L.reduce((a, x) => a + x.uf, 0);
+  return '<div style="padding:8px 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><input placeholder="Buscar contrato, cliente o servicio" style="min-width:220px" value="' + esc(pmCtoQ) + '" onchange="pmCtoQ=this.value;pmRenderSemana()"><select onchange="pmCtoMovil=this.value;pmRenderSemana()"><option value="">Todas las móviles</option>' + moviles.map(m => '<option value="' + m + '"' + (pmCtoMovil === m ? ' selected' : '') + '>Móvil ' + m + '</option>').join('') + '</select><span style="color:#667;font-size:12px">' + L.length + ' contrato(s) · costo ' + pmM(tc) + ' · UF ' + pmM(uf) + '</span><span style="flex:1"></span><button class="btn secondary" onclick="pmCortesExcel(pmCtoMovil)">⬇ Excel' + (pmCtoMovil ? ' de la móvil ' + pmCtoMovil : '') + '</button></div>' +
+    '<table><thead><tr><th>Móvil</th><th>Fecha</th><th>Contrato</th><th>Cliente</th><th>Servicios</th><th>Pago móvil</th><th>UF</th></tr></thead><tbody>' + L.slice(0, 500).map(x => '<tr><td>' + esc(x.movil) + '</td><td>' + esc(pmFh(x.fecha)) + '</td><td>' + esc(x.contrato) + '</td><td>' + esc(x.cliente) + '</td><td>' + esc(x.servicios.join(' + ')) + '</td><td>' + pmM(x.costo) + '</td><td>' + pmM(x.uf) + '</td></tr>').join('') + '</tbody></table>' + (L.length > 500 ? '<div class="loading">Se muestran 500 de ' + L.length + '. Filtra por móvil.</div>' : '');
+}
+function pmCortesMoviles() {
+  const m = {};
+  pmS.ordenes.forEach(o => { const k = String(Number(o.movil)); const x = m[k] || (m[k] = { movil: k, ordenes: [], costo: 0, uf: 0 }); x.ordenes.push(o); x.costo += o.costo; x.uf += o.ufCosto; });
+  return Object.keys(m).map(k => m[k]).sort((a, b) => a.movil - b.movil);
+}
+async function pmCortesExcel(movil) {
+  try {
+    await cargarLib('xlsx', SEG_URL_XLSX);
+    const C = pmCortesMoviles().filter(x => !movil || x.movil === String(movil));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['Móvil', 'Contratista', 'Órdenes', 'Pago a la móvil', 'UF Telecable', 'Margen']].concat(C.map(x => [x.movil, (pmS.resumen.filas.find(f => f.moviles[x.movil]) || {}).nombre || '', x.ordenes.length, pmR2(x.costo), pmR2(x.uf), pmR2(x.uf - x.costo)]))), 'Resumen');
+    C.forEach(x => XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['Fecha', 'Contrato', 'N.º orden', 'Cliente', 'Servicio (Telecable)', 'Tipo aplicado', 'Cant.', 'Pago móvil', 'UF']].concat(x.ordenes.map(o => [o.fecha, o.contrato, o.nOrden, o.cliente, o.servicios, o.tipo, o.cantidad || 1, o.costo, o.ufCosto])).concat([['TOTAL', '', '', '', '', '', '', pmR2(x.costo), pmR2(x.uf)]])), 'Móvil ' + x.movil));
+    XLSX.writeFile(wb, 'Corte_' + (movil ? 'movil_' + movil + '_' : 'moviles_') + pmS.semana.desde + '_' + pmS.semana.hasta + '.xlsx');
+  } catch (e) { mostrarError(e, 'No se pudo generar el Excel.'); }
+}
+function pmCortePdf(movil) {
+  const C = pmCortesMoviles().filter(x => !movil || x.movil === String(movil)), m = pmM, S = pmS;
+  if (!C.length) { toast('No hay órdenes de esa móvil.'); return; }
+  const cuerpo = C.map(x => {
+    const f = S.resumen.filas.find(r => r.moviles[x.movil]);
+    return '<div class="pg"><h1>Corte de la móvil ' + esc(x.movil) + '</h1><div class="sub">Soluciones Red Dorada SRL · Semana ' + esc(pmFh(S.semana.desde)) + ' al ' + esc(pmFh(S.semana.hasta)) + (f ? ' · ' + esc(f.nombre) : '') + '</div>' +
+      '<table class="k"><tr><td>Órdenes<b>' + x.ordenes.length + '</b></td><td>Pago a la móvil<b>' + m(x.costo) + '</b></td></tr></table>' +
+      '<table><thead><tr><th>Fecha</th><th>Contrato</th><th>Cliente</th><th>Servicio</th><th>Cant.</th><th>Pago</th></tr></thead><tbody>' + x.ordenes.map(o => '<tr><td>' + esc(pmFh(o.fecha)) + '</td><td>' + esc(o.contrato) + '</td><td>' + esc(o.cliente) + '</td><td>' + esc(o.tipo || o.servicios) + '</td><td>' + (o.cantidad || 1) + '</td><td>' + m(o.costo) + '</td></tr>').join('') + '<tr class="t"><td colspan="5">Total</td><td>' + m(x.costo) + '</td></tr></tbody></table></div>';
+  }).join('');
+  const html = '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Corte por móvil</title><style>body{font-family:Arial,Helvetica,sans-serif;color:#1d2433;margin:24px;font-size:11px}h1{font-size:18px;margin:0 0 4px;color:#0f1b2d}.sub{color:#556;margin-bottom:8px}table{border-collapse:collapse;width:100%;margin-bottom:6px}td,th{border:1px solid #cfd6df;padding:3px 6px;text-align:left}th{background:#eef2f7}tr.t td{font-weight:700;background:#f3f6fa}table.k td{font-size:11px;color:#556}table.k b{display:block;font-size:14px;color:#0f1b2d}.pg{page-break-after:always}.pg:last-child{page-break-after:auto}</style></head><body>' + cuerpo + '</body></html>';
+  const fr = document.createElement('iframe'); fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0'; document.body.appendChild(fr);
+  fr.onload = () => { try { fr.contentWindow.focus(); fr.contentWindow.print(); } catch (e) { toast('No se pudo abrir la impresión.'); } setTimeout(() => fr.remove(), 60000); };
+  fr.srcdoc = html;
 }
 
 /* ---------- Banco ---------- */
@@ -6846,6 +6971,7 @@ function pmHtmlArc() {
   return '<div style="padding:14px;display:grid;gap:14px;max-width:760px">' +
     '<div><h3 style="margin:0 0 4px">Archivo para el banco</h3><div style="font-size:12px;color:#667;margin-bottom:6px">Genera el .prn de pago de planillas y proveedores con los depósitos de esta semana' + (pmS.extras.length ? ' y las líneas adicionales' : '') + '. Antes de subirlo revisa el total.</div><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end"><label>Fecha de pago<input type="date" id="paFec" value="' + (pmD.hoy || '') + '"></label><label>N.º de envío<input type="number" id="paEnv" style="width:90px" value="' + (pmD.banco.ultimoEnvio + 1) + '"></label><button class="btn primary" onclick="pmBanco()">Generar archivo .prn</button></div><div id="pmBanOut" style="margin-top:8px"></div></div>' +
     '<div><h3 style="margin:0 0 4px">Resumen semanal</h3><div style="font-size:12px;color:#667;margin-bottom:6px">Excel con las hojas Detalle (por contratista) y Pago (depósitos), más las órdenes.</div><button class="btn secondary" onclick="pmResumenExcel()">⬇ Descargar Excel</button></div>' +
+    '<div><h3 style="margin:0 0 4px">Corte por móvil</h3><div style="font-size:12px;color:#667;margin-bottom:6px">Detalle de las órdenes de cada móvil con su pago (sin ajustes del contratista). Excel con una hoja por móvil, o PDF para imprimir.</div><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end"><label>Móvil<select id="pmCorteM"><option value="">Todas</option>' + pmCortesMoviles().map(x => '<option value="' + x.movil + '">' + x.movil + '</option>').join('') + '</select></label><button class="btn secondary" onclick="pmCortesExcel($(\'pmCorteM\').value)">⬇ Excel</button><button class="btn secondary" onclick="pmCortePdf($(\'pmCorteM\').value)">🖨 PDF</button></div></div>' +
     '<div><h3 style="margin:0 0 4px">Estados de cuenta</h3><div style="font-size:12px;color:#667;margin-bottom:6px">Un estado por contratista con sus órdenes, ajustes y depósito. Se abre para imprimir o guardar como PDF (todos juntos, una página cada uno).</div><button class="btn secondary" onclick="pmEstadoCuenta(\'\')">🖨 Todos los contratistas</button></div></div>';
 }
 async function pmBanco() {
@@ -13291,6 +13417,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 38 · 14-oct 00:20</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 40 · 14-oct 01:20</div>
 </body>
 </html>
