@@ -413,6 +413,18 @@
     .nav { flex-wrap: nowrap; }
     @media (max-width: 700px) { #userLabel { display: none; } }
     @media (max-width: 900px) { .tableWrap { max-height: none; } }
+    /* Pago a móviles: menús fijos, tablas compactas con scroll propio y encabezado fijo */
+    #pmTabs { position: sticky; top: var(--topH); z-index: 30; background: var(--fondo); padding: 6px 0 4px; margin-bottom: 6px; }
+    .pmT th { position: sticky; top: 0; z-index: 2; padding: 5px 7px; font-size: 11.5px; }
+    .pmT thead tr:nth-child(2) th { top: 27px; }
+    .pmT td { padding: 3px 7px; font-size: 11.5px; line-height: 1.25; }
+    .pmT input { padding: 4px 6px; font-size: 11.5px; }
+    #pmPSem.pmFlex { display: flex; flex-direction: column; height: calc(100vh - var(--topH) - 100px); min-height: 380px; }
+    #pmPSem.pmFlex > * { flex: none; }
+    #pmPSem.pmFlex > .pmFill { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; margin-bottom: 0; }
+    #pmPSem.pmFlex > .pmFill > .tableWrap { flex: 1 1 auto; min-height: 0; max-height: none; }
+    #pmPSem.pmFlex .toolbar { margin-bottom: 6px; }
+    @media (max-width: 900px) { #pmPSem.pmFlex { display: block; height: auto; } #pmPSem.pmFlex > .pmFill { display: block; } }
     /* =====================  MENÚ LATERAL  ===================== */
     :root { --sideW: 232px; --topH: 52px; }
     .top { height: var(--topH); box-sizing: border-box; padding: 0 16px; justify-content: space-between; }
@@ -6549,7 +6561,7 @@ function pmTab(t) {
 
 /* ---------- Semanas ---------- */
 function pmRenderSemanas() {
-  pmSemId = ''; pmS = null;
+  pmSemId = ''; pmS = null; $('pmPSem').classList.remove('pmFlex');
   let h = '<div class="toolbar"><button class="btn primary" onclick="pmImportarModal()">⬆ Importar semana de Telecable</button></div><div class="panel"><div class="panelHead"><h2>Semanas de pago</h2></div><div class="tableWrap">';
   if (!pmD.semanas.length) h += '<div class="loading">Aún no hay semanas. Importa el Excel «Pago servicios» que envía Telecable.</div>';
   else h += '<table class="pmT"><thead><tr><th>Semana</th><th>Estado</th><th>Pago estimado</th><th>Pagos hechos</th><th style="text-align:right">Depósito pendiente</th><th style="text-align:right">Órdenes</th><th style="text-align:right">Contratos</th><th>Precios</th><th style="text-align:right">Costo móviles (detalle)</th><th style="text-align:right">UF Telecable</th><th style="text-align:right">Margen</th><th></th></tr></thead><tbody>' +
@@ -6570,12 +6582,12 @@ function pmRenderSemana() {
   const tb = (v, t) => '<button class="' + (pmVista === v ? 'active' : '') + '" onclick="pmSub(\'' + v + '\')">' + t + '</button>';
   let h = '<div class="toolbar"><button class="btn secondary" onclick="pmRenderSemanas()">← Semanas</button><b style="font-size:15px">Semana ' + esc(pmFh(S.semana.desde)) + ' al ' + esc(pmFh(S.semana.hasta)) + '</b>' + (cerr ? '<span class="chip verde">Cerrada</span>' : '<span class="chip amar">Abierta</span>') +
     '<span class="chip azul" title="Semana + días de plazo habitual">Pago estimado: ' + esc(pmFh(S.semana.fechaPagoEst)) + '</span><span style="flex:1"></span>' + (cerr || !(S.prestamosActivos || []).length ? '' : '<button class="btn secondary" title="Rebaja la cuota semanal de cada préstamo activo" onclick="pmAplicarCuotas()">🏦 Aplicar cuotas de préstamos</button>') + '<button class="btn secondary" onclick="pmPagoModal()">💵 Registrar pago</button><button class="btn secondary" onclick="pmCerrarSemana(' + (cerr ? 'false' : 'true') + ')">' + (cerr ? 'Reabrir' : 'Cerrar semana') + '</button><button class="btn secondary" onclick="pmEliminarSemana()">🗑 Eliminar</button></div>';
-  h += '<div class="panel"><div style="display:flex;gap:18px;flex-wrap:wrap;padding:12px 14px;font-size:13px">' +
+  h += '<div class="panel"><div style="display:flex;gap:18px;flex-wrap:wrap;padding:6px 14px;font-size:13px">' +
     [['Órdenes', T.nOrdenes], ['Costo detalle', pmM(T.detalle)], ['UF Telecable', pmM(T.uf)], ['Margen (UF − costo)', pmM(margen)], ['Total facturado', pmM(T.totalFacturado)], ['Total a depositar', pmM(T.deposito)]]
       .map(x => '<div><div style="color:#667;font-size:11px">' + x[0] + '</div><b style="font-size:15px">' + x[1] + '</b></div>').join('') + '</div></div>';
   if (S.diferencias || S.sinLista) h += '<div class="panel" style="padding:10px 14px;font-size:13px;background:#fff8e1">' + (S.diferencias ? '⚠ <b>' + S.diferencias + '</b> orden(es) con costo distinto a la lista de precios. ' + (cerr ? '' : '<button class="btn secondary" onclick="pmAplicarLista()">Aplicar precio de lista</button> ') : '') + (S.sinLista ? '⚠ <b>' + S.sinLista + '</b> orden(es) sin precio de pago (el servicio no está en la lista). ' + (cerr ? '' : '<button class="btn primary" onclick="pmSinPrecioModal()">Asignar precio</button>') : '') + '</div>';
   h += '<div class="subtabs">' + tb('mov', 'Resumen por móvil') + tb('ord', 'Órdenes') + tb('res', 'Pago por contratista') + tb('ape', 'Apelaciones' + (S.apelaciones.some(a => a.estado === 'Pendiente') ? ' •' : '')) + tb('aju', 'Ajustes') + tb('ext', 'Adicionales') + tb('ver', 'Verificación') + tb('arc', 'Archivos') + '</div>';
-  h += '<div class="panel"><div class="tableWrap">';
+  h += '<div class="panel pmFill"><div class="tableWrap">';
   if (pmVista === 'mov') h += pmHtmlMov();
   if (pmVista === 'res') h += pmHtmlRes(cerr);
   if (pmVista === 'ord') h += pmHtmlOrd(cerr);
@@ -6584,7 +6596,7 @@ function pmRenderSemana() {
   if (pmVista === 'ext') h += pmHtmlExt(cerr);
   if (pmVista === 'ver') h += pmHtmlVer();
   if (pmVista === 'arc') h += pmHtmlArc();
-  $('pmPSem').innerHTML = h + '</div></div>';
+  $('pmPSem').classList.add('pmFlex'); $('pmPSem').innerHTML = h + '</div></div>';
 }
 
 /* Grupos de la tabla de pago: celdas donde se cargan valores por contratista */
@@ -6606,20 +6618,20 @@ function pmHtmlRes(cerr) {
   if (!R.filas.length) return '<div class="loading">Sin datos.</div>';
   const th = (t, s) => '<th style="text-align:' + (s || 'left') + '">' + t + '</th>';
   const num = v => '<td style="text-align:right;white-space:nowrap">' + v + '</td>';
-  return '<div style="padding:8px 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;border-bottom:1px solid #e3e7ee"><b style="font-size:13px">Estados de cuenta, un archivo por contratista:</b><button class="btn secondary" title="Descarga un PDF separado por cada contratista" onclick="pmEcLote(\'pdf\')">⬇ PDF (uno por contratista)</button><button class="btn secondary" title="Descarga un Excel separado por cada contratista" onclick="pmEcLote(\'xlsx\')">⬇ Excel (uno por contratista)</button><span style="color:#778;font-size:12px">Individual: botón 📄 Reporte de cada fila (PDF, Excel o correo).</span></div>' +
+  return '<div style="padding:8px 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;border-bottom:1px solid #e3e7ee"><b style="font-size:13px">Archivos de pago:</b><button class="btn primary" title="Un estado de cuenta (PDF y/o Excel) por cada contratista, comprimidos en un ZIP" onclick="pmExportarModal()">📦 Exportar archivos de pago</button><span style="color:#778;font-size:12px">Individual: botón 📄 Reporte de cada fila (PDF, Excel o correo).</span></div>' +
     '<div style="padding:8px 12px;font-size:12px;color:#667">Haz clic en las celdas <b>Apelaciones</b>, <b>Penalizaciones</b>, <b>Alquiler</b> y <b>Rebajos</b> para ver o cargar varios valores. Apelaciones suman a la factura; penalizaciones y alquiler la restan; los rebajos solo bajan el depósito.</div>' +
     '<table class="pmT"><thead><tr><th colspan="3"></th><th colspan="3" style="text-align:center;background:#7a1a1a;color:#fff">Antes de facturar · afectan la factura</th><th colspan="3"></th><th style="text-align:center;background:#444;color:#fff">Después de facturar</th><th colspan="4"></th></tr><tr>' + th('Contratista (factura)') + th('Órd.', 'right') + th('Detalle', 'right') + th('Apelaciones (+)', 'right') + th('Penaliz. (−)', 'right') + th('Alquiler / otros (−)', 'right') + th('A facturar', 'right') + th('IVA 13%', 'right') + th('Total factura', 'right') + th('Rebajos (−)', 'right') + th('A depositar', 'right') + th('N.º factura') + th('Pagado') + '<th></th></tr></thead><tbody>' +
     R.filas.map(f => {
       const tec = (f.tecnicos || []).map(t => 'M' + esc(t.movil) + (t.tecnico && pmNorm(t.tecnico) !== pmNorm(f.nombre) ? ' · ' + esc(t.tecnico) : '')).join(' &nbsp;|&nbsp; ');
-      return '<tr' + (f.sinContratista ? ' style="background:#fdecea"' : '') + '><td><b>' + esc(f.nombre) + '</b>' +
+      return '<tr' + (f.sinContratista ? ' style="background:#fdecea"' : '') + '><td><b>' + esc(f.nombre) + '</b>' + (!f.sinContratista && !/^\d{20}$/.test(f.iban || '') ? ' <span style="font-size:10.5px;color:#9b1c1c;white-space:nowrap">⚠ Falta IBAN</span>' : '') +
         (tec ? '<div style="font-size:11px;color:#556">' + tec + '</div>' : '') +
         (f.titular && f.titular !== f.nombre ? '<div style="font-size:11px;color:#556">Cuenta a nombre de ' + esc(f.titular) + '</div>' : '') +
         (f.fueraPlazo ? '<div><span class="chip rojo">Salió ' + esc(pmFh(f.salida)) + ': pasó el plazo de 2 semanas</span></div>' : (f.estadoSis === 'inactiva' ? '<div><span class="chip amar">Salió ' + esc(pmFh(f.salida)) + ' · paga hasta ' + esc(pmFh(f.plazoHasta)) + '</span></div>' : '')) +
-        (f.sinContratista ? '<div style="font-size:11px;color:#9b1c1c">Móvil sin contratista: créalo en la pestaña Contratistas</div>' : (!/^\d{20}$/.test(f.iban || '') ? '<div style="font-size:11px;color:#9b1c1c">Falta IBAN</div>' : '')) + '</td>' +
+        (f.sinContratista ? '<div style="font-size:11px;color:#9b1c1c">Móvil sin contratista: créalo en la pestaña Contratistas</div>' : '') + '</td>' +
         num(f.nOrdenes) + num(pmM(f.detalle)) + pmCelda(f, 'apel', f.reclamos, cerr) + pmCelda(f, 'pen', f.penalizaciones, cerr) + pmCelda(f, 'alq', f.alquileres + f.camisas + f.otros, cerr) +
         '<td style="text-align:right;white-space:nowrap"><b>' + pmM(f.subtotal) + '</b></td>' + num(f.aplicaIva ? pmM(f.iva) : '<span style="color:#888">sin IVA</span>') + '<td style="text-align:right;white-space:nowrap"><b>' + pmM(f.totalFacturado) + '</b></td>' +
         pmCelda(f, 'reb', f.deducciones, cerr) + '<td style="text-align:right;white-space:nowrap;background:#eef7ee"><b>' + pmM(f.deposito) + '</b></td>' +
-        '<td>' + (f.sinContratista ? '' : '<input style="width:118px" value="' + esc(f.factura) + '" ' + (cerr ? 'disabled' : '') + ' onchange="pmGuardarFactura(\'' + f.idCon + '\',this.value)" placeholder="N.º factura">') + '</td><td>' + (f.pagado ? '<span class="chip verde">' + esc(pmFh(f.pagado)) + '</span>' : (f.sinContratista ? '' : '<span style="color:#999">—</span>')) + '</td><td style="white-space:nowrap">' + (f.sinContratista ? '' : '<button class="btn secondary" title="Estado de cuenta: PDF, Excel o correo" onclick="pmReporteModal(\'' + f.idCon + '\')">📄 Reporte</button>') + '</td></tr>';
+        '<td>' + (f.sinContratista ? '' : '<input style="width:100px" value="' + esc(f.factura) + '" ' + (cerr ? 'disabled' : '') + ' onchange="pmGuardarFactura(\'' + f.idCon + '\',this.value)" placeholder="N.º factura">') + '</td><td>' + (f.pagado ? '<span class="chip verde">' + esc(pmFh(f.pagado)) + '</span>' : (f.sinContratista ? '' : '<span style="color:#999">—</span>')) + '</td><td style="white-space:nowrap">' + (f.sinContratista ? '' : '<button class="btn secondary" title="Estado de cuenta: PDF, Excel o correo" onclick="pmReporteModal(\'' + f.idCon + '\')">📄 Reporte</button>') + '</td></tr>';
     }).join('') +
     '<tr style="font-weight:700;background:#f3f6fa"><td>Total</td>' + num(T.nOrdenes) + num(pmM(T.detalle)) + num(pmM(T.reclamos)) + num(pmM(T.penalizaciones)) + num(pmM(T.alquileres + T.camisas + T.otros)) + num(pmM(T.subtotal)) + num(pmM(T.iva)) + num(pmM(T.totalFacturado)) + num(pmM(T.deducciones)) + num(pmM(T.deposito)) + '<td></td><td></td><td></td></tr></tbody></table>';
 }
@@ -7528,13 +7540,36 @@ async function pmEcExcel(idCon, silencioso) {
     XLSX.writeFile(wb, pmEcNom(D) + '.xlsx');
   } catch (e) { if (!silencioso) mostrarError(e, 'No se pudo generar el Excel.'); else throw e; }
 }
-/* Un documento por contratista, cada uno aparte (descargas seguidas) */
-async function pmEcLote(tipo) {
+/* Exportar archivos de pago: un PDF y/o Excel por contratista, comprimidos en un ZIP o sueltos */
+const URL_JSZIP = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+function pmExportarModal() {
   const L = pmS.resumen.filas.filter(f => !f.sinContratista && f.nOrdenes > 0);
-  if (!L.length) { toast('No hay contratistas con pago.'); return; }
-  toast('Generando ' + L.length + ' archivo(s) separados… si el navegador pregunta, permite las descargas múltiples.', 6000);
-  try { for (const f of L) { if (tipo === 'pdf') await pmEcPdf(f.idCon, true); else await pmEcExcel(f.idCon, true); await new Promise(r => setTimeout(r, 700)); } }
-  catch (e) { mostrarError(e, 'No se pudieron generar todos los archivos.'); }
+  pmModal('<h3>Exportar archivos de pago</h3><div style="font-size:12px;color:#556;margin-bottom:10px">Semana ' + esc(pmFh(pmS.semana.desde)) + ' al ' + esc(pmFh(pmS.semana.hasta)) + ' · se genera un documento <b>por cada contratista</b> (' + L.length + ').</div><div style="display:grid;gap:8px">' +
+    '<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="pxPdf" checked> PDF (estado de cuenta)</label><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="pxXls"> Excel (estado de cuenta)</label>' +
+    '<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="pxZip" checked> Comprimir todo en un solo archivo ZIP</label></div>' +
+    '<div style="font-size:11px;color:#778;margin-top:8px">Sin comprimir, se descargan los archivos uno por uno (el navegador puede pedir permiso para descargas múltiples).</div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn secondary" onclick="pmCerrar()">Cancelar</button><button class="btn primary" id="pxBtn" onclick="pmExportarOk()">Exportar</button></div>', 460);
+}
+function pmEcExcelBuf(D) {
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, pmEcHoja(pmEcAoa(D)), 'Estado de cuenta');
+  return XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+}
+async function pmExportarOk() {
+  const pdf = $('pxPdf').checked, xls = $('pxXls').checked, zip = $('pxZip').checked;
+  if (!pdf && !xls) { toast('Elige PDF, Excel o ambos.'); return; }
+  const L = pmS.resumen.filas.filter(f => !f.sinContratista && f.nOrdenes > 0); if (!L.length) { toast('No hay contratistas con pago.'); return; }
+  const btn = $('pxBtn'); btn.disabled = true;
+  try {
+    if (pdf) await cargarLib('jspdf', URL_JSPDF); if (xls) await cargarLib('xlsx', SEG_URL_XLSX); if (zip) await cargarLib('jszip', URL_JSZIP);
+    const Z = zip ? new JSZip() : null, S = pmS.semana; let n = 0;
+    for (const f of L) {
+      btn.textContent = 'Generando ' + (++n) + ' de ' + L.length + '…';
+      const D = pmEcDatos(f.idCon); if (!D) continue; const nom = pmEcNom(D);
+      if (pdf) { const d = new window.jspdf.jsPDF({ unit: 'mm', format: 'letter' }); pmEcDibujar(d, D); pmEcPie(d, D.emp.nombre); if (Z) Z.file(nom + '.pdf', d.output('arraybuffer')); else { d.save(nom + '.pdf'); await new Promise(r => setTimeout(r, 700)); } }
+      if (xls) { const buf = pmEcExcelBuf(D); if (Z) Z.file(nom + '.xlsx', buf); else { pmBajar(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), nom + '.xlsx'); await new Promise(r => setTimeout(r, 700)); } }
+    }
+    if (Z) { btn.textContent = 'Comprimiendo…'; pmBajar(await Z.generateAsync({ type: 'blob', compression: 'DEFLATE' }), 'Archivos_de_pago_' + S.desde + '_' + S.hasta + '.zip'); }
+    pmCerrar(); toast('Archivos de pago exportados' + (Z ? ' en un ZIP.' : '.'));
+  } catch (e) { btn.disabled = false; btn.textContent = 'Exportar'; mostrarError(e, 'No se pudieron exportar los archivos.'); }
 }
 
 /* Genera el PDF (jsPDF) */
@@ -14115,6 +14150,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 61 · 14-oct 15:27</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 62 · 14-oct 15:38</div>
 </body>
 </html>
