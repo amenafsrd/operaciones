@@ -408,6 +408,7 @@
     .tableWrap { max-height: calc(100vh - 230px); min-height: 220px; overflow: auto; }
     .tableWrap .table thead th { position: sticky; top: 0; z-index: 2; }
     .segLista .tableWrap, .hist .tableWrap { max-height: 60vh; }
+    .hist .tableWrap, #historialContenido .tableWrap, #ctCuerpo .tableWrap, #bodHisLista .tableWrap { min-height: 0; }
     .top { flex-wrap: nowrap; gap: 10px; }
     .nav { flex-wrap: nowrap; }
     @media (max-width: 700px) { #userLabel { display: none; } }
@@ -998,6 +999,7 @@
           <button id="stBodCons" onclick="bodSubtab('cons')">📥 Consumo (OT)</button>
           <button id="stBodInv" onclick="bodSubtab('inv')">🧮 Cortes de inventario</button>
           <button id="stBodDev" onclick="bodSubtab('dev')">🔁 Devoluciones de cambio</button>
+          <button id="stBodHis" onclick="bodSubtab('his')">🕘 Historial de cambios</button>
           <button id="stBodCat" onclick="bodSubtab('cat')">⚙️ Materiales</button>
         </div>
         <div id="bodAlertaBox"></div>
@@ -1206,6 +1208,10 @@
         </div>
 
         <!-- Catálogo -->
+        <div id="bodPanelHis" style="display:none">
+          <div class="toolbar" style="flex-wrap:wrap"><label>Desde <input type="date" id="bhDesde"></label><label>Hasta <input type="date" id="bhHasta"></label><input id="bhQ" placeholder="Buscar usuario, acción o detalle" style="min-width:240px" onkeydown="if(event.key==='Enter')cargarHistBodega()"><button class="btn secondary" onclick="cargarHistBodega()">Buscar</button></div>
+          <div class="panel"><div class="panelHead"><h2>🕘 Historial de cambios de bodega</h2><span id="bhTotal"></span></div><div id="bodHisLista" class="hist"></div></div>
+        </div>
         <div id="bodPanelCat" style="display:none">
           <div class="panel">
             <div class="panelHead"><div><h2>Catálogo de materiales</h2>
@@ -9615,7 +9621,7 @@ async function devExportar() {
 
 function bodSubtab(s) {
   bodSub = s;
-  const m = { res: 'Res', moviles: 'Moviles', ing: 'Ing', abas: 'Abas', ali: 'Ali', cons: 'Cons', inv: 'Inv', dev: 'Dev', cat: 'Cat' };
+  const m = { res: 'Res', moviles: 'Moviles', ing: 'Ing', abas: 'Abas', ali: 'Ali', cons: 'Cons', inv: 'Inv', dev: 'Dev', his: 'His', cat: 'Cat' };
   Object.keys(m).forEach(k => {
     $('bodPanel' + m[k]).style.display = k === s ? 'block' : 'none';
     $('stBod' + m[k]).classList.toggle('active', k === s);
@@ -9627,6 +9633,16 @@ function bodSubtab(s) {
   if (s === 'cons') cargarBodCons();
   if (s === 'inv') cargarCortes();
   if (s === 'dev') cargarDevoluciones();
+  if (s === 'his') cargarHistBodega();
+}
+
+async function cargarHistBodega() {
+  $('bodHisLista').innerHTML = '<div class="loading">Cargando historial...</div>';
+  try {
+    const r = await api('historialBodegaWeb', $('bhDesde').value, $('bhHasta').value, $('bhQ').value);
+    $('bhTotal').textContent = r.total + ' cambio(s)' + (r.total > r.filas.length ? ' · se muestran los ' + r.filas.length + ' más recientes' : '');
+    $('bodHisLista').innerHTML = r.filas.length ? '<div class="tableWrap"><table class="table" style="min-width:0"><thead><tr><th>Fecha y hora</th><th class="left">Usuario</th><th class="left">Cambio</th><th class="left">Detalle</th></tr></thead><tbody>' + r.filas.map(x => '<tr><td style="white-space:nowrap">' + esc(x.hora) + '</td><td class="left">' + esc(x.usuario) + '</td><td class="left"><b>' + esc(x.accion) + '</b></td><td class="left">' + esc(x.detalle) + '</td></tr>').join('') + '</tbody></table></div>' : '<div class="vacio">Aún no hay cambios registrados (se registran desde esta versión).</div>';
+  } catch (e) { $('bodHisLista').innerHTML = ''; mostrarError(e, 'No se pudo cargar el historial.'); }
 }
 
 function bodLlenarFiltros() {
@@ -13784,6 +13800,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 50 · 14-oct 16:10</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 51 · 14-oct 12:30</div>
 </body>
 </html>
