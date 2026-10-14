@@ -10740,7 +10740,7 @@ function generarBancoPmWeb(token, idSemana, fechaPago, envio) {
 
 /* Validación de «Reinstalación total (interno-externo)» con el reporte de materiales:
    fibra + cable RG6 → Instalación completa; solo fibra → Cambio de acometida. filas: [{nOrden, contrato, fibra, rg6}] */
-const PM_REINST = { servicio: 'reinstalacion total (interno-externo)', completa: 'Instalación FTTH', acometida: 'Cambio de acometida de fibra' };
+const PM_REINST = { servicio: 'reinstalacion total (interno-externo)', completa: 'Instalación FTTH', acometida: 'Cambio de acometida de fibra', interna: 'Reinstalación interna' };
 function validarReinstalacionPmWeb(token, idSemana, filas, aplicar) {
   requerirSesion_(token, 'admin');
   idSemana = txt_(idSemana);
@@ -10755,7 +10755,7 @@ function validarReinstalacionPmWeb(token, idSemana, filas, aplicar) {
   });
   const precios = pmPrecios_();
   const pc = nom => precios.find(x => x.servicio === nom);
-  if (!pc(PM_REINST.completa) || !pc(PM_REINST.acometida)) throw new Error('Faltan en la lista de precios «' + PM_REINST.completa + '» o «' + PM_REINST.acometida + '».');
+  if (!pc(PM_REINST.completa) || !pc(PM_REINST.acometida) || !pc(PM_REINST.interna)) throw new Error('Faltan en la lista de precios «' + PM_REINST.completa + '», «' + PM_REINST.acometida + '» o «' + PM_REINST.interna + '».');
   const calc = () => {
     const sh = pmHoja_('ORD'), t = leerTabla_(sh);
     const out = [];
@@ -10769,7 +10769,8 @@ function validarReinstalacionPmWeb(token, idSemana, filas, aplicar) {
       if (m) {
         if (m.fibra > 0 && m.rg6 > 0) { res = 'COMPLETA'; tipo = PM_REINST.completa; motivo = 'Usó fibra y cable RG6'; }
         else if (m.fibra > 0) { res = 'ACOMETIDA'; tipo = PM_REINST.acometida; motivo = 'Usó solo fibra'; }
-        else { motivo = m.rg6 > 0 ? 'Usó RG6 pero no fibra' : 'No usó fibra ni RG6'; }
+        else if (m.rg6 > 0) { res = 'INTERNA'; tipo = PM_REINST.interna; motivo = 'Usó solo cable RG6 (sin fibra)'; }
+        else { motivo = 'No usó fibra ni RG6'; }
       }
       const cant = Number(r[t.idx.Cantidad]) > 0 ? Number(r[t.idx.Cantidad]) : 1;
       const antes = pmNum_(r[t.idx.Costo_Aplicado]);
@@ -10785,7 +10786,7 @@ function validarReinstalacionPmWeb(token, idSemana, filas, aplicar) {
     const r = calc(); let n = 0;
     r.out.forEach(x => {
       const obs = x.resultado === 'REVISAR' ? 'Validar: ' + x.motivo : 'Validado con materiales: ' + x.motivo;
-      r.sh.getRange(x.fila, r.t.idx.Validacion + 1).setValue(x.resultado === 'COMPLETA' ? 'Instalación completa' : (x.resultado === 'ACOMETIDA' ? 'Cambio de acometida' : 'Revisar: ' + x.motivo));
+      r.sh.getRange(x.fila, r.t.idx.Validacion + 1).setValue(x.resultado === 'COMPLETA' ? 'Instalación completa' : (x.resultado === 'ACOMETIDA' ? 'Cambio de acometida' : (x.resultado === 'INTERNA' ? 'Reinstalación interna' : 'Revisar: ' + x.motivo)));
       if (x.resultado === 'REVISAR') return;
       r.sh.getRange(x.fila, r.t.idx.Tipo + 1).setValue(x.tipo);
       if (!x.manual) r.sh.getRange(x.fila, r.t.idx.Costo_Aplicado + 1).setValue(x.despues);
