@@ -10769,8 +10769,7 @@ function validarReinstalacionPmWeb(token, idSemana, filas, aplicar) {
       if (m) {
         if (m.fibra > 0 && m.rg6 > 0) { res = 'COMPLETA'; tipo = PM_REINST.completa; motivo = 'Usó fibra y cable RG6'; }
         else if (m.fibra > 0) { res = 'ACOMETIDA'; tipo = PM_REINST.acometida; motivo = 'Usó solo fibra'; }
-        else if (m.rg6 > 0) { res = 'INTERNA'; tipo = PM_REINST.interna; motivo = 'Usó solo cable RG6 (sin fibra)'; }
-        else { motivo = 'No usó fibra ni RG6'; }
+        else { res = 'INTERNA'; tipo = PM_REINST.interna; motivo = m.rg6 > 0 ? 'Usó solo cable RG6 (sin fibra)' : 'No usó fibra ni RG6'; }
       }
       const cant = Number(r[t.idx.Cantidad]) > 0 ? Number(r[t.idx.Cantidad]) : 1;
       const antes = pmNum_(r[t.idx.Costo_Aplicado]);
