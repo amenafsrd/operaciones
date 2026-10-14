@@ -5741,10 +5741,18 @@ function sideRefrescar() {
    COLABORADORES (vacaciones, permisos y pagos)
    ========================================================= */
 
+let rhEstado = 'activos', rhPagDesde = '', rhPagHasta = '', rhRep = null;
 let rhDatos = null, rhTabAct = '', rhColSel = '', rhPagos = null, rhFiltroSol = 'Pendiente', rhFiltroColSol = '';
 
 const rhTxt = { Pendiente: ['#8a6100', '#fff3cd'], Aprobada: ['#1b6b3a', '#d6f0e0'], Denegada: ['#a31616', '#fde8e8'], Cancelada: ['#666', '#eee'] };
 function rhBadge(e) { const c = rhTxt[e] || ['#444', '#eee']; return '<span class="segBadge" style="color:' + c[0] + ';background:' + c[1] + '">' + esc(e) + '</span>'; }
+/* Filtro común (Colaboradores, Asistencia y Pagos): activos, fuera de la operativa o todos */
+function rhSelEstado(fn) {
+  return '<div style="display:flex;gap:0;border:1px solid #c9ced6;border-radius:7px;overflow:hidden">' + [['activos', 'Activos'], ['fuera', 'Fuera de la operativa'], ['todos', 'Todos']].map(x =>
+    '<button class="btn ' + (rhEstado === x[0] ? 'primary' : 'secondary') + '" style="border-radius:0;border:0" onclick="rhCambiaEstado(\'' + x[0] + '\',' + fn + ')">' + x[1] + '</button>').join('') + '</div>';
+}
+function rhCambiaEstado(e, fn) { rhEstado = e; fn(); }
+function rhEstadoOk(c) { return rhEstado === 'todos' ? true : (rhEstado === 'fuera' ? !c.activo : c.activo); }
 function rhModal(html) { $('rhModal').innerHTML = html; $('rhModalBg').classList.add('show'); }
 function rhCerrar() { $('rhModalBg').classList.remove('show'); $('rhModal').style.maxWidth = '560px'; }
 function rhFecha(iso) { return iso ? fmtFechaSeg(iso) : '—'; }
@@ -5812,17 +5820,17 @@ function rhPeriodoMover(tipo, ini, fin, dir) { return dir < 0 ? rhIso(rhMsC(ini)
 
 async function rhRenderAsi() {
   const adm = rhDatos.admin;
-  if (!rhAsiTipo) rhAsiTipo = adm ? 'Quincenal' : (rhDatos.mio.periodicidad || 'Quincenal');
+  if (!rhAsiTipo) rhAsiTipo = adm ? 'Todos' : (rhDatos.mio.periodicidad || 'Quincenal');
   if (!adm) rhAsiTipo = rhDatos.mio.periodicidad || 'Quincenal';
   if (!rhAsiRef) rhAsiRef = rhDatos.hoy;
-  const [ini, fin] = rhPeriodoDe(rhAsiTipo, rhAsiRef);
+  const [ini, fin] = rhPeriodoDe(rhAsiTipo === 'Todos' ? 'Quincenal' : rhAsiTipo, rhAsiRef);
   $('rhPAsi').innerHTML = '<div class="loading">Cargando asistencia...</div>';
-  try { rhAsiData = await api('obtenerAsistenciaRhWeb', ini, fin); }
+  try { rhAsiData = await api('obtenerAsistenciaRhWeb', ini, fin, rhEstado); }
   catch (e) { mostrarError(e, 'No se pudo cargar la asistencia.'); return; }
   rhPintarAsi(ini, fin);
 }
 
-function rhAsiNav(dir) { const [ini, fin] = rhPeriodoDe(rhAsiTipo, rhAsiRef); rhAsiRef = rhPeriodoMover(rhAsiTipo, ini, fin, dir); rhRenderAsi(); }
+function rhAsiNav(dir) { const t = rhAsiTipo === 'Todos' ? 'Quincenal' : rhAsiTipo; const [ini, fin] = rhPeriodoDe(t, rhAsiRef); rhAsiRef = rhPeriodoMover(t, ini, fin, dir); rhRenderAsi(); }
 function rhAsiCambiaTipo(t) { rhAsiTipo = t; rhRenderAsi(); }
 function rhAsiHoy() { rhAsiRef = rhDatos.hoy; rhRenderAsi(); }
 
@@ -5854,17 +5862,18 @@ function rhAsiResumen(c, dias, hoy) {
 function rhPintarAsi(ini, fin) {
   const D = rhAsiData, adm = D.admin, hoy = D.hoy;
   const dias = []; for (let t = rhMsC(ini); t <= rhMsC(fin); t += 86400000) dias.push(rhIso(t));
-  const col = D.colaboradores.filter(c => !adm || c.periodicidad === rhAsiTipo);
+  const todos = rhAsiTipo === 'Todos';
+  const col = D.colaboradores.filter(c => !adm || todos || c.periodicidad === rhAsiTipo);
   const DS = ['D', 'L', 'M', 'X', 'J', 'V', 'S'];
   let h = '<div class="toolbar"><button class="btn secondary" onclick="rhAsiNav(-1)">‹</button><div style="font-weight:600;min-width:210px;text-align:center">' + esc(rhFecha(ini)) + ' al ' + esc(rhFecha(fin)) + '</div>' +
     '<button class="btn secondary" onclick="rhAsiNav(1)">›</button><button class="btn secondary" onclick="rhAsiHoy()">Hoy</button>';
-  if (adm) h += '<span style="flex:1"></span><span style="font-size:12px;color:#666">Pago:</span>' + ['Semanal', 'Quincenal', 'Mensual'].map(t => '<button class="btn ' + (t === rhAsiTipo ? 'primary' : 'secondary') + '" onclick="rhAsiCambiaTipo(\'' + t + '\')">' + t + 'es</button>').join('');
+  if (adm) h += '<span style="flex:1"></span>' + rhSelEstado('rhRenderAsi') + '<span style="font-size:12px;color:#666;margin-left:6px">Pago:</span>' + ['Todos', 'Semanal', 'Quincenal', 'Mensual'].map(t => '<button class="btn ' + (t === rhAsiTipo ? 'primary' : 'secondary') + '" onclick="rhAsiCambiaTipo(\'' + t + '\')">' + (t === 'Todos' ? 'Todos' : t + 'es') + '</button>').join('');
   h += '</div>';
   h += '<div style="font-size:12px;color:#666;margin:0 0 8px">Los días hábiles pasados cuentan como <b>laborados</b> salvo que marques otra cosa. Vacaciones, permisos e incapacidades aprobados se ponen solos.' + (adm ? ' Toca un día para cambiarlo.' : '') + '</div>';
-  if (!col.length) { $('rhPAsi').innerHTML = h + '<div class="empty">No hay colaboradores ' + (adm ? rhAsiTipo.toLowerCase().replace(/l$/, 'les') : '') + ' con pago de esta periodicidad en este período.</div>'; return; }
+  if (!col.length) { $('rhPAsi').innerHTML = h + '<div class="empty">No hay colaboradores con este filtro en este período.</div>'; return; }
   h += '<div class="panel"><div class="tableWrap"><table class="table tblRh tblAsi"><thead><tr><th>Colaborador</th>' +
     dias.map(f => { const wd = new Date(rhMsC(f)).getUTCDay(); return '<th style="text-align:center;padding:6px 3px;' + (f === hoy ? 'background:#7a1b1b;' : '') + '">' + DS[wd] + '<div style="font-weight:400;font-size:11px">' + f.slice(8) + '</div></th>'; }).join('') +
-    '<th style="text-align:center">Laborados</th><th style="text-align:center">Pagables</th><th style="text-align:center">Descontar</th>' + (adm ? '<th>Pago sugerido</th><th></th>' : '') + '</tr></thead><tbody>';
+    '<th style="text-align:center">Laborados</th><th style="text-align:center">Pagables</th><th style="text-align:center">Descontar</th>' + (adm && !todos ? '<th>Pago sugerido</th><th></th>' : '') + '</tr></thead><tbody>';
   col.forEach(c => {
     const r = rhAsiResumen(c, dias, hoy);
     h += '<tr><td style="white-space:nowrap"><b>' + esc(c.nombre) + '</b></td>' + dias.map(f => {
@@ -5876,7 +5885,7 @@ function rhPintarAsi(ini, fin) {
     }).join('') +
     '<td style="text-align:center"><b>' + r.LAB + '</b></td><td style="text-align:center">' + r.pagables + '</td>' +
     '<td style="text-align:center">' + (r.descuento ? '<b style="color:#a31616">' + r.descuento + '</b>' : '—') + '</td>' +
-    (adm ? '<td>' + (c.salario ? '<b>' + colones(r.sugerido) + '</b>' + (r.descuento ? '<div style="font-size:11px;color:#a31616">de ' + colones(rhPagoPeriodo(c)) + '</div>' : '') : '<span class="segSinCarga">sin salario</span>') + '</td>' +
+    (adm && !todos ? '<td>' + (c.salario ? '<b>' + colones(r.sugerido) + '</b>' + (r.descuento ? '<div style="font-size:11px;color:#a31616">de ' + colones(rhPagoPeriodo(c)) + '</div>' : '') : '<span class="segSinCarga">sin salario</span>') + '</td>' +
       '<td style="white-space:nowrap"><button class="btnMini" onclick="rhAsiPago(\'' + escJs(c.id) + '\',\'' + ini + '\',\'' + fin + '\')">💰 Pago</button></td>' : '') + '</tr>';
   });
   h += '</tbody></table></div></div><div style="display:flex;flex-wrap:wrap;gap:8px;margin:10px 0;font-size:12px">' +
@@ -5902,7 +5911,7 @@ function rhAsiMarcar(idColab, f) {
 async function rhAsiAplicar(estado) {
   const sel = rhAsiSel; if (!sel) return;
   const todos = $('raTodos') && $('raTodos').checked, obs = $('raObs') ? $('raObs').value : '';
-  const ids = todos ? rhAsiData.colaboradores.filter(c => c.periodicidad === rhAsiTipo && !(c.dias[sel.f] && c.dias[sel.f].auto)).map(c => c.id) : [sel.id];
+  const ids = todos ? rhAsiData.colaboradores.filter(c => (rhAsiTipo === 'Todos' || c.periodicidad === rhAsiTipo) && !(c.dias[sel.f] && c.dias[sel.f].auto)).map(c => c.id) : [sel.id];
   try {
     for (const id of ids) await api('marcarAsistenciaRhWeb', id, [sel.f], estado, obs);
     rhCerrar(); rhRenderAsi();
@@ -5913,8 +5922,7 @@ function rhAsiPago(id, ini, fin) {
   const c = rhAsiData.colaboradores.find(x => x.id === id); if (!c) return;
   const dias = []; for (let t = rhMsC(ini); t <= rhMsC(fin); t += 86400000) dias.push(rhIso(t));
   const r = rhAsiResumen(c, dias, rhAsiData.hoy);
-  rhColSel = id;
-  rhNuevoPago(ini.slice(0, 7) + ' ' + ini.slice(8) + '-' + fin.slice(8), r.sugerido, r.LAB + ' días laborados' + (r.descuento ? ', ' + r.descuento + ' a descontar' : ''));
+  rhNuevoPago(id, ini.slice(0, 7) + ' ' + ini.slice(8) + '-' + fin.slice(8), r.sugerido, r.LAB + ' días laborados' + (r.descuento ? ', ' + r.descuento + ' a descontar' : ''));
 }
 
 /* ---------- Mis vacaciones y permisos ---------- */
@@ -6098,11 +6106,11 @@ function notifRefrescarSiExiste() { try { if (typeof notifCargar === 'function')
 /* ---------- Colaboradores (fichas) ---------- */
 
 function rhRenderCol() {
-  const l = rhDatos.colaboradores;
-  $('rhPCol').innerHTML = rhAvisoSinFicha() + rhAvisoExigibles() + '<div class="toolbar"><button class="btn primary" onclick="rhEditarCol(\'\')">➕ Nuevo colaborador</button>' +
+  const l = rhDatos.colaboradores.filter(rhEstadoOk);
+  $('rhPCol').innerHTML = rhAvisoSinFicha() + rhAvisoExigibles() + '<div class="toolbar"><button class="btn primary" onclick="rhEditarCol(\'\')">➕ Nuevo colaborador</button>' + rhSelEstado('rhRenderCol') +
     '<span style="font-size:12px;color:#777;margin-left:8px">Vacaciones: ' + rhDatos.semanasPeriodo + ' semanas laboradas = 2 semanas de vacaciones (10 días en semana de 5 días, 12 en semana de 6). Los salarios solo los ve el administrador.</span></div>' +
     '<div class="panel"><div class="panelHead"><h2>Colaboradores internos</h2><span style="font-size:12px;color:#777">' + l.length + '</span></div><div class="tableWrap">' +
-    (!l.length ? '<div class="empty">Aún no hay colaboradores. Agrega el primero con su fecha de ingreso.</div>' :
+    (!l.length ? '<div class="empty">' + (rhDatos.colaboradores.length ? 'No hay colaboradores con este filtro.' : 'Aún no hay colaboradores. Agrega el primero con su fecha de ingreso.') + '</div>' :
       '<table class="table tblRh"><thead><tr><th>Colaborador</th><th>Usuario</th><th>Puesto</th><th>Ingreso</th><th>Salario</th><th>Devengadas</th><th>Tomadas</th><th>Saldo</th><th>Por programar</th><th>Estado</th><th></th></tr></thead><tbody>' +
       l.map(c => '<tr' + (c.activo ? '' : ' style="opacity:.55"') + '><td><b>' + esc(c.nombre) + '</b></td><td>' + (c.usuario ? esc(c.usuario) : '<span class="muted">sin usuario</span>') + '</td><td>' + esc(c.puesto) + '</td>' +
         '<td>' + (c.ingreso ? esc(rhFecha(c.ingreso)) : '<span class="segBadge" style="background:#fff3cd;color:#8a6100">Falta ingreso</span>') + '</td><td>' + (c.salario ? colones(c.salario) : '<span class="segSinCarga">sin salario</span>') + '<div style="font-size:11px;color:#888">' + esc(c.periodicidad) + '</div></td>' +
@@ -6148,60 +6156,265 @@ async function rhGuardarCol() {
 
 /* ---------- Pagos ---------- */
 
+/* ---------- Pagos a nivel general: cargas sociales, aguinaldo y reportes ---------- */
+
+function rhRangoRapido(k, sinRender) {
+  const hoy = rhDatos.hoy, y = Number(hoy.slice(0, 4)), m = Number(hoy.slice(5, 7));
+  const ult = (yy, mm) => new Date(Date.UTC(yy, mm, 0)).getUTCDate();
+  const p2 = n => String(n).padStart(2, '0');
+  if (k === 'mes') { rhPagDesde = y + '-' + p2(m) + '-01'; rhPagHasta = y + '-' + p2(m) + '-' + p2(ult(y, m)); }
+  else if (k === 'mesant') { const yy = m === 1 ? y - 1 : y, mm = m === 1 ? 12 : m - 1; rhPagDesde = yy + '-' + p2(mm) + '-01'; rhPagHasta = yy + '-' + p2(mm) + '-' + p2(ult(yy, mm)); }
+  else if (k === 'anio') { rhPagDesde = y + '-01-01'; rhPagHasta = y + '-12-31'; }
+  else if (k === 'anioant') { rhPagDesde = (y - 1) + '-01-01'; rhPagHasta = (y - 1) + '-12-31'; }
+  else if (k === 'agui') { const ini = m >= 12 ? y : y - 1; rhPagDesde = ini + '-12-01'; rhPagHasta = (ini + 1) + '-11-30'; }
+  if (!sinRender) rhRenderPag();
+}
+function rhPagFechas() { rhPagDesde = $('rpgD').value || rhPagDesde; rhPagHasta = $('rpgH').value || rhPagHasta; rhRenderPag(); }
+function rhPagEstado(e) { rhEstado = e; rhColSel = ''; rhRenderPag(); }
+function rhPagColab(id) { rhColSel = id; rhRenderPag(); }
+
 async function rhRenderPag() {
+  if (!rhPagDesde) rhRangoRapido('anio', true);
   const cols = rhDatos.colaboradores;
-  if (!cols.length) { $('rhPPag').innerHTML = '<div class="empty">Primero agrega colaboradores en la pestaña «Colaboradores».</div>'; return; }
-  if (!rhColSel || !cols.find(c => c.id === rhColSel)) rhColSel = cols[0].id;
-  $('rhPPag').innerHTML = '<div class="toolbar"><div class="field" style="min-width:260px"><label>Colaborador</label><select onchange="rhColSel=this.value;rhRenderPag()">' +
-    cols.map(c => '<option value="' + esc(c.id) + '"' + (c.id === rhColSel ? ' selected' : '') + '>' + esc(c.nombre) + (c.activo ? '' : ' (retirado)') + '</option>').join('') + '</select></div>' +
-    '<span style="flex:1"></span><button class="btn primary" onclick="rhNuevoPago()">➕ Registrar pago</button></div><div id="rhPagBody"><div class="loading">Cargando...</div></div>';
-  try { rhPagos = await api('obtenerPagosRhWeb', rhColSel); }
-  catch (e) { mostrarError(e, 'No se pudieron cargar los pagos.'); return; }
-  const P = rhPagos, A = P.aguinaldo[0], A2 = P.aguinaldo[1], L = P.liquidacion;
-  const card = (n, t, cl, money) => '<div class="card ' + (cl || '') + '"><div class="n">' + (money ? colones(n) : fmtN(n)) + '</div><div class="t">' + t + '</div></div>';
+  if (rhColSel && !cols.find(c => c.id === rhColSel)) rhColSel = '';
+  const lista = cols.filter(c => rhEstadoOk(c) || c.id === rhColSel);
+  const rq = (k, t) => '<button class="btn secondary" style="padding:5px 9px;font-size:12px" onclick="rhRangoRapido(\'' + k + '\')">' + t + '</button>';
+  $('rhPPag').innerHTML = '<div class="toolbar" style="flex-wrap:wrap;gap:10px">' +
+    '<div style="display:flex;gap:0;border:1px solid #c9ced6;border-radius:7px;overflow:hidden">' + [['activos', 'Activos'], ['fuera', 'Fuera de la operativa'], ['todos', 'Todos']].map(x =>
+      '<button class="btn ' + (rhEstado === x[0] ? 'primary' : 'secondary') + '" style="border-radius:0;border:0" onclick="rhPagEstado(\'' + x[0] + '\')">' + x[1] + '</button>').join('') + '</div>' +
+    '<div class="field" style="min-width:220px;margin:0"><label>Colaborador</label><select onchange="rhPagColab(this.value)"><option value="">Todos (reporte general)</option>' +
+    lista.map(c => '<option value="' + esc(c.id) + '"' + (c.id === rhColSel ? ' selected' : '') + '>' + esc(c.nombre) + (c.activo ? '' : ' (fuera)') + '</option>').join('') + '</select></div>' +
+    '<div class="field" style="margin:0"><label>Desde</label><input type="date" id="rpgD" value="' + esc(rhPagDesde) + '" onchange="rhPagFechas()"></div>' +
+    '<div class="field" style="margin:0"><label>Hasta</label><input type="date" id="rpgH" value="' + esc(rhPagHasta) + '" onchange="rhPagFechas()"></div>' +
+    '<div style="display:flex;gap:4px;flex-wrap:wrap;align-self:flex-end">' + rq('mes', 'Este mes') + rq('mesant', 'Mes anterior') + rq('anio', 'Este año') + rq('anioant', 'Año anterior') + rq('agui', 'Ciclo aguinaldo') + '</div></div>' +
+    '<div class="toolbar" style="flex-wrap:wrap;gap:8px"><button class="btn primary" onclick="rhNuevoPago(rhColSel)">➕ Registrar pago</button><button class="btn secondary" onclick="rhPegarPagos()">📋 Pegar varios pagos</button>' +
+    '<button class="btn secondary" onclick="rhTasasModal()">⚙️ Cargas sociales</button><span style="flex:1"></span>' +
+    '<button class="btn secondary" onclick="rhExportarCsv(\'resumen\')">⬇ Excel (CSV)</button><button class="btn secondary" onclick="rhExportarCsv(\'detalle\')">⬇ Detalle de pagos</button><button class="btn secondary" onclick="rhImprimir()">🖨 Reporte / PDF</button></div>' +
+    '<div id="rhPagBody"><div class="loading">Cargando...</div></div>';
+  try {
+    rhRep = await api('obtenerReportePagosRhWeb', rhPagDesde, rhPagHasta, rhEstado, rhColSel);
+    rhPagos = rhColSel ? await api('obtenerPagosRhWeb', rhColSel) : null;
+  } catch (e) { mostrarError(e, 'No se pudo cargar el reporte de pagos.'); return; }
+  rhPintarPag();
+}
+
+const rhCard = (n, t, cl, money) => '<div class="card ' + (cl || '') + '"><div class="n">' + (money === false ? fmtN(n) : colones(n)) + '</div><div class="t">' + t + '</div></div>';
+
+function rhPintarPag() {
+  const R = rhRep, T = R.totales;
+  let h = '<div class="cards">' + rhCard(T.bruto, 'Total bruto pagado') + rhCard(T.cargas, 'Cargas patronales (' + fmtN(R.totalPatronal) + '% de lo salarial)', 's') +
+    rhCard(T.costo, 'Costo total para la empresa', 'f') + rhCard(T.deducciones, 'Deducciones al trabajador') + rhCard(T.neto, 'Neto pagado') +
+    rhCard(T.aguEstimado, 'Aguinaldo a provisionar (ciclo ' + R.ciclo.desde.slice(0, 4) + '–' + R.ciclo.hasta.slice(0, 4) + ')') + '</div>';
+  if (rhColSel && rhPagos) h += rhHtmlPersona(rhPagos);
+  if (!rhColSel) {
+    h += '<div class="panel" style="margin-bottom:12px"><div class="panelHead"><h2>Resumen por colaborador</h2><span style="font-size:12px;color:#777">' + esc(rhFecha(R.desde)) + ' al ' + esc(rhFecha(R.hasta)) + ' · ' + R.filas.length + ' persona(s)</span></div><div class="tableWrap">' +
+      (!R.filas.length ? '<div class="empty">No hay colaboradores con este filtro.</div>' :
+        '<table class="table tblRh"><thead><tr><th>Colaborador</th><th>Salarial</th><th>Aguinaldo</th><th>Otros</th><th>Total bruto</th><th>Cargas patronales</th><th>Costo total</th><th>Deducciones</th><th>Neto</th><th>Aguinaldo del ciclo (÷12)</th></tr></thead><tbody>' +
+        R.filas.map(r => '<tr' + (r.activo ? '' : ' style="opacity:.6"') + '><td><a href="#" onclick="rhPagColab(\'' + escJs(r.id) + '\');return false" style="font-weight:600;color:inherit">' + esc(r.nombre) + '</a>' + (r.activo ? '' : ' <span class="tag tag-inactive">fuera</span>') + '</td>' +
+          '<td>' + colones(r.salarial) + '</td><td>' + colones(r.aguinaldoPagado) + '</td><td>' + colones(r.noSalarial + r.liquidacion) + '</td><td><b>' + colones(r.bruto) + '</b></td><td>' + colones(r.cargas) + '</td><td><b>' + colones(r.costo) + '</b></td><td>' + colones(r.deducciones) + '</td><td>' + colones(r.neto) + '</td>' +
+          '<td>' + colones(r.aguEstimado) + (r.aguPagadoCiclo ? '<div style="font-size:11px;color:#2c6b3c">pagado ' + colones(r.aguPagadoCiclo) + '</div>' : '') + '</td></tr>').join('') +
+        '<tr style="background:#f1f3f6;font-weight:700"><td>Total</td><td>' + colones(T.salarial) + '</td><td>' + colones(T.aguinaldoPagado) + '</td><td>' + colones(T.noSalarial + T.liquidacion) + '</td><td>' + colones(T.bruto) + '</td><td>' + colones(T.cargas) + '</td><td>' + colones(T.costo) + '</td><td>' + colones(T.deducciones) + '</td><td>' + colones(T.neto) + '</td><td>' + colones(T.aguEstimado) + '</td></tr></tbody></table>') +
+      '</div></div>';
+  }
+  h += '<div class="panel" style="margin-bottom:12px"><div class="panelHead"><h2>Cargas patronales del período</h2><span style="font-size:12px;color:#777">sobre ' + colones(T.salarial) + ' salarial</span></div><div class="tableWrap"><table class="table tblRh"><thead><tr><th>Concepto</th><th>%</th><th>Monto</th></tr></thead><tbody>' +
+    R.desglose.map(d => '<tr><td>' + esc(d.nombre) + '</td><td>' + fmtN(d.pct) + '%</td><td>' + colones(d.monto) + '</td></tr>').join('') +
+    '<tr style="background:#f1f3f6;font-weight:700"><td>Total cargas patronales</td><td>' + fmtN(R.totalPatronal) + '%</td><td>' + colones(T.cargas) + '</td></tr></tbody></table></div>' +
+    '<div style="padding:8px 14px;font-size:12px;color:#777">Solo el salario, horas extra, comisiones/bonos salariales y vacaciones pagadas pagan cargas. El aguinaldo, la liquidación, los viáticos y los incentivos no salariales no. Las tasas se pueden ajustar en «Cargas sociales». Es un cálculo de referencia: confírmalo con tu contador y la planilla de la CCSS.</div></div>';
+  if (R.pagos.length) {
+    h += '<div class="panel"><div class="panelHead"><h2>Pagos del período</h2><span style="font-size:12px;color:#777">' + R.pagos.length + (R.pagos.length >= 3000 ? ' (máximo mostrado)' : '') + '</span></div><div class="tableWrap"><table class="table tblRh"><thead><tr><th>Fecha</th>' + (rhColSel ? '' : '<th>Colaborador</th>') + '<th>Período</th><th>Tipo</th><th>Bruto</th><th>Cargas patr.</th><th>Deducciones</th><th>Neto</th><th>Nota</th><th></th></tr></thead><tbody>' +
+      R.pagos.map(p => '<tr><td>' + esc(rhFecha(p.fecha)) + '</td>' + (rhColSel ? '' : '<td>' + esc(p.nombre) + '</td>') + '<td>' + esc(p.periodo) + '</td><td>' + esc(p.tipoTxt) + (rhDatos.salariales.indexOf(p.tipo) !== -1 ? ' <span title="Cuenta para el aguinaldo y las cargas" style="color:#2c6b3c">●</span>' : '') + '</td><td>' + colones(p.bruto) + '</td><td>' + (p.cargas ? colones(p.cargas) : '<span class="segSinCarga">—</span>') + '</td><td>' + colones(p.deducciones) + '</td><td><b>' + colones(p.neto) + '</b></td><td>' + esc(p.obs) + '</td>' +
+        '<td><button class="btnMini" style="color:#a31616" onclick="rhEliminarPago(\'' + escJs(p.id) + '\')">🗑️</button></td></tr>').join('') + '</tbody></table></div></div>';
+  } else h += '<div class="empty">No hay pagos registrados en este período. Usa «Registrar pago» o «Pegar varios pagos» para ir cargando los pagos a la fecha.</div>';
+  $('rhPagBody').innerHTML = h;
+}
+
+/* Vista de una persona: aguinaldo del ciclo y liquidación estimada */
+function rhHtmlPersona(P) {
+  const A = P.aguinaldo[0], A2 = P.aguinaldo[1], L = P.liquidacion, c = P.colaborador;
   const totalLiq = L.vacacionesMonto + L.aguinaldoProporcional;
-  $('rhPagBody').innerHTML =
-    '<div class="cards">' + card(A.base, 'Salarial acumulado ' + A.desde.slice(0, 7) + ' a ' + A.hasta.slice(0, 7), '', true) + card(A.estimado, 'Aguinaldo estimado del ciclo (÷ 12)', 'f', true) +
-    card(A.pagado, 'Aguinaldo ya pagado en este ciclo', '', true) + card(A2.estimado, 'Aguinaldo del ciclo anterior (' + A2.desde.slice(0, 4) + '–' + A2.hasta.slice(0, 4) + ')', '', true) + '</div>' +
+  return '<div class="panel" style="margin-bottom:12px"><div class="panelHead"><h2>' + esc(c.nombre) + (c.activo ? '' : ' · fuera de la operativa') + '</h2><button class="btnMini" onclick="rhPagColab(\'\')">← Volver al general</button></div>' +
+    '<div style="padding:10px 14px;font-size:13px;color:#555">' + [c.puesto, c.cedula ? 'Cédula ' + c.cedula : '', c.ingreso ? 'Ingreso ' + rhFecha(c.ingreso) : '', c.salida ? 'Salida ' + rhFecha(c.salida) : ''].filter(Boolean).map(esc).join(' · ') + '</div></div>' +
+    '<div class="cards">' + rhCard(A.base, 'Salarial acumulado ' + A.desde.slice(0, 7) + ' a ' + A.hasta.slice(0, 7)) + rhCard(A.estimado, 'Aguinaldo estimado del ciclo (÷ 12)', 'f') +
+    rhCard(A.pagado, 'Aguinaldo ya pagado en este ciclo') + rhCard(A2.estimado, 'Aguinaldo del ciclo anterior (' + A2.desde.slice(0, 4) + '–' + A2.hasta.slice(0, 4) + ')') + '</div>' +
     '<div class="panel" style="margin-bottom:12px"><div class="panelHead"><h2>Liquidación estimada (referencia)</h2></div><div style="padding:12px 16px;font-size:14px;line-height:1.7">' +
     'Vacaciones pendientes: <b>' + fmtN(L.vacacionesDias) + '</b> días × salario diario promedio ' + colones(L.salarioDiario) + ' = <b>' + colones(L.vacacionesMonto) + '</b><br>' +
     'Aguinaldo proporcional (desde el 1 de diciembre): <b>' + colones(L.aguinaldoProporcional) + '</b><br>' +
     '<span style="font-size:16px">Subtotal estimado: <b>' + colones(totalLiq) + '</b></span>' +
-    '<div style="font-size:12px;color:#777;margin-top:6px">Es una referencia: usa el promedio mensual salarial de los últimos 6 meses (' + colones(L.promedioMensual) + ') ÷ 30. No incluye preaviso ni cesantía, que dependen de la causa y de los años de servicio; consúltelo con su asesor legal antes de liquidar.</div></div></div>' +
-    '<div class="panel"><div class="panelHead"><h2>Pagos registrados</h2><span style="font-size:12px;color:#777">' + P.pagos.length + '</span></div><div class="tableWrap">' +
-    (!P.pagos.length ? '<div class="empty">Aún no hay pagos registrados para este colaborador.</div>' :
-      '<table class="table tblRh"><thead><tr><th>Fecha</th><th>Período</th><th>Tipo</th><th>Bruto</th><th>Deducciones</th><th>Neto</th><th>Nota</th><th>Registró</th><th></th></tr></thead><tbody>' +
-      P.pagos.map(p => '<tr><td>' + esc(rhFecha(p.fecha)) + '</td><td>' + esc(p.periodo) + '</td><td>' + esc(p.tipoTxt) + (rhDatos.salariales.indexOf(p.tipo) !== -1 ? ' <span title="Cuenta para el aguinaldo" style="color:#2c6b3c">●</span>' : '') + '</td><td>' + colones(p.bruto) + '</td><td>' + colones(p.deducciones) + '</td><td><b>' + colones(p.neto) + '</b></td><td>' + esc(p.obs) + '</td><td>' + esc(p.por) +
-        '</td><td><button class="btnMini" style="color:#a31616" onclick="rhEliminarPago(\'' + escJs(p.id) + '\')">🗑️</button></td></tr>').join('') + '</tbody></table>') + '</div></div>';
+    '<div style="font-size:12px;color:#777;margin-top:6px">Es una referencia: usa el promedio mensual salarial de los últimos 6 meses (' + colones(L.promedioMensual) + ') ÷ 30. No incluye preaviso ni cesantía, que dependen de la causa y de los años de servicio; consúltelo con su asesor legal antes de liquidar.</div></div></div>';
 }
 
-function rhNuevoPago(per, bruto, obs) {
-  const c = rhDatos.colaboradores.find(x => x.id === rhColSel); if (!c) return;
-  rhModal('<h3>Registrar pago · ' + esc(c.nombre) + '</h3>' +
+/* ---------- Registrar pago ---------- */
+
+function rhTasaObr() { return (rhDatos.tasas || []).filter(t => t.clave.indexOf('obr_') === 0).reduce((a, t) => a + t.valor, 0); }
+function rhTasaPat() { return (rhDatos.tasas || []).filter(t => t.clave.indexOf('pat_') === 0).reduce((a, t) => a + t.valor, 0); }
+
+function rhNuevoPago(idColab, per, bruto, obs) {
+  const lista = rhDatos.colaboradores.filter(x => rhEstadoOk(x) || x.id === idColab);
+  const c = rhDatos.colaboradores.find(x => x.id === idColab) || lista[0]; if (!c) { toast('Primero agrega colaboradores.'); return; }
+  rhModal('<h3>Registrar pago</h3>' +
+    '<div class="field"><label>Colaborador</label><select id="rpColab" onchange="rhPagoColabCambio()">' + lista.map(x => '<option value="' + esc(x.id) + '"' + (x.id === c.id ? ' selected' : '') + '>' + esc(x.nombre) + '</option>').join('') + '</select></div>' +
     '<div style="display:flex;gap:10px"><div class="field" style="flex:1"><label>Fecha del pago</label><input type="date" id="rpFecha" value="' + esc(rhDatos.hoy) + '"></div>' +
     '<div class="field" style="flex:1"><label>Período (ej. 2026-10 1Q)</label><input id="rpPeriodo" maxlength="40" autocomplete="off" value="' + esc(per || '') + '"></div></div>' +
-    '<div class="field"><label>Tipo</label><select id="rpTipo">' + Object.keys(rhDatos.tiposPago).map(k => '<option value="' + k + '">' + esc(rhDatos.tiposPago[k]) + (rhDatos.salariales.indexOf(k) !== -1 ? ' (cuenta para aguinaldo)' : '') + '</option>').join('') + '</select></div>' +
+    '<div class="field"><label>Tipo</label><select id="rpTipo" onchange="rhNeto()">' + Object.keys(rhDatos.tiposPago).map(k => '<option value="' + k + '">' + esc(rhDatos.tiposPago[k]) + (rhDatos.salariales.indexOf(k) !== -1 ? ' (cuenta para aguinaldo y cargas)' : '') + '</option>').join('') + '</select></div>' +
     '<div style="display:flex;gap:10px"><div class="field" style="flex:1"><label>Monto bruto (₡)</label><input type="number" id="rpBruto" min="0" step="0.01" value="' + (bruto !== undefined ? bruto : (c.salario ? rh2c(rhPagoPeriodo(c)) : '')) + '" oninput="rhNeto()"></div>' +
-    '<div class="field" style="flex:1"><label>Deducciones (CCSS, renta, otras) (₡)</label><input type="number" id="rpDed" min="0" step="0.01" value="0" oninput="rhNeto()"></div></div>' +
-    '<div id="rpNeto" style="font-size:14px;margin:4px 0 8px"></div><div class="field"><label>Nota (opcional)</label><input id="rpObs" maxlength="200" autocomplete="off" value="' + esc(obs || '') + '"></div>' +
-    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button class="btn secondary" onclick="rhCerrar()">Cancelar</button><button class="btn primary" id="rpBtn" onclick="rhGuardarPago()">Registrar</button></div>');
+    '<div class="field" style="flex:1"><label>Deducciones al trabajador (₡)</label><input type="number" id="rpDed" min="0" step="0.01" value="0" oninput="rhNeto()"></div></div>' +
+    '<button class="btnMini" onclick="rhCalcDed()">Calcular CCSS y Banco Popular del trabajador (' + fmtN(rhTasaObr()) + '%)</button>' +
+    '<div id="rpNeto" style="font-size:14px;margin:8px 0"></div><div class="field"><label>Nota (opcional)</label><input id="rpObs" maxlength="200" autocomplete="off" value="' + esc(obs || '') + '"></div>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap"><button class="btn secondary" onclick="rhCerrar()">Cerrar</button><button class="btn secondary" id="rpBtn2" onclick="rhGuardarPago(true)">Registrar y agregar otro</button><button class="btn primary" id="rpBtn" onclick="rhGuardarPago(false)">Registrar</button></div>');
   rhNeto();
 }
 
-function rhNeto() { $('rpNeto').innerHTML = 'Neto: <b>' + colones((+$('rpBruto').value || 0) - (+$('rpDed').value || 0)) + '</b>'; }
+function rhPagoColabCambio() {
+  const c = rhDatos.colaboradores.find(x => x.id === $('rpColab').value);
+  if (c && c.salario && $('rpTipo').value === 'SALARIO') { $('rpBruto').value = rh2c(rhPagoPeriodo(c)); rhNeto(); }
+}
+function rhCalcDed() { $('rpDed').value = rh2c((+$('rpBruto').value || 0) * rhTasaObr() / 100); rhNeto(); }
+function rhNeto() {
+  const b = +$('rpBruto').value || 0, sal = rhDatos.salariales.indexOf($('rpTipo').value) !== -1;
+  $('rpNeto').innerHTML = 'Neto: <b>' + colones(b - (+$('rpDed').value || 0)) + '</b>' + (sal ? ' · Cargas patronales estimadas: <b>' + colones(b * rhTasaPat() / 100) + '</b> (' + fmtN(rhTasaPat()) + '%)' : ' · <span style="color:#777">no paga cargas patronales</span>');
+}
 
-async function rhGuardarPago() {
-  const b = $('rpBtn'); b.disabled = true;
+async function rhGuardarPago(otro) {
+  const b = $(otro ? 'rpBtn2' : 'rpBtn'); b.disabled = true;
   try {
-    await api('registrarPagoRhWeb', { idColab: rhColSel, fecha: $('rpFecha').value, periodo: $('rpPeriodo').value, tipo: $('rpTipo').value, bruto: $('rpBruto').value, deducciones: $('rpDed').value, obs: $('rpObs').value });
-    rhCerrar(); toast('Pago registrado.'); if (rhTabAct === 'pag') rhRenderPag();
+    await api('registrarPagoRhWeb', { idColab: $('rpColab').value, fecha: $('rpFecha').value, periodo: $('rpPeriodo').value, tipo: $('rpTipo').value, bruto: $('rpBruto').value, deducciones: $('rpDed').value, obs: $('rpObs').value });
+    toast('Pago registrado.');
+    if (otro) { b.disabled = false; $('rpBruto').value = ''; $('rpDed').value = 0; $('rpObs').value = ''; rhNeto(); $('rpBruto').focus(); }
+    else rhCerrar();
+    if (rhTabAct === 'pag') rhRenderPag();
   } catch (e) { b.disabled = false; mostrarError(e, 'No se pudo registrar el pago.'); }
 }
 
 async function rhEliminarPago(id) {
-  if (!confirm('¿Eliminar este pago? Cambia el aguinaldo estimado.')) return;
+  if (!confirm('¿Eliminar este pago? Cambia el aguinaldo estimado y las cargas.')) return;
   try { await api('eliminarPagoRhWeb', id); toast('Pago eliminado.'); rhRenderPag(); }
   catch (e) { mostrarError(e, 'No se pudo eliminar.'); }
+}
+
+/* ---------- Carga masiva (pegar desde Excel) ---------- */
+
+function rhNorm(t) { return String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim(); }
+function rhNumTxt(t) {
+  let x = String(t || '').replace(/[₡\s]/g, '');
+  if (!x) return 0;
+  const c = x.lastIndexOf(','), p = x.lastIndexOf('.');
+  if (c !== -1 && p !== -1) x = c > p ? x.replace(/\./g, '').replace(',', '.') : x.replace(/,/g, '');
+  else if (c !== -1) x = /,\d{1,2}$/.test(x) ? x.replace(',', '.') : x.replace(/,/g, '');
+  const n = Number(x); return isNaN(n) ? NaN : n;
+}
+function rhFechaTxt(t) {
+  t = String(t || '').trim(); let m;
+  if ((m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/))) return m[1] + '-' + m[2].padStart(2, '0') + '-' + m[3].padStart(2, '0');
+  if ((m = t.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/))) return (m[3].length === 2 ? '20' + m[3] : m[3]) + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0');
+  return '';
+}
+function rhTipoTxt(t) {
+  const n = rhNorm(t); if (!n) return '';
+  const ks = Object.keys(rhDatos.tiposPago);
+  return ks.find(k => rhNorm(k) === n) || ks.find(k => rhNorm(rhDatos.tiposPago[k]) === n) || ks.find(k => rhNorm(rhDatos.tiposPago[k]).indexOf(n) === 0) || '';
+}
+
+function rhPegarPagos() {
+  rhModal('<h3>Pegar varios pagos</h3><div style="font-size:13px;color:#555;margin-bottom:8px">Copia las filas desde Excel (o sepáralas con «;») con estas columnas, en este orden:<br><b>Colaborador · Fecha · Período · Tipo · Bruto · Deducciones · Nota</b> (período, deducciones y nota son opcionales). Tipos: ' +
+    Object.keys(rhDatos.tiposPago).map(k => esc(rhDatos.tiposPago[k])).join(', ') + '. Las fechas pueden ser 15/03/2026 o 2026-03-15.</div>' +
+    '<textarea id="rpgTxt" rows="8" style="width:100%;font-family:monospace;font-size:12px" placeholder="Ana Soto Vega\t15/03/2026\t2026-03 1Q\tSalario\t400000\t43320"></textarea>' +
+    '<div id="rpgPrev" style="margin-top:8px"></div>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn secondary" onclick="rhCerrar()">Cancelar</button><button class="btn secondary" onclick="rhPegarValidar()">Revisar</button><button class="btn primary" id="rpgOk" onclick="rhPegarGuardar()" disabled>Registrar</button></div>');
+  $('rhModal').style.maxWidth = '820px';
+}
+let rhLote = [];
+function rhPegarValidar() {
+  const lineas = $('rpgTxt').value.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const porNombre = {}; rhDatos.colaboradores.forEach(c => { porNombre[rhNorm(c.nombre)] = c; });
+  rhLote = []; let errores = 0;
+  const filas = lineas.map((l, i) => {
+    const col = l.indexOf('\t') !== -1 ? l.split('\t') : l.split(';');
+    const c = porNombre[rhNorm(col[0])], f = rhFechaTxt(col[1]), tipo = rhTipoTxt(col[3]), br = rhNumTxt(col[4]), de = rhNumTxt(col[5]);
+    const er = !c ? 'Colaborador no encontrado' : !f ? 'Fecha no válida' : !tipo ? 'Tipo no válido' : !(br > 0) ? 'Bruto no válido' : isNaN(de) ? 'Deducciones no válidas' : de > br ? 'Deducciones mayores al bruto' : '';
+    if (er) errores++; else rhLote.push({ idColab: c.id, fecha: f, periodo: (col[2] || '').trim(), tipo: tipo, bruto: br, deducciones: de || 0, obs: (col[6] || '').trim() });
+    return '<tr' + (er ? ' style="background:#fde8e8"' : '') + '><td>' + (i + 1) + '</td><td>' + esc(c ? c.nombre : col[0]) + '</td><td>' + esc(f || col[1]) + '</td><td>' + esc(tipo ? rhDatos.tiposPago[tipo] : col[3]) + '</td><td>' + (br > 0 ? colones(br) : esc(col[4])) + '</td><td>' + (isNaN(de) ? esc(col[5]) : colones(de || 0)) + '</td><td style="color:#a31616">' + esc(er) + '</td></tr>';
+  });
+  $('rpgPrev').innerHTML = !lineas.length ? '<div class="empty">Pega al menos una fila.</div>' : '<div style="max-height:260px;overflow:auto"><table class="table tblRh"><thead><tr><th>#</th><th>Colaborador</th><th>Fecha</th><th>Tipo</th><th>Bruto</th><th>Deducciones</th><th></th></tr></thead><tbody>' + filas.join('') + '</tbody></table></div>' +
+    '<div style="margin-top:6px;font-weight:600;color:' + (errores ? '#a31616' : '#2c6b3c') + '">' + (errores ? errores + ' fila(s) con error: corrígelas y vuelve a revisar.' : lineas.length + ' pago(s) listos para registrar.') + '</div>';
+  $('rpgOk').disabled = !!errores || !rhLote.length;
+}
+async function rhPegarGuardar() {
+  $('rpgOk').disabled = true;
+  try { const r = await api('registrarPagosLoteRhWeb', rhLote); rhCerrar(); toast(r.cantidad + ' pagos registrados.'); rhRenderPag(); }
+  catch (e) { $('rpgOk').disabled = false; mostrarError(e, 'No se pudieron registrar los pagos.'); }
+}
+
+/* ---------- Tasas de cargas sociales ---------- */
+
+function rhTasasModal() {
+  rhModal('<h3>Cargas sociales (Costa Rica, 2026)</h3><div style="font-size:12px;color:#666;margin-bottom:8px">Porcentajes sobre el salario bruto. Si cambian por ley o por tu póliza del INS, ajústalos aquí y todos los reportes usan los nuevos valores.</div>' +
+    '<div style="max-height:52vh;overflow:auto">' + rhDatos.tasas.map(t => '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><label style="flex:1;font-size:13px">' + esc(t.nombre) + '</label><input type="number" step="0.01" min="0" max="100" data-k="' + t.clave + '" value="' + t.valor + '" style="width:90px" oninput="rhTasasSuma()"> %</div>').join('') + '</div>' +
+    '<div id="rtSum" style="margin-top:8px;font-weight:600"></div><div style="display:flex;gap:8px;justify-content:space-between;margin-top:12px;flex-wrap:wrap"><button class="btn secondary" onclick="rhTasasDef()">Restablecer valores 2026</button><span><button class="btn secondary" onclick="rhCerrar()">Cancelar</button> <button class="btn primary" onclick="rhTasasGuardar()">Guardar</button></span></div>');
+  rhTasasSuma();
+}
+function rhTasasSuma() {
+  let p = 0, o = 0; Array.from($('rhModal').querySelectorAll('input[data-k]')).forEach(i => { const v = +i.value || 0; if (i.dataset.k.indexOf('pat_') === 0) p += v; else o += v; });
+  $('rtSum').innerHTML = 'Total patrono: ' + fmtN(Math.round(p * 100) / 100) + '% · Total trabajador: ' + fmtN(Math.round(o * 100) / 100) + '%';
+}
+function rhTasasDef() { rhDatos.tasas.forEach(t => { const i = $('rhModal').querySelector('input[data-k="' + t.clave + '"]'); if (i) i.value = t.defecto; }); rhTasasSuma(); }
+async function rhTasasGuardar() {
+  const o = {}; Array.from($('rhModal').querySelectorAll('input[data-k]')).forEach(i => { o[i.dataset.k] = i.value; });
+  try { const r = await api('guardarTasasRhWeb', o); rhDatos.tasas = r.tasas; rhCerrar(); toast('Cargas sociales actualizadas.'); rhRenderPag(); }
+  catch (e) { mostrarError(e, 'No se pudieron guardar las tasas.'); }
+}
+
+/* ---------- Reportes: Excel (CSV) e impresión / PDF ---------- */
+
+function rhCsvCelda(v) { v = v === null || v === undefined ? '' : String(v); return /[",;\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
+function rhExportarCsv(modo) {
+  if (!rhRep) return;
+  const R = rhRep; let filas;
+  if (modo === 'detalle' || rhColSel) {
+    filas = [['Fecha', 'Colaborador', 'Período', 'Tipo', 'Bruto', 'Cargas patronales', 'Deducciones', 'Neto', 'Nota']].concat(R.pagos.map(p => [p.fecha, p.nombre, p.periodo, p.tipoTxt, p.bruto, p.cargas, p.deducciones, p.neto, p.obs]));
+  } else {
+    filas = [['Colaborador', 'Estado', 'Salarial', 'Aguinaldo pagado', 'Otros', 'Total bruto', 'Cargas patronales', 'Costo total', 'Deducciones', 'Neto', 'Aguinaldo del ciclo (÷12)']]
+      .concat(R.filas.map(r => [r.nombre, r.activo ? 'Activo' : 'Fuera de la operativa', r.salarial, r.aguinaldoPagado, r.noSalarial + r.liquidacion, r.bruto, r.cargas, r.costo, r.deducciones, r.neto, r.aguEstimado]))
+      .concat([['TOTAL', '', R.totales.salarial, R.totales.aguinaldoPagado, R.totales.noSalarial + R.totales.liquidacion, R.totales.bruto, R.totales.cargas, R.totales.costo, R.totales.deducciones, R.totales.neto, R.totales.aguEstimado]]);
+  }
+  const csv = '﻿' + filas.map(f => f.map(rhCsvCelda).join(';')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = 'pagos_' + (rhColSel ? 'persona_' : (modo === 'detalle' ? 'detalle_' : 'general_')) + R.desde + '_' + R.hasta + '.csv';
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+
+function rhReporteHtml() {
+  const R = rhRep, T = R.totales, m = n => colones(n);
+  const persona = rhColSel && rhPagos ? rhPagos.colaborador : null;
+  const est = { activos: 'Colaboradores activos', fuera: 'Fuera de la operativa', todos: 'Todos los colaboradores' }[R.estado];
+  let h = '<h1>Reporte de pagos ' + (persona ? '· ' + esc(persona.nombre) : '· General') + '</h1><div class="sub">Soluciones Red Dorada SRL · Período ' + esc(rhFecha(R.desde)) + ' al ' + esc(rhFecha(R.hasta)) + (persona ? '' : ' · ' + est) + ' · Generado ' + esc(rhFecha(R.hoy)) + '</div>';
+  if (persona) h += '<div class="sub">' + [persona.puesto, persona.cedula ? 'Cédula ' + persona.cedula : '', persona.ingreso ? 'Ingreso ' + rhFecha(persona.ingreso) : '', persona.salida ? 'Salida ' + rhFecha(persona.salida) : ''].filter(Boolean).map(esc).join(' · ') + '</div>';
+  h += '<table class="k"><tr><td>Total bruto<b>' + m(T.bruto) + '</b></td><td>Cargas patronales (' + fmtN(R.totalPatronal) + '%)<b>' + m(T.cargas) + '</b></td><td>Costo total<b>' + m(T.costo) + '</b></td><td>Deducciones<b>' + m(T.deducciones) + '</b></td><td>Neto pagado<b>' + m(T.neto) + '</b></td><td>Aguinaldo ciclo (÷12)<b>' + m(T.aguEstimado) + '</b></td></tr></table>';
+  if (!persona) {
+    h += '<h2>Resumen por colaborador</h2><table><thead><tr><th>Colaborador</th><th>Salarial</th><th>Aguinaldo</th><th>Otros</th><th>Total bruto</th><th>Cargas patr.</th><th>Costo total</th><th>Deducciones</th><th>Neto</th><th>Aguinaldo ciclo</th></tr></thead><tbody>' +
+      R.filas.map(r => '<tr><td>' + esc(r.nombre) + (r.activo ? '' : ' (fuera)') + '</td><td>' + m(r.salarial) + '</td><td>' + m(r.aguinaldoPagado) + '</td><td>' + m(r.noSalarial + r.liquidacion) + '</td><td>' + m(r.bruto) + '</td><td>' + m(r.cargas) + '</td><td>' + m(r.costo) + '</td><td>' + m(r.deducciones) + '</td><td>' + m(r.neto) + '</td><td>' + m(r.aguEstimado) + '</td></tr>').join('') +
+      '<tr class="t"><td>Total</td><td>' + m(T.salarial) + '</td><td>' + m(T.aguinaldoPagado) + '</td><td>' + m(T.noSalarial + T.liquidacion) + '</td><td>' + m(T.bruto) + '</td><td>' + m(T.cargas) + '</td><td>' + m(T.costo) + '</td><td>' + m(T.deducciones) + '</td><td>' + m(T.neto) + '</td><td>' + m(T.aguEstimado) + '</td></tr></tbody></table>';
+  } else {
+    const A = rhPagos.aguinaldo[0], L = rhPagos.liquidacion;
+    h += '<h2>Aguinaldo y liquidación (referencia)</h2><table><tbody><tr><td>Salarial acumulado del ciclo ' + esc(A.desde.slice(0, 7)) + ' a ' + esc(A.hasta.slice(0, 7)) + '</td><td>' + m(A.base) + '</td></tr><tr><td>Aguinaldo estimado (÷ 12)</td><td>' + m(A.estimado) + '</td></tr><tr><td>Aguinaldo ya pagado en el ciclo</td><td>' + m(A.pagado) + '</td></tr>' +
+      '<tr><td>Vacaciones pendientes: ' + fmtN(L.vacacionesDias) + ' días</td><td>' + m(L.vacacionesMonto) + '</td></tr></tbody></table>';
+  }
+  h += '<h2>Cargas patronales</h2><table><thead><tr><th>Concepto</th><th>%</th><th>Monto</th></tr></thead><tbody>' + R.desglose.map(d => '<tr><td>' + esc(d.nombre) + '</td><td>' + fmtN(d.pct) + '%</td><td>' + m(d.monto) + '</td></tr>').join('') + '<tr class="t"><td>Total</td><td>' + fmtN(R.totalPatronal) + '%</td><td>' + m(T.cargas) + '</td></tr></tbody></table>';
+  if (persona || R.pagos.length <= 400) {
+    h += '<h2>Detalle de pagos</h2><table><thead><tr><th>Fecha</th>' + (persona ? '' : '<th>Colaborador</th>') + '<th>Período</th><th>Tipo</th><th>Bruto</th><th>Cargas patr.</th><th>Deducciones</th><th>Neto</th></tr></thead><tbody>' +
+      R.pagos.map(p => '<tr><td>' + esc(rhFecha(p.fecha)) + '</td>' + (persona ? '' : '<td>' + esc(p.nombre) + '</td>') + '<td>' + esc(p.periodo) + '</td><td>' + esc(p.tipoTxt) + '</td><td>' + m(p.bruto) + '</td><td>' + m(p.cargas) + '</td><td>' + m(p.deducciones) + '</td><td>' + m(p.neto) + '</td></tr>').join('') + '</tbody></table>';
+  }
+  h += '<div class="sub" style="margin-top:14px">Las cargas patronales se calculan sobre salario, horas extra, comisiones/bonos salariales y vacaciones pagadas, con los porcentajes configurados. Cálculo de referencia: confírmalo con la planilla de la CCSS y tu contador.</div>';
+  return '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Reporte de pagos</title><style>body{font-family:Arial,Helvetica,sans-serif;color:#1d2433;margin:24px;font-size:12px}h1{font-size:20px;margin:0 0 4px;color:#0f1b2d}h2{font-size:14px;margin:18px 0 6px;color:#7a1b1b;border-bottom:1px solid #ccc;padding-bottom:3px}.sub{color:#666;margin:2px 0}table{border-collapse:collapse;width:100%;margin-top:4px}th,td{border:1px solid #d5d9e0;padding:4px 6px;text-align:right}th:first-child,td:first-child{text-align:left}thead th{background:#0f1b2d;color:#fff}tr.t td{font-weight:700;background:#eef0f4}table.k td{text-align:left;font-size:11px;color:#666}table.k b{display:block;font-size:14px;color:#1d2433}@media print{body{margin:10mm}}</style></head><body>' + h + '</body></html>';
+}
+
+function rhImprimir() {
+  if (!rhRep) return;
+  const f = document.createElement('iframe');
+  f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+  document.body.appendChild(f);
+  f.onload = () => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { toast('No se pudo abrir la impresión.'); } setTimeout(() => f.remove(), 60000); };
+  f.srcdoc = rhReporteHtml();
 }
 
 function mostrarVista(v, forzar) {
@@ -12654,6 +12867,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 34 · 13-oct 20:45</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 35 · 13-oct 21:30</div>
 </body>
 </html>

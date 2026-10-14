@@ -9053,21 +9053,31 @@ function configurarConsecutivoCotWeb(token, ultimo) {
    ========================================================= */
 
 const RH = {
-  HOJAS: { COLAB: 'RH_COLABORADORES', SOL: 'RH_SOLICITUDES', PAG: 'RH_PAGOS', ASI: 'RH_ASISTENCIA' },
+  HOJAS: { COLAB: 'RH_COLABORADORES', SOL: 'RH_SOLICITUDES', PAG: 'RH_PAGOS', ASI: 'RH_ASISTENCIA', PAR: 'RH_PARAMETROS' },
   HEADERS: {
     COLAB: ['ID', 'Usuario', 'Nombre', 'Puesto', 'Fecha_Ingreso', 'Salario_Base', 'Periodicidad', 'Dias_Semana', 'Dias_Por_Periodo',
       'Dias_Tomados_Previos', 'Activo', 'Fecha_Salida', 'Obs', 'Creado', 'Actualizado',
       'Cedula', 'Fecha_Nacimiento', 'Telefono', 'Correo_Personal', 'Direccion', 'Contacto_Emergencia', 'Tel_Emergencia'],
     SOL: ['ID', 'ID_Colab', 'Tipo', 'Desde', 'Hasta', 'Dias', 'Motivo', 'Estado', 'Comentario_Admin', 'Resuelto_Por', 'Resuelto', 'Creado_Por', 'Creado'],
     PAG: ['ID', 'ID_Colab', 'Fecha', 'Periodo', 'Tipo', 'Bruto', 'Deducciones', 'Neto', 'Obs', 'Registrado_Por', 'Creado'],
-    ASI: ['ID_Colab', 'Fecha', 'Estado', 'Obs', 'Registrado_Por', 'Actualizado']
+    ASI: ['ID_Colab', 'Fecha', 'Estado', 'Obs', 'Registrado_Por', 'Actualizado'],
+    PAR: ['Clave', 'Valor', 'Actualizado']
   },
   TEXTO: {
     COLAB: ['ID', 'Usuario', 'Fecha_Ingreso', 'Fecha_Salida', 'Creado', 'Actualizado', 'Cedula', 'Fecha_Nacimiento', 'Telefono', 'Tel_Emergencia'],
     SOL: ['ID', 'ID_Colab', 'Desde', 'Hasta', 'Resuelto', 'Creado'],
     PAG: ['ID', 'ID_Colab', 'Fecha', 'Periodo', 'Creado'],
-    ASI: ['ID_Colab', 'Fecha', 'Actualizado']
+    ASI: ['ID_Colab', 'Fecha', 'Actualizado'],
+    PAR: ['Clave']
   },
+  /* Cargas sociales de Costa Rica vigentes desde enero 2026 (porcentajes editables en la plataforma) */
+  TASAS_DEF: [
+    ['pat_sem', 'Patrono · Seguro de Salud y Maternidad (SEM)', 9.25], ['pat_ivm', 'Patrono · Invalidez, Vejez y Muerte (IVM)', 5.58],
+    ['pat_bp', 'Patrono · Cuota Banco Popular', 0.25], ['pat_asfa', 'Patrono · Asignaciones Familiares (FODESAF)', 5], ['pat_imas', 'Patrono · IMAS', 0.5],
+    ['pat_ina', 'Patrono · INA', 1.5], ['pat_bpl', 'Patrono · Aporte Banco Popular (Ley Protección al Trabajador)', 0.25], ['pat_fcl', 'Patrono · Fondo de Capitalización Laboral', 1.5],
+    ['pat_opc', 'Patrono · Fondo de Pensiones Complementarias', 2], ['pat_ins', 'Patrono · INS (ajusta según tu póliza de riesgos del trabajo)', 1],
+    ['obr_sem', 'Trabajador · SEM', 5.5], ['obr_ivm', 'Trabajador · IVM', 4.33], ['obr_bp', 'Trabajador · Banco Popular', 1]
+  ],
   /* Estados de asistencia que se marcan a mano (los de solicitudes aprobadas se ponen solos) */
   ESTADOS_ASI: { LAB: 'Laborado', AUS: 'Ausencia', LIB: 'Día libre', FER: 'Feriado' },
   TIPOS_SOL: { VAC: 'Vacaciones', PCG: 'Permiso con goce', PSG: 'Permiso sin goce', INC: 'Incapacidad' },
@@ -9222,6 +9232,7 @@ function obtenerRhWeb(token) {
 
   if (admin) {
     out.colaboradores = colabs.map(rhColabInfo_).map(c => Object.assign(c, { saldo: rhSaldo_(c, sols, hoy) }));
+    out.tasas = rhTasas_();
     out.solicitudes = sols.map(s => rhSolInfo_(s, nombres)).filter(s => s.estado === 'Pendiente' || s.hasta >= lim || s.creado >= lim)
       .sort((a, b) => (a.estado === 'Pendiente' ? 0 : 1) - (b.estado === 'Pendiente' ? 0 : 1) || b.desde.localeCompare(a.desde));
     const us = leerObjetos_(obtenerHoja_(CONFIG.HOJAS.USUARIOS));
@@ -9404,7 +9415,7 @@ function obtenerPagosRhWeb(token, idColab) {
     const c = rhCicloAguinaldo_(hoy, k);
     const base = pagos.filter(p => RH.SALARIALES.indexOf(p.tipo) !== -1 && p.fecha >= c.desde && p.fecha <= c.hasta).reduce((a, p) => a + p.bruto, 0);
     const tope = formatearFechaISO_(sumarDias_(convertirFecha_(c.hasta), 40));
-    const pagado = pagos.filter(p => p.tipo === 'AGUINALDO' && p.fecha >= c.desde && p.fecha <= tope).reduce((a, p) => a + p.bruto, 0);
+    const pagado = pagos.filter(p => p.tipo === 'AGUINALDO' && p.fecha > c.hasta && p.fecha <= tope).reduce((a, p) => a + p.bruto, 0);
     return { desde: c.desde, hasta: c.hasta, base: rh2_(base), estimado: rh2_(base / 12), pagado: rh2_(pagado) };
   });
 
@@ -9464,7 +9475,7 @@ function fmtRh_(iso) { const p = String(iso || '').split('-'); return p.length =
 
 /* Marcas manuales (Laborado, Ausencia, Día libre, Feriado) más los días cubiertos por solicitudes aprobadas.
    Devuelve por colaborador: dias {fecha: {e, auto, obs}} y las fechas del rango. */
-function obtenerAsistenciaRhWeb(token, desde, hasta) {
+function obtenerAsistenciaRhWeb(token, desde, hasta, estado) {
 
   const ses = requerirSesion_(token, 'consulta');
   const admin = ses.rol === 'admin';
@@ -9476,7 +9487,10 @@ function obtenerAsistenciaRhWeb(token, desde, hasta) {
 
   let colabs = leerObjetos_(rhHoja_('COLAB')).map(rhColabInfo_);
   if (!admin) colabs = colabs.filter(c => c.id === mio.id);
-  else colabs = colabs.filter(c => c.activo || (c.salida && c.salida >= desde));
+  else {
+    estado = estado === 'fuera' || estado === 'todos' ? estado : 'activos';
+    colabs = colabs.filter(c => estado === 'todos' ? true : (estado === 'fuera' ? !c.activo : c.activo));
+  }
   const ids = {}; colabs.forEach(c => { ids[c.id] = { id: c.id, nombre: c.nombre, periodicidad: c.periodicidad, diasSemana: c.diasSemana, ingreso: c.ingreso, salida: c.salida, dias: {} }; });
   if (admin) colabs.forEach(c => { ids[c.id].salario = c.salario; });
 
@@ -9592,6 +9606,132 @@ function guardarMiFichaRhWeb(token, d) {
       return { ok: true };
     }
     throw new Error('No se encontró tu ficha.');
+  });
+}
+
+
+/* ---------- Pagos a nivel general: cargas sociales y reportes ---------- */
+
+function rhTasas_() {
+  const m = {};
+  leerObjetos_(rhHoja_('PAR')).forEach(r => { if (txt_(r.Clave)) m[txt_(r.Clave)] = rhNum_(r.Valor); });
+  return RH.TASAS_DEF.map(t => ({ clave: t[0], nombre: t[1], valor: m[t[0]] !== undefined ? m[t[0]] : t[2], defecto: t[2] }));
+}
+
+function guardarTasasRhWeb(token, tasas) {
+  requerirSesion_(token, 'admin');
+  tasas = tasas || {};
+  return conBloqueo_(() => {
+    const sh = rhHoja_('PAR');
+    const t = leerTabla_(sh);
+    const ahora = segAhora_();
+    RH.TASAS_DEF.forEach(def => {
+      if (tasas[def[0]] === undefined || tasas[def[0]] === null || String(tasas[def[0]]) === '') return;
+      const v = rhNum_(tasas[def[0]]);
+      if (v < 0 || v > 100) throw new Error('Los porcentajes deben estar entre 0 y 100.');
+      let fila = -1;
+      for (let i = 1; i < t.values.length; i++) if (txt_(t.values[i][t.idx.Clave]) === def[0]) { fila = i; break; }
+      if (fila < 0) { appendPorEncabezados_(sh, { Clave: def[0], Valor: v, Actualizado: ahora }); }
+      else { sh.getRange(fila + 1, t.idx.Valor + 1).setValue(v); sh.getRange(fila + 1, t.idx.Actualizado + 1).setValue(ahora); }
+    });
+    return { ok: true, tasas: rhTasas_() };
+  });
+}
+
+function obtenerTasasRhWeb(token) { requerirSesion_(token, 'admin'); return { tasas: rhTasas_() }; }
+
+function rhSumTasas_(tasas, pref) { return rh2_(tasas.filter(t => t.clave.indexOf(pref) === 0).reduce((a, t) => a + t.valor, 0)); }
+
+function rhFiltroEstado_(c, estado) { return estado === 'todos' ? true : (estado === 'fuera' ? !c.activo : c.activo); }
+
+/* Reporte de pagos del período: por colaborador (general) o detalle de una persona. Cargas patronales = % sobre lo salarial (aguinaldo, liquidación y rubros no salariales no pagan cargas). */
+function obtenerReportePagosRhWeb(token, desde, hasta, estado, idColab) {
+
+  requerirSesion_(token, 'admin');
+  desde = segFecha_(desde); hasta = segFecha_(hasta);
+  if (!desde || !hasta || hasta < desde) throw new Error('Rango de fechas no válido.');
+  estado = estado === 'fuera' || estado === 'todos' ? estado : 'activos';
+  idColab = txt_(idColab);
+  const hoy = rhHoy_();
+  const tasas = rhTasas_();
+  const tPat = rhSumTasas_(tasas, 'pat_'), tObr = rhSumTasas_(tasas, 'obr_');
+  const colabs = leerObjetos_(rhHoja_('COLAB')).map(rhColabInfo_).filter(c => idColab ? c.id === idColab : rhFiltroEstado_(c, estado));
+  const mapa = {};
+  colabs.forEach(c => { mapa[c.id] = { id: c.id, nombre: c.nombre, activo: c.activo, puesto: c.puesto, usuario: c.usuario, cedula: c.cedula, ingreso: c.ingreso, salida: c.salida,
+    tipos: {}, salarial: 0, noSalarial: 0, aguinaldoPagado: 0, liquidacion: 0, bruto: 0, deducciones: 0, neto: 0, cargas: 0, npagos: 0, aguBase: 0, aguEstimado: 0, aguPagadoCiclo: 0 }; });
+
+  const ciclo = rhCicloAguinaldo_(hoy, 0);
+  const tope = formatearFechaISO_(sumarDias_(convertirFecha_(ciclo.hasta), 40));
+  const detalle = [];
+  leerObjetos_(rhHoja_('PAG')).forEach(p => {
+    const id = txt_(p.ID_Colab), r = mapa[id];
+    if (!r) return;
+    const f = segFecha_(p.Fecha) || '', tipo = txt_(p.Tipo), bruto = rhNum_(p.Bruto);
+    const sal = RH.SALARIALES.indexOf(tipo) !== -1;
+    if (sal && f >= ciclo.desde && f <= ciclo.hasta) r.aguBase += bruto;
+    if (tipo === 'AGUINALDO' && f > ciclo.hasta && f <= tope) r.aguPagadoCiclo += bruto;
+    if (f < desde || f > hasta) return;
+    const ded = rhNum_(p.Deducciones);
+    r.tipos[tipo] = (r.tipos[tipo] || 0) + bruto;
+    r.bruto += bruto; r.deducciones += ded; r.neto += rhNum_(p.Neto); r.npagos++;
+    if (sal) r.salarial += bruto; else if (tipo === 'AGUINALDO') r.aguinaldoPagado += bruto; else if (tipo === 'LIQ') r.liquidacion += bruto; else r.noSalarial += bruto;
+    const cargas = sal ? bruto * tPat / 100 : 0;
+    r.cargas += cargas;
+    if (detalle.length < 3000) detalle.push({ id: txt_(p.ID), idColab: id, nombre: r.nombre, fecha: f, periodo: txt_(p.Periodo), tipo: tipo, tipoTxt: RH.TIPOS_PAGO[tipo] || tipo,
+      bruto: bruto, deducciones: ded, neto: rhNum_(p.Neto), cargas: rh2_(cargas), obs: txt_(p.Obs) });
+  });
+
+  const filas = Object.keys(mapa).map(k => mapa[k]).map(r => {
+    ['salarial', 'noSalarial', 'aguinaldoPagado', 'liquidacion', 'bruto', 'deducciones', 'neto', 'cargas', 'aguBase'].forEach(n => { r[n] = rh2_(r[n]); });
+    Object.keys(r.tipos).forEach(k => { r.tipos[k] = rh2_(r.tipos[k]); });
+    r.aguEstimado = rh2_(r.aguBase / 12); r.aguPagadoCiclo = rh2_(r.aguPagadoCiclo);
+    r.costo = rh2_(r.bruto + r.cargas);
+    return r;
+  }).sort((a, b) => a.nombre.localeCompare(b.nombre));
+
+  const tot = { salarial: 0, noSalarial: 0, aguinaldoPagado: 0, liquidacion: 0, bruto: 0, deducciones: 0, neto: 0, cargas: 0, costo: 0, aguEstimado: 0, aguPagadoCiclo: 0, npagos: 0 };
+  filas.forEach(r => Object.keys(tot).forEach(k => { tot[k] += r[k]; }));
+  Object.keys(tot).forEach(k => { tot[k] = rh2_(tot[k]); });
+  /* Desglose de las cargas patronales del total */
+  const desglose = tasas.filter(t => t.clave.indexOf('pat_') === 0).map(t => ({ nombre: t.nombre.replace('Patrono · ', ''), pct: t.valor, monto: rh2_(tot.salarial * t.valor / 100) }));
+  detalle.sort((a, b) => b.fecha.localeCompare(a.fecha) || a.nombre.localeCompare(b.nombre));
+  return { desde: desde, hasta: hasta, estado: estado, hoy: hoy, ciclo: ciclo, tasas: tasas, totalPatronal: tPat, totalObrero: tObr, filas: filas, totales: tot, desglose: desglose, pagos: detalle, tipos: RH.TIPOS_PAGO };
+}
+
+/* Carga masiva: lista de {colaborador (nombre o ID), fecha, periodo, tipo, bruto, deducciones, obs}. Todo o nada. */
+function registrarPagosLoteRhWeb(token, lista) {
+
+  const ses = requerirSesion_(token, 'admin');
+  lista = Array.isArray(lista) ? lista : [];
+  if (!lista.length) throw new Error('No hay pagos para registrar.');
+  if (lista.length > 500) throw new Error('Máximo 500 pagos por carga.');
+  const norm = t => sinAcentos_(String(t || '')).toLowerCase().replace(/\s+/g, ' ').trim();
+  const colabs = leerObjetos_(rhHoja_('COLAB')).map(rhColabInfo_);
+  const porNombre = {}, porId = {};
+  colabs.forEach(c => { porNombre[norm(c.nombre)] = c; porId[c.id] = c; });
+  const filas = [];
+  lista.forEach((d, i) => {
+    const n = 'Fila ' + (i + 1) + ': ';
+    const c = porId[txt_(d.idColab)] || porNombre[norm(d.colaborador)];
+    if (!c) throw new Error(n + 'no se encontró al colaborador «' + txt_(d.colaborador || d.idColab) + '».');
+    const fecha = segFecha_(d.fecha);
+    if (!fecha) throw new Error(n + 'fecha no válida.');
+    const tipo = txt_(d.tipo);
+    if (!RH.TIPOS_PAGO[tipo]) throw new Error(n + 'tipo de pago no válido («' + tipo + '»).');
+    const bruto = rhNum_(d.bruto), ded = Math.max(0, rhNum_(d.deducciones));
+    if (!(bruto > 0)) throw new Error(n + 'el monto bruto debe ser mayor que cero.');
+    if (ded > bruto) throw new Error(n + 'las deducciones superan el monto bruto.');
+    filas.push({ ID_Colab: c.id, Fecha: fecha, Periodo: txt_(d.periodo).slice(0, 40), Tipo: tipo, Bruto: rh2_(bruto), Deducciones: rh2_(ded), Neto: rh2_(bruto - ded), Obs: txt_(d.obs).slice(0, 200) });
+  });
+  return conBloqueo_(() => {
+    const sh = rhHoja_('PAG');
+    const ahora = segAhora_();
+    const base = Date.now();
+    filas.forEach((o, i) => {
+      o.ID = 'P' + (base + i).toString(36).toUpperCase(); o.Registrado_Por = ses.usuario; o.Creado = ahora;
+      appendPorEncabezados_(sh, o);
+    });
+    return { ok: true, cantidad: filas.length };
   });
 }
 
@@ -9768,7 +9908,7 @@ function prepararSistemaWeb(token) {
 
   }
 
-return {loginWeb: loginWeb, miPerfilWeb: miPerfilWeb, guardarFotoPerfilWeb: guardarFotoPerfilWeb, validarSesionWeb: validarSesionWeb, logoutWeb: logoutWeb, cambiarClaveWeb: cambiarClaveWeb, listarUsuariosWeb: listarUsuariosWeb, crearUsuarioWeb: crearUsuarioWeb, actualizarUsuarioWeb: actualizarUsuarioWeb, obtenerDatosWeb: obtenerDatosWeb, obtenerSemanasWeb: obtenerSemanasWeb, obtenerCalendarioWeb: obtenerCalendarioWeb, obtenerRotacionBackupWeb: obtenerRotacionBackupWeb, guardarCalendarioWeb: guardarCalendarioWeb, obtenerHistorialWeb: obtenerHistorialWeb, agregarMovilWeb: agregarMovilWeb, actualizarMovilWeb: actualizarMovilWeb, obtenerHistorialMovilWeb: obtenerHistorialMovilWeb, darDeBajaMovilWeb: darDeBajaMovilWeb, reactivarMovilWeb: reactivarMovilWeb, exportarCalendarioClienteExcelWeb: exportarCalendarioClienteExcelWeb, obtenerResumenWeb: obtenerResumenWeb, obtenerFichasWeb: obtenerFichasWeb, guardarFichasWeb: guardarFichasWeb, obtenerPersonalWeb: obtenerPersonalWeb, buscarPersonaWeb: buscarPersonaWeb, obtenerVehiculosWeb: obtenerVehiculosWeb, deshacerSinTecnicosWeb: deshacerSinTecnicosWeb, guardarSalidaPersonalWeb: guardarSalidaPersonalWeb, obtenerCambiosFichasWeb: obtenerCambiosFichasWeb, exportarFichasExcelWeb: exportarFichasExcelWeb, obtenerSeguimientoWeb: obtenerSeguimientoWeb, guardarJustificacionTiempoWeb: guardarJustificacionTiempoWeb, guardarSeguimientoWeb: guardarSeguimientoWeb, guardarAlmuerzoWeb: guardarAlmuerzoWeb, guardarSalidaWeb: guardarSalidaWeb, corregirCorteWeb: corregirCorteWeb, eliminarCorteWeb: eliminarCorteWeb, obtenerAusenciasWeb: obtenerAusenciasWeb, guardarAusenciaWeb: guardarAusenciaWeb, marcarPenalizacionWeb: marcarPenalizacionWeb, eliminarAusenciaWeb: eliminarAusenciaWeb, importarFinalizadasWeb: importarFinalizadasWeb, guardarSuspendidaWeb: guardarSuspendidaWeb, marcarSuspendidasWeb: marcarSuspendidasWeb, guardarEstadoOtWeb: guardarEstadoOtWeb, eliminarSuspendidaWeb: eliminarSuspendidaWeb, obtenerBodegaWeb: obtenerBodegaWeb, guardarAlistosWeb: guardarAlistosWeb, obtenerAlistosWeb: obtenerAlistosWeb, cambiarEstadoAlistoWeb: cambiarEstadoAlistoWeb, aplicarAlistoWeb: aplicarAlistoWeb, obtenerMovimientosInvWeb: obtenerMovimientosInvWeb, guardarMovimientoInvWeb: guardarMovimientoInvWeb, firmarMovimientoInvWeb: firmarMovimientoInvWeb, obtenerFirmaInvWeb: obtenerFirmaInvWeb, eliminarMovimientoInvWeb: eliminarMovimientoInvWeb, guardarObjetivosWeb: guardarObjetivosWeb, aplicarCostosAdendumWeb: aplicarCostosAdendumWeb, guardarMaterialInvWeb: guardarMaterialInvWeb, importarConsumoWeb: importarConsumoWeb, obtenerConsumoDetalleWeb: obtenerConsumoDetalleWeb, eliminarCargaConsumoWeb: eliminarCargaConsumoWeb, importarDevolucionesWeb: importarDevolucionesWeb, obtenerDevolucionesWeb: obtenerDevolucionesWeb, obtenerHistorialDevolucionWeb: obtenerHistorialDevolucionWeb, registrarDevolucionLineaWeb: registrarDevolucionLineaWeb, recibirLineasDevolucionWeb: recibirLineasDevolucionWeb, registrarBoletaDevolucionWeb: registrarBoletaDevolucionWeb, registrarEntregaMovilWeb: registrarEntregaMovilWeb, justificarDevolucionWeb: justificarDevolucionWeb, cambiarEquipoDevolucionWeb: cambiarEquipoDevolucionWeb, revertirDevolucionWeb: revertirDevolucionWeb, eliminarPeriodoDevolucionesWeb: eliminarPeriodoDevolucionesWeb, aceptarAlertasBodegaWeb: aceptarAlertasBodegaWeb, obtenerNotificacionesWeb: obtenerNotificacionesWeb, obtenerConsumoInvWeb: obtenerConsumoInvWeb, obtenerCortesInvWeb: obtenerCortesInvWeb, crearCorteInvWeb: crearCorteInvWeb, obtenerConteoInvWeb: obtenerConteoInvWeb, guardarConteoInvWeb: guardarConteoInvWeb, justificarDiferenciaInvWeb: justificarDiferenciaInvWeb, cerrarCorteInvWeb: cerrarCorteInvWeb, eliminarCorteInvWeb: eliminarCorteInvWeb, reabrirCorteInvWeb: reabrirCorteInvWeb, guardarMapeoInvWeb: guardarMapeoInvWeb, compararClienteWeb: compararClienteWeb, cargarCatalogoOficialWeb: cargarCatalogoOficialWeb, aplicarObjetivoBaseWeb: aplicarObjetivoBaseWeb, unirMaterialInvWeb: unirMaterialInvWeb, eliminarMaterialesInvWeb: eliminarMaterialesInvWeb, kardexMaterialWeb: kardexMaterialWeb, guardarClienteCotWeb: guardarClienteCotWeb, eliminarClienteCotWeb: eliminarClienteCotWeb, guardarMaterialCotWeb: guardarMaterialCotWeb, eliminarMaterialCotWeb: eliminarMaterialCotWeb, importarMaterialesCotWeb: importarMaterialesCotWeb, obtenerCotizacionesWeb: obtenerCotizacionesWeb, obtenerCotizacionWeb: obtenerCotizacionWeb, guardarCotizacionWeb: guardarCotizacionWeb, cambiarEstadoCotWeb: cambiarEstadoCotWeb, subirFotoCotWeb: subirFotoCotWeb, eliminarFotoCotWeb: eliminarFotoCotWeb, obtenerArchivoCotWeb: obtenerArchivoCotWeb, guardarInformeCotWeb: guardarInformeCotWeb, guardarGastoCotWeb: guardarGastoCotWeb, marcarPagoGastoCotWeb: marcarPagoGastoCotWeb, anularGastoCotWeb: anularGastoCotWeb, eliminarGastoCotWeb: eliminarGastoCotWeb, guardarOCCotWeb: guardarOCCotWeb, facturarCotWeb: facturarCotWeb, registrarPagoFacturaCotWeb: registrarPagoFacturaCotWeb, revertirPagoFacturaCotWeb: revertirPagoFacturaCotWeb, revertirFacturaCotWeb: revertirFacturaCotWeb, archivarCotWeb: archivarCotWeb, desarchivarCotWeb: desarchivarCotWeb, enviarCotWeb: enviarCotWeb, eliminarCotizacionWeb: eliminarCotizacionWeb, configurarConsecutivoCotWeb: configurarConsecutivoCotWeb, miAccesoRhWeb: miAccesoRhWeb, obtenerRhWeb: obtenerRhWeb, guardarColaboradorWeb: guardarColaboradorWeb, crearSolicitudRhWeb: crearSolicitudRhWeb, cancelarSolicitudRhWeb: cancelarSolicitudRhWeb, resolverSolicitudRhWeb: resolverSolicitudRhWeb, obtenerPagosRhWeb: obtenerPagosRhWeb, registrarPagoRhWeb: registrarPagoRhWeb, eliminarPagoRhWeb: eliminarPagoRhWeb, obtenerAsistenciaRhWeb: obtenerAsistenciaRhWeb, marcarAsistenciaRhWeb: marcarAsistenciaRhWeb, guardarMiFichaRhWeb: guardarMiFichaRhWeb, loginPaso1_: loginPaso1_, loginPaso2_: loginPaso2_, refrescarWeb: refrescarWeb, prepararSistemaWeb: prepararSistemaWeb};
+return {loginWeb: loginWeb, miPerfilWeb: miPerfilWeb, guardarFotoPerfilWeb: guardarFotoPerfilWeb, validarSesionWeb: validarSesionWeb, logoutWeb: logoutWeb, cambiarClaveWeb: cambiarClaveWeb, listarUsuariosWeb: listarUsuariosWeb, crearUsuarioWeb: crearUsuarioWeb, actualizarUsuarioWeb: actualizarUsuarioWeb, obtenerDatosWeb: obtenerDatosWeb, obtenerSemanasWeb: obtenerSemanasWeb, obtenerCalendarioWeb: obtenerCalendarioWeb, obtenerRotacionBackupWeb: obtenerRotacionBackupWeb, guardarCalendarioWeb: guardarCalendarioWeb, obtenerHistorialWeb: obtenerHistorialWeb, agregarMovilWeb: agregarMovilWeb, actualizarMovilWeb: actualizarMovilWeb, obtenerHistorialMovilWeb: obtenerHistorialMovilWeb, darDeBajaMovilWeb: darDeBajaMovilWeb, reactivarMovilWeb: reactivarMovilWeb, exportarCalendarioClienteExcelWeb: exportarCalendarioClienteExcelWeb, obtenerResumenWeb: obtenerResumenWeb, obtenerFichasWeb: obtenerFichasWeb, guardarFichasWeb: guardarFichasWeb, obtenerPersonalWeb: obtenerPersonalWeb, buscarPersonaWeb: buscarPersonaWeb, obtenerVehiculosWeb: obtenerVehiculosWeb, deshacerSinTecnicosWeb: deshacerSinTecnicosWeb, guardarSalidaPersonalWeb: guardarSalidaPersonalWeb, obtenerCambiosFichasWeb: obtenerCambiosFichasWeb, exportarFichasExcelWeb: exportarFichasExcelWeb, obtenerSeguimientoWeb: obtenerSeguimientoWeb, guardarJustificacionTiempoWeb: guardarJustificacionTiempoWeb, guardarSeguimientoWeb: guardarSeguimientoWeb, guardarAlmuerzoWeb: guardarAlmuerzoWeb, guardarSalidaWeb: guardarSalidaWeb, corregirCorteWeb: corregirCorteWeb, eliminarCorteWeb: eliminarCorteWeb, obtenerAusenciasWeb: obtenerAusenciasWeb, guardarAusenciaWeb: guardarAusenciaWeb, marcarPenalizacionWeb: marcarPenalizacionWeb, eliminarAusenciaWeb: eliminarAusenciaWeb, importarFinalizadasWeb: importarFinalizadasWeb, guardarSuspendidaWeb: guardarSuspendidaWeb, marcarSuspendidasWeb: marcarSuspendidasWeb, guardarEstadoOtWeb: guardarEstadoOtWeb, eliminarSuspendidaWeb: eliminarSuspendidaWeb, obtenerBodegaWeb: obtenerBodegaWeb, guardarAlistosWeb: guardarAlistosWeb, obtenerAlistosWeb: obtenerAlistosWeb, cambiarEstadoAlistoWeb: cambiarEstadoAlistoWeb, aplicarAlistoWeb: aplicarAlistoWeb, obtenerMovimientosInvWeb: obtenerMovimientosInvWeb, guardarMovimientoInvWeb: guardarMovimientoInvWeb, firmarMovimientoInvWeb: firmarMovimientoInvWeb, obtenerFirmaInvWeb: obtenerFirmaInvWeb, eliminarMovimientoInvWeb: eliminarMovimientoInvWeb, guardarObjetivosWeb: guardarObjetivosWeb, aplicarCostosAdendumWeb: aplicarCostosAdendumWeb, guardarMaterialInvWeb: guardarMaterialInvWeb, importarConsumoWeb: importarConsumoWeb, obtenerConsumoDetalleWeb: obtenerConsumoDetalleWeb, eliminarCargaConsumoWeb: eliminarCargaConsumoWeb, importarDevolucionesWeb: importarDevolucionesWeb, obtenerDevolucionesWeb: obtenerDevolucionesWeb, obtenerHistorialDevolucionWeb: obtenerHistorialDevolucionWeb, registrarDevolucionLineaWeb: registrarDevolucionLineaWeb, recibirLineasDevolucionWeb: recibirLineasDevolucionWeb, registrarBoletaDevolucionWeb: registrarBoletaDevolucionWeb, registrarEntregaMovilWeb: registrarEntregaMovilWeb, justificarDevolucionWeb: justificarDevolucionWeb, cambiarEquipoDevolucionWeb: cambiarEquipoDevolucionWeb, revertirDevolucionWeb: revertirDevolucionWeb, eliminarPeriodoDevolucionesWeb: eliminarPeriodoDevolucionesWeb, aceptarAlertasBodegaWeb: aceptarAlertasBodegaWeb, obtenerNotificacionesWeb: obtenerNotificacionesWeb, obtenerConsumoInvWeb: obtenerConsumoInvWeb, obtenerCortesInvWeb: obtenerCortesInvWeb, crearCorteInvWeb: crearCorteInvWeb, obtenerConteoInvWeb: obtenerConteoInvWeb, guardarConteoInvWeb: guardarConteoInvWeb, justificarDiferenciaInvWeb: justificarDiferenciaInvWeb, cerrarCorteInvWeb: cerrarCorteInvWeb, eliminarCorteInvWeb: eliminarCorteInvWeb, reabrirCorteInvWeb: reabrirCorteInvWeb, guardarMapeoInvWeb: guardarMapeoInvWeb, compararClienteWeb: compararClienteWeb, cargarCatalogoOficialWeb: cargarCatalogoOficialWeb, aplicarObjetivoBaseWeb: aplicarObjetivoBaseWeb, unirMaterialInvWeb: unirMaterialInvWeb, eliminarMaterialesInvWeb: eliminarMaterialesInvWeb, kardexMaterialWeb: kardexMaterialWeb, guardarClienteCotWeb: guardarClienteCotWeb, eliminarClienteCotWeb: eliminarClienteCotWeb, guardarMaterialCotWeb: guardarMaterialCotWeb, eliminarMaterialCotWeb: eliminarMaterialCotWeb, importarMaterialesCotWeb: importarMaterialesCotWeb, obtenerCotizacionesWeb: obtenerCotizacionesWeb, obtenerCotizacionWeb: obtenerCotizacionWeb, guardarCotizacionWeb: guardarCotizacionWeb, cambiarEstadoCotWeb: cambiarEstadoCotWeb, subirFotoCotWeb: subirFotoCotWeb, eliminarFotoCotWeb: eliminarFotoCotWeb, obtenerArchivoCotWeb: obtenerArchivoCotWeb, guardarInformeCotWeb: guardarInformeCotWeb, guardarGastoCotWeb: guardarGastoCotWeb, marcarPagoGastoCotWeb: marcarPagoGastoCotWeb, anularGastoCotWeb: anularGastoCotWeb, eliminarGastoCotWeb: eliminarGastoCotWeb, guardarOCCotWeb: guardarOCCotWeb, facturarCotWeb: facturarCotWeb, registrarPagoFacturaCotWeb: registrarPagoFacturaCotWeb, revertirPagoFacturaCotWeb: revertirPagoFacturaCotWeb, revertirFacturaCotWeb: revertirFacturaCotWeb, archivarCotWeb: archivarCotWeb, desarchivarCotWeb: desarchivarCotWeb, enviarCotWeb: enviarCotWeb, eliminarCotizacionWeb: eliminarCotizacionWeb, configurarConsecutivoCotWeb: configurarConsecutivoCotWeb, miAccesoRhWeb: miAccesoRhWeb, obtenerRhWeb: obtenerRhWeb, guardarColaboradorWeb: guardarColaboradorWeb, crearSolicitudRhWeb: crearSolicitudRhWeb, cancelarSolicitudRhWeb: cancelarSolicitudRhWeb, resolverSolicitudRhWeb: resolverSolicitudRhWeb, obtenerPagosRhWeb: obtenerPagosRhWeb, registrarPagoRhWeb: registrarPagoRhWeb, eliminarPagoRhWeb: eliminarPagoRhWeb, obtenerAsistenciaRhWeb: obtenerAsistenciaRhWeb, marcarAsistenciaRhWeb: marcarAsistenciaRhWeb, guardarMiFichaRhWeb: guardarMiFichaRhWeb, guardarTasasRhWeb: guardarTasasRhWeb, obtenerTasasRhWeb: obtenerTasasRhWeb, obtenerReportePagosRhWeb: obtenerReportePagosRhWeb, registrarPagosLoteRhWeb: registrarPagosLoteRhWeb, loginPaso1_: loginPaso1_, loginPaso2_: loginPaso2_, refrescarWeb: refrescarWeb, prepararSistemaWeb: prepararSistemaWeb};
 })();
 
 /* =====================================================================
