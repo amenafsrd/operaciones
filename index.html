@@ -6010,6 +6010,13 @@ function rhPlSemTot(f) {
   const bruto = Math.round(((f.base || 0) + ext) * 100) / 100, cargas = (f.ccss && !f.adicional) ? Math.round(bruto * rhPlS.tasaObr) / 100 : 0;
   return { ext: ext, reb: reb, bruto: bruto, cargas: cargas, neto: Math.round((bruto - cargas - reb) * 100) / 100 };
 }
+function rhPlGrupos(R) {
+  const defs = [['Semanal', 'Planillas semanales', 'semanales'], ['Quincenal', 'Planillas quincenales', 'quincenales']], usados = {}, out = [];
+  defs.forEach(d => { const items = []; R.filas.forEach((f, i) => { if (f.periodicidad === d[0]) { items.push({ f, i }); usados[i] = 1; } }); if (items.some(x => !R.exc[x.f.id])) out.push({ titulo: d[1], corto: d[2], items }); });
+  const resto = []; R.filas.forEach((f, i) => { if (!usados[i]) resto.push({ f, i }); });
+  if (resto.some(x => !R.exc[x.f.id])) out.push({ titulo: 'Otras planillas', corto: 'otras', items: resto });
+  return out;
+}
 function rhPlSemDibujar() {
   const R = rhPlS, d = $('rhPlSem'); if (!d) return;
   if (!R.semanas.length) { d.innerHTML = ''; return; }
@@ -6022,11 +6029,11 @@ function rhPlSemDibujar() {
     '<span style="font-size:12px;color:#667">Pago estimado: ' + esc(R.fechaPago.split('-').reverse().join('/')) + '</span></div>' +
     '<div style="padding:4px 14px 10px;font-size:12px;color:#667">Es la planilla de colaboradores que se paga junto con las móviles de esta semana. Agrega o quita rubros a cada persona (extras suman, rebajos restan) y guarda: al generar el archivo del banco de esta semana, esos montos ya vienen cargados.</div>' +
     '<div class="tableWrap"><table class="table"><thead><tr><th>Colaborador</th><th>Período</th><th class="num">Base</th><th class="num">Extras (+)</th><th class="num">Rebajos (−)</th><th class="num">Cargas</th><th class="num">Neto</th><th>Rubros</th></tr></thead><tbody>' +
-    (R.filas.some(f => !R.exc[f.id]) ? R.filas.map((f, i) => { if (R.exc[f.id]) return ''; const t = rhPlSemTot(f), rb = R.rub[f.id] || []; return '<tr style="' + (R.exc[f.id] ? 'opacity:.45' : '') + '"><td><b>' + esc(f.nombre) + '</b>' + (f.adicional ? ' <span class="segBadge" style="background:#e8f0fe;color:#1d4f91">Pago adicional</span>' : '') + (R.exc[f.id] ? ' <span class="segBadge" style="background:#fdecea;color:#9b1c1c">No se paga en este archivo</span>' : '') + '<div style="font-size:11px;color:#667">' + esc(f.periodicidad) + (f.pagado ? ' · <span style="color:#1e7e34">ya pagado en envío ' + esc(f.pagado.envio) + '</span>' : '') + '</div></td><td style="font-size:12px">' + esc(f.periodo) + '</td>' +
+    (R.filas.some(f => !R.exc[f.id]) ? rhPlGrupos(R).map(g => '<tr><td colspan="8" style="background:#e8eef7;color:#1d3f6e;font-weight:700;padding:7px 10px">' + g.titulo + ' · ' + g.items.length + ' colaborador' + (g.items.length === 1 ? '' : 'es') + '</td></tr>' + g.items.map(({ f, i }) => { if (R.exc[f.id]) return ''; const t = rhPlSemTot(f), rb = R.rub[f.id] || []; return '<tr style="' + (R.exc[f.id] ? 'opacity:.45' : '') + '"><td><b>' + esc(f.nombre) + '</b>' + (f.adicional ? ' <span class="segBadge" style="background:#e8f0fe;color:#1d4f91">Pago adicional</span>' : '') + (R.exc[f.id] ? ' <span class="segBadge" style="background:#fdecea;color:#9b1c1c">No se paga en este archivo</span>' : '') + '<div style="font-size:11px;color:#667">' + esc(f.periodicidad) + (f.pagado ? ' · <span style="color:#1e7e34">ya pagado en envío ' + esc(f.pagado.envio) + '</span>' : '') + '</div></td><td style="font-size:12px">' + esc(f.periodo) + '</td>' +
       '<td class="num">' + pmM(f.base) + '</td><td class="num">' + (t.ext ? pmM(t.ext) : '—') + '</td><td class="num">' + (t.reb ? '−' + pmM(t.reb) : '—') + '</td><td class="num">' + (t.cargas ? '−' + pmM(t.cargas) : '—') + '</td><td class="num"><b>' + pmM(t.neto) + '</b></td>' +
       '<td style="min-width:260px">' + rb.map((x, j) => '<div style="display:flex;gap:4px;align-items:center;margin-bottom:3px"><select onchange="rhPlSemRub(' + i + ',' + j + ',\'tipo\',this.value)" style="width:78px;font-size:12px"><option value="extra"' + (x.tipo !== 'rebajo' ? ' selected' : '') + '>Extra +</option><option value="rebajo"' + (x.tipo === 'rebajo' ? ' selected' : '') + '>Rebajo −</option></select>' +
         '<input value="' + esc(x.concepto || '') + '" placeholder="Concepto" maxlength="60" onchange="rhPlSemRub(' + i + ',' + j + ',\'concepto\',this.value)" style="flex:1;min-width:90px;font-size:12px"><input type="number" min="0" value="' + esc(x.monto || '') + '" placeholder="₡" onchange="rhPlSemRub(' + i + ',' + j + ',\'monto\',this.value)" style="width:86px;font-size:12px"><button class="btnMini" title="Quitar" onclick="rhPlSemQuitar(' + i + ',' + j + ')">✕</button></div>').join('') +
-      '<button class="btnMini" onclick="rhPlSemAgregar(' + i + ')">➕ Agregar rubro</button> ' + (f.adicional ? (f.conSalarioPeriodo ? '<button class="btnMini" title="Volver a pagarle el salario de este período" onclick="rhPlSemConSalario(' + i + ')">↩ Pagar con salario</button> ' : '') + '<button class="btnMini" title="Quitar de esta planilla" onclick="rhPlSemQuitarPersona(' + i + ')">🗑 Quitar</button>' : '<button class="btnMini" onclick="rhPlSemExcluir(' + i + ')">' + (R.exc[f.id] ? '↩ Incluir' : '🚫 No pagar aquí') + '</button> <button class="btnMini" title="No se le paga el salario de este período, solo los rubros (por ejemplo un bono)" onclick="rhPlSemSoloRubros(' + i + ')">✂ Solo rubros (sin salario)</button>') + '</td></tr>'; }).join('') + '<tr style="background:#f1f3f6;font-weight:700"><td colspan="6">Neto total de colaboradores</td><td class="num">' + pmM(tot) + '</td><td></td></tr>'
+      '<button class="btnMini" onclick="rhPlSemAgregar(' + i + ')">➕ Agregar rubro</button> ' + (f.adicional ? (f.conSalarioPeriodo ? '<button class="btnMini" title="Volver a pagarle el salario de este período" onclick="rhPlSemConSalario(' + i + ')">↩ Pagar con salario</button> ' : '') + '<button class="btnMini" title="Quitar de esta planilla" onclick="rhPlSemQuitarPersona(' + i + ')">🗑 Quitar</button>' : '<button class="btnMini" onclick="rhPlSemExcluir(' + i + ')">' + (R.exc[f.id] ? '↩ Incluir' : '🚫 No pagar aquí') + '</button> <button class="btnMini" title="No se le paga el salario de este período, solo los rubros (por ejemplo un bono)" onclick="rhPlSemSoloRubros(' + i + ')">✂ Solo rubros (sin salario)</button>') + '</td></tr>'; }).join('') + '<tr style="background:#f6f8fb;font-weight:600"><td colspan="6" style="text-align:right">Neto ' + g.corto + '</td><td class="num">' + pmM(g.items.filter(x => !R.exc[x.f.id]).reduce((a, x) => a + rhPlSemTot(x.f).neto, 0)) + '</td><td></td></tr>').join('') + '<tr style="background:#f1f3f6;font-weight:700"><td colspan="6">Neto total de colaboradores</td><td class="num">' + pmM(tot) + '</td><td></td></tr>'
       : '<tr><td colspan="8" class="empty">No hay colaboradores por pagar en esta semana (revisa salario, ingreso y periodicidad).</td></tr>') + '</tbody></table></div>' +
     (R.filas.some(f => R.exc[f.id]) ? '<div style="padding:8px 14px 0;font-size:12px;color:#667">Fuera de esta planilla: ' + R.filas.map((f, i) => R.exc[f.id] ? '<span style="display:inline-flex;gap:4px;align-items:center;margin-right:10px"><b>' + esc(f.nombre) + '</b><button class="btnMini" onclick="rhPlSemExcluir(' + i + ')">↩ Volver a incluir con salario</button></span>' : '').join('') + '</div>' : '') +
     '<div style="display:flex;gap:8px;align-items:center;padding:10px 14px 0;flex-wrap:wrap"><span style="font-size:13px"><b>Agregar a otra persona</b> (bono u otro pago, aunque no le toque en este archivo):</span><select id="rhPlSemOtro" style="max-width:240px"><option value="">Elige un colaborador</option>' + otros.map(c => '<option value="' + esc(c.id) + '">' + esc(c.nombre) + '</option>').join('') + '</select><button class="btn secondary" onclick="rhPlSemAgregarPersona()">➕ Agregar</button></div>' +
@@ -6909,7 +6916,7 @@ const PM_GRUPOS = {
   apel: { t: 'Apelaciones', tipos: ['RECLAMO'], efecto: '+ Suman a la factura (antes del IVA).', color: '#2d5a1b' },
   pen: { t: 'Penalizaciones', tipos: ['PENALIZACION'], efecto: '− Restan de la factura (antes del IVA).', color: '#9b1c1c' },
   alq: { t: 'Alquiler / uniformes / otros', tipos: ['ALQUILER', 'CAMISAS', 'OTROANTES'], efecto: '− Restan de la factura (antes del IVA).', color: '#9b1c1c' },
-  reb: { t: 'Rebajos al depósito', tipos: ['ADELANTO', 'PRESTAMO', 'APORTE', 'INVENTARIO', 'INS', 'HERRAMIENTAS', 'OTROS'], ver: ['ADELANTO', 'PRESTAMO', 'APORTE', 'INVENTARIO', 'INS', 'HERRAMIENTAS', 'OTROS', 'REBAJO', 'EXTRA'], efecto: 'No afectan la factura: se descuentan solo del depósito.', color: '#9b1c1c' }
+  reb: { t: 'Rebajos al depósito', tipos: ['ADELANTO', 'PRESTAMO', 'APORTE', 'INVENTARIO', 'INS', 'HERRAMIENTAS', 'OTROS'], ver: ['ADELANTO', 'PRESTAMO', 'APORTE', 'INVENTARIO', 'INS', 'HERRAMIENTAS', 'OTROS', 'REBAJO', 'EXTRA', 'INTERNA'], efecto: 'No afectan la factura: se descuentan solo del depósito.', color: '#9b1c1c' }
 };
 function pmAjDe(idCon, g) { return pmS.ajustes.filter(a => a.idCon === idCon && (PM_GRUPOS[g].ver || PM_GRUPOS[g].tipos).indexOf(a.tipo) >= 0); }
 function pmCelda(f, g, valor, cerr) {
@@ -6942,9 +6949,55 @@ function pmHtmlRes(cerr) {
         num(f.nOrdenes) + num(pmM(f.detalle)) + pmCelda(f, 'apel', f.reclamos, cerr) + pmCelda(f, 'pen', f.penalizaciones, cerr) + pmCelda(f, 'alq', f.alquileres + f.camisas + f.otros, cerr) +
         '<td style="text-align:right;white-space:nowrap"><b>' + pmM(f.subtotal) + '</b></td>' + num(f.aplicaIva ? pmM(f.iva) : '<span style="color:#888">sin IVA</span>') + '<td style="text-align:right;white-space:nowrap"><b>' + pmM(f.totalFacturado) + '</b></td>' +
         pmCelda(f, 'reb', f.deducciones, cerr) + '<td style="text-align:right;white-space:nowrap;background:#eef7ee"><b>' + pmM(f.deposito) + '</b></td>' +
-        '<td style="white-space:nowrap">' + fac + '</td><td>' + (f.pagado ? '<span class="chip verde">' + esc(pmFh(f.pagado)) + '</span>' : (f.sinContratista ? '' : '<span style="color:#999">—</span>')) + '</td><td style="white-space:nowrap">' + (f.sinContratista ? '' : '<button class="btn secondary" title="Estado de cuenta: PDF, Excel o correo" onclick="pmReporteModal(\'' + f.idCon + '\')">📄</button>') + '</td></tr>';
+        '<td style="white-space:nowrap">' + fac + '</td><td>' + (f.pagado ? '<span class="chip verde">' + esc(pmFh(f.pagado)) + '</span>' : (f.sinContratista ? '' : '<span style="color:#999">—</span>')) + '</td><td style="white-space:nowrap">' + (f.sinContratista ? '' : '<button class="btn secondary" title="Estado de cuenta: PDF, Excel o correo" onclick="pmReporteModal(\'' + f.idCon + '\')">📄</button> <button class="btn secondary" style="' + ((pmS.internas || {})[f.idCon] ? 'background:#e7f4e4;border-color:#9c9' : '') + '" title="Móvil interna: paga un % a los compañeros y la diferencia se transfiere a la empresa" onclick="pmInternaModal(\'' + f.idCon + '\')">🚐</button>') + '</td></tr>';
     }).join('') +
     '<tr style="font-weight:700;background:#f3f6fa"><td>Total</td><td></td>' + num(T.nOrdenes) + num(pmM(T.detalle)) + num(pmM(T.reclamos)) + num(pmM(T.penalizaciones)) + num(pmM(T.alquileres + T.camisas + T.otros)) + num(pmM(T.subtotal)) + num(pmM(T.iva)) + num(pmM(T.totalFacturado)) + num(pmM(T.deducciones)) + num(pmM(T.deposito)) + '<td></td><td></td><td></td></tr></tbody></table>';
+}
+/* ---------- Móvil interna: % a compañeros (planilla) + diferencia a la empresa ---------- */
+let pmInt = null;
+async function pmInternaModal(idCon) {
+  const f = pmS.resumen.filas.find(x => x.idCon === idCon); if (!f) return;
+  const ya = (pmS.internas || {})[idCon], cerr = pmS.semana.estado === 'Cerrada';
+  if (!rhDatos || !rhDatos.colaboradores) { try { rhDatos = await api('obtenerRhWeb'); } catch (e) { return mostrarError(e, 'No se pudieron cargar los colaboradores.'); } }
+  const movs = Object.keys(f.moviles).join(', ');
+  if (ya) {
+    pmModal('<h3>Móvil ' + esc(movs) + ' · pago interno aplicado</h3><div style="font-size:13px;display:grid;gap:6px"><div>Facturado sin IVA: <b>' + pmM(ya.base) + '</b> · ' + esc(ya.pct) + '%</div><div>A depositar antes: <b>' + pmM(ya.deposito) + '</b></div>' +
+      ya.items.map(it => '<div>→ ' + esc(it.nombre) + ' (planilla): <b>' + pmM(it.monto) + '</b></div>').join('') +
+      '<div>→ Transferencia a la empresa: <b>' + pmM(ya.diferencia) + '</b></div><div style="font-size:12px;color:#667">Aplicado ' + esc(String(ya.fecha).slice(0, 16)) + '. El depósito de este contratista quedó en cero; los pagos a compañeros están en Planilla y la diferencia en «Adicionales».</div></div>' +
+      '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn secondary" ' + (cerr ? 'disabled' : '') + ' onclick="pmInternaDeshacer(\'' + idCon + '\')">↩ Deshacer</button><button class="btn secondary" onclick="pmCerrar()">Cerrar</button></div>', 520);
+    return;
+  }
+  const L = (rhDatos.colaboradores || []).filter(c => c.activo), op = '<option value="">—</option>' + L.map(c => '<option value="' + esc(c.id) + '">' + esc(c.nombre) + '</option>').join('');
+  pmInt = { f: f, manual: false };
+  const cu = pmD.ahorroCuenta || {};
+  pmModal('<h3>Móvil interna ' + esc(movs) + '</h3><div style="font-size:12px;color:#667;margin-bottom:8px">Se paga a los compañeros un porcentaje de lo facturado sin IVA (ya con los gastos descontados). Ese pago entra a la planilla de la semana y el resto del depósito se transfiere a la cuenta de la empresa.</div>' +
+    '<div style="display:grid;gap:8px"><div style="font-size:13px">A facturar (sin IVA): <b>' + pmM(f.subtotal) + '</b> <span style="color:#667;font-size:11.5px">(órdenes ' + pmM(f.detalle) + ' + apelaciones ' + pmM(f.reclamos) + ' − penalizaciones ' + pmM(f.penalizaciones) + ' − alquiler/otros ' + pmM(f.alquileres + f.camisas + f.otros) + ')</span></div>' +
+    '<div style="font-size:13px">A depositar hoy: <b>' + pmM(f.deposito) + '</b></div>' +
+    '<label>Porcentaje para los compañeros<input id="piPct" type="number" min="0" max="100" step="0.01" value="30" oninput="pmIntCalc(true)"></label>' +
+    '<div style="display:grid;grid-template-columns:1fr 120px;gap:6px;align-items:end"><label>Técnico<select id="piC1" onchange="pmIntCalc(true)">' + op + '</select></label><label>Monto<input id="piM1" type="number" min="0" step="0.01" oninput="pmInt.manual=true;pmIntCalc(false)"></label>' +
+    '<label>Asistente<select id="piC2" onchange="pmIntCalc(true)">' + op + '</select></label><label>Monto<input id="piM2" type="number" min="0" step="0.01" oninput="pmInt.manual=true;pmIntCalc(false)"></label></div>' +
+    '<div id="piRes" style="background:#f3f6fa;border-radius:8px;padding:10px;font-size:13px"></div>' +
+    '<div style="font-size:12px;color:#667">Cuenta de la empresa: ' + (/^\d{20}$/.test(cu.iban || '') && cu.banco && cu.referencia ? esc((cu.nombre || 'Empresa') + ' · ' + cu.banco + ' · CR' + cu.iban) : '<span style="color:#9b1c1c">sin configurar (Banco → Cuenta de ahorro de la empresa)</span>') + '</div></div>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn primary" ' + (cerr ? 'disabled' : '') + ' onclick="pmInternaOk(\'' + idCon + '\')">Aplicar</button><button class="btn secondary" onclick="pmCerrar()">Cancelar</button></div>', 560);
+  pmIntCalc(true);
+}
+function pmIntCalc(reparte) {
+  const f = pmInt.f, pct = Number($('piPct').value) || 0, total = Math.round(f.subtotal * pct) / 100, c1 = $('piC1').value, c2 = $('piC2').value;
+  if (reparte) {
+    pmInt.manual = false;
+    const n = (c1 ? 1 : 0) + (c2 ? 1 : 0);
+    $('piM1').value = c1 && n ? (Math.round(total / n * 100) / 100) : ''; $('piM2').value = c2 && n ? (Math.round((total - (c1 ? Math.round(total / n * 100) / 100 : 0)) * 100) / 100) : '';
+  }
+  const pago = Math.round(((Number($('piM1').value) || 0) + (Number($('piM2').value) || 0)) * 100) / 100, dif = Math.round((f.deposito - pago) * 100) / 100;
+  $('piRes').innerHTML = '<div>' + pct + '% de ' + pmM(f.subtotal) + ' = <b>' + pmM(total) + '</b></div><div>Pago a compañeros (planilla): <b>' + pmM(pago) + '</b></div><div>Transferencia a la empresa: <b style="color:' + (dif < 0 ? '#9b1c1c' : '#2d5a1b') + '">' + pmM(dif) + '</b></div>' + (dif < 0 ? '<div style="color:#9b1c1c">El pago supera lo que hay a depositar.</div>' : '');
+}
+async function pmInternaOk(idCon) {
+  const it = []; [['piC1', 'piM1'], ['piC2', 'piM2']].forEach(x => { if ($(x[0]).value || Number($(x[1]).value)) it.push({ idColab: $(x[0]).value, monto: $(x[1]).value }); });
+  try { await api('aplicarMovilInternaPmWeb', { idSemana: pmSemId, idCon: idCon, pct: $('piPct').value, items: it }); pmCerrar(); await pmRecargar(); toast('Pago interno aplicado: planilla de compañeros y transferencia a la empresa.', 5000); } catch (e) { mostrarError(e, 'No se pudo aplicar.'); }
+}
+async function pmInternaDeshacer(idCon) {
+  if (!confirm('¿Deshacer el pago interno? Se quitan los pagos de la planilla, la línea a la empresa y el rebajo.')) return;
+  try { await api('deshacerMovilInternaPmWeb', pmSemId, idCon); pmCerrar(); await pmRecargar(); toast('Pago interno deshecho.'); } catch (e) { mostrarError(e, 'No se pudo deshacer.'); }
 }
 async function pmGuardarBorrador() {
   try {
@@ -14825,6 +14878,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 98 · 15-oct 12:05</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 100 · 15-oct 12:18</div>
 </body>
 </html>
