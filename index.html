@@ -5963,6 +5963,62 @@ async function rhHistGuardar() {
   } catch (e) { b.disabled = false; b.textContent = 'Importar'; mostrarError(e, 'No se pudo importar.'); }
 }
 
+
+/* ---- Planilla de la semana a pagar (mismos períodos que las móviles) con rubros por colaborador ---- */
+let rhPlS = null;
+function rhPlSemMontar() {
+  const box = $('rhPPag'); if (!box || !rhDatos || !rhDatos.admin) return;
+  let d = $('rhPlSem'); if (!d) { d = document.createElement('div'); d.id = 'rhPlSem'; box.insertBefore(d, box.firstChild); }
+  d.innerHTML = '<div class="loading">Cargando la planilla de la semana...</div>';
+  rhPlSemCargar(rhPlS && rhPlS.idSemana);
+}
+async function rhPlSemCargar(id) {
+  const d = $('rhPlSem'); if (!d) return;
+  try {
+    const keep = rhPlS && rhPlS.idSemana === id ? rhPlS.rub : null;
+    const R = await api('planillaSemanaRhWeb', id || '');
+    R.rub = {}; R.filas.forEach(f => { R.rub[f.id] = (f.rubros || []).map(x => Object.assign({}, x)); });
+    R.sucio = false; rhPlS = R; rhPlSemDibujar();
+  } catch (e) { d.innerHTML = '<span style="color:#9b1c1c;font-size:13px">' + esc(e.message || e) + '</span>'; }
+}
+function rhPlSemTot(f) {
+  const rb = rhPlS.rub[f.id] || [], ext = rb.filter(x => x.tipo !== 'rebajo').reduce((a, x) => a + (Number(x.monto) || 0), 0), reb = rb.filter(x => x.tipo === 'rebajo').reduce((a, x) => a + (Number(x.monto) || 0), 0);
+  const bruto = Math.round((f.base + ext) * 100) / 100, cargas = f.ccss ? Math.round(bruto * rhPlS.tasaObr) / 100 : 0;
+  return { ext: ext, reb: reb, bruto: bruto, cargas: cargas, neto: Math.round((bruto - cargas - reb) * 100) / 100 };
+}
+function rhPlSemDibujar() {
+  const R = rhPlS, d = $('rhPlSem'); if (!d) return;
+  if (!R.semanas.length) { d.innerHTML = ''; return; }
+  const dm = x => x.split('-').reverse().slice(0, 2).join('/');
+  const tot = R.filas.reduce((a, f) => a + rhPlSemTot(f).neto, 0);
+  d.innerHTML = '<div class="panel" style="margin-bottom:14px"><div class="panelHead" style="flex-wrap:wrap;gap:8px"><h2>Planilla de la semana a pagar</h2>' +
+    '<select onchange="rhPlSemCargar(this.value)" style="max-width:280px">' + R.semanas.map(s => '<option value="' + esc(s.id) + '"' + (s.id === R.idSemana ? ' selected' : '') + '>Semana ' + dm(s.desde) + ' al ' + dm(s.hasta) + (s.estado === 'Cerrada' ? ' (cerrada)' : '') + '</option>').join('') + '</select>' +
+    '<span style="font-size:12px;color:#667">Pago estimado: ' + esc(R.fechaPago.split('-').reverse().join('/')) + '</span></div>' +
+    '<div style="padding:4px 14px 10px;font-size:12px;color:#667">Es la planilla de colaboradores que se paga junto con las móviles de esta semana. Agrega o quita rubros a cada persona (extras suman, rebajos restan) y guarda: al generar el archivo del banco de esta semana, esos montos ya vienen cargados.</div>' +
+    '<div class="tableWrap"><table class="table"><thead><tr><th>Colaborador</th><th>Período</th><th class="num">Base</th><th class="num">Extras (+)</th><th class="num">Rebajos (−)</th><th class="num">Cargas</th><th class="num">Neto</th><th>Rubros</th></tr></thead><tbody>' +
+    (R.filas.length ? R.filas.map((f, i) => { const t = rhPlSemTot(f), rb = R.rub[f.id] || []; return '<tr><td><b>' + esc(f.nombre) + '</b><div style="font-size:11px;color:#667">' + esc(f.periodicidad) + (f.pagado ? ' · <span style="color:#1e7e34">ya pagado en envío ' + esc(f.pagado.envio) + '</span>' : '') + '</div></td><td style="font-size:12px">' + esc(f.periodo) + '</td>' +
+      '<td class="num">' + pmM(f.base) + '</td><td class="num">' + (t.ext ? pmM(t.ext) : '—') + '</td><td class="num">' + (t.reb ? '−' + pmM(t.reb) : '—') + '</td><td class="num">' + (t.cargas ? '−' + pmM(t.cargas) : '—') + '</td><td class="num"><b>' + pmM(t.neto) + '</b></td>' +
+      '<td style="min-width:260px">' + rb.map((x, j) => '<div style="display:flex;gap:4px;align-items:center;margin-bottom:3px"><select onchange="rhPlSemRub(' + i + ',' + j + ',\'tipo\',this.value)" style="width:78px;font-size:12px"><option value="extra"' + (x.tipo !== 'rebajo' ? ' selected' : '') + '>Extra +</option><option value="rebajo"' + (x.tipo === 'rebajo' ? ' selected' : '') + '>Rebajo −</option></select>' +
+        '<input value="' + esc(x.concepto || '') + '" placeholder="Concepto" maxlength="60" onchange="rhPlSemRub(' + i + ',' + j + ',\'concepto\',this.value)" style="flex:1;min-width:90px;font-size:12px"><input type="number" min="0" value="' + esc(x.monto || '') + '" placeholder="₡" onchange="rhPlSemRub(' + i + ',' + j + ',\'monto\',this.value)" style="width:86px;font-size:12px"><button class="btnMini" title="Quitar" onclick="rhPlSemQuitar(' + i + ',' + j + ')">✕</button></div>').join('') +
+      '<button class="btnMini" onclick="rhPlSemAgregar(' + i + ')">➕ Agregar rubro</button></td></tr>'; }).join('') + '<tr style="background:#f1f3f6;font-weight:700"><td colspan="6">Neto total de colaboradores</td><td class="num">' + pmM(tot) + '</td><td></td></tr>'
+      : '<tr><td colspan="8" class="empty">No hay colaboradores por pagar en esta semana (revisa salario, ingreso y periodicidad).</td></tr>') + '</tbody></table></div>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;padding:10px 14px;flex-wrap:wrap"><button class="btn secondary" onclick="rhPlSemCopiar()">📋 Copiar tabla</button><button class="btn primary" id="rhPlSemBtn" onclick="rhPlSemGuardar()">💾 Guardar rubros de la semana' + (R.sucio ? ' *' : '') + '</button></div></div>';
+}
+function rhPlSemRub(i, j, k, v) { const f = rhPlS.filas[i]; rhPlS.rub[f.id][j][k] = k === 'monto' ? (Number(v) || 0) : v; rhPlS.sucio = true; rhPlSemDibujar(); }
+function rhPlSemAgregar(i) { const f = rhPlS.filas[i]; (rhPlS.rub[f.id] = rhPlS.rub[f.id] || []).push({ tipo: 'extra', concepto: '', monto: 0 }); rhPlS.sucio = true; rhPlSemDibujar(); }
+function rhPlSemQuitar(i, j) { const f = rhPlS.filas[i]; rhPlS.rub[f.id].splice(j, 1); rhPlS.sucio = true; rhPlSemDibujar(); }
+async function rhPlSemGuardar() {
+  const b = $('rhPlSemBtn'); b.disabled = true;
+  try { await api('guardarRubrosPlanillaRhWeb', rhPlS.idSemana, rhPlS.rub); toast('Rubros guardados. Se cargarán al generar el archivo del banco de esta semana.'); await rhPlSemCargar(rhPlS.idSemana); }
+  catch (e) { b.disabled = false; mostrarError(e, 'No se pudo guardar.'); }
+}
+function rhPlSemCopiar() {
+  const R = rhPlS, filas = [['Colaborador', 'Período', 'Base', 'Extras', 'Rebajos', 'Cargas', 'Neto', 'Rubros']];
+  R.filas.forEach(f => { const t = rhPlSemTot(f); filas.push([f.nombre, f.periodo, f.base, t.ext, t.reb, t.cargas, t.neto, (R.rub[f.id] || []).map(x => (x.tipo === 'rebajo' ? '-' : '+') + x.monto + ' ' + (x.concepto || '')).join('; ')]); });
+  const txt = filas.map(r => r.join('\t')).join('\n');
+  (navigator.clipboard && navigator.clipboard.writeText ? navigator.clipboard.writeText(txt) : Promise.reject()).then(() => toast('Tabla copiada. Pégala en Excel.')).catch(() => { const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); toast('Tabla copiada.'); } catch (e) { toast('No se pudo copiar.'); } ta.remove(); });
+}
+
 function rhModal(html) { $('rhModal').innerHTML = html; $('rhModalBg').classList.add('show'); }
 function rhCerrar() { $('rhModalBg').classList.remove('show'); $('rhModal').style.maxWidth = '560px'; }
 function rhFecha(iso) { return iso ? fmtFechaSeg(iso) : '—'; }
@@ -6399,7 +6455,8 @@ function rhPagFechas() { rhPagDesde = $('rpgD').value || rhPagDesde; rhPagHasta 
 function rhPagEstado(e) { rhEstado = e; rhColSel = ''; rhRenderPag(); }
 function rhPagColab(id) { rhColSel = id; rhRenderPag(); }
 
-async function rhRenderPag() {
+async function rhRenderPag() { await rhRenderPag0(); rhPlSemMontar(); }
+async function rhRenderPag0() {
   if (!rhPagDesde) rhRangoRapido('anio', true);
   const cols = rhDatos.colaboradores;
   if (rhColSel && !cols.find(c => c.id === rhColSel)) rhColSel = '';
@@ -14533,6 +14590,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 78 · 14-oct 21:03</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 79 · 14-oct 21:23</div>
 </body>
 </html>
