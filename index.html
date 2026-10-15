@@ -6901,6 +6901,7 @@ function pmRenderSemana() {
   if (mk >= 0) { fijo = c.slice(0, mk); c = c.slice(mk + 11); }
   else if (['ape', 'aju', 'ext'].indexOf(pmVista) >= 0) { const j = c.indexOf('</div>') + 6; fijo = c.slice(0, j); c = c.slice(j); }
   $('pmPSem').classList.add('pmFlex'); $('pmPSem').innerHTML = h + (fijo ? '<div class="panel pmFixBar">' + fijo + '</div>' : '') + '<div class="panel pmFill"><div class="tableWrap">' + c + '</div></div>';
+  if (pmVista === 'res') tablaOrdenable('pmPSem');
 }
 
 /* Grupos de la tabla de pago: celdas donde se cargan valores por contratista */
@@ -6924,7 +6925,7 @@ function pmHtmlRes(cerr) {
   const num = v => '<td style="text-align:right;white-space:nowrap">' + v + '</td>';
   const todas = R.filas, visibles = pmSinOrd ? todas : todas.filter(f => f.nOrdenes > 0 || f.sinContratista || f.subtotal !== 0 || f.deposito !== 0 || f.deducciones !== 0 || pmS.ajustes.some(a => a.idCon === f.idCon)), nOcultas = todas.length - visibles.length;
   return '<div style="padding:6px 12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn primary" title="Un estado de cuenta (PDF y/o Excel) por cada contratista, comprimidos en un ZIP" onclick="pmExportarModal()">📦 Exportar archivos de pago</button>' +
-    '<label style="font-size:12px"><input type="checkbox" ' + (pmSinOrd ? 'checked' : '') + ' onchange="pmSinOrd=this.checked;pmRenderSemana()"> Mostrar sin órdenes' + (nOcultas ? ' (' + nOcultas + ' ocultos)' : '') + '</label>' +
+    '<button class="btn secondary" id="ordMovBtn" title="Ordena la tabla por número de móvil; otro clic invierte el orden y un tercero vuelve al original" onclick="tablaOrdenarMovil(\'pmPSem\')">🔢 Ordenar por n.º de móvil</button><label style="font-size:12px"><input type="checkbox" ' + (pmSinOrd ? 'checked' : '') + ' onchange="pmSinOrd=this.checked;pmRenderSemana()"> Mostrar sin órdenes' + (nOcultas ? ' (' + nOcultas + ' ocultos)' : '') + '</label>' +
     '<span style="color:#778;font-size:11.5px">Clic en las celdas Apelaciones, Penalizaciones, Alquiler y Rebajos para ver o cargar valores · 📄 en cada fila: estado de cuenta (PDF, Excel o correo).</span></div><!--/FIX-->' +
     '<table class="pmT pmGrid"><thead><tr><th colspan="3"></th><th colspan="3" style="text-align:center;background:#7a1a1a;color:#fff">Antes de facturar · afectan la factura</th><th colspan="3"></th><th style="text-align:center;background:var(--rojo-osc);color:#fff">Después de facturar</th><th colspan="4"></th></tr><tr>' + th('Contratista (factura)') + th('Órd.', 'right') + th('Detalle', 'right') + th('Apelaciones (+)', 'right') + th('Penaliz. (−)', 'right') + th('Alquiler / otros (−)', 'right') + th('A facturar', 'right') + th('IVA 13%', 'right') + th('Total factura', 'right') + th('Rebajos (−)', 'right') + th('A depositar', 'right') + th('N.º factura') + th('Pagado') + '<th></th></tr></thead><tbody>' +
     visibles.map(f => {
@@ -6933,7 +6934,8 @@ function pmHtmlRes(cerr) {
       const extra = (f.fueraPlazo ? ' <span class="chip rojo" title="Salió ' + esc(pmFh(f.salida)) + ': pasó el plazo de pago">fuera de plazo</span>' : (f.estadoSis === 'inactiva' ? ' <span class="chip amar" title="Paga hasta ' + esc(pmFh(f.plazoHasta)) + '">salió ' + esc(pmFh(f.salida)) + '</span>' : '')) + (sinIban ? ' <span style="color:#9b1c1c" title="Falta la cuenta IBAN">⚠ IBAN</span>' : '') + (f.sinContratista ? ' <span style="color:#9b1c1c">crea el contratista en la pestaña Contratistas</span>' : '');
       const fac = f.sinContratista ? '' : '<input style="width:84px;' + (!f.factura && !f.vb && f.deposito > 0 ? 'border-color:#d9534f' : '') + '" value="' + esc(f.factura) + '" ' + (cerr ? 'disabled' : '') + ' onchange="pmGuardarFactura(\'' + f.idCon + '\',this.value)" placeholder="N.º factura" title="' + (!f.factura && !f.vb && f.deposito > 0 ? 'Sin factura no se paga sin visto bueno del administrador' : 'N.º de factura') + '">' +
         (f.vb ? ' <span class="chip verde" title="' + esc(f.vb) + '">VB ✓</span>' + (cerr ? '' : ' <a href="#" style="font-size:10.5px" title="Quitar visto bueno" onclick="pmVb(\'' + f.idCon + '\',false);return false">✕</a>') : (!f.factura && f.deposito > 0 && !cerr ? ' <a href="#" style="font-size:10.5px;white-space:nowrap" title="Autorizar el pago sin factura (visto bueno del administrador)" onclick="pmVb(\'' + f.idCon + '\',true);return false">Autorizar</a>' : ''));
-      return '<tr' + (f.sinContratista ? ' style="background:#fdecea"' : '') + '><td style="max-width:250px"><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="' + esc(f.nombre) + '"><b>' + esc(f.nombre) + '</b></div><div style="font-size:10.5px;color:#556;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="' + esc(tec) + '">' + esc(tec).replace(/&amp;/g, '&') + extra + '</div></td>' +
+      const nMov = Math.min.apply(null, (f.tecnicos || []).map(t => parseInt(String(t.movil).replace(/\D/g, ''), 10)).filter(n => !isNaN(n)));
+      return '<tr data-mov="' + (isFinite(nMov) ? nMov : 1e9) + '"' + (f.sinContratista ? ' style="background:#fdecea"' : '') + '><td style="max-width:250px"><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="' + esc(f.nombre) + '"><b>' + esc(f.nombre) + '</b></div><div style="font-size:10.5px;color:#556;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="' + esc(tec) + '">' + esc(tec).replace(/&amp;/g, '&') + extra + '</div></td>' +
         num(f.nOrdenes) + num(pmM(f.detalle)) + pmCelda(f, 'apel', f.reclamos, cerr) + pmCelda(f, 'pen', f.penalizaciones, cerr) + pmCelda(f, 'alq', f.alquileres + f.camisas + f.otros, cerr) +
         '<td style="text-align:right;white-space:nowrap"><b>' + pmM(f.subtotal) + '</b></td>' + num(f.aplicaIva ? pmM(f.iva) : '<span style="color:#888">sin IVA</span>') + '<td style="text-align:right;white-space:nowrap"><b>' + pmM(f.totalFacturado) + '</b></td>' +
         pmCelda(f, 'reb', f.deducciones, cerr) + '<td style="text-align:right;white-space:nowrap;background:#eef7ee"><b>' + pmM(f.deposito) + '</b></td>' +
@@ -7866,6 +7868,7 @@ function pmPrestamoModal(id) {
     if (i < 0) { pmPrOps.unshift({ movil: p.movil || '', nombre: p.deudor || p.contratista, tecnico: '', con: pmD.contratistas.find(c => c.id === p.idCon) || { id: p.idCon, nombre: p.contratista }, actual: true }); i = 0; }
     pmPrSelIdx = i;
   } else pmPrSelIdx = -1;
+  const frec = p.cuotaMensual > 0 ? 'Mes' : 'Semana';
   const L = 'display:grid;gap:4px;font-size:12px;font-weight:600;color:#445';
   const sec = t => '<div style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#8a93a3;font-weight:700;margin:2px 0 -2px">' + t + '</div>';
   pmModal('<style>.prF input,.prF select{width:100%;box-sizing:border-box;min-width:0}.prF label{min-width:0}</style><h3 style="margin:0 0 12px">' + (id ? 'Editar' : 'Nuevo') + ' préstamo</h3><div class="prF" style="display:grid;gap:12px;max-height:74vh;overflow:auto;padding:2px 6px 2px 0">' +
@@ -7874,22 +7877,60 @@ function pmPrestamoModal(id) {
     '<label style="' + L + '">Móvil y persona<select id="prOp" onchange="pmPrSelIdx=this.value===\'\'?-1:+this.value;pmPrInfo()"></select></label>' +
     '<div id="prInfo" style="font-size:12.5px;background:#f4f9ff;border:1px solid #dbe7f5;border-radius:8px;padding:8px 10px;display:grid;gap:2px"></div>' +
     sec('Condiciones') +
-    '<div style="display:grid;gap:12px;grid-template-columns:1fr 1fr"><label style="' + L + '">Fecha en que se prestó<input type="date" id="prFec" value="' + esc(p.fecha) + '"></label><label style="' + L + '">Monto prestado (₡)<input type="number" id="prMon" step="0.01" min="0" value="' + esc(p.monto) + '" oninput="pmPrEq()"></label>' +
+    '<div style="display:grid;gap:12px;grid-template-columns:1fr 1fr"><label style="' + L + '">Fecha en que se prestó<input type="date" id="prFec" value="' + esc(p.fecha) + '" oninput="pmPrProy()"></label><label style="' + L + '">Monto prestado (₡)<input type="number" id="prMon" step="0.01" min="0" value="' + esc(p.monto) + '" oninput="pmPrEq()"></label>' +
     '<label style="' + L + '">Interés semanal (%) sobre el saldo<input type="number" id="prTasa" step="0.01" min="0" value="' + esc(p.tasa) + '" oninput="pmPrEq()"><span id="prEq" style="font-size:11px;font-weight:400;color:#667">≈ ' + (Math.round(p.tasa * 52 / 12 * 10) / 10) + ' % mensual · ' + (Math.round(p.tasa * 52 * 10) / 10) + ' % anual (simple)</span></label>' +
-    '<label style="' + L + '">Cuota mensual pactada (₡)<input type="number" id="prCuo" step="0.01" min="0" value="' + esc(p.cuotaMensual || '') + '" placeholder="Se propone al rebajar la cuota"><span style="font-size:11px;font-weight:400;color:#667">' + (p.cuota > 0 && !(p.cuotaMensual > 0) ? 'Tiene una cuota semanal antigua de ' + pmM(p.cuota) + '; al poner la mensual se usa la mensual.' : 'La cuota se rebaja una vez al mes con «Aplicar cuotas».') + '</span></label>' +
+    '<label style="' + L + '">Rebajo de la cuota<select id="prFrec" onchange="pmPrFrecCambio()"><option value="Semana"' + (frec === 'Semana' ? ' selected' : '') + '>Por semana</option><option value="Mes"' + (frec === 'Mes' ? ' selected' : '') + '>Por mes</option></select></label>' +
+    '<label style="' + L + '"><span id="prCuoL">Cuota ' + (frec === 'Mes' ? 'mensual' : 'semanal') + ' pactada (₡)</span><input type="number" id="prCuo" step="0.01" min="0" value="' + esc(frec === 'Mes' ? (p.cuotaMensual || '') : (p.cuota || '')) + '" placeholder="Monto de cada cuota" oninput="pmPrProy()"><span id="prCuoAy" style="font-size:11px;font-weight:400;color:#667">' + (frec === 'Mes' ? 'Se rebaja una vez al mes con «Aplicar cuotas».' : 'Se rebaja cada semana con «Aplicar cuotas».') + '</span></label>' +
+    '<div id="prProy" style="grid-column:1/3;font-size:12.5px;background:#fbf6f6;border:1px solid #ecd5d5;border-radius:8px;padding:8px 10px"></div>' +
     '<label style="' + L + ';grid-column:1/3">Concepto<input id="prCon2" maxlength="160" value="' + esc(p.concepto) + '" placeholder="ej. Adelanto para herramientas"></label>' + (id ? '<label style="' + L + '">Estado<select id="prEst"><option' + (p.estado === 'Activo' ? ' selected' : '') + '>Activo</option><option' + (p.estado === 'Cancelado' ? ' selected' : '') + '>Cancelado</option></select></label>' : '') + '</div></div>' +
     '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;padding-top:12px;border-top:1px solid #e6e9ef">' + (id ? '<button class="btn secondary" onclick="pmPrestamoBorrar(\'' + id + '\')">🗑 Eliminar</button>' : '') + '<span style="flex:1"></span><button class="btn secondary" onclick="pmCerrar()">Cancelar</button><button class="btn primary" onclick="pmPrestamoGuardar(\'' + (id || '') + '\')">Guardar</button></div>', 600);
   pmPrPintar(); pmPrEq();
 }
+/* Proyección de un préstamo: el interés semanal se acumula por día sobre el saldo de capital; cada cuota paga primero interés y luego capital */
+function pmPrSumar(f, freq, n) {
+  const p = String(f).split('-'), d = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]));
+  if (freq === 'Mes') { const dia = d.getUTCDate(); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() + n); const ult = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate(); d.setUTCDate(Math.min(dia, ult)); }
+  else d.setUTCDate(d.getUTCDate() + 7 * n);
+  return d.toISOString().slice(0, 10);
+}
+function pmPrSim(cap, int0, tasa, cuota, freq, desde) {
+  const td = (tasa || 0) / 100 / 7, filas = []; let cp = cap, it = int0 || 0, ult = desde, tI = 0, n = 0;
+  if (!(cuota > 0) || !(cp + it > 0.005)) return { filas: filas, n: 0, interes: 0, total: 0, noBaja: false, ok: false };
+  const i1 = cp * td * (freq === 'Mes' ? 30.4 : 7); const noBaja = cuota <= i1 + 0.005 && cp > 0 && td > 0;
+  while (cp + it > 0.005 && n < 600) {
+    n++; const f = pmPrSumar(desde, freq, n), dias = Math.round((Date.UTC(+f.slice(0, 4), +f.slice(5, 7) - 1, +f.slice(8)) - Date.UTC(+ult.slice(0, 4), +ult.slice(5, 7) - 1, +ult.slice(8))) / 86400000);
+    const g = cp * td * dias; it += g; tI += g; ult = f;
+    const pago = Math.min(cuota, cp + it), aI = Math.min(it, pago), aC = pago - aI; it -= aI; cp -= aC;
+    filas.push({ n: n, fecha: f, interes: g, pago: pago, aI: aI, aC: aC, cap: Math.max(0, cp), saldo: Math.max(0, cp + it) });
+    if (noBaja && n >= 60) break;
+  }
+  return { filas: filas, n: n, interes: tI, total: filas.reduce((a, x) => a + x.pago, 0), noBaja: noBaja && cp + it > 0.005, ok: true, fin: filas.length ? filas[filas.length - 1].fecha : desde };
+}
+function pmPrProyHtml(S, freq, cuota, titulo) {
+  if (!S.ok) return '<span style="color:#667">Escribe la cuota para ver cuántas cuotas faltan y cómo baja el saldo.</span>';
+  const per = freq === 'Mes' ? 'mes' : 'semana';
+  if (S.noBaja) return '<b style="color:#9b1c1c">⚠ La cuota de ' + pmM(cuota) + ' por ' + per + ' no alcanza a cubrir el interés: el saldo no baja.</b>';
+  return '<div>' + (titulo || 'Con esa cuota') + ': se cancela en <b>' + S.n + ' ' + (S.n === 1 ? 'cuota' : 'cuotas') + ' ' + (freq === 'Mes' ? 'mensuales' : 'semanales') + '</b> (aprox. ' + esc(pmFh(S.fin)) + ') · interés total <b>' + pmM(S.interes) + '</b> · total a pagar <b>' + pmM(S.total) + '</b>.</div>' +
+    '<details style="margin-top:4px"><summary style="cursor:pointer;color:#a31616;font-weight:600">Ver tabla de saldos por cuota</summary><div style="max-height:220px;overflow:auto;margin-top:4px"><table class="pmT" style="font-size:11.5px"><thead><tr><th>N.º</th><th>Fecha</th><th style="text-align:right">Interés del período</th><th style="text-align:right">Cuota</th><th style="text-align:right">A interés</th><th style="text-align:right">A capital</th><th style="text-align:right">Saldo capital</th><th style="text-align:right">Saldo total</th></tr></thead><tbody>' +
+    S.filas.slice(0, 200).map(x => '<tr><td>' + x.n + '</td><td>' + esc(pmFh(x.fecha)) + '</td><td style="text-align:right">' + pmM(x.interes) + '</td><td style="text-align:right"><b>' + pmM(x.pago) + '</b></td><td style="text-align:right">' + pmM(x.aI) + '</td><td style="text-align:right">' + pmM(x.aC) + '</td><td style="text-align:right">' + pmM(x.cap) + '</td><td style="text-align:right"><b>' + pmM(x.saldo) + '</b></td></tr>').join('') + '</tbody></table></div></details>';
+}
+function pmPrFrecCambio() {
+  const fr = $('prFrec').value; $('prCuoL').textContent = 'Cuota ' + (fr === 'Mes' ? 'mensual' : 'semanal') + ' pactada (₡)';
+  $('prCuoAy').textContent = fr === 'Mes' ? 'Se rebaja una vez al mes con «Aplicar cuotas».' : 'Se rebaja cada semana con «Aplicar cuotas».'; pmPrProy();
+}
+function pmPrProy() {
+  const el = $('prProy'); if (!el) return; const fr = $('prFrec').value, cu = +$('prCuo').value || 0;
+  el.innerHTML = pmPrProyHtml(pmPrSim(+$('prMon').value || 0, 0, +$('prTasa').value || 0, cu, fr, $('prFec').value || pmD.hoy), fr, cu, 'Con ' + (cu > 0 ? pmM(cu) : 'esa cuota') + ' por ' + (fr === 'Mes' ? 'mes' : 'semana'));
+}
 function pmPrEq() {
   const el = $('prEq'); if (!el) return; const v = +$('prTasa').value || 0, m = +$('prMon').value || 0, r1 = x => Math.round(x * 10) / 10;
-  el.innerHTML = '≈ ' + r1(v * 52 / 12) + ' % mensual · ' + r1(v * 52) + ' % anual (simple)' + (m > 0 ? '<br>Sobre ' + pmM(m) + ': <b>' + pmM(m * v / 100) + '</b> por semana · <b>' + pmM(m * v / 100 * 52 / 12) + '</b> por mes' : '') + '<br><i>El interés se acumula por día (' + v + ' % ÷ 7' + (m > 0 ? ' = ' + pmM(m * v / 100 / 7) + ' al día' : '') + '): el primer día solo suma 1/7 de la semana.</i>';
+  pmPrProy(); el.innerHTML = '≈ ' + r1(v * 52 / 12) + ' % mensual · ' + r1(v * 52) + ' % anual (simple)' + (m > 0 ? '<br>Sobre ' + pmM(m) + ': <b>' + pmM(m * v / 100) + '</b> por semana · <b>' + pmM(m * v / 100 * 52 / 12) + '</b> por mes' : '') + '<br><i>El interés se acumula por día (' + v + ' % ÷ 7' + (m > 0 ? ' = ' + pmM(m * v / 100 / 7) + ' al día' : '') + '): el primer día solo suma 1/7 de la semana.</i>';
 }
 async function pmPrestamoGuardar(id) {
   const o = pmPrOps[pmPrSelIdx];
   if (!o) { toast('Elige ' + (pmPrTipo === 'Asistente' ? 'al asistente' : 'la móvil') + '.'); return; }
   if (!o.con) { toast('Esa móvil no tiene contratista activo.'); return; }
-  try { await api('guardarPrestamoPmWeb', { id: id, deudorTipo: pmPrTipo, deudorNombre: pmPrTipo === 'Asistente' ? o.nombre : '', movil: o.movil, idCon: o.con.id, fecha: $('prFec').value, monto: $('prMon').value, tasa: $('prTasa').value, cuotaMensual: $('prCuo').value, concepto: $('prCon2').value, estado: id ? $('prEst').value : 'Activo' }); pmCerrar(); await pmRenderPst(); toast('Préstamo guardado.'); }
+  try { await api('guardarPrestamoPmWeb', { id: id, deudorTipo: pmPrTipo, deudorNombre: pmPrTipo === 'Asistente' ? o.nombre : '', movil: o.movil, idCon: o.con.id, fecha: $('prFec').value, monto: $('prMon').value, tasa: $('prTasa').value, cuotaMensual: $('prFrec').value === 'Mes' ? $('prCuo').value : 0, cuota: $('prFrec').value === 'Semana' ? $('prCuo').value : 0, concepto: $('prCon2').value, estado: id ? $('prEst').value : 'Activo' }); pmCerrar(); await pmRenderPst(); toast('Préstamo guardado.'); }
   catch (e) { mostrarError(e, 'No se pudo guardar.'); }
 }
 function pmPrCambio(id) {
@@ -7908,8 +7949,10 @@ async function pmPrCambioOk(id) {
 async function pmPrestamoBorrar(id) { if (!confirm('Se eliminará el préstamo con sus abonos registrados. ¿Seguro?')) return; try { await api('eliminarPrestamoPmWeb', id); pmCerrar(); await pmRenderPst(); toast('Préstamo eliminado.'); } catch (e) { mostrarError(e, 'No se pudo eliminar.'); } }
 function pmPrestamoDetalle(id) {
   const p = pmPr.prestamos.find(x => x.id === id); if (!p) return; const e = p.estadoCalc;
-  pmModal('<h3>Préstamo · ' + esc(p.deudor || p.contratista) + '</h3><div style="font-size:12px;color:#556;margin-bottom:8px">' + esc(p.concepto) + ' · prestado el ' + esc(pmFh(p.fecha)) + ' · ' + p.tasa + ' % semanal (≈ ' + pmM(e.capital * p.tasa / 100 / 7) + ' de interés por día sobre el saldo)' + (p.deudorTipo === 'Asistente' ? ' · asistente ' + esc(p.deudorNombre) : '') + (p.cuota ? ' · cuota semanal ' + pmM(p.cuota) : '') + '</div>' +
-    '<div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:8px">' + [['Prestado', pmM(e.prestado)], ['Abonado a capital', pmM(e.abonadoCapital)], ['Interés pagado', pmM(e.abonadoInteres)], ['Saldo capital', pmM(e.capital)], ['Interés pendiente', pmM(e.interes)], ['Nos debe a hoy', pmM(e.debe)]].map(x => '<div><div style="color:#667;font-size:11px">' + x[0] + '</div><b>' + x[1] + '</b></div>').join('') + '</div>' +
+  const frD = p.cuotaMensual > 0 ? 'Mes' : 'Semana', cuD = p.cuotaMensual > 0 ? p.cuotaMensual : p.cuota;
+  const proyD = e.debe > 0.005 && p.estado !== 'Cancelado' ? '<div style="font-size:12.5px;background:#fbf6f6;border:1px solid #ecd5d5;border-radius:8px;padding:8px 10px;margin-bottom:8px">' + (cuD > 0 ? pmPrProyHtml(pmPrSim(e.capital, e.interes, p.tasa, cuD, frD, pmPr.hoy), frD, cuD, 'Proyección desde hoy con ' + pmM(cuD) + ' por ' + (frD === 'Mes' ? 'mes' : 'semana')) : '<span style="color:#667">Sin cuota pactada: edita el préstamo y elige el rebajo por semana o por mes para ver la proyección de saldos.</span>') + '</div>' : '';
+  pmModal('<h3>Préstamo · ' + esc(p.deudor || p.contratista) + '</h3><div style="font-size:12px;color:#556;margin-bottom:8px">' + esc(p.concepto) + ' · prestado el ' + esc(pmFh(p.fecha)) + ' · ' + p.tasa + ' % semanal (≈ ' + pmM(e.capital * p.tasa / 100 / 7) + ' de interés por día sobre el saldo)' + (p.deudorTipo === 'Asistente' ? ' · asistente ' + esc(p.deudorNombre) : '') + (p.cuotaMensual ? ' · cuota mensual ' + pmM(p.cuotaMensual) : (p.cuota ? ' · cuota semanal ' + pmM(p.cuota) : '')) + '</div>' +
+    '<div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:8px">' + [['Prestado', pmM(e.prestado)], ['Abonado a capital', pmM(e.abonadoCapital)], ['Interés pagado', pmM(e.abonadoInteres)], ['Saldo capital', pmM(e.capital)], ['Interés pendiente', pmM(e.interes)], ['Nos debe a hoy', pmM(e.debe)]].map(x => '<div><div style="color:#667;font-size:11px">' + x[0] + '</div><b>' + x[1] + '</b></div>').join('') + '</div>' + proyD +
     '<table class="pmT"><thead><tr><th>Fecha</th><th>Movimiento</th><th>Origen</th><th>Nota</th><th style="text-align:right">Monto</th><th></th></tr></thead><tbody><tr><td>' + esc(pmFh(p.fecha)) + '</td><td>Préstamo inicial</td><td>—</td><td>' + esc(p.concepto) + '</td><td style="text-align:right;color:#9b1c1c">' + pmM(p.monto) + '</td><td></td></tr>' +
     p.movs.map(m => '<tr' + (m.fecha > pmPr.hoy ? ' style="color:#888"' : '') + '><td>' + esc(pmFh(m.fecha)) + (m.fecha > pmPr.hoy ? ' <span class="chip amar">programado</span>' : '') + '</td><td>' + (m.tipo === 'ABONO' ? 'Abono / aporte' : 'Nuevo adelanto') + '</td><td>' + esc(m.origen) + '</td><td>' + esc(m.nota) + '</td><td style="text-align:right;color:' + (m.tipo === 'ABONO' ? '#2d5a1b' : '#9b1c1c') + '">' + (m.tipo === 'ABONO' ? '−' : '+') + pmM(m.monto) + '</td><td>' + (m.origen === 'Manual' ? '<button class="btn secondary" onclick="pmMovBorrar(\'' + m.id + '\',\'' + id + '\')">✕</button>' : '') + '</td></tr>').join('') + '</tbody></table>' +
     '<div style="margin-top:10px;padding:10px;background:#f7f9fc;border:1px solid #dde3ec;border-radius:8px"><b style="font-size:13px">Registrar movimiento</b><div style="display:grid;gap:8px;grid-template-columns:1fr 1fr 1fr;margin-top:6px"><label>Tipo<select id="pvTipo"><option value="ABONO">Abono / aporte del contratista</option><option value="DESEMBOLSO">Nuevo adelanto (más préstamo)</option></select></label><label>Fecha<input type="date" id="pvFec" value="' + pmPr.hoy + '"></label><label>Monto (₡)<input type="number" id="pvMon" step="0.01" min="0"></label><label style="grid-column:1/4">Nota<input id="pvNota" maxlength="200" placeholder="ej. transferencia, efectivo"></label></div><div style="text-align:right;margin-top:8px"><button class="btn primary" onclick="pmMovGuardar(\'' + id + '\')">Registrar</button></div></div>' +
@@ -11054,26 +11097,33 @@ let abLista = [];
 /* Orden por columna para cualquier tabla ya dibujada: clic en el encabezado = ascendente ▲, otro clic = descendente ▼, otro = orden original. */
 const ordEstado = {};
 function ordValor(td) {
-  const t = (td ? td.innerText : '').trim();
+  if (!td) return [2, ''];
+  const inp = td.querySelector('input,select'); let t = (inp ? inp.value : td.innerText).trim();
   const f = t.match(/^(\d{2})\/(\d{2})\/(\d{4})/); if (f) return [0, f[3] + f[2] + f[1]];
-  const p = t.split(/\s/)[0];
-  if (/^-?[\d.,]+$/.test(p)) { const v = parseFloat(p.replace(/,/g, '')); if (!isNaN(v)) return [1, v]; }
+  const m = t.split('\n')[0].trim().match(/^([−+-]?)\s*[₡$]?\s*(\d[\d\s.,]*)(\s+[^\d].*)?$/);
+  if (m) {
+    let s = m[2].replace(/[\s  ]/g, '');
+    if (s.indexOf(',') >= 0 && s.lastIndexOf(',') > s.lastIndexOf('.')) s = s.replace(/\./g, '').replace(',', '.'); else s = s.replace(/,/g, '');
+    const v = parseFloat(s); if (!isNaN(v)) return [1, (m[1] === '-' || m[1] === '−' ? -1 : 1) * v];
+  }
   return [2, t.toLowerCase()];
 }
 function tablaOrdenable(idCont) {
   const tb = document.querySelector('#' + idCont + ' table'); if (!tb || !tb.tHead || !tb.tBodies[0]) return;
-  const ths = Array.from(tb.tHead.rows[0].cells), cuerpo = tb.tBodies[0];
+  const ths = Array.from(tb.tHead.rows[tb.tHead.rows.length - 1].cells), cuerpo = tb.tBodies[0];
+  const esTot = r => /^total/i.test((r.cells[0] ? r.cells[0].innerText : '').trim());
   Array.from(cuerpo.rows).forEach((r, i) => { r.dataset.o = i; });
   const st = ordEstado[idCont] || (ordEstado[idCont] = { c: -1, d: 1 });
   const aplicar = () => {
-    const rows = Array.from(cuerpo.rows);
-    rows.sort((a, b) => {
+    const rows = Array.from(cuerpo.rows), fijas = rows.filter(esTot), libres = rows.filter(r => !esTot(r));
+    libres.sort((a, b) => {
       if (st.c < 0) return a.dataset.o - b.dataset.o;
-      const x = ordValor(a.cells[st.c]), y = ordValor(b.cells[st.c]);
+      const x = st.c === 'm' ? [1, +a.dataset.mov || 1e9] : ordValor(a.cells[st.c]), y = st.c === 'm' ? [1, +b.dataset.mov || 1e9] : ordValor(b.cells[st.c]);
       const r = x[0] !== y[0] ? x[0] - y[0] : x[1] < y[1] ? -1 : x[1] > y[1] ? 1 : 0;
       return r ? r * st.d : a.dataset.o - b.dataset.o;
     });
-    rows.forEach(r => cuerpo.appendChild(r));
+    libres.concat(fijas).forEach(r => cuerpo.appendChild(r));
+    const bm = document.getElementById('ordMovBtn'); if (bm) bm.textContent = '🔢 Ordenar por n.º de móvil' + (st.c === 'm' ? (st.d === 1 ? ' ▲' : ' ▼') : '');
     ths.forEach((th, i) => { const s = th.querySelector('.ordF'); if (s) { s.textContent = st.c === i ? (st.d === 1 ? ' ▲' : ' ▼') : ' ⇅'; s.style.opacity = st.c === i ? 1 : .45; } });
   };
   ths.forEach((th, i) => {
@@ -11082,7 +11132,13 @@ function tablaOrdenable(idCont) {
     th.insertAdjacentHTML('beforeend', '<span class="ordF"></span>');
     th.onclick = () => { if (st.c === i) { if (st.d === 1) st.d = -1; else { st.c = -1; st.d = 1; } } else { st.c = i; st.d = 1; } aplicar(); };
   });
+  st.apl = aplicar;
   aplicar();
+}
+function tablaOrdenarMovil(idCont) {
+  const st = ordEstado[idCont]; if (!st || !st.apl) return;
+  if (st.c === 'm') { if (st.d === 1) st.d = -1; else { st.c = -1; st.d = 1; } } else { st.c = 'm'; st.d = 1; }
+  st.apl();
 }
 
 function abVerTodo() {
@@ -14751,6 +14807,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 91 · 15-oct 09:27</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 94 · 15-oct 10:05</div>
 </body>
 </html>
