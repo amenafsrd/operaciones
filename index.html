@@ -5814,6 +5814,99 @@ function rhSelEstado(fn) {
 }
 function rhCambiaEstado(e, fn) { rhEstado = e; fn(); }
 function rhEstadoOk(c) { return rhEstado === 'todos' ? true : (rhEstado === 'fuera' ? !c.activo : c.activo); }
+
+/* ---- Importar historial de pagos de colaboradores (Excel de control de pagos internos) ---- */
+let rhHist = null;
+function rhHistModal() {
+  rhHist = null; $('rhModal').style.maxWidth = '860px';
+  rhModal('<h3>Importar historial de pagos</h3><div style="font-size:13px;color:#555;margin-bottom:8px">Sube el Excel de control de pagos internos. Se crean o actualizan los colaboradores que siguen laborando, se registra cada semana pagada (el sistema ya no se las vuelve a cobrar) y se marcan como laborados esos días en el calendario. Los que quedaron en salario 0 (liquidados o sin liquidar) no se importan, salvo que los marques.</div>' +
+    '<input type="file" accept=".xlsx,.xls" onchange="rhHistLeer(this.files[0])"><div id="rhHistBox" style="margin-top:10px"></div>');
+}
+function rhHistLeer(f) {
+  if (!f) return;
+  (async () => {
+    const box = $('rhHistBox'); box.innerHTML = '<div class="loading">Leyendo el Excel...</div>';
+    try {
+      await cargarLib('xlsx', SEG_URL_XLSX);
+      const wb = XLSX.read(await f.arrayBuffer(), { type: 'array', cellDates: true });
+      const fl = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: '' });
+      const enc = fl[0].map(x => String(x).trim().toLowerCase());
+      const ix = k => enc.findIndex(x => x.indexOf(k) === 0);
+      const c = { nom: ix('nombre'), ing: ix('fecha de ingreso'), mod: ix('modalidad'), sal: ix('salario bruto mensual'), tot: ix('total salario bruto'), net: ix('salario neto semanal') };
+      c.lab = enc.length - 1; for (let i = enc.length - 1; i >= 0; i--) { if (enc[i] === '' ) { c.lab = i; } }
+      c.lab = fl.slice(1, 6).reduce((m, r) => { for (let i = r.length - 1; i >= 0; i--) if (/pago servicios/i.test(String(r[i]))) return i; return m; }, -1);
+      if (c.nom < 0 || c.net < 0 || c.tot < 0 || c.lab < 0) throw new Error('No se reconocen las columnas del Excel (nombre, total salario bruto, salario neto semanal y la columna con «Pago servicios …»).');
+      const iso = d => d.toISOString().slice(0, 10), mas = (s, n) => iso(new Date(Date.parse(s + 'T12:00:00Z') + n * 86400000));
+      const aIso = v => v instanceof Date ? new Date(v.getTime() + 12 * 3600000).toISOString().slice(0, 10) : '';
+      const grupos = {};
+      fl.slice(1).forEach(r => {
+        const nom = String(r[c.nom]).replace(/\s+/g, ' ').trim(), lab = String(r[c.lab]).trim();
+        const m = lab.match(/^([\d-]+?)-Pago servicios\s*\((\d+)-0?(\d+)\)\s*(\d{2})-(\d{2})-(\d{4})$/i);
+        if (!nom || !m) return;
+        let y = +m[6]; if (y > 2026) y = 2026;
+        const pago = y + '-' + m[5] + '-' + m[4];
+        (grupos[lab.replace(/-(\d{4})$/, '') + '|' + pago] = grupos[lab.replace(/-(\d{4})$/, '') + '|' + pago] || { fact: m[1], ini: +m[2], fin: +m[3], pago: pago, etiqueta: lab.replace(/-\d{4}$/, '-' + y), filas: [] }).filas.push({ nom: nom, r: r });
+      });
+      const gs = Object.values(grupos).sort((a, b) => a.pago < b.pago ? -1 : a.pago > b.pago ? 1 : (a.fact < b.fact ? -1 : 1)), avisos = []; let prevPago = '';
+      gs.forEach(g => {
+        let pago = g.pago;
+        const cand = []; for (let k = 7; k <= 35; k++) { const s = mas(pago, -k); if (+s.slice(8) === g.ini && new Date(s + 'T12:00:00Z').getUTCDay() === 1) { cand.push(s); break; } }
+        let lunes = cand[0] || mas(pago, -19);
+        if (new Date(lunes + 'T12:00:00Z').getUTCDay() !== 1) lunes = mas(pago, -19);
+        if (prevPago && pago <= prevPago) { const n = mas(mas(lunes, 6), 13); avisos.push('«' + g.etiqueta + '» traía fecha de pago ' + pago.split('-').reverse().join('/') + ' (igual o anterior a la semana previa); se usó ' + n.split('-').reverse().join('/') + '.'); pago = n; }
+        prevPago = pago; g.lunes = lunes; g.hasta = mas(lunes, 6); g.pago = pago;
+      });
+      const per = {};
+      gs.forEach(g => g.filas.forEach(({ nom, r }) => {
+        const limpio = nom.replace(/\([^)]*\)/g, '').replace(/\s+/g, ' ').trim();
+        const p = per[limpio.toLowerCase()] = per[limpio.toLowerCase()] || { nombre: limpio, ingreso: '', periodicidad: 'Quincenal', salario: 0, ccss: false, semanas: [], ti: /t\/i/i.test(nom) };
+        const sal = Number(r[c.sal]) || 0, tot = Number(r[c.tot]) || 0, neto = Number(r[c.net]) || 0, ing = aIso(r[c.ing]);
+        if (ing && !p.ingreso) p.ingreso = ing;
+        p.periodicidad = String(r[c.mod]).trim() || p.periodicidad; p.salario = tot || sal;
+        if (!(neto > 0)) return;
+        const bruto = Math.round(tot / 4 * 100) / 100;
+        p.ccss = bruto - neto > 1;
+        p.semanas.push({ lunes: g.lunes, hasta: g.hasta, fechaPago: g.pago, bruto: bruto, neto: Math.round(neto * 100) / 100, factura: g.fact, etiqueta: g.etiqueta });
+      }));
+      /* Quincenales: se pagan el 15 y el 30 (en febrero, el último día); se arman las quincenas de nov-2025 a sep-2026 con la mitad del salario */
+      Object.values(per).forEach(p => {
+        if (p.periodicidad !== 'Quincenal' || !p.semanas.length || !(p.salario > 0)) return;
+        const ult = (y, m) => new Date(Date.UTC(y, m, 0)).getUTCDate(), p2 = n => String(n).padStart(2, '0');
+        const medio = Math.round(p.salario / 2 * 100) / 100, q = [];
+        for (let y = 2025, m = 11; y * 100 + m <= 202609; m++) {
+          if (m > 12) { m = 1; y++; }
+          const ym = y + '-' + p2(m), u = ult(y, m), pago2 = m === 2 ? u : 30;
+          const neto = p.ccss ? Math.round(medio * (1 - 0.1083) * 100) / 100 : medio;
+          if (y * 100 + m > 202511) q.push({ clave: 'Q|' + ym + '|1', lunes: ym + '-01', hasta: ym + '-15', fechaPago: ym + '-15', bruto: medio, neto: neto, factura: '', etiqueta: 'Quincena 01-15 ' + ym });
+          q.push({ clave: 'Q|' + ym + '|2', lunes: ym + '-16', hasta: ym + '-' + p2(u), fechaPago: ym + '-' + p2(pago2), bruto: medio, neto: neto, factura: '', etiqueta: 'Quincena 16-' + p2(u) + ' ' + ym });
+        }
+        p.semanas = q;
+      });
+      const lista = Object.values(per).map(p => { p.activo = p.salario > 0; p.sel = p.activo; return p; }).sort((a, b) => a.nombre.localeCompare(b.nombre));
+      rhHist = { lista: lista, avisos: avisos };
+      rhHistDibujar();
+    } catch (e) { box.innerHTML = '<span style="color:#9b1c1c">' + esc(e.message || e) + '</span>'; }
+  })();
+}
+function rhHistDibujar() {
+  const H = rhHist, box = $('rhHistBox'); if (!H) return;
+  const tot = H.lista.filter(p => p.sel).reduce((a, p) => a + p.semanas.reduce((x, w) => x + w.neto, 0), 0);
+  box.innerHTML = (H.avisos.length ? '<div style="background:#fff8e1;border:1px solid #f0d98a;border-radius:6px;padding:6px 10px;font-size:12px;margin-bottom:8px">' + H.avisos.map(esc).join('<br>') + '</div>' : '') +
+    '<div class="tableWrap"><table><thead><tr><th></th><th>Colaborador</th><th>Pago</th><th class="num">Salario mensual</th><th>CCSS</th><th class="num">Pagos</th><th>Primera → última</th><th class="num">Neto total</th></tr></thead><tbody>' +
+    H.lista.map((p, i) => { const s = p.semanas; return '<tr style="' + (p.activo ? '' : 'opacity:.6') + '"><td><input type="checkbox" ' + (p.sel ? 'checked' : '') + ' onchange="rhHist.lista[' + i + '].sel=this.checked;rhHistDibujar()"></td><td><b>' + esc(p.nombre) + '</b>' + (p.activo ? '' : ' <span style="font-size:11px;color:#9b1c1c">salario 0 · no sigue laborando</span>') + (p.ti ? ' <span style="font-size:11px;color:#667">T/I CCSS</span>' : '') + '</td><td>' + esc(p.periodicidad) + (p.periodicidad === 'Quincenal' ? ' <span style="font-size:11px;color:#667">(15 y 30)</span>' : '') + '</td><td class="num">' + pmM(p.salario) + '</td><td>' + (p.ccss ? 'Sí' : 'No') + '</td><td class="num">' + s.length + '</td><td style="font-size:12px">' + (s.length ? s[0].lunes.split('-').reverse().join('/') + ' → ' + s[s.length - 1].hasta.split('-').reverse().join('/') : '') + '</td><td class="num">' + pmM(s.reduce((a, w) => a + w.neto, 0)) + '</td></tr>'; }).join('') +
+    '</tbody></table></div><div style="font-size:12px;color:#667;margin:8px 0">Neto total a registrar: <b>' + pmM(tot) + '</b>. El pago se guarda como neto de la semana; las cargas son la diferencia contra el bruto semanal (salario ÷ 4). Lo ya registrado no se duplica.</div>' +
+    '<div class="modalBtns"><button class="btn secondary" onclick="rhCerrar()">Cancelar</button><button class="btn primary" id="rhHistBtn" onclick="rhHistGuardar()">Importar</button></div>';
+}
+async function rhHistGuardar() {
+  const sel = rhHist.lista.filter(p => p.sel && p.semanas.length); if (!sel.length) return toast('Marca al menos un colaborador.');
+  const b = $('rhHistBtn'); b.disabled = true; b.textContent = 'Importando...';
+  try {
+    const r = await api('importarHistorialPagosRhWeb', { colabs: sel.map(p => ({ nombre: p.nombre, ingreso: p.ingreso, periodicidad: p.periodicidad, salario: p.salario, ccss: p.ccss, semanas: p.semanas })) });
+    rhCerrar(); try { await abrirColab(); } catch (e) { }
+    toast(r.nuevos + ' nuevo(s), ' + r.actualizados + ' actualizado(s), ' + r.pagos + ' pago(s) registrados, ' + r.dias + ' día(s) marcados' + (r.omitidosPagos ? ', ' + r.omitidosPagos + ' ya existían' : '') + '.');
+  } catch (e) { b.disabled = false; b.textContent = 'Importar'; mostrarError(e, 'No se pudo importar.'); }
+}
+
 function rhModal(html) { $('rhModal').innerHTML = html; $('rhModalBg').classList.add('show'); }
 function rhCerrar() { $('rhModalBg').classList.remove('show'); $('rhModal').style.maxWidth = '560px'; }
 function rhFecha(iso) { return iso ? fmtFechaSeg(iso) : '—'; }
@@ -6168,7 +6261,7 @@ function notifRefrescarSiExiste() { try { if (typeof notifCargar === 'function')
 
 function rhRenderCol() {
   const l = rhDatos.colaboradores.filter(rhEstadoOk);
-  $('rhPCol').innerHTML = rhAvisoSinFicha() + rhAvisoExigibles() + '<div class="toolbar"><button class="btn primary" onclick="rhEditarCol(\'\')">➕ Nuevo colaborador</button>' + rhSelEstado('rhRenderCol') +
+  $('rhPCol').innerHTML = rhAvisoSinFicha() + rhAvisoExigibles() + '<div class="toolbar"><button class="btn primary" onclick="rhEditarCol(\'\')">➕ Nuevo colaborador</button><button class="btn secondary" onclick="rhHistModal()">📥 Importar historial de pagos</button>' + rhSelEstado('rhRenderCol') +
     '<span style="font-size:12px;color:#777;margin-left:8px">Vacaciones: ' + rhDatos.semanasPeriodo + ' semanas laboradas = 2 semanas de vacaciones (10 días en semana de 5 días, 12 en semana de 6). Los salarios solo los ve el administrador.</span></div>' +
     '<div class="panel"><div class="panelHead"><h2>Colaboradores internos</h2><span style="font-size:12px;color:#777">' + l.length + '</span></div><div class="tableWrap">' +
     (!l.length ? '<div class="empty">' + (rhDatos.colaboradores.length ? 'No hay colaboradores con este filtro.' : 'Aún no hay colaboradores. Agrega el primero con su fecha de ingreso.') + '</div>' :
@@ -14373,6 +14466,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 70 · 14-oct 19:25</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 72 · 14-oct 20:07</div>
 </body>
 </html>
