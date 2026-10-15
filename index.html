@@ -1866,7 +1866,7 @@
         <div class="grid2" style="margin-top:10px">
           <div class="field"><label>Fecha de ingreso</label><input id="uFIngreso" type="date"></div>
           <div class="field"><label>Puesto</label><input id="uFPuesto" maxlength="60" autocomplete="off"></div>
-          <div class="field"><label>Cédula</label><input id="uFCedula" maxlength="30" autocomplete="off"></div>
+          <div class="field"><label>Cédula / pasaporte <b style="color:#9b1c1c" title="Obligatoria al crear">*</b></label><input id="uFCedula" placeholder="Obligatoria" maxlength="30" autocomplete="off"></div>
           <div class="field"><label>Fecha de nacimiento</label><input id="uFNac" type="date"></div>
           <div class="field"><label>Teléfono</label><input id="uFTel" maxlength="30" autocomplete="off"></div>
           <div class="field"><label>Correo personal</label><input id="uFCorreoP" type="email" maxlength="80" autocomplete="off"></div>
@@ -3946,7 +3946,7 @@ function abrirNuevoUsuario() {
 
   uEditando = false;
   uUsuarioEditado = '';
-  uFichaPoner(null);
+  uFichaPoner(null); $('uFichaDet').open = true;
 
   $('uTitulo').textContent = 'Nuevo usuario';
   $('uNombre').value = '';
@@ -4051,6 +4051,7 @@ function guardarUsuario() {
 
   if (nombre.split(/\s+/).length < 2) { toast('Escribe el nombre completo (nombre y apellido).'); return; }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(correo)) { toast('Escribe un correo empresarial válido.'); return; }
+  if (!uEditando && $('uFCedula').value.replace(/[^0-9A-Za-z]/g, '').length < 5) { $('uFichaDet').open = true; $('uFCedula').focus(); toast('La cédula (o pasaporte) es obligatoria: identifica a la persona y evita duplicados.'); return; }
 
   const btn = $('btnGuardarUsuario');
   btn.disabled = true;
@@ -5819,8 +5820,8 @@ function rhEstadoOk(c) { return rhEstado === 'todos' ? true : (rhEstado === 'fue
 let rhHist = null;
 function rhHistModal() {
   rhHist = null; $('rhModal').style.maxWidth = '860px';
-  rhModal('<h3>Importar historial de pagos</h3><div style="font-size:13px;color:#555;margin-bottom:8px">Sube el Excel de control de pagos internos. Se crean o actualizan los colaboradores que siguen laborando, se registra cada semana pagada (el sistema ya no se las vuelve a cobrar) y se marcan como laborados esos días en el calendario. Los que quedaron en salario 0 (liquidados o sin liquidar) no se importan, salvo que los marques.</div>' +
-    '<input type="file" accept=".xlsx,.xls" onchange="rhHistLeer(this.files[0])"><div id="rhHistBox" style="margin-top:10px"></div>');
+  rhModal('<h3>Importar historial de pagos</h3><div style="font-size:13px;color:#555;margin-bottom:8px">Sube el Excel de control de pagos internos. Se crean o actualizan los colaboradores que siguen laborando (si ya existe una ficha con otro nombre, por ejemplo «Alex Mena Fonseca», elígela en «Ficha existente» para no duplicarla y escribe la cédula y la fecha de ingreso que falten; con la cédula se distingue a quienes tienen el mismo nombre), se registra cada semana pagada (el sistema ya no se las vuelve a cobrar) y se marcan como laborados esos días en el calendario. Los que quedaron en salario 0 (liquidados o sin liquidar) no se importan, salvo que los marques.</div>' +
+    '<input type="file" accept=".xlsx,.xls" onchange="rhHistLeer(this.files[0])"><div style="margin-top:8px;font-size:12px"><a href="#" onclick="rhHistBorrar();return false" style="color:#9b1c1c">🗑 Eliminar lo importado antes (pagos y días marcados)</a></div><div id="rhHistBox" style="margin-top:10px"></div>');
 }
 function rhHistLeer(f) {
   if (!f) return;
@@ -5832,7 +5833,7 @@ function rhHistLeer(f) {
       const fl = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: '' });
       const enc = fl[0].map(x => String(x).trim().toLowerCase());
       const ix = k => enc.findIndex(x => x.indexOf(k) === 0);
-      const c = { nom: ix('nombre'), ing: ix('fecha de ingreso'), mod: ix('modalidad'), sal: ix('salario bruto mensual'), tot: ix('total salario bruto'), net: ix('salario neto semanal') };
+      const c = { nom: ix('nombre'), ing: ix('fecha de ingreso'), mod: ix('modalidad'), sal: ix('salario bruto mensual'), tot: ix('total salario bruto'), net: ix('salario neto semanal'), ced: ix('cedula') };
       c.lab = enc.length - 1; for (let i = enc.length - 1; i >= 0; i--) { if (enc[i] === '' ) { c.lab = i; } }
       c.lab = fl.slice(1, 6).reduce((m, r) => { for (let i = r.length - 1; i >= 0; i--) if (/pago servicios/i.test(String(r[i]))) return i; return m; }, -1);
       if (c.nom < 0 || c.net < 0 || c.tot < 0 || c.lab < 0) throw new Error('No se reconocen las columnas del Excel (nombre, total salario bruto, salario neto semanal y la columna con «Pago servicios …»).');
@@ -5859,7 +5860,8 @@ function rhHistLeer(f) {
       const per = {};
       gs.forEach(g => g.filas.forEach(({ nom, r }) => {
         const limpio = nom.replace(/\([^)]*\)/g, '').replace(/\s+/g, ' ').trim();
-        const p = per[limpio.toLowerCase()] = per[limpio.toLowerCase()] || { nombre: limpio, ingreso: '', periodicidad: 'Quincenal', salario: 0, ccss: false, semanas: [], ti: /t\/i/i.test(nom) };
+        const ced = c.ced >= 0 ? String(r[c.ced]).replace(/\D/g, '') : '', kp = ced ? ced : limpio.toLowerCase();
+        const p = per[kp] = per[kp] || { nombre: limpio, cedula: ced, ingreso: '', periodicidad: 'Quincenal', salario: 0, ccss: false, semanas: [], ti: /t\/i/i.test(nom) };
         const sal = Number(r[c.sal]) || 0, tot = Number(r[c.tot]) || 0, neto = Number(r[c.net]) || 0, ing = aIso(r[c.ing]);
         if (ing && !p.ingreso) p.ingreso = ing;
         p.periodicidad = String(r[c.mod]).trim() || p.periodicidad; p.salario = tot || sal;
@@ -5883,7 +5885,19 @@ function rhHistLeer(f) {
         p.semanas = q;
       });
       const lista = Object.values(per).map(p => { p.activo = p.salario > 0; p.sel = p.activo; return p; }).sort((a, b) => a.nombre.localeCompare(b.nombre));
-      rhHist = { lista: lista, avisos: avisos };
+      /* ligar con fichas ya existentes (p. ej. creadas al dar de alta usuarios con otro nombre) para no duplicar */
+      const nz = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\([^)]*\)/g, ' ').split(/\s+/).filter(Boolean);
+      const igual = (a, b) => a === b || (Math.min(a.length, b.length) >= 4 && (a.startsWith(b) || b.startsWith(a)));
+      const ex = ((rhDatos && rhDatos.colaboradores) || []);
+      lista.forEach(p => {
+        p.idEx = ''; const tp = nz(p.nombre);
+        if (p.cedula) { const ec = ex.find(e => String(e.cedula || '').replace(/\D/g, '') === p.cedula); if (ec) { p.idEx = ec.id; return; } }
+        const e0 = ex.find(e => nz(e.nombre).join(' ') === tp.join(' ')); if (e0) { p.idEx = e0.id; return; }
+        const pun = ex.filter(e => !(e.salario > 0)).map(e => ({ e: e, s: nz(e.nombre).filter(t => tp.some(u => igual(t, u))).length, n: nz(e.nombre).length }));
+        const mx = Math.max(0, ...pun.map(x => x.s)), top = pun.filter(x => x.s === mx && x.s >= 2 && x.s >= x.n);
+        if (top.length === 1 && lista.filter(o => o !== p && o.nombre.toLowerCase().indexOf(tp[0]) === 0).length === 0) p.idEx = top[0].e.id;
+      });
+      rhHist = { lista: lista, avisos: avisos, ex: ex };
       rhHistDibujar();
     } catch (e) { box.innerHTML = '<span style="color:#9b1c1c">' + esc(e.message || e) + '</span>'; }
   })();
@@ -5892,16 +5906,32 @@ function rhHistDibujar() {
   const H = rhHist, box = $('rhHistBox'); if (!H) return;
   const tot = H.lista.filter(p => p.sel).reduce((a, p) => a + p.semanas.reduce((x, w) => x + w.neto, 0), 0);
   box.innerHTML = (H.avisos.length ? '<div style="background:#fff8e1;border:1px solid #f0d98a;border-radius:6px;padding:6px 10px;font-size:12px;margin-bottom:8px">' + H.avisos.map(esc).join('<br>') + '</div>' : '') +
-    '<div class="tableWrap"><table><thead><tr><th></th><th>Colaborador</th><th>Pago</th><th class="num">Salario mensual</th><th>CCSS</th><th class="num">Pagos</th><th>Primera → última</th><th class="num">Neto total</th></tr></thead><tbody>' +
-    H.lista.map((p, i) => { const s = p.semanas; return '<tr style="' + (p.activo ? '' : 'opacity:.6') + '"><td><input type="checkbox" ' + (p.sel ? 'checked' : '') + ' onchange="rhHist.lista[' + i + '].sel=this.checked;rhHistDibujar()"></td><td><b>' + esc(p.nombre) + '</b>' + (p.activo ? '' : ' <span style="font-size:11px;color:#9b1c1c">salario 0 · no sigue laborando</span>') + (p.ti ? ' <span style="font-size:11px;color:#667">T/I CCSS</span>' : '') + '</td><td>' + esc(p.periodicidad) + (p.periodicidad === 'Quincenal' ? ' <span style="font-size:11px;color:#667">(15 y 30)</span>' : '') + '</td><td class="num">' + pmM(p.salario) + '</td><td>' + (p.ccss ? 'Sí' : 'No') + '</td><td class="num">' + s.length + '</td><td style="font-size:12px">' + (s.length ? s[0].lunes.split('-').reverse().join('/') + ' → ' + s[s.length - 1].hasta.split('-').reverse().join('/') : '') + '</td><td class="num">' + pmM(s.reduce((a, w) => a + w.neto, 0)) + '</td></tr>'; }).join('') +
+    '<div class="tableWrap"><table><thead><tr><th></th><th>Colaborador</th><th>Pago</th><th>Ficha existente</th><th>Cédula</th><th>Ingreso</th><th class="num">Salario mensual</th><th>CCSS</th><th class="num">Pagos</th><th>Primera → última</th><th class="num">Neto total</th></tr></thead><tbody>' +
+    H.lista.map((p, i) => { const s = p.semanas; return '<tr style="' + (p.activo ? '' : 'opacity:.6') + '"><td><input type="checkbox" ' + (p.sel ? 'checked' : '') + ' onchange="rhHist.lista[' + i + '].sel=this.checked;rhHistDibujar()"></td><td><b>' + esc(p.nombre) + '</b>' + (p.activo ? '' : ' <span style="font-size:11px;color:#9b1c1c">salario 0 · no sigue laborando</span>') + (p.ti ? ' <span style="font-size:11px;color:#667">T/I CCSS</span>' : '') + '</td><td><select style="max-width:170px;font-size:12px" onchange="rhHist.lista[' + i + '].idEx=this.value;rhHistDibujar()"><option value="">— Elige el colaborador —</option>' + H.ex.map(e => '<option value="' + esc(e.id) + '"' + (e.id === p.idEx ? ' selected' : '') + '>' + esc(e.nombre) + (e.cedula ? ' · ' + esc(e.cedula) : '') + (e.salario > 0 ? '' : ' (sin salario)') + '</option>').join('') + '</select></td><td><input type="text" inputmode="numeric" placeholder="Cédula" style="font-size:12px;width:110px" value="' + esc(p.cedula || '') + '" onchange="rhHistCed(' + i + ',this.value)"></td><td><input type="date" style="font-size:12px" value="' + esc(p.ingreso || '') + '" onchange="rhHist.lista[' + i + '].ingreso=this.value"></td><td>' + esc(p.periodicidad) + (p.periodicidad === 'Quincenal' ? ' <span style="font-size:11px;color:#667">(15 y 30)</span>' : '') + '</td><td class="num">' + pmM(p.salario) + '</td><td>' + (p.ccss ? 'Sí' : 'No') + '</td><td class="num">' + s.length + '</td><td style="font-size:12px">' + (s.length ? s[0].lunes.split('-').reverse().join('/') + ' → ' + s[s.length - 1].hasta.split('-').reverse().join('/') : '') + '</td><td class="num">' + pmM(s.reduce((a, w) => a + w.neto, 0)) + '</td></tr>'; }).join('') +
     '</tbody></table></div><div style="font-size:12px;color:#667;margin:8px 0">Neto total a registrar: <b>' + pmM(tot) + '</b>. El pago se guarda como neto de la semana; las cargas son la diferencia contra el bruto semanal (salario ÷ 4). Lo ya registrado no se duplica.</div>' +
     '<div class="modalBtns"><button class="btn secondary" onclick="rhCerrar()">Cancelar</button><button class="btn primary" id="rhHistBtn" onclick="rhHistGuardar()">Importar</button></div>';
+  if (H.lista.some(p => p.sel && !p.idEx)) box.insertAdjacentHTML('afterbegin', '<div style="background:#fdecea;border:1px solid #e6b0aa;border-radius:6px;padding:6px 10px;font-size:12px;margin-bottom:8px">Elige en «Ficha existente» a qué colaborador corresponde cada fila marcada. Esta importación no crea colaboradores nuevos: si falta alguno, créalo primero con su cédula (Usuarios o Colaboradores).</div>');
+}
+function rhHistBorrar() {
+  $('rhHistBox').innerHTML = '<div style="background:#fdecea;border:1px solid #e6b0aa;border-radius:8px;padding:10px 12px;font-size:13px">Se eliminarán todos los pagos y días laborados que vinieron de una importación anterior (los pagos que registraste a mano no se tocan).<label style="display:flex;gap:6px;align-items:center;margin-top:8px"><input type="checkbox" id="rhHistBFichas" checked> También eliminar las fichas que creó la importación (sin usuario, sin cédula y sin otros pagos)</label>' +
+    '<div style="margin-top:10px"><button class="btn secondary" onclick="$(\'rhHistBox\').innerHTML=\'\'">Cancelar</button> <button class="btn primary" id="rhHistBBtn" onclick="rhHistBorrarOk()">Sí, eliminar</button></div></div>';
+}
+async function rhHistBorrarOk() {
+  const b = $('rhHistBBtn'); b.disabled = true; b.textContent = 'Eliminando...';
+  try { const r = await api('eliminarPagosImportadosRhWeb', { fichas: $('rhHistBFichas').checked }); toast(r.pagos + ' pago(s), ' + r.dias + ' día(s) y ' + r.fichas + ' ficha(s) eliminados.'); try { await abrirColab(); } catch (e) { } $('rhHistBox').innerHTML = '<div style="color:#1e7e34;font-size:13px">Listo. Ahora puedes subir el Excel de nuevo y elegir a qué colaborador corresponde cada fila.</div>'; }
+  catch (e) { b.disabled = false; b.textContent = 'Sí, eliminar'; mostrarError(e, 'No se pudo eliminar.'); }
+}
+function rhHistCed(i, v) {
+  const p = rhHist.lista[i]; p.cedula = String(v || '').replace(/\D/g, '');
+  const ec = p.cedula ? rhHist.ex.find(e => String(e.cedula || '').replace(/\D/g, '') === p.cedula) : null;
+  if (ec) p.idEx = ec.id; rhHistDibujar();
 }
 async function rhHistGuardar() {
   const sel = rhHist.lista.filter(p => p.sel && p.semanas.length); if (!sel.length) return toast('Marca al menos un colaborador.');
+  const sinFicha = sel.filter(p => !p.idEx); if (sinFicha.length) return toast('Elige a qué colaborador corresponde: ' + sinFicha.map(p => p.nombre).join(', ') + '. La importación no crea colaboradores nuevos.');
   const b = $('rhHistBtn'); b.disabled = true; b.textContent = 'Importando...';
   try {
-    const r = await api('importarHistorialPagosRhWeb', { colabs: sel.map(p => ({ nombre: p.nombre, ingreso: p.ingreso, periodicidad: p.periodicidad, salario: p.salario, ccss: p.ccss, semanas: p.semanas })) });
+    const r = await api('importarHistorialPagosRhWeb', { colabs: sel.map(p => ({ idExistente: p.idEx, cedula: p.cedula, nombre: p.nombre, ingreso: p.ingreso, periodicidad: p.periodicidad, salario: p.salario, ccss: p.ccss, semanas: p.semanas })) });
     rhCerrar(); try { await abrirColab(); } catch (e) { }
     toast(r.nuevos + ' nuevo(s), ' + r.actualizados + ' actualizado(s), ' + r.pagos + ' pago(s) registrados, ' + r.dias + ' día(s) marcados' + (r.omitidosPagos ? ', ' + r.omitidosPagos + ' ya existían' : '') + '.');
   } catch (e) { b.disabled = false; b.textContent = 'Importar'; mostrarError(e, 'No se pudo importar.'); }
@@ -6282,6 +6312,7 @@ function rhEditarCol(id) {
   rhModal('<h3>' + (id ? 'Editar colaborador' : 'Nuevo colaborador') + '</h3><input type="hidden" id="rcId" value="' + esc(c.id) + '">' +
     '<div class="field"><label>Nombre completo</label><input id="rcNombre" value="' + esc(c.nombre) + '" maxlength="80"></div>' +
     '<div class="field"><label>Usuario del sistema (para que pida sus permisos)</label><select id="rcUsuario">' + usu + '</select></div>' +
+    '<div class="field"><label>Cédula / pasaporte <b style="color:#9b1c1c">*</b> (obligatoria al crear)</label><input id="rcCedula" maxlength="30" value="' + esc(c.cedula || '') + '" autocomplete="off"></div>' +
     '<div style="display:flex;gap:10px"><div class="field" style="flex:1"><label>Puesto</label><input id="rcPuesto" value="' + esc(c.puesto) + '" maxlength="60"></div>' +
     '<div class="field" style="flex:1"><label>Fecha de ingreso</label><input type="date" id="rcIngreso" value="' + esc(c.ingreso) + '"></div></div>' +
     '<div style="display:flex;gap:10px"><div class="field" style="flex:1"><label>Salario base (₡)</label><input type="number" id="rcSalario" min="0" value="' + esc(c.salario) + '"></div>' +
@@ -6306,7 +6337,7 @@ function rhSugPeriodo() { $('rcDiasPeriodo').value = $('rcDiasSemana').value ===
 async function rhGuardarCol() {
   const b = $('rcBtn'); b.disabled = true;
   try {
-    await api('guardarColaboradorWeb', { id: $('rcId').value, nombre: $('rcNombre').value, usuario: $('rcUsuario').value, puesto: $('rcPuesto').value, ingreso: $('rcIngreso').value,
+    await api('guardarColaboradorWeb', { cedula: $('rcCedula').value, id: $('rcId').value, nombre: $('rcNombre').value, usuario: $('rcUsuario').value, puesto: $('rcPuesto').value, ingreso: $('rcIngreso').value,
       salario: $('rcSalario').value, periodicidad: $('rcPeriodicidad').value, diasSemana: $('rcDiasSemana').value, diasPeriodo: $('rcDiasPeriodo').value, previos: $('rcPrevios').value,
       activo: $('rcActivo').value === '1', salida: $('rcSalida').value, obs: $('rcObs').value, banco: $('rcBanco').value, referencia: $('rcRef').value, iban: $('rcIban').value, ccss: $('rcCcss').checked });
     rhCerrar(); toast('Colaborador guardado.'); await abrirColab();
@@ -14466,6 +14497,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 72 · 14-oct 20:07</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 76 · 14-oct 20:44</div>
 </body>
 </html>
