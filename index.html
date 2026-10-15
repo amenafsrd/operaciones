@@ -12825,15 +12825,20 @@ async function iiAplicar() {
       return;
     }
 
-    const lista = [];
+    /* varios renglones del archivo pueden ser el mismo material del sistema (p. ej. ONT 2PLAY + ONT solo): se suman */
+    const lista = [], porClave = {};
     mapeos.forEach(x => {
       const l = r.lineas[x.linea];
       const clave = x.claveFija || mapa[l.codigo || l.descripcion];
-      if (clave) lista.push({ ubicacion: ub, clave: clave, fisico: l.cantidad });
+      if (!clave) return;
+      if (porClave[clave]) { porClave[clave].fisico = Math.round((porClave[clave].fisico + (l.cantidad || 0)) * 100) / 100; return; }
+      porClave[clave] = { ubicacion: ub, clave: clave, fisico: l.cantidad || 0 };
+      lista.push(porClave[clave]);
     });
 
     await api('guardarConteoInvWeb', invActual.info.corte, lista);
-    toast('Conteo cargado: ' + lista.length + ' materiales.');
+    const unidos = mapeos.length - lista.length;
+    toast('Conteo cargado: ' + lista.length + ' materiales' + (unidos > 0 ? ' (' + unidos + ' renglón(es) sumados a un material ya cargado)' : '') + '.');
     await cargarBodega();
     await abrirCorte(invActual.info.corte);
     iiSiguiente();
@@ -12941,7 +12946,16 @@ async function cmpCalcular() {
     const sis = r.materiales || {};
     const mats = {};
     bodDatos.materiales.forEach(m => { mats[m.clave] = m; });
-    cmpFilas = cmpLineas.map(l => {
+    /* renglones del cliente que son el mismo material del sistema se suman para compararlos juntos */
+    const agr = [], porClave = {};
+    cmpLineas.forEach(l => {
+      if (!l.clave) { agr.push(l); return; }
+      const g = porClave[l.clave];
+      if (!g) { const c = Object.assign({}, l, { cli: Object.assign({}, l.cli) }); porClave[l.clave] = c; agr.push(c); return; }
+      ['ini', 'ent', 'gas', 'dev', 'tot'].forEach(k => { g.cli[k] = (g.cli[k] || 0) + (l.cli[k] || 0); });
+      g.codigo += ' / ' + l.codigo; g.descripcion += ' + ' + l.descripcion;
+    });
+    cmpFilas = agr.map(l => {
       const x = l.clave ? (sis[l.clave] || { inicial: 0, ingresos: 0, consumo: 0, devProv: 0, ajustes: 0, final: 0, bodega: 0, moviles: 0 }) : null;
       return { clave: l.clave, codigo: l.codigo, desc: l.descripcion, material: l.clave && mats[l.clave] ? mats[l.clave].material : '', cli: l.cli, sis: x };
     });
@@ -14673,6 +14687,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 86 · 15-oct 07:49</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 87 · 15-oct 08:12</div>
 </body>
 </html>
