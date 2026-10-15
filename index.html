@@ -6873,7 +6873,7 @@ function pmRenderSemanas() {
   $('pmPSem').innerHTML = h + '</div></div>';
 }
 async function pmAbrir(id) {
-  pmSemId = id; pmVer = null; $('pmPSem').innerHTML = '<div class="loading">Cargando semana...</div>';
+  pmSemId = id; pmVer = null; pmIM = { movil: '', cfg: null }; $('pmPSem').innerHTML = '<div class="loading">Cargando semana...</div>';
   try { pmS = await api('obtenerSemanaPmWeb', id); pmRenderSemana(); }
   catch (e) { pmSemId = ''; pmRenderSemanas(); mostrarError(e, 'No se pudo abrir la semana.'); }
 }
@@ -6882,7 +6882,10 @@ async function pmVb(idCon, aprobar) {
   if (aprobar && !confirm('Esta móvil no ha entregado factura. ¿Das tu visto bueno como administrador para incluirla en el pago?')) return;
   try { await api('vbSinFacturaPmWeb', pmSemId, idCon, !!aprobar); await pmRecargar(); toast(aprobar ? 'Visto bueno registrado.' : 'Visto bueno quitado.'); } catch (e) { mostrarError(e, 'No se pudo guardar.'); }
 }
-function pmSub(v) { pmVista = v; pmRenderSemana(); }
+async function pmSub(v) {
+  if (v === 'int' && (!rhDatos || !rhDatos.colaboradores)) { try { rhDatos = await api('obtenerRhWeb'); } catch (e) { return mostrarError(e, 'No se pudieron cargar los colaboradores.'); } }
+  pmVista = v; pmRenderSemana();
+}
 
 function pmRenderSemana() {
   const S = pmS, T = S.resumen.totales, cerr = S.semana.estado === 'Cerrada';
@@ -6894,7 +6897,7 @@ function pmRenderSemana() {
     [['Órdenes', T.nOrdenes], ['Costo detalle', pmM(T.detalle)], ['UF Telecable', pmM(T.uf)], ['Margen (UF − costo)', pmM(margen)], ['Total facturado', pmM(T.totalFacturado)], ['Total a depositar', pmM(T.deposito)]]
       .map(x => '<span>' + x[0] + ' <b style="font-size:13px;color:#1d2433">' + x[1] + '</b></span>').join('') + '</div></div>';
   if (S.diferencias || S.sinLista) h += '<div class="panel" style="padding:10px 14px;font-size:13px;background:#fff8e1">' + (S.diferencias ? '⚠ <b>' + S.diferencias + '</b> orden(es) con costo distinto a la lista de precios. ' + (cerr ? '' : '<button class="btn secondary" onclick="pmAplicarLista()">Aplicar precio de lista</button> ') : '') + (S.sinLista ? '⚠ <b>' + S.sinLista + '</b> orden(es) sin precio de pago (el servicio no está en la lista). ' + (cerr ? '' : '<button class="btn primary" onclick="pmSinPrecioModal()">Asignar precio</button>') : '') + '</div>';
-  h += '<div class="subtabs">' + tb('mov', 'Resumen por móvil') + tb('ord', 'Órdenes') + tb('res', 'Pago por contratista') + tb('ape', 'Apelaciones' + (S.apelaciones.some(a => a.estado === 'Pendiente') ? ' •' : '')) + tb('aju', 'Ajustes') + tb('ext', 'Adicionales') + tb('ver', 'Verificación') + '</div>';
+  h += '<div class="subtabs">' + tb('mov', 'Resumen por móvil') + tb('ord', 'Órdenes') + tb('res', 'Pago por contratista') + tb('ape', 'Apelaciones' + (S.apelaciones.some(a => a.estado === 'Pendiente') ? ' •' : '')) + tb('aju', 'Ajustes') + tb('ext', 'Adicionales') + tb('int', 'Móviles internas' + (Object.keys(pmS.internasMov || {}).length ? ' (' + Object.keys(pmS.internasMov).length + ')' : '')) + tb('ver', 'Verificación') + '</div>';
   let c = '';
   if (pmVista === 'mov') c = pmHtmlMov();
   if (pmVista === 'res') c = pmHtmlRes(cerr);
@@ -6903,6 +6906,7 @@ function pmRenderSemana() {
   if (pmVista === 'aju') c = pmHtmlAju(cerr);
   if (pmVista === 'ext') c = pmHtmlExt(cerr);
   if (pmVista === 'ver') c = pmHtmlVer();
+  if (pmVista === 'int') c = pmHtmlInt();
   /* botones y filtros de cada vista quedan fijos arriba; solo la tabla se desplaza */
   let fijo = ''; const mk = c.indexOf('<!--/FIX-->');
   if (mk >= 0) { fijo = c.slice(0, mk); c = c.slice(mk + 11); }
@@ -6949,55 +6953,74 @@ function pmHtmlRes(cerr) {
         num(f.nOrdenes) + num(pmM(f.detalle)) + pmCelda(f, 'apel', f.reclamos, cerr) + pmCelda(f, 'pen', f.penalizaciones, cerr) + pmCelda(f, 'alq', f.alquileres + f.camisas + f.otros, cerr) +
         '<td style="text-align:right;white-space:nowrap"><b>' + pmM(f.subtotal) + '</b></td>' + num(f.aplicaIva ? pmM(f.iva) : '<span style="color:#888">sin IVA</span>') + '<td style="text-align:right;white-space:nowrap"><b>' + pmM(f.totalFacturado) + '</b></td>' +
         pmCelda(f, 'reb', f.deducciones, cerr) + '<td style="text-align:right;white-space:nowrap;background:#eef7ee"><b>' + pmM(f.deposito) + '</b></td>' +
-        '<td style="white-space:nowrap">' + fac + '</td><td>' + (f.pagado ? '<span class="chip verde">' + esc(pmFh(f.pagado)) + '</span>' : (f.sinContratista ? '' : '<span style="color:#999">—</span>')) + '</td><td style="white-space:nowrap">' + (f.sinContratista ? '' : '<button class="btn secondary" title="Estado de cuenta: PDF, Excel o correo" onclick="pmReporteModal(\'' + f.idCon + '\')">📄</button> <button class="btn secondary" style="' + ((pmS.internas || {})[f.idCon] ? 'background:#e7f4e4;border-color:#9c9' : '') + '" title="Móvil interna: paga un % a los compañeros y la diferencia se transfiere a la empresa" onclick="pmInternaModal(\'' + f.idCon + '\')">🚐</button>') + '</td></tr>';
+        '<td style="white-space:nowrap">' + fac + '</td><td>' + (f.pagado ? '<span class="chip verde">' + esc(pmFh(f.pagado)) + '</span>' : (f.sinContratista ? '' : '<span style="color:#999">—</span>')) + '</td><td style="white-space:nowrap">' + (f.sinContratista ? '' : '<button class="btn secondary" title="Estado de cuenta: PDF, Excel o correo" onclick="pmReporteModal(\'' + f.idCon + '\')">📄</button>') + '</td></tr>';
     }).join('') +
     '<tr style="font-weight:700;background:#f3f6fa"><td>Total</td><td></td>' + num(T.nOrdenes) + num(pmM(T.detalle)) + num(pmM(T.reclamos)) + num(pmM(T.penalizaciones)) + num(pmM(T.alquileres + T.camisas + T.otros)) + num(pmM(T.subtotal)) + num(pmM(T.iva)) + num(pmM(T.totalFacturado)) + num(pmM(T.deducciones)) + num(pmM(T.deposito)) + '<td></td><td></td><td></td></tr></tbody></table>';
 }
-/* ---------- Móvil interna: % a compañeros (planilla) + diferencia a la empresa ---------- */
-let pmInt = null;
-async function pmInternaModal(idCon) {
-  const f = pmS.resumen.filas.find(x => x.idCon === idCon); if (!f) return;
-  const ya = (pmS.internas || {})[idCon], cerr = pmS.semana.estado === 'Cerrada';
-  if (!rhDatos || !rhDatos.colaboradores) { try { rhDatos = await api('obtenerRhWeb'); } catch (e) { return mostrarError(e, 'No se pudieron cargar los colaboradores.'); } }
-  const movs = Object.keys(f.moviles).join(', ');
-  if (ya) {
-    pmModal('<h3>Móvil ' + esc(movs) + ' · pago interno aplicado</h3><div style="font-size:13px;display:grid;gap:6px"><div>Facturado sin IVA: <b>' + pmM(ya.base) + '</b> · ' + esc(ya.pct) + '%</div><div>A depositar antes: <b>' + pmM(ya.deposito) + '</b></div>' +
-      ya.items.map(it => '<div>→ ' + esc(it.nombre) + ' (planilla): <b>' + pmM(it.monto) + '</b></div>').join('') +
-      '<div>→ Transferencia a la empresa: <b>' + pmM(ya.diferencia) + '</b></div><div style="font-size:12px;color:#667">Aplicado ' + esc(String(ya.fecha).slice(0, 16)) + '. El depósito de este contratista quedó en cero; los pagos a compañeros están en Planilla y la diferencia en «Adicionales».</div></div>' +
-      '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn secondary" ' + (cerr ? 'disabled' : '') + ' onclick="pmInternaDeshacer(\'' + idCon + '\')">↩ Deshacer</button><button class="btn secondary" onclick="pmCerrar()">Cerrar</button></div>', 520);
-    return;
+/* ---------- Móviles internas: facturado sin IVA, rebajos, técnico y asistente, utilidad SRD ---------- */
+let pmIM = { movil: '', cfg: null };
+function pmImBase(mv) { let base = 0, n = 0; pmS.resumen.filas.forEach(f => { const m = f.moviles[mv]; if (m) { base += m.detalle; n += m.n; } }); return { base: pmR2(base), n: n }; }
+function pmImCalc(cfg, base) {
+  const pct = Math.max(0, Math.min(100, Number(cfg.pct) || 0)), reb = pmR2((cfg.rebajos || []).reduce((a, x) => a + (Number(x.monto) || 0), 0)), bruto = pmR2(base * pct / 100), pool = Math.max(0, pmR2(bruto - reb));
+  const pers = cfg.personas || [], sumaP = pers.reduce((a, x) => a + (Number(x.parte) || 0), 0); let rest = pool;
+  const pagos = pers.map((p, i) => { const m = (i === pers.length - 1 && sumaP >= 99.99) ? rest : pmR2(pool * (Number(p.parte) || 0) / 100); rest = pmR2(rest - m); return m; });
+  const total = pmR2(pagos.reduce((a, x) => a + x, 0));
+  return { pct, reb, bruto, pool, pagos, total, utilidad: pmR2(base - total), sumaP };
+}
+function pmImNueva() { return { pct: 30, rebajos: [], personas: [{ rol: 'Técnico', idColab: '', parte: 50 }, { rol: 'Asistente', idColab: '', parte: 50 }], aplicado: null }; }
+function pmImElegir(mv) { pmIM.movil = mv; pmIM.cfg = JSON.parse(JSON.stringify((pmS.internasMov || {})[mv] || pmImNueva())); pmRenderSemana(); }
+function pmImAgregarMovil() { const mv = $('imNueva').value; if (!mv) return toast('Elige la móvil.'); pmIM.movil = mv; pmIM.cfg = pmImNueva(); pmIM.nueva = true; pmRenderSemana(); }
+function pmImCampo(k, v) { pmIM.cfg[k] = v; pmRenderSemana(); }
+function pmImReb(i, k, v) { pmIM.cfg.rebajos[i][k] = k === 'monto' ? (Number(v) || 0) : v; pmRenderSemana(); }
+function pmImRebAdd() { pmIM.cfg.rebajos.push({ concepto: '', monto: 0 }); pmRenderSemana(); }
+function pmImRebDel(i) { pmIM.cfg.rebajos.splice(i, 1); pmRenderSemana(); }
+function pmImPer(i, k, v) { pmIM.cfg.personas[i][k] = k === 'parte' ? (Number(v) || 0) : v; pmRenderSemana(); }
+function pmImPerAdd() { if (pmIM.cfg.personas.length >= 4) return; pmIM.cfg.personas.push({ rol: 'Compañero', idColab: '', parte: 0 }); pmRenderSemana(); }
+function pmImPerDel(i) { pmIM.cfg.personas.splice(i, 1); pmRenderSemana(); }
+async function pmImGuardar(silencio) {
+  const c = pmIM.cfg;
+  try { await api('guardarMovilInternaSemanaPmWeb', { idSemana: pmSemId, movil: pmIM.movil, pct: c.pct, rebajos: c.rebajos, personas: c.personas }); pmS = await api('obtenerSemanaPmWeb', pmSemId); pmIM.nueva = false; pmIM.cfg = JSON.parse(JSON.stringify(pmS.internasMov[pmIM.movil])); pmRenderSemana(); if (!silencio) toast('Móvil interna guardada.'); return true; }
+  catch (e) { mostrarError(e, 'No se pudo guardar.'); return false; }
+}
+async function pmImAplicar() {
+  if (!(await pmImGuardar(true))) return;
+  if (!confirm('¿Aplicar a la planilla? Los pagos del técnico y del asistente se cargan como rubros de esta semana en la pestaña Planilla.')) return;
+  try { await api('aplicarMovilInternaSemanaPmWeb', pmSemId, pmIM.movil); pmS = await api('obtenerSemanaPmWeb', pmSemId); pmIM.cfg = JSON.parse(JSON.stringify(pmS.internasMov[pmIM.movil])); pmRenderSemana(); toast('Aplicado a la planilla de compañeros.', 4000); } catch (e) { mostrarError(e, 'No se pudo aplicar.'); }
+}
+async function pmImDeshacer() {
+  if (!confirm('¿Quitar estos pagos de la planilla?')) return;
+  try { await api('deshacerMovilInternaSemanaPmWeb', pmSemId, pmIM.movil); pmS = await api('obtenerSemanaPmWeb', pmSemId); pmIM.cfg = JSON.parse(JSON.stringify(pmS.internasMov[pmIM.movil])); pmRenderSemana(); toast('Pagos quitados de la planilla.'); } catch (e) { mostrarError(e, 'No se pudo deshacer.'); }
+}
+async function pmImQuitar() {
+  if (!confirm('¿Quitar la móvil ' + pmIM.movil + ' de las internas de esta semana?')) return;
+  try { if ((pmS.internasMov || {})[pmIM.movil]) { await api('quitarMovilInternaSemanaPmWeb', pmSemId, pmIM.movil); pmS = await api('obtenerSemanaPmWeb', pmSemId); } pmIM = { movil: '', cfg: null }; pmRenderSemana(); } catch (e) { mostrarError(e, 'No se pudo quitar.'); }
+}
+function pmHtmlInt() {
+  const cerr = pmS.semana.estado === 'Cerrada', todas = pmS.internasMov || {}, ks = Object.keys(todas).sort((a, b) => a - b);
+  const disp = []; pmS.resumen.filas.forEach(f => Object.keys(f.moviles).forEach(m => { if (disp.indexOf(m) < 0 && !todas[m]) disp.push(m); })); disp.sort((a, b) => a - b);
+  let utilTot = 0; ks.forEach(m => { utilTot += pmImCalc(todas[m], pmImBase(m).base).utilidad; }); utilTot = pmR2(utilTot);
+  let h = '<div style="padding:12px;display:grid;gap:12px"><div style="font-size:13px;color:#555">Para las móviles que atiende el personal de SRD. Se toma lo <b>facturado sin IVA</b> de la móvil en esta semana, se aplican los rebajos y el porcentaje para los compañeros, y lo que sobra es la <b>utilidad móviles SRD</b>. Estas móviles no deben tener contratista asignado, para que no se les pague dos veces.</div>' +
+    '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><select id="imNueva" ' + (cerr ? 'disabled' : '') + '><option value="">Elige la móvil…</option>' + disp.map(m => '<option value="' + m + '">Móvil ' + m + '</option>').join('') + '</select><button class="btn primary" ' + (cerr ? 'disabled' : '') + ' onclick="pmImAgregarMovil()">➕ Móvil interna</button><span style="width:12px"></span>' +
+    ks.map(m => '<button class="btn ' + (pmIM.movil === m ? 'primary' : 'secondary') + '" onclick="pmImElegir(\'' + m + '\')">Móvil ' + m + (todas[m].aplicado ? ' ✔' : '') + '</button>').join('') +
+    (ks.length ? '<span style="flex:1"></span><span style="font-size:13px">Utilidad móviles SRD de la semana: <b style="color:#2d5a1b">' + pmM(utilTot) + '</b></span>' : '') + '</div>';
+  if (pmIM.movil && pmIM.cfg) {
+    const c = pmIM.cfg, mv = pmIM.movil, B = pmImBase(mv), K = pmImCalc(c, B.base), ap = !!c.aplicado, dis = (ap || cerr) ? 'disabled' : '';
+    const L = (rhDatos.colaboradores || []).filter(x => x.activo);
+    h += '<div class="panel" style="padding:12px;display:grid;gap:12px"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><h3 style="margin:0">Móvil ' + esc(mv) + '</h3><span class="chip azul">' + B.n + ' órdenes</span>' + (ap ? '<span class="chip verde">Aplicada a la planilla</span>' : '') + (B.n ? '' : '<span class="chip amar">Sin órdenes esta semana</span>') + '</div>' +
+      '<div style="display:flex;gap:18px;flex-wrap:wrap;align-items:end"><div><div style="font-size:11px;color:#667">Facturado sin IVA</div><b style="font-size:18px">' + pmM(B.base) + '</b></div>' +
+      '<label style="font-size:12px">% para compañeros<br><input type="number" min="0" max="100" step="0.01" style="width:90px" value="' + esc(c.pct) + '" ' + dis + ' onchange="pmImCampo(\'pct\',this.value)"></label></div>' +
+      '<div><b style="font-size:13px">Rebajos de la móvil</b> <span style="font-size:11.5px;color:#667">(combustible, repuestos, etc.; se restan a lo que se les paga)</span><table class="pmT" style="max-width:640px;margin-top:4px"><thead><tr><th>Concepto</th><th style="text-align:right">Monto</th><th></th></tr></thead><tbody>' +
+      (c.rebajos.length ? c.rebajos.map((r, i) => '<tr><td><input style="width:100%" value="' + esc(r.concepto) + '" placeholder="Concepto" ' + dis + ' onchange="pmImReb(' + i + ',\'concepto\',this.value)"></td><td><input type="number" min="0" step="0.01" style="width:120px;text-align:right" value="' + esc(r.monto || '') + '" ' + dis + ' onchange="pmImReb(' + i + ',\'monto\',this.value)"></td><td>' + (dis ? '' : '<button class="btnMini" onclick="pmImRebDel(' + i + ')">✕</button>') + '</td></tr>').join('') : '<tr><td colspan="3" style="color:#889">Sin rebajos.</td></tr>') +
+      '<tr style="font-weight:700;background:#f3f6fa"><td>Total rebajos</td><td style="text-align:right">' + pmM(K.reb) + '</td><td></td></tr></tbody></table>' + (dis ? '' : '<button class="btnMini" style="margin-top:4px" onclick="pmImRebAdd()">➕ Agregar rebajo</button>') + '</div>' +
+      '<div><b style="font-size:13px">Técnico y asistente</b><table class="pmT" style="max-width:760px;margin-top:4px"><thead><tr><th>Puesto</th><th>Colaborador</th><th style="text-align:right">% del reparto</th><th style="text-align:right">Total a pagar</th><th></th></tr></thead><tbody>' +
+      c.personas.map((p, i) => '<tr><td><input style="width:110px" value="' + esc(p.rol) + '" ' + dis + ' onchange="pmImPer(' + i + ',\'rol\',this.value)"></td><td><select ' + dis + ' onchange="pmImPer(' + i + ',\'idColab\',this.value)"><option value="">— elige —</option>' + L.map(x => '<option value="' + esc(x.id) + '"' + (x.id === p.idColab ? ' selected' : '') + '>' + esc(x.nombre) + '</option>').join('') + '</select></td><td style="text-align:right"><input type="number" min="0" max="100" step="0.01" style="width:80px;text-align:right" value="' + esc(p.parte) + '" ' + dis + ' onchange="pmImPer(' + i + ',\'parte\',this.value)"></td><td style="text-align:right"><b>' + pmM(K.pagos[i] || 0) + '</b></td><td>' + (dis || c.personas.length < 2 ? '' : '<button class="btnMini" onclick="pmImPerDel(' + i + ')">✕</button>') + '</td></tr>').join('') +
+      '<tr style="font-weight:700;background:#f3f6fa"><td colspan="2">Total a pagar a compañeros</td><td style="text-align:right">' + K.sumaP + '%</td><td style="text-align:right">' + pmM(K.total) + '</td><td></td></tr></tbody></table>' + (dis || c.personas.length >= 4 ? '' : '<button class="btnMini" style="margin-top:4px" onclick="pmImPerAdd()">➕ Agregar compañero</button>') + (K.sumaP > 100.01 ? ' <span style="color:#9b1c1c;font-size:12px">El reparto suma más de 100%.</span>' : (K.sumaP < 99.99 ? ' <span style="color:#b26a00;font-size:12px">El reparto suma menos de 100%: lo que no se reparte queda como utilidad.</span>' : '')) + '</div>' +
+      '<table class="pmT" style="max-width:520px"><tbody><tr><td>Facturado sin IVA</td><td style="text-align:right">' + pmM(B.base) + '</td></tr><tr><td>' + K.pct + '% para compañeros</td><td style="text-align:right">' + pmM(K.bruto) + '</td></tr><tr><td>− Rebajos de la móvil</td><td style="text-align:right">−' + pmM(K.reb) + '</td></tr><tr><td>Total a pagar a compañeros</td><td style="text-align:right"><b>' + pmM(K.total) + '</b></td></tr>' +
+      '<tr style="background:#e7f4e4;font-size:15px"><td><b>Utilidad móviles SRD</b> <span style="font-size:11px;color:#667">(facturado − pagos a compañeros)</span></td><td style="text-align:right"><b style="color:#2d5a1b">' + pmM(K.utilidad) + '</b></td></tr></tbody></table>' +
+      (ap ? '<div style="font-size:12px;color:#667">Aplicada el ' + esc(String(c.aplicado.fecha).slice(0, 16)) + ': ' + c.aplicado.items.map(it => esc(it.nombre) + ' ' + pmM(it.monto)).join(' · ') + '. Está en Planilla como rubro de esta semana.</div>' : '') +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap">' + (ap ? '<button class="btn secondary" ' + (cerr ? 'disabled' : '') + ' onclick="pmImDeshacer()">↩ Quitar de la planilla</button>' : '<button class="btn secondary" ' + (cerr ? 'disabled' : '') + ' onclick="pmImGuardar()">💾 Guardar</button><button class="btn primary" ' + (cerr ? 'disabled' : '') + ' onclick="pmImAplicar()">✔ Guardar y aplicar a la planilla</button><button class="btn secondary" ' + (cerr ? 'disabled' : '') + ' onclick="pmImQuitar()">Quitar móvil</button>') + '</div></div>';
   }
-  const L = (rhDatos.colaboradores || []).filter(c => c.activo), op = '<option value="">—</option>' + L.map(c => '<option value="' + esc(c.id) + '">' + esc(c.nombre) + '</option>').join('');
-  pmInt = { f: f, manual: false };
-  const cu = pmD.ahorroCuenta || {};
-  pmModal('<h3>Móvil interna ' + esc(movs) + '</h3><div style="font-size:12px;color:#667;margin-bottom:8px">Se paga a los compañeros un porcentaje de lo facturado sin IVA (ya con los gastos descontados). Ese pago entra a la planilla de la semana y el resto del depósito se transfiere a la cuenta de la empresa.</div>' +
-    '<div style="display:grid;gap:8px"><div style="font-size:13px">A facturar (sin IVA): <b>' + pmM(f.subtotal) + '</b> <span style="color:#667;font-size:11.5px">(órdenes ' + pmM(f.detalle) + ' + apelaciones ' + pmM(f.reclamos) + ' − penalizaciones ' + pmM(f.penalizaciones) + ' − alquiler/otros ' + pmM(f.alquileres + f.camisas + f.otros) + ')</span></div>' +
-    '<div style="font-size:13px">A depositar hoy: <b>' + pmM(f.deposito) + '</b></div>' +
-    '<label>Porcentaje para los compañeros<input id="piPct" type="number" min="0" max="100" step="0.01" value="30" oninput="pmIntCalc(true)"></label>' +
-    '<div style="display:grid;grid-template-columns:1fr 120px;gap:6px;align-items:end"><label>Técnico<select id="piC1" onchange="pmIntCalc(true)">' + op + '</select></label><label>Monto<input id="piM1" type="number" min="0" step="0.01" oninput="pmInt.manual=true;pmIntCalc(false)"></label>' +
-    '<label>Asistente<select id="piC2" onchange="pmIntCalc(true)">' + op + '</select></label><label>Monto<input id="piM2" type="number" min="0" step="0.01" oninput="pmInt.manual=true;pmIntCalc(false)"></label></div>' +
-    '<div id="piRes" style="background:#f3f6fa;border-radius:8px;padding:10px;font-size:13px"></div>' +
-    '<div style="font-size:12px;color:#667">Cuenta de la empresa: ' + (/^\d{20}$/.test(cu.iban || '') && cu.banco && cu.referencia ? esc((cu.nombre || 'Empresa') + ' · ' + cu.banco + ' · CR' + cu.iban) : '<span style="color:#9b1c1c">sin configurar (Banco → Cuenta de ahorro de la empresa)</span>') + '</div></div>' +
-    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn primary" ' + (cerr ? 'disabled' : '') + ' onclick="pmInternaOk(\'' + idCon + '\')">Aplicar</button><button class="btn secondary" onclick="pmCerrar()">Cancelar</button></div>', 560);
-  pmIntCalc(true);
-}
-function pmIntCalc(reparte) {
-  const f = pmInt.f, pct = Number($('piPct').value) || 0, total = Math.round(f.subtotal * pct) / 100, c1 = $('piC1').value, c2 = $('piC2').value;
-  if (reparte) {
-    pmInt.manual = false;
-    const n = (c1 ? 1 : 0) + (c2 ? 1 : 0);
-    $('piM1').value = c1 && n ? (Math.round(total / n * 100) / 100) : ''; $('piM2').value = c2 && n ? (Math.round((total - (c1 ? Math.round(total / n * 100) / 100 : 0)) * 100) / 100) : '';
-  }
-  const pago = Math.round(((Number($('piM1').value) || 0) + (Number($('piM2').value) || 0)) * 100) / 100, dif = Math.round((f.deposito - pago) * 100) / 100;
-  $('piRes').innerHTML = '<div>' + pct + '% de ' + pmM(f.subtotal) + ' = <b>' + pmM(total) + '</b></div><div>Pago a compañeros (planilla): <b>' + pmM(pago) + '</b></div><div>Transferencia a la empresa: <b style="color:' + (dif < 0 ? '#9b1c1c' : '#2d5a1b') + '">' + pmM(dif) + '</b></div>' + (dif < 0 ? '<div style="color:#9b1c1c">El pago supera lo que hay a depositar.</div>' : '');
-}
-async function pmInternaOk(idCon) {
-  const it = []; [['piC1', 'piM1'], ['piC2', 'piM2']].forEach(x => { if ($(x[0]).value || Number($(x[1]).value)) it.push({ idColab: $(x[0]).value, monto: $(x[1]).value }); });
-  try { await api('aplicarMovilInternaPmWeb', { idSemana: pmSemId, idCon: idCon, pct: $('piPct').value, items: it }); pmCerrar(); await pmRecargar(); toast('Pago interno aplicado: planilla de compañeros y transferencia a la empresa.', 5000); } catch (e) { mostrarError(e, 'No se pudo aplicar.'); }
-}
-async function pmInternaDeshacer(idCon) {
-  if (!confirm('¿Deshacer el pago interno? Se quitan los pagos de la planilla, la línea a la empresa y el rebajo.')) return;
-  try { await api('deshacerMovilInternaPmWeb', pmSemId, idCon); pmCerrar(); await pmRecargar(); toast('Pago interno deshecho.'); } catch (e) { mostrarError(e, 'No se pudo deshacer.'); }
+  return h + '</div>';
 }
 async function pmGuardarBorrador() {
   try {
@@ -14878,6 +14901,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 100 · 15-oct 12:18</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 101 · 15-oct 12:57</div>
 </body>
 </html>
