@@ -1324,7 +1324,6 @@
           <button id="pmTPst" onclick="pmTab('pst')">Préstamos</button>
           <button id="pmTPnl" onclick="pmTab('pnl')">Penalizaciones</button>
           <button id="pmTPre" onclick="pmTab('pre')">Lista de precios</button>
-          <button id="pmTPla" onclick="pmTab('pla')">Planilla</button>
           <button id="pmTBan" onclick="pmTab('ban')">Banco</button>
         </div>
         <div id="pmAlertP"></div>
@@ -1333,7 +1332,6 @@
         <div id="pmPCon" style="display:none"></div>
         <div id="pmPPst" style="display:none"></div>
         <div id="pmPPnl" style="display:none"></div>
-        <div id="pmPPla" style="display:none"><div id="plnTop"></div><div id="rhPlSem"></div><div id="plnDesg"></div></div>
         <div id="pmPPre" style="display:none"></div>
         <div id="pmPBan" style="display:none"></div>
         <div id="pmModalBg" class="modalBg" style="z-index:90"><div class="modal" id="pmModal" style="max-width:640px"></div></div>
@@ -5961,6 +5959,13 @@ async function rhHistGuardar() {
 
 /* ---- Planilla de la semana a pagar (mismos períodos que las móviles) con rubros por colaborador ---- */
 let rhPlS = null;
+async function plnMontar() {
+  const d = $('rhPlSem'); if (!d) return;
+  $('plnTop').innerHTML = '<div style="padding:0 2px 10px;font-size:13px;color:#667">Planilla de colaboradores que se paga junto con las móviles de esta semana: con la asistencia ya actualizada se calcula el monto; puede quitar el salario de alguien y pagarle solo un bono, agregar personal o cargar personal interno. El archivo del banco se genera en <b>Planillas y proveedores → Banco</b>.</div>';
+  if (rhPlS && rhPlS.idSemana === pmSemId && !rhPlS.sucio) { rhPlSemDibujar(); plnDesgCargar(); return; }
+  d.innerHTML = '<div class="loading">Cargando la planilla...</div>';
+  try { if (!rhDatos || !rhDatos.colaboradores) rhDatos = await api('obtenerRhWeb'); await rhPlSemCargar(pmSemId); } catch (e) { d.innerHTML = '<span style="color:#9b1c1c">' + esc(e.message || e) + '</span>'; }
+}
 async function abrirPlanillas() {
   const d = $('rhPlSem'); d.innerHTML = '<div class="loading">Cargando la planilla...</div>'; $('plnDesg').innerHTML = '';
   $('plnTop').innerHTML = '<div style="padding:0 2px 10px;font-size:13px;color:#667">Aquí se arma la planilla de colaboradores de la semana: con la asistencia ya actualizada se calcula el monto, y puedes quitar el salario de alguien y pagarle solo un bono, agregar personal o cargar personal interno de las móviles. Cuando esté lista, mira cuánto queda disponible de la factura de Telecable. El archivo del banco se genera en <b>Pago a móviles → Banco</b>.</div>';
@@ -6025,7 +6030,7 @@ function rhPlSemDibujar() {
   const yaEn = {}; R.filas.forEach(f => { if (!R.exc[f.id]) yaEn[f.id] = 1; });
   const otros = (rhDatos.colaboradores || []).filter(c => c.activo && !yaEn[c.id]);
   d.innerHTML = '<div class="panel" style="margin-bottom:14px"><div class="panelHead" style="flex-wrap:wrap;gap:8px"><h2>Planilla de la semana a pagar</h2>' +
-    '<select onchange="rhPlSemCargar(this.value)" style="max-width:280px">' + R.semanas.map(s => '<option value="' + esc(s.id) + '"' + (s.id === R.idSemana ? ' selected' : '') + '>Semana ' + dm(s.desde) + ' al ' + dm(s.hasta) + (s.estado === 'Cerrada' ? ' (cerrada)' : '') + '</option>').join('') + '</select>' +
+    '<b style="font-size:13px">Semana ' + dm(R.desde) + ' al ' + dm(R.hasta) + '</b>' +
     '<span style="font-size:12px;color:#667">Pago estimado: ' + esc(R.fechaPago.split('-').reverse().join('/')) + '</span></div>' +
     '<div style="padding:4px 14px 10px;font-size:12px;color:#667">Es la planilla de colaboradores que se paga junto con las móviles de esta semana. Agrega o quita rubros a cada persona (extras suman, rebajos restan) y guarda: al generar el archivo del banco de esta semana, esos montos ya vienen cargados.</div>' +
     '<div class="tableWrap"><table class="table"><thead><tr><th>Colaborador</th><th>Período</th><th class="num">Base</th><th class="num">Extras (+)</th><th class="num">Rebajos (−)</th><th class="num">Cargas</th><th class="num">Neto</th><th>Rubros</th></tr></thead><tbody>' +
@@ -6769,7 +6774,7 @@ function rhImprimir() {
 }
 
 function mostrarVista(v, forzar) {
-  if (v === 'planillas') { pmTabAct = 'pla'; v = 'pagomov'; }
+  if (v === 'planillas') { pmTabAct = 'sem'; pmVista = 'pla'; v = 'pagomov'; }
 
   if (MODULOS_NAV[v] && !puedeModulo(MODULOS_NAV[v]) && !forzar) { toast('No tienes acceso a ese módulo.'); return; }
   if ((v === 'pagomov' || v === 'planillas') && !esAdmin()) { toast('No tienes acceso a ese módulo.'); return; }
@@ -6850,7 +6855,7 @@ function pmIrArchivo() {
 }
 function pmTab(t) {
   pmTabAct = t; pmAlertaPlanilla();
-  [['sem', 'Sem'], ['pag', 'Pag'], ['con', 'Con'], ['pst', 'Pst'], ['pnl', 'Pnl'], ['pre', 'Pre'], ['pla', 'Pla'], ['ban', 'Ban']].forEach(x => { $('pmT' + x[1]).classList.toggle('active', x[0] === t); $('pmP' + x[1]).style.display = x[0] === t ? '' : 'none'; });
+  [['sem', 'Sem'], ['pag', 'Pag'], ['con', 'Con'], ['pst', 'Pst'], ['pnl', 'Pnl'], ['pre', 'Pre'], ['ban', 'Ban']].forEach(x => { $('pmT' + x[1]).classList.toggle('active', x[0] === t); $('pmP' + x[1]).style.display = x[0] === t ? '' : 'none'; });
   if (!pmD) return;
   if (t === 'sem') { if (pmSemId) pmRenderSemana(); else pmRenderSemanas(); }
   if (t === 'con') pmRenderCon();
@@ -6858,7 +6863,6 @@ function pmTab(t) {
   if (t === 'pst') pmRenderPst();
   if (t === 'pnl') pmRenderPnl();
   if (t === 'pre') pmRenderPre();
-  if (t === 'pla') abrirPlanillas();
   if (t === 'ban') pmRenderBan();
   setTimeout(sideRefrescar, 30);
 }
@@ -6883,7 +6887,7 @@ async function pmVb(idCon, aprobar) {
   try { await api('vbSinFacturaPmWeb', pmSemId, idCon, !!aprobar); await pmRecargar(); toast(aprobar ? 'Visto bueno registrado.' : 'Visto bueno quitado.'); } catch (e) { mostrarError(e, 'No se pudo guardar.'); }
 }
 async function pmSub(v) {
-  if (v === 'int' && (!rhDatos || !rhDatos.colaboradores)) { try { rhDatos = await api('obtenerRhWeb'); } catch (e) { return mostrarError(e, 'No se pudieron cargar los colaboradores.'); } }
+  if ((v === 'int' || v === 'pla') && (!rhDatos || !rhDatos.colaboradores)) { try { rhDatos = await api('obtenerRhWeb'); } catch (e) { return mostrarError(e, 'No se pudieron cargar los colaboradores.'); } }
   pmVista = v; pmRenderSemana();
 }
 
@@ -6897,7 +6901,7 @@ function pmRenderSemana() {
     [['Órdenes', T.nOrdenes], ['Costo detalle', pmM(T.detalle)], ['UF Telecable', pmM(T.uf)], ['Margen (UF − costo)', pmM(margen)], ['Total facturado', pmM(T.totalFacturado)], ['Total a depositar', pmM(T.deposito)]]
       .map(x => '<span>' + x[0] + ' <b style="font-size:13px;color:#1d2433">' + x[1] + '</b></span>').join('') + '</div></div>';
   if (S.diferencias || S.sinLista) h += '<div class="panel" style="padding:10px 14px;font-size:13px;background:#fff8e1">' + (S.diferencias ? '⚠ <b>' + S.diferencias + '</b> orden(es) con costo distinto a la lista de precios. ' + (cerr ? '' : '<button class="btn secondary" onclick="pmAplicarLista()">Aplicar precio de lista</button> ') : '') + (S.sinLista ? '⚠ <b>' + S.sinLista + '</b> orden(es) sin precio de pago (el servicio no está en la lista). ' + (cerr ? '' : '<button class="btn primary" onclick="pmSinPrecioModal()">Asignar precio</button>') : '') + '</div>';
-  h += '<div class="subtabs">' + tb('mov', 'Resumen por móvil') + tb('ord', 'Órdenes') + tb('res', 'Pago por contratista') + tb('ape', 'Apelaciones' + (S.apelaciones.some(a => a.estado === 'Pendiente') ? ' •' : '')) + tb('aju', 'Ajustes') + tb('ext', 'Adicionales') + tb('int', 'Móviles internas' + (Object.keys(pmS.internasMov || {}).length ? ' (' + Object.keys(pmS.internasMov).length + ')' : '')) + tb('ver', 'Verificación') + '</div>';
+  h += '<div class="subtabs">' + tb('mov', 'Resumen por móvil') + tb('ord', 'Órdenes') + tb('res', 'Pago por contratista') + tb('int', 'Móviles internas' + ((pmS.internasLista || []).length ? ' (' + pmS.internasLista.length + ')' : '')) + tb('pla', 'Planilla') + tb('ape', 'Apelaciones' + (S.apelaciones.some(a => a.estado === 'Pendiente') ? ' •' : '')) + tb('aju', 'Ajustes') + tb('ext', 'Adicionales') + tb('ver', 'Verificación') + '</div>';
   let c = '';
   if (pmVista === 'mov') c = pmHtmlMov();
   if (pmVista === 'res') c = pmHtmlRes(cerr);
@@ -6907,12 +6911,14 @@ function pmRenderSemana() {
   if (pmVista === 'ext') c = pmHtmlExt(cerr);
   if (pmVista === 'ver') c = pmHtmlVer();
   if (pmVista === 'int') c = pmHtmlInt();
+  if (pmVista === 'pla') c = '<div id="plnTop"></div><div id="rhPlSem"></div><div id="plnDesg"></div>';
   /* botones y filtros de cada vista quedan fijos arriba; solo la tabla se desplaza */
   let fijo = ''; const mk = c.indexOf('<!--/FIX-->');
   if (mk >= 0) { fijo = c.slice(0, mk); c = c.slice(mk + 11); }
   else if (['ape', 'aju', 'ext'].indexOf(pmVista) >= 0) { const j = c.indexOf('</div>') + 6; fijo = c.slice(0, j); c = c.slice(j); }
   $('pmPSem').classList.add('pmFlex'); $('pmPSem').innerHTML = h + (fijo ? '<div class="panel pmFixBar">' + fijo + '</div>' : '') + '<div class="panel pmFill"><div class="tableWrap">' + c + '</div></div>';
   if (pmVista === 'res') tablaOrdenable('pmPSem');
+  if (pmVista === 'pla') plnMontar();
 }
 
 /* Grupos de la tabla de pago: celdas donde se cargan valores por contratista */
@@ -6959,7 +6965,7 @@ function pmHtmlRes(cerr) {
 }
 /* ---------- Móviles internas: facturado sin IVA, rebajos, técnico y asistente, utilidad SRD ---------- */
 let pmIM = { movil: '', cfg: null };
-function pmImBase(mv) { let base = 0, n = 0; pmS.resumen.filas.forEach(f => { const m = f.moviles[mv]; if (m) { base += m.detalle; n += m.n; } }); return { base: pmR2(base), n: n }; }
+function pmImBase(mv) { const d = (pmS.internasDatos || {})[mv] || { n: 0, detalle: 0, apel: 0, pen: 0, otros: 0, base: 0 }; return { base: d.base, n: d.n, d: d }; }
 function pmImCalc(cfg, base) {
   const pct = Math.max(0, Math.min(100, Number(cfg.pct) || 0)), reb = pmR2((cfg.rebajos || []).reduce((a, x) => a + (Number(x.monto) || 0), 0)), bruto = pmR2(base * pct / 100), pool = Math.max(0, pmR2(bruto - reb));
   const pers = cfg.personas || [], sumaP = pers.reduce((a, x) => a + (Number(x.parte) || 0), 0); let rest = pool;
@@ -6967,9 +6973,14 @@ function pmImCalc(cfg, base) {
   const total = pmR2(pagos.reduce((a, x) => a + x, 0));
   return { pct, reb, bruto, pool, pagos, total, utilidad: pmR2(base - total), sumaP };
 }
-function pmImNueva() { return { pct: 30, rebajos: [], personas: [{ rol: 'Técnico', idColab: '', parte: 50 }, { rol: 'Asistente', idColab: '', parte: 50 }], aplicado: null }; }
-function pmImElegir(mv) { pmIM.movil = mv; pmIM.cfg = JSON.parse(JSON.stringify((pmS.internasMov || {})[mv] || pmImNueva())); pmRenderSemana(); }
-function pmImAgregarMovil() { const mv = $('imNueva').value; if (!mv) return toast('Elige la móvil.'); pmIM.movil = mv; pmIM.cfg = pmImNueva(); pmIM.nueva = true; pmRenderSemana(); }
+function pmImNueva(mv) { const pl = (pmS.internasPlantilla || {})[mv]; return pl ? { pct: pl.pct, rebajos: [], personas: JSON.parse(JSON.stringify(pl.personas)), aplicado: null } : { pct: 30, rebajos: [], personas: [{ rol: 'Técnico', idColab: '', parte: 50 }, { rol: 'Asistente', idColab: '', parte: 50 }], aplicado: null }; }
+function pmImCfg(mv) { return (pmS.internasMov || {})[mv] || pmImNueva(mv); }
+function pmImElegir(mv) { pmIM.movil = mv; pmIM.cfg = JSON.parse(JSON.stringify(pmImCfg(mv))); pmRenderSemana(); }
+async function pmImAgregarMovil() {
+  const mv = $('imNueva').value; if (!mv) return toast('Elige la móvil.');
+  const c = pmImNueva(mv);
+  try { await api('guardarMovilInternaSemanaPmWeb', { idSemana: pmSemId, movil: mv, pct: c.pct, rebajos: [], personas: c.personas }); pmS = await api('obtenerSemanaPmWeb', pmSemId); pmIM.movil = mv; pmIM.cfg = JSON.parse(JSON.stringify(pmImCfg(mv))); pmRenderSemana(); toast('La móvil ' + mv + ' pasó de «Pago por contratista» a esta tabla.', 4000); } catch (e) { mostrarError(e, 'No se pudo agregar.'); }
+}
 function pmImCampo(k, v) { pmIM.cfg[k] = v; pmRenderSemana(); }
 function pmImReb(i, k, v) { pmIM.cfg.rebajos[i][k] = k === 'monto' ? (Number(v) || 0) : v; pmRenderSemana(); }
 function pmImRebAdd() { pmIM.cfg.rebajos.push({ concepto: '', monto: 0 }); pmRenderSemana(); }
@@ -6992,17 +7003,24 @@ async function pmImDeshacer() {
   try { await api('deshacerMovilInternaSemanaPmWeb', pmSemId, pmIM.movil); pmS = await api('obtenerSemanaPmWeb', pmSemId); pmIM.cfg = JSON.parse(JSON.stringify(pmS.internasMov[pmIM.movil])); pmRenderSemana(); toast('Pagos quitados de la planilla.'); } catch (e) { mostrarError(e, 'No se pudo deshacer.'); }
 }
 async function pmImQuitar() {
-  if (!confirm('¿Quitar la móvil ' + pmIM.movil + ' de las internas de esta semana?')) return;
+  if (!confirm('¿Quitar la móvil ' + pmIM.movil + ' de las internas? Vuelve a «Pago por contratista».')) return;
   try { if ((pmS.internasMov || {})[pmIM.movil]) { await api('quitarMovilInternaSemanaPmWeb', pmSemId, pmIM.movil); pmS = await api('obtenerSemanaPmWeb', pmSemId); } pmIM = { movil: '', cfg: null }; pmRenderSemana(); } catch (e) { mostrarError(e, 'No se pudo quitar.'); }
 }
 function pmHtmlInt() {
   const cerr = pmS.semana.estado === 'Cerrada', todas = pmS.internasMov || {}, ks = Object.keys(todas).sort((a, b) => a - b);
-  const disp = []; pmS.resumen.filas.forEach(f => Object.keys(f.moviles).forEach(m => { if (disp.indexOf(m) < 0 && !todas[m]) disp.push(m); })); disp.sort((a, b) => a - b);
-  let utilTot = 0; ks.forEach(m => { utilTot += pmImCalc(todas[m], pmImBase(m).base).utilidad; }); utilTot = pmR2(utilTot);
-  let h = '<div style="padding:12px;display:grid;gap:12px"><div style="font-size:13px;color:#555">Para las móviles que atiende el personal de SRD. Se toma lo <b>facturado sin IVA</b> de la móvil en esta semana, se aplican los rebajos y el porcentaje para los compañeros, y lo que sobra es la <b>utilidad móviles SRD</b>. Estas móviles no deben tener contratista asignado, para que no se les pague dos veces.</div>' +
-    '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><select id="imNueva" ' + (cerr ? 'disabled' : '') + '><option value="">Elige la móvil…</option>' + disp.map(m => '<option value="' + m + '">Móvil ' + m + '</option>').join('') + '</select><button class="btn primary" ' + (cerr ? 'disabled' : '') + ' onclick="pmImAgregarMovil()">➕ Móvil interna</button><span style="width:12px"></span>' +
-    ks.map(m => '<button class="btn ' + (pmIM.movil === m ? 'primary' : 'secondary') + '" onclick="pmImElegir(\'' + m + '\')">Móvil ' + m + (todas[m].aplicado ? ' ✔' : '') + '</button>').join('') +
-    (ks.length ? '<span style="flex:1"></span><span style="font-size:13px">Utilidad móviles SRD de la semana: <b style="color:#2d5a1b">' + pmM(utilTot) + '</b></span>' : '') + '</div>';
+  const lista = (pmS.internasLista || []).slice().sort((a, b) => a - b), disp = []; pmS.resumen.filas.forEach(f => Object.keys(f.moviles).forEach(m => { if (disp.indexOf(m) < 0 && lista.indexOf(m) < 0) disp.push(m); })); disp.sort((a, b) => a - b);
+  let utilTot = 0, totR = { n: 0, detalle: 0, apel: 0, pen: 0, otros: 0, base: 0, reb: 0, pago: 0 };
+  const filasI = lista.map(m => { const B = pmImBase(m), K = pmImCalc(pmImCfg(m), B.base), d = B.d; utilTot += K.utilidad; totR.n += d.n; ['detalle', 'apel', 'pen', 'otros', 'base'].forEach(k => { totR[k] += d[k]; }); totR.reb += K.reb; totR.pago += K.total; return { m, d, K }; });
+  utilTot = pmR2(utilTot);
+  let h = '<div style="padding:12px;display:grid;gap:12px"><div style="font-size:13px;color:#555">Para las móviles que atiende el personal de SRD. Se toma lo <b>facturado sin IVA</b> de la móvil en esta semana, se aplican los rebajos y el porcentaje para los compañeros, y lo que sobra es la <b>utilidad móviles SRD</b>. Las móviles que agregue aquí dejan de aparecer en «Pago por contratista» y no se pagan a ningún contratista.</div>' +
+    '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><select id="imNueva" ' + (cerr ? 'disabled' : '') + '><option value="">Elige la móvil…</option>' + disp.map(m => '<option value="' + m + '">Móvil ' + m + '</option>').join('') + '</select><button class="btn primary" ' + (cerr ? 'disabled' : '') + ' onclick="pmImAgregarMovil()">➕ Móvil interna</button><span style="font-size:12px;color:#667">Al agregarla, sale de «Pago por contratista» y pasa a esta tabla.</span></div>';
+  const n0 = v => '<td style="text-align:right;white-space:nowrap">' + v + '</td>';
+  if (lista.length) {
+    h += '<div class="panel"><div class="tableWrap"><table class="pmT"><thead><tr><th>Móvil</th><th style="text-align:right">Órd.</th><th style="text-align:right">Detalle</th><th style="text-align:right">Apelaciones (+)</th><th style="text-align:right">Penaliz. (−)</th><th style="text-align:right">Alquiler / otros (−)</th><th style="text-align:right">A facturar (sin IVA)</th><th style="text-align:right">Rebajos (−)</th><th style="text-align:right">A compañeros</th><th style="text-align:right;background:#e7f4e4;color:#1d4a12">Utilidad móviles SRD</th><th></th></tr></thead><tbody>' +
+      filasI.map(r => '<tr style="cursor:pointer;' + (pmIM.movil === r.m ? 'background:#eef4ff' : '') + '" onclick="pmImElegir(\'' + r.m + '\')"><td><b>' + r.m + '</b>' + ((pmS.internasMov || {})[r.m] && pmS.internasMov[r.m].aplicado ? ' <span class="chip verde">planilla ✔</span>' : '') + '</td>' + n0(r.d.n) + n0(pmM(r.d.detalle)) + n0(r.d.apel ? '+' + pmM(r.d.apel) : '—') + n0(r.d.pen ? '−' + pmM(r.d.pen) : '—') + n0(r.d.otros ? '−' + pmM(r.d.otros) : '—') + n0('<b>' + pmM(r.d.base) + '</b>') + n0(r.K.reb ? '−' + pmM(r.K.reb) : '—') + n0(pmM(r.K.total)) + '<td style="text-align:right;background:#f1f9ef"><b style="color:#2d5a1b">' + pmM(r.K.utilidad) + '</b></td><td><button class="btn secondary">Abrir</button></td></tr>').join('') +
+      '<tr style="font-weight:700;background:#f3f6fa"><td>Total</td>' + n0(totR.n) + n0(pmM(pmR2(totR.detalle))) + n0(pmM(pmR2(totR.apel))) + n0(pmM(pmR2(totR.pen))) + n0(pmM(pmR2(totR.otros))) + n0(pmM(pmR2(totR.base))) + n0(pmM(pmR2(totR.reb))) + n0(pmM(pmR2(totR.pago))) + '<td style="text-align:right;background:#e7f4e4"><b>' + pmM(utilTot) + '</b></td><td></td></tr></tbody></table></div></div>' +
+      '<div style="font-size:11.5px;color:#667">Las apelaciones, penalizaciones y alquileres de una móvil interna se cargan en <b>Ajustes</b> y <b>Apelaciones</b> indicando el número de móvil; aquí se suman solos.</div>';
+  }
   if (pmIM.movil && pmIM.cfg) {
     const c = pmIM.cfg, mv = pmIM.movil, B = pmImBase(mv), K = pmImCalc(c, B.base), ap = !!c.aplicado, dis = (ap || cerr) ? 'disabled' : '';
     const L = (rhDatos.colaboradores || []).filter(x => x.activo);
@@ -14901,6 +14919,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 101 · 15-oct 12:57</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 103 · 15-oct 13:19</div>
 </body>
 </html>
