@@ -1819,6 +1819,10 @@
       <h3 id="uTitulo">Nuevo usuario</h3>
 
       <div class="grid2">
+        <div class="field" id="uCampoColab" style="grid-column:1/-1">
+          <label>¿Es un colaborador ya registrado? (sin usuario)</label>
+          <select id="uColab" onchange="uColabElegido()"><option value="">No, es una persona nueva</option></select>
+        </div>
         <div class="field" style="grid-column:1/-1">
           <label>Nombre completo</label>
           <input id="uNombre" placeholder="Ej. Allan Mena Fonseca" autocomplete="off">
@@ -1891,6 +1895,7 @@
 
       <div class="modalActions">
         <button class="btn secondary" onclick="cerrarUsuario()">Cancelar</button>
+        <button id="btnEliminarUsuario" class="btn secondary" style="display:none;margin-right:auto;color:#9b1c1c" onclick="eliminarUsuario()">🗑 Eliminar usuario</button>
         <button id="btnGuardarUsuario" class="btn primary" onclick="guardarUsuario()">💾 Guardar</button>
       </div>
 
@@ -3942,7 +3947,16 @@ function uFichaLeer() {
     correoPersonal: $('uFCorreoP').value, direccion: $('uFDir').value, contactoEmergencia: $('uFContacto').value, telEmergencia: $('uFTelEmg').value };
 }
 
+let uColabLista = [];
+function uColabElegido() {
+  const c = uColabLista.find(x => x.id === $('uColab').value);
+  if (!c) return;
+  $('uNombre').value = c.nombre; $('uFCedula').value = c.cedula || ''; $('uFIngreso').value = c.ingreso || ''; $('uFPuesto').value = c.puesto || '';
+  $('uFTel').value = c.telefono || ''; $('uFCorreoP').value = c.correoPersonal || ''; $('uFichaDet').open = true;
+}
 function abrirNuevoUsuario() {
+  $('uCampoColab').style.display = ''; $('uColab').innerHTML = '<option value="">No, es una persona nueva</option>'; uColabLista = [];
+  api('colaboradoresSinUsuarioWeb').then(l => { uColabLista = l || []; $('uColab').innerHTML = '<option value="">No, es una persona nueva</option>' + uColabLista.map(c => '<option value="' + esc(c.id) + '">' + esc(c.nombre) + (c.cedula ? ' · ' + esc(c.cedula) : '') + '</option>').join(''); }).catch(() => { });
 
   uEditando = false;
   uUsuarioEditado = '';
@@ -3958,6 +3972,7 @@ function abrirNuevoUsuario() {
   $('uCampoActivo').style.display = 'none';
   $('uNotaNuevo').style.display = 'block';
   $('uBloqueClave').style.display = 'none';
+  $('btnEliminarUsuario').style.display = 'none';
 
   $('modalUsuario').classList.add('show');
 }
@@ -3981,11 +3996,22 @@ function editarUsuario(usuario) {
   $('uCampoUsuario').style.display = 'block';
   $('uCampoActivo').style.display = 'block';
   $('uNotaNuevo').style.display = 'none';
-  $('uBloqueClave').style.display = 'block';
+  $('uBloqueClave').style.display = 'block'; $('uCampoColab').style.display = 'none';
+  $('btnEliminarUsuario').style.display = (sesion && sesion.usuario === u.usuario) ? 'none' : '';
 
   $('modalUsuario').classList.add('show');
 }
 
+function eliminarUsuario() {
+  if (!uEditando || !uUsuarioEditado) return;
+  const u = uUsuarioEditado;
+  if (!confirm('¿Eliminar el usuario «' + u + '»?\n\nYa no podrá entrar al sistema. Su ficha de colaborador y sus pagos se conservan (quedan sin usuario).')) return;
+  const borrarFicha = confirm('¿También eliminar su ficha de colaborador?\n\nAceptar = eliminar la ficha (solo si no tiene pagos registrados).\nCancelar = conservar la ficha.');
+  const b = $('btnEliminarUsuario'); b.disabled = true;
+  api('eliminarUsuarioWeb', { usuario: u, borrarFicha: borrarFicha })
+    .then(r => { b.disabled = false; cerrarUsuario(); toast('Usuario eliminado. Ficha ' + r.ficha + '.'); cargarUsuarios(); })
+    .catch(e => { b.disabled = false; mostrarError(e, 'No se pudo eliminar el usuario.'); });
+}
 function cerrarUsuario() { $('modalUsuario').classList.remove('show'); }
 
 function mostrarCredenciales(usuario, clave, nombre, correo) {
@@ -4056,7 +4082,7 @@ function guardarUsuario() {
   const btn = $('btnGuardarUsuario');
   btn.disabled = true;
 
-  const datos = { nombre: nombre, correo: correo, rol: $('uRol').value, modulos: uGetModulos(), ficha: uFichaLeer() };
+  const datos = { nombre: nombre, correo: correo, rol: $('uRol').value, modulos: uGetModulos(), ficha: uFichaLeer(), idColab: uEditando ? '' : $('uColab').value };
 
   let llamada;
 
@@ -6301,17 +6327,18 @@ function rhRenderCol() {
         '<td>' + fmtN(c.saldo.devengado) + '</td><td>' + fmtN(c.saldo.tomadas + c.saldo.programadas) + '</td><td><b>' + fmtN(c.saldo.saldo) + '</b></td>' +
         '<td>' + (c.saldo.exigibles > 0 ? '<b style="color:' + (c.saldo.vencidos > 0 ? '#a31616' : '#b8860b') + '">' + fmtN(c.saldo.exigibles) + '</b>' + (c.saldo.vencidos > 0 ? '<div style="font-size:11px;color:#a31616">plazo vencido</div>' : '') : '<span class="segSinCarga">—</span>') + '</td>' +
         '<td>' + (c.activo ? '<span class="tag tag-active">Activo</span>' : '<span class="tag tag-inactive">Retirado</span>') + '</td>' +
-        '<td style="white-space:nowrap"><button class="btnMini" onclick="rhVerPeriodos(\'' + escJs(c.id) + '\')">📅 Períodos</button> <button class="btnMini" onclick="rhEditarCol(\'' + escJs(c.id) + '\')">✏️ Editar</button></td></tr>').join('') + '</tbody></table>') +
+        '<td style="white-space:nowrap">' + (c.usuario ? '' : '<button class="btnMini" title="Crear su usuario del sistema" onclick="rhEditarCol(\'' + escJs(c.id) + '\', true)">🔑 Crear usuario</button> ') + '<button class="btnMini" onclick="rhVerPeriodos(\'' + escJs(c.id) + '\')">📅 Períodos</button> <button class="btnMini" onclick="rhEditarCol(\'' + escJs(c.id) + '\')">✏️ Editar</button></td></tr>').join('') + '</tbody></table>') +
     '</div></div>';
 }
 
-function rhEditarCol(id) {
+function rhEditarCol(id, crear) {
   const c = id ? rhDatos.colaboradores.find(x => x.id === id) : { id: '', usuario: '', nombre: '', puesto: '', ingreso: '', salario: '', periodicidad: 'Quincenal', diasSemana: 5, diasPeriodo: 10, previos: 0, activo: true, salida: '', obs: '', banco: '', iban: '', referencia: '', ccss: true };
   const ocupados = {}; rhDatos.colaboradores.forEach(x => { if (x.usuario && x.id !== c.id) ocupados[x.usuario] = 1; });
-  const usu = '<option value="">Sin usuario (no se autogestiona)</option>' + rhDatos.usuarios.filter(u => !ocupados[u.usuario]).map(u => '<option value="' + esc(u.usuario) + '"' + (u.usuario === c.usuario ? ' selected' : '') + '>' + esc(u.nombre || u.usuario) + ' (' + esc(u.usuario) + ')</option>').join('');
+  const usu = '<option value="">Sin usuario (no entra al sistema)</option>' + (c.usuario ? '' : '<option value="__nuevo__"' + (crear ? ' selected' : '') + '>➕ Crear un usuario nuevo para este colaborador</option>') + rhDatos.usuarios.filter(u => !ocupados[u.usuario]).map(u => '<option value="' + esc(u.usuario) + '"' + (u.usuario === c.usuario ? ' selected' : '') + '>' + esc(u.nombre || u.usuario) + ' (' + esc(u.usuario) + ')</option>').join('');
   rhModal('<h3>' + (id ? 'Editar colaborador' : 'Nuevo colaborador') + '</h3><input type="hidden" id="rcId" value="' + esc(c.id) + '">' +
     '<div class="field"><label>Nombre completo</label><input id="rcNombre" value="' + esc(c.nombre) + '" maxlength="80"></div>' +
-    '<div class="field"><label>Usuario del sistema (para que pida sus permisos)</label><select id="rcUsuario">' + usu + '</select></div>' +
+    '<div class="field"><label>Usuario del sistema (opcional: para que entre a la plataforma y pida sus permisos)</label><select id="rcUsuario" onchange="rhUsuNuevoToggle()">' + usu + '</select><div style="font-size:11.5px;color:#777;margin-top:3px">Puede quedar sin usuario y crearlo o ligarlo a una cuenta existente más adelante.</div></div>' +
+    '<div id="rcUsuNuevo" style="display:' + (crear && !c.usuario ? 'flex' : 'none') + ';gap:10px"><div class="field" style="flex:2"><label>Correo empresarial del usuario</label><input id="rcUsuCorreo" type="email" autocapitalize="none" placeholder="nombre@empresa.com"></div><div class="field" style="flex:1"><label>Rol</label><select id="rcUsuRol"><option value="consulta">Consulta</option><option value="operador">Operador</option><option value="admin">Administrador</option></select></div></div>' +
     '<div class="field"><label>Cédula / pasaporte <b style="color:#9b1c1c">*</b> (obligatoria al crear)</label><input id="rcCedula" maxlength="30" value="' + esc(c.cedula || '') + '" autocomplete="off"></div>' +
     '<div style="display:flex;gap:10px"><div class="field" style="flex:1"><label>Puesto</label><input id="rcPuesto" value="' + esc(c.puesto) + '" maxlength="60"></div>' +
     '<div class="field" style="flex:1"><label>Fecha de ingreso</label><input type="date" id="rcIngreso" value="' + esc(c.ingreso) + '"></div></div>' +
@@ -6332,15 +6359,24 @@ function rhEditarCol(id) {
     '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button class="btn secondary" onclick="rhCerrar()">Cancelar</button><button class="btn primary" id="rcBtn" onclick="rhGuardarCol()">Guardar</button></div>');
 }
 
+function rhUsuNuevoToggle() { $('rcUsuNuevo').style.display = $('rcUsuario').value === '__nuevo__' ? 'flex' : 'none'; }
 function rhSugPeriodo() { $('rcDiasPeriodo').value = $('rcDiasSemana').value === '6' ? 12 : 10; }
 
 async function rhGuardarCol() {
+  const nuevoUsu = $('rcUsuario').value === '__nuevo__', correoU = nuevoUsu ? $('rcUsuCorreo').value.trim() : '';
+  if (nuevoUsu && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(correoU)) return toast('Escribe el correo empresarial del usuario nuevo.');
   const b = $('rcBtn'); b.disabled = true;
   try {
-    await api('guardarColaboradorWeb', { cedula: $('rcCedula').value, id: $('rcId').value, nombre: $('rcNombre').value, usuario: $('rcUsuario').value, puesto: $('rcPuesto').value, ingreso: $('rcIngreso').value,
+    const rg = await api('guardarColaboradorWeb', { cedula: $('rcCedula').value, id: $('rcId').value, nombre: $('rcNombre').value, usuario: nuevoUsu ? '' : $('rcUsuario').value, puesto: $('rcPuesto').value, ingreso: $('rcIngreso').value,
       salario: $('rcSalario').value, periodicidad: $('rcPeriodicidad').value, diasSemana: $('rcDiasSemana').value, diasPeriodo: $('rcDiasPeriodo').value, previos: $('rcPrevios').value,
       activo: $('rcActivo').value === '1', salida: $('rcSalida').value, obs: $('rcObs').value, banco: $('rcBanco').value, referencia: $('rcRef').value, iban: $('rcIban').value, ccss: $('rcCcss').checked });
+    let cred = null;
+    if (nuevoUsu) {
+      try { cred = await api('crearUsuarioColaboradorWeb', { idColab: rg.id, correo: correoU, rol: $('rcUsuRol').value }); }
+      catch (e2) { rhCerrar(); await abrirColab(); mostrarError(e2, 'El colaborador se guardó, pero no se pudo crear su usuario.'); return; }
+    }
     rhCerrar(); toast('Colaborador guardado.'); await abrirColab();
+    if (cred) mostrarCredenciales(cred.usuario, cred.clave, cred.nombre, cred.correo);
   } catch (e) { b.disabled = false; mostrarError(e, 'No se pudo guardar el colaborador.'); }
 }
 
@@ -14497,6 +14533,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 76 · 14-oct 20:44</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 78 · 14-oct 21:03</div>
 </body>
 </html>
