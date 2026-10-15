@@ -7382,7 +7382,10 @@ async function pmConGuardar(id) {
   if (dig($('pcIban').value) && dig($('pcIban').value) === dig($('pcRef').value) && (!id || dig(prev.iban) !== dig(prev.referencia)) && !confirm('La referencia del banco y la cuenta IBAN quedaron con el mismo número (' + $('pcIban').value.trim() + '). ¿Es correcto? Si el navegador autocompletó un campo, pulsa Cancelar y corrígelo.')) return;
   try {
     const r = await api('guardarContratistaPmWeb', { id: id, nombre: $('pcNom').value, banco: $('pcBan').value, referencia: $('pcRef').value, movilTecnico: $('pcMT').value, moviles: $('pcMov').value, iban: $('pcIban').value, cedula: $('pcCed').value, telefono: $('pcTel').value, correo: $('pcCor').value, correoFact: $('pcCorF').value, aplicaIva: $('pcIva').checked, activo: $('pcAct').checked });
-    pmCerrar(); pmD = await api('obtenerPmWeb'); pmRenderCon(); toast(r.reactivado ? 'Esa persona ya estaba en el historial: se reactivó y se actualizó su registro (no se duplicó).' : 'Contratista guardado.', r.reactivado ? 6000 : 2500);
+    const gd = r.guardado, tI = $('pcIban').value, tR = $('pcRef').value, dg = v => String(v || '').replace(/\D/g, '').replace(/^CR/i, '');
+    pmCerrar(); pmD = await api('obtenerPmWeb'); pmRenderCon();
+    if (gd && (dg(gd.iban) !== dg(tI) || String(gd.referencia).trim() !== String(tR).trim())) alert('Atención: lo guardado no coincide con lo escrito.\n\nEscribió → IBAN: ' + tI + ' · Referencia: ' + tR + '\nSe guardó → IBAN: ' + gd.iban + ' · Referencia: ' + gd.referencia + '\n\nEnvíe una captura de este mensaje.');
+    toast(r.reactivado ? 'Esa persona ya estaba en el historial: se reactivó y se actualizó su registro (no se duplicó).' : 'Contratista guardado.', r.reactivado ? 6000 : 2500);
   } catch (e) { mostrarError(e, 'No se pudo guardar.'); }
 }
 function pmImportarConModal() {
@@ -14822,6 +14825,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 96 · 15-oct 10:48</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 97 · 15-oct 10:59</div>
 </body>
 </html>

@@ -10238,7 +10238,7 @@ const PM = {
     APE: ['ID', 'ID_Semana', 'ID_Contratista', 'Tipo', 'Contrato', 'Movil', 'Servicio', 'Cantidad', 'Monto', 'Motivo', 'Estado', 'Resolucion', 'Monto_Aprobado', 'Creado_Por', 'Creado', 'Resuelto_Por', 'Resuelto']
   },
   TEXTO: {
-    PRE: ['ID'], CON: ['ID', 'Cedula', 'IBAN', 'Moviles', 'Telefono', 'Actualizado', 'Factura_Cedula', 'Movil_Tecnico'], SEM: ['ID', 'Desde', 'Hasta', 'Creado', 'Cerrada'],
+    PRE: ['ID'], CON: ['ID', 'Cedula', 'IBAN', 'Moviles', 'Telefono', 'Actualizado', 'Factura_Cedula', 'Movil_Tecnico', 'Banco', 'Referencia_Banco'], SEM: ['ID', 'Desde', 'Hasta', 'Creado', 'Cerrada'],
     ORD: ['ID', 'ID_Semana', 'Contrato', 'Movil', 'Fecha', 'N_Orden'], AJU: ['ID', 'ID_Semana', 'ID_Contratista', 'Contrato', 'Movil', 'Creado'],
     PAG: ['ID_Semana', 'ID_Contratista', 'Factura', 'Pagado', 'Actualizado'], EXT: ['ID', 'ID_Semana', 'Cedula', 'IBAN', 'Creado'], PAR: ['Clave', 'Valor', 'Actualizado'], APE: ['ID', 'ID_Semana', 'ID_Contratista', 'Contrato', 'Movil', 'Creado', 'Resuelto'],
     PST: ['ID', 'ID_Contratista', 'Fecha', 'Creado', 'Deudor_Movil', 'Movil_Aviso'], PMV: ['ID', 'ID_Prestamo', 'Fecha', 'Creado']
@@ -10847,10 +10847,12 @@ function guardarContratistaPmWeb(token, d) {
     if (previo) {
       if (reactivado) o.Moviles = Array.from(new Set(yaTenia.concat(moviles ? moviles.split(',') : []))).join(',');
       Object.keys(o).forEach(n => sh.getRange(previo._fila, t.idx[n] + 1).setValue(o[n]));
-      return { ok: true, id: id, reactivado: reactivado };
+      const g = leerObjetos_(sh).find(c => txt_(c.ID) === id) || {};
+      return { ok: true, id: id, reactivado: reactivado, guardado: { iban: pmIban_(g.IBAN), referencia: txt_(g.Referencia_Banco), banco: txt_(g.Banco) } };
     }
     o.ID = pmId_('K'); appendPorEncabezados_(sh, o);
-    return { ok: true, id: o.ID };
+    const g2 = leerObjetos_(sh).find(c => txt_(c.ID) === o.ID) || {};
+    return { ok: true, id: o.ID, guardado: { iban: pmIban_(g2.IBAN), referencia: txt_(g2.Referencia_Banco), banco: txt_(g2.Banco) } };
   });
 }
 
