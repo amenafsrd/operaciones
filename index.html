@@ -6631,9 +6631,9 @@ const PM_GRUPOS = {
   apel: { t: 'Apelaciones', tipos: ['RECLAMO'], efecto: '+ Suman a la factura (antes del IVA).', color: '#2d5a1b' },
   pen: { t: 'Penalizaciones', tipos: ['PENALIZACION'], efecto: '− Restan de la factura (antes del IVA).', color: '#9b1c1c' },
   alq: { t: 'Alquiler / uniformes / otros', tipos: ['ALQUILER', 'CAMISAS', 'OTROANTES'], efecto: '− Restan de la factura (antes del IVA).', color: '#9b1c1c' },
-  reb: { t: 'Rebajos al depósito', tipos: ['ADELANTO', 'PRESTAMO', 'INVENTARIO', 'INS', 'HERRAMIENTAS', 'REBAJO', 'EXTRA'], efecto: 'No afectan la factura: se descuentan solo del depósito (los «Pago adicional» se suman al depósito).', color: '#9b1c1c' }
+  reb: { t: 'Rebajos al depósito', tipos: ['ADELANTO', 'PRESTAMO', 'APORTE', 'INVENTARIO', 'INS', 'HERRAMIENTAS', 'OTROS'], ver: ['ADELANTO', 'PRESTAMO', 'APORTE', 'INVENTARIO', 'INS', 'HERRAMIENTAS', 'OTROS', 'REBAJO', 'EXTRA'], efecto: 'No afectan la factura: se descuentan solo del depósito.', color: '#9b1c1c' }
 };
-function pmAjDe(idCon, g) { return pmS.ajustes.filter(a => a.idCon === idCon && PM_GRUPOS[g].tipos.indexOf(a.tipo) >= 0); }
+function pmAjDe(idCon, g) { return pmS.ajustes.filter(a => a.idCon === idCon && (PM_GRUPOS[g].ver || PM_GRUPOS[g].tipos).indexOf(a.tipo) >= 0); }
 function pmCelda(f, g, valor, cerr) {
   const n = pmAjDe(f.idCon, g).length;
   if (f.sinContratista) return '<td></td>';
@@ -6680,7 +6680,7 @@ function pmLibro(idCon, g) {
     h += '<div id="plbForm" style="margin-top:12px;padding:10px;background:#f7f9fc;border:1px solid #dde3ec;border-radius:8px"><b style="font-size:13px">Agregar</b><div style="display:grid;gap:8px;grid-template-columns:1fr 1fr;margin-top:6px">' +
       (g === 'pen' ? '<label style="grid-column:1/3">Penalización de la lista (opcional)<select id="plbPen" onchange="const p=pmD.penalizaciones[+this.value];if(p){$(\'plbMonto\').value=p.monto;$(\'plbDet\').value=p.nombre}"><option value="">—</option>' + pmD.penalizaciones.map((p, i) => '<option value="' + i + '">' + esc(p.nombre) + ' · ' + pmM(p.monto) + '</option>').join('') + '</select></label>' : '') +
       (G.tipos.length > 1 ? '<label>Tipo<select id="plbTipo" onchange="pmLibroTipo()">' + G.tipos.map(k => '<option value="' + k + '">' + esc(pmD.tipos[k].txt) + '</option>').join('') + '</select></label>' : '<input type="hidden" id="plbTipo" value="' + G.tipos[0] + '"><label>Tipo<input disabled value="' + esc(pmD.tipos[G.tipos[0]].txt) + '"></label>') +
-      (g === 'reb' ? '<label id="plbPW" style="display:none;grid-column:1/3">Préstamo al que corresponde la cuota<select id="plbPr"><option value="">— sin vincular —</option>' + (pmS.prestamosActivos || []).filter(p => p.idCon === idCon).map(p => '<option value="' + p.id + '">' + esc(p.concepto || 'Préstamo') + ' · ' + esc(pmFh(p.fecha)) + ' · debe ' + pmM(p.debe) + (p.cuota ? ' · cuota ' + pmM(p.cuota) : '') + '</option>').join('') + '</select></label>' : '') + '<label>Monto (₡)<input id="plbMonto" type="number" step="0.01" min="0"></label>' +
+      (g === 'reb' ? '<label id="plbPW" style="display:none;grid-column:1/3">Préstamo al que corresponde<select id="plbPr" onchange="pmLibroPrestamo()"><option value="">— Elige el préstamo —</option>' + (pmS.prestamosActivos || []).filter(p => p.idCon === idCon).map(p => '<option value="' + p.id + '">' + esc(p.concepto || 'Préstamo') + ' · ' + esc(pmFh(p.fecha)) + ' · debe ' + pmM(p.debe) + (p.cuotaMensual ? ' · cuota mensual pactada ' + pmM(p.cuotaMensual) : (p.cuota ? ' · cuota ' + pmM(p.cuota) : '')) + '</option>').join('') + '</select></label><label id="plbNW" style="display:none">N.º de cuota (1, 2, 3…)<input id="plbN" type="number" min="1" step="1" oninput="pmLibroPrestamo(true)"></label>' : '') + '<label>Monto (₡)<input id="plbMonto" type="number" step="0.01" min="0"></label>' +
       '<label style="grid-column:1/3"><b>Concepto' + (g === 'reb' ? ' — obligatorio: a qué corresponde el rebajo' : '') + '</b><input id="plbDet" maxlength="200" placeholder="' + (g === 'reb' ? 'ej. Adelanto del 12/10, cuota préstamo arnés...' : 'ej. Apelación OT 55238400') + '"></label>' +
       '<label>Contrato (opcional)<input id="plbCto" maxlength="30"></label></div>' + '<div style="text-align:right;margin-top:8px"><button class="btn primary" onclick="pmLibroAgregar()">➕ Agregar</button></div></div>';
   }
@@ -6690,13 +6690,28 @@ function pmLibro(idCon, g) {
 async function pmLibroAgregar() {
   const b = pmLb; if (!b) return;
   if (!(+$('plbMonto').value > 0)) { toast('Escribe el monto.'); $('plbMonto').focus(); return; }
+  if (['PRESTAMO', 'APORTE'].indexOf($('plbTipo').value) >= 0 && !$('plbPr').value) { toast($('plbPr').options.length > 1 ? 'Elige el préstamo al que corresponde.' : 'Este contratista no tiene préstamos activos: créalo primero en Préstamos.', 5000); $('plbPr').focus(); return; }
   if (PM_GRUPOS[b.g].tipos.some(k => pmD.tipos[k].fase === 'despues') && $('plbDet').value.trim().length < 3) { toast('Escribe el concepto: a qué corresponde el rebajo.'); $('plbDet').style.outline = '2px solid #c0392b'; $('plbDet').focus(); return; }
   try {
-    await api('guardarAjustePmWeb', { idSemana: pmSemId, idCon: b.idCon, tipo: $('plbTipo').value, monto: $('plbMonto').value, detalle: $('plbDet').value, contrato: $('plbCto').value, idPrestamo: ($('plbTipo').value === 'PRESTAMO' && $('plbPr')) ? $('plbPr').value : '' });
+    await api('guardarAjustePmWeb', { idSemana: pmSemId, idCon: b.idCon, tipo: $('plbTipo').value, monto: $('plbMonto').value, detalle: $('plbDet').value, contrato: $('plbCto').value, idPrestamo: (['PRESTAMO', 'APORTE'].indexOf($('plbTipo').value) >= 0 && $('plbPr')) ? $('plbPr').value : '', nCuota: ($('plbTipo').value === 'PRESTAMO' && $('plbN')) ? $('plbN').value : '' });
     await pmRecargar(); pmLibro(b.idCon, b.g); toast('Registrado.');
   } catch (e) { mostrarError(e, 'No se pudo guardar.'); }
 }
-function pmLibroTipo() { const w = $('plbPW'); if (w) w.style.display = $('plbTipo').value === 'PRESTAMO' ? '' : 'none'; }
+function pmLibroTipo() {
+  const t = $('plbTipo').value, w = $('plbPW'), n = $('plbNW');
+  if (w) w.style.display = (t === 'PRESTAMO' || t === 'APORTE') ? '' : 'none';
+  if (n) n.style.display = t === 'PRESTAMO' ? '' : 'none';
+  pmLibroPrestamo();
+}
+/* Al elegir el préstamo: propone el N.º de cuota, el monto de la cuota mensual pactada y el concepto (todo editable) */
+function pmLibroPrestamo(soloNum) {
+  const t = $('plbTipo').value, sel = $('plbPr'); if (!sel || (t !== 'PRESTAMO' && t !== 'APORTE')) return;
+  const p = (pmS.prestamosActivos || []).find(x => x.id === sel.value); if (!p) return;
+  if (t === 'PRESTAMO') {
+    if (!soloNum) { $('plbN').value = (p.ultimaCuota || 0) + 1; const c = p.cuotaMensual || p.cuota; if (c) $('plbMonto').value = Math.min(c, p.debe); }
+    $('plbDet').value = 'Cuota ' + ($('plbN').value || 1) + ' · ' + (p.concepto || 'Préstamo');
+  } else if (!soloNum) $('plbDet').value = 'Aporte extraordinario · ' + (p.concepto || 'Préstamo');
+}
 async function pmLibroBorrar(id) {
   const b = pmLb; if (!confirm('¿Eliminar este registro?')) return;
   try { await api('eliminarAjustePmWeb', id); await pmRecargar(); pmLibro(b.idCon, b.g); } catch (e) { mostrarError(e, 'No se pudo eliminar.'); }
@@ -6916,7 +6931,7 @@ function pmHtmlAju(cerr) {
 function pmAjusteModal() {
   const cons = pmD.contratistas;
   pmModal('<h3>Nuevo ajuste</h3><div style="display:grid;gap:8px"><label>Contratista<select id="paCon">' + cons.map(c => '<option value="' + c.id + '">' + esc(c.nombre) + (c.moviles ? ' (' + esc(c.moviles) + ')' : '') + '</option>').join('') + '</select></label>' +
-    '<label>Tipo<select id="paTipo" onchange="pmAjusteTipo()">' + Object.keys(pmD.tipos).map(k => '<option value="' + k + '">' + esc(pmD.tipos[k].txt) + '</option>').join('') + '</select></label>' +
+    '<label>Tipo<select id="paTipo" onchange="pmAjusteTipo()">' + Object.keys(pmD.tipos).filter(k => ['REBAJO', 'EXTRA', 'PRESTAMO', 'APORTE'].indexOf(k) < 0).map(k => '<option value="' + k + '">' + esc(pmD.tipos[k].txt) + '</option>').join('') + '</select></label>' +
     '<label id="paPenL" style="display:none">Penalización de la lista<select id="paPen" onchange="pmAjustePen()"><option value="">—</option>' + pmD.penalizaciones.map((p, i) => '<option value="' + i + '">' + esc(p.nombre) + ' · ' + pmM(p.monto) + '</option>').join('') + '</select></label>' +
     '<label>Monto (₡)<input id="paMonto" type="number" step="0.01"></label><label>Detalle<input id="paDet" maxlength="200"></label><label>Contrato (opcional)<input id="paCto" maxlength="30"></label></div>' +
     '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn secondary" onclick="pmCerrar()">Cancelar</button><button class="btn primary" onclick="pmAjusteGuardar()">Guardar</button></div>'); pmAjusteTipo();
@@ -7575,8 +7590,8 @@ function pmDibujarPst() {
   $('pmPPst').innerHTML = '<div class="toolbar"><button class="btn primary" onclick="pmPrestamoModal()">➕ Nuevo préstamo</button><span style="flex:1"></span><label>Ver <select onchange="pmPrF=this.value;pmDibujarPst()">' + [['saldo', 'Con saldo pendiente'], ['pagados', 'Pagados'], ['todos', 'Todos']].map(x => '<option value="' + x[0] + '"' + (pmPrF === x[0] ? ' selected' : '') + '>' + x[1] + '</option>').join('') + '</select></label></div>' +
     '<div class="panel"><div style="display:flex;gap:22px;flex-wrap:wrap;padding:12px 14px;font-size:13px">' + [['Prestado', pmM(tot.pr)], ['Abonado (capital + interés)', pmM(tot.ab)], ['Interés generado', pmM(tot.ig)], ['Saldo de capital', pmM(tot.cap)], ['Interés pendiente', pmM(tot.int)], ['Nos deben', pmM(tot.d)]].map(x => '<div><div style="color:#667;font-size:11px">' + x[0] + '</div><b style="font-size:15px">' + x[1] + '</b></div>').join('') + '</div></div>' +
     '<div class="panel"><div class="panelHead"><h2>Préstamos</h2><span>' + P.length + '</span></div><div style="padding:6px 12px;font-size:12px;color:#667">Interés simple <b>semanal</b> sobre el saldo de capital (no se capitaliza). Cada abono (rebajo del pago semanal o aporte directo) paga primero el interés y luego el capital.</div><div class="tableWrap">' +
-    (P.length ? '<table class="pmT"><thead><tr><th>Deudor</th><th>Fecha</th><th>Concepto</th><th style="text-align:right">Prestado</th><th style="text-align:right">Interés semanal</th><th style="text-align:right">Cuota semanal</th><th style="text-align:right">Abonado</th><th style="text-align:right">Saldo capital</th><th style="text-align:right">Interés pend.</th><th style="text-align:right">Nos debe</th><th></th></tr></thead><tbody>' +
-      P.map(p => { const e = p.estadoCalc; return '<tr><td><b>' + esc(p.deudor || p.contratista) + '</b>' + (p.deudorTipo === 'Asistente' ? ' <span class="chip azul" title="Se rebaja del pago de ' + esc(p.contratista) + '">Asistente</span>' : '') + (p.movil ? '<div style="font-size:11px;color:#667">Móvil ' + esc(p.movil) + (p.deudorTipo === 'Asistente' ? ' · paga ' + esc(p.contratista) : '') + '</div>' : (p.deudorTipo === 'Asistente' ? '<div style="font-size:11px;color:#667">Paga ' + esc(p.contratista) + '</div>' : '')) + (p.cambio ? '<div><button class="btn secondary" style="padding:1px 8px;font-size:11px;border-color:#c9a227;background:#fff8e1" onclick="pmPrCambio(\'' + p.id + '\')">⚠ Pasó a la móvil ' + esc(p.cambio.a) + ': decidir</button></div>' : '') + (p.sinMovilActiva && p.estadoCalc.debe > 0.005 && p.estado !== 'Cancelado' ? '<div style="font-size:11px;color:#9b1c1c">⚠ ya no figura en ninguna móvil activa</div>' : '') + (p.estado === 'Cancelado' ? ' <span class="chip rojo">Cancelado</span>' : (e.debe <= 0.005 ? ' <span class="chip verde">Pagado</span>' : '')) + '</td><td>' + esc(pmFh(p.fecha)) + '</td><td>' + esc(p.concepto) + '</td>' + num(pmM(e.prestado)) + num(p.tasa + ' % <span style="color:#889;font-size:10.5px" title="Equivalente mensual (52/12 semanas)">≈' + (Math.round(p.tasa * 52 / 12 * 10) / 10) + '%/mes</span>') + num(p.cuota ? pmM(p.cuota) : '—') + num(pmM(e.abonadoCapital + e.abonadoInteres)) + num(pmM(e.capital)) + num(pmM(e.interes)) + num('<b>' + pmM(e.debe) + '</b>') +
+    (P.length ? '<table class="pmT"><thead><tr><th>Deudor</th><th>Fecha</th><th>Concepto</th><th style="text-align:right">Prestado</th><th style="text-align:right">Interés semanal</th><th style="text-align:right">Cuota</th><th style="text-align:right">Abonado</th><th style="text-align:right">Saldo capital</th><th style="text-align:right">Interés pend.</th><th style="text-align:right">Nos debe</th><th></th></tr></thead><tbody>' +
+      P.map(p => { const e = p.estadoCalc; return '<tr><td><b>' + esc(p.deudor || p.contratista) + '</b>' + (p.deudorTipo === 'Asistente' ? ' <span class="chip azul" title="Se rebaja del pago de ' + esc(p.contratista) + '">Asistente</span>' : '') + (p.movil ? '<div style="font-size:11px;color:#667">Móvil ' + esc(p.movil) + (p.deudorTipo === 'Asistente' ? ' · paga ' + esc(p.contratista) : '') + '</div>' : (p.deudorTipo === 'Asistente' ? '<div style="font-size:11px;color:#667">Paga ' + esc(p.contratista) + '</div>' : '')) + (p.cambio ? '<div><button class="btn secondary" style="padding:1px 8px;font-size:11px;border-color:#c9a227;background:#fff8e1" onclick="pmPrCambio(\'' + p.id + '\')">⚠ Pasó a la móvil ' + esc(p.cambio.a) + ': decidir</button></div>' : '') + (p.sinMovilActiva && p.estadoCalc.debe > 0.005 && p.estado !== 'Cancelado' ? '<div style="font-size:11px;color:#9b1c1c">⚠ ya no figura en ninguna móvil activa</div>' : '') + (p.estado === 'Cancelado' ? ' <span class="chip rojo">Cancelado</span>' : (e.debe <= 0.005 ? ' <span class="chip verde">Pagado</span>' : '')) + '</td><td>' + esc(pmFh(p.fecha)) + '</td><td>' + esc(p.concepto) + '</td>' + num(pmM(e.prestado)) + num(p.tasa + ' % <span style="color:#889;font-size:10.5px" title="Equivalente mensual (52/12 semanas)">≈' + (Math.round(p.tasa * 52 / 12 * 10) / 10) + '%/mes</span>') + num(p.cuotaMensual ? pmM(p.cuotaMensual) + '<div style="font-size:10.5px;color:#889">mensual</div>' : (p.cuota ? pmM(p.cuota) + '<div style="font-size:10.5px;color:#889">semanal</div>' : '—')) + num(pmM(e.abonadoCapital + e.abonadoInteres)) + num(pmM(e.capital)) + num(pmM(e.interes)) + num('<b>' + pmM(e.debe) + '</b>') +
         '<td style="white-space:nowrap"><button class="btn secondary" onclick="pmPrestamoDetalle(\'' + p.id + '\')">Detalle</button> <button class="btn secondary" onclick="pmPrestamoModal(\'' + p.id + '\')">Editar</button></td></tr>'; }).join('') + '</tbody></table>' : '<div class="loading">No hay préstamos en esta vista.</div>') + '</div></div>';
 }
 let pmPrOps = [], pmPrTipo = 'Técnico', pmPrSelIdx = -1, pmPrEdit = null;
@@ -7617,18 +7632,22 @@ function pmPrestamoModal(id) {
     '<label style="' + L + '">Móvil y persona<select id="prOp" onchange="pmPrSelIdx=this.value===\'\'?-1:+this.value;pmPrInfo()"></select></label>' +
     '<div id="prInfo" style="font-size:12.5px;background:#f4f9ff;border:1px solid #dbe7f5;border-radius:8px;padding:8px 10px;display:grid;gap:2px"></div>' +
     sec('Condiciones') +
-    '<div style="display:grid;gap:12px;grid-template-columns:1fr 1fr"><label style="' + L + '">Fecha en que se prestó<input type="date" id="prFec" value="' + esc(p.fecha) + '"></label><label style="' + L + '">Monto prestado (₡)<input type="number" id="prMon" step="0.01" min="0" value="' + esc(p.monto) + '"></label>' +
-    '<label style="' + L + '">Interés semanal (%) sobre el saldo<input type="number" id="prTasa" step="0.01" min="0" value="' + esc(p.tasa) + '" oninput="const v=+this.value||0;$(\'prEq\').textContent=\'≈ \'+(Math.round(v*52/12*10)/10)+\' % mensual · \'+(Math.round(v*52*10)/10)+\' % anual (simple)\'"><span id="prEq" style="font-size:11px;font-weight:400;color:#667">≈ ' + (Math.round(p.tasa * 52 / 12 * 10) / 10) + ' % mensual · ' + (Math.round(p.tasa * 52 * 10) / 10) + ' % anual (simple)</span></label>' +
-    '<label style="' + L + '">Cuota semanal a rebajar (₡, opcional)<input type="number" id="prCuo" step="0.01" min="0" value="' + esc(p.cuota || '') + '"></label>' +
+    '<div style="display:grid;gap:12px;grid-template-columns:1fr 1fr"><label style="' + L + '">Fecha en que se prestó<input type="date" id="prFec" value="' + esc(p.fecha) + '"></label><label style="' + L + '">Monto prestado (₡)<input type="number" id="prMon" step="0.01" min="0" value="' + esc(p.monto) + '" oninput="pmPrEq()"></label>' +
+    '<label style="' + L + '">Interés semanal (%) sobre el saldo<input type="number" id="prTasa" step="0.01" min="0" value="' + esc(p.tasa) + '" oninput="pmPrEq()"><span id="prEq" style="font-size:11px;font-weight:400;color:#667">≈ ' + (Math.round(p.tasa * 52 / 12 * 10) / 10) + ' % mensual · ' + (Math.round(p.tasa * 52 * 10) / 10) + ' % anual (simple)</span></label>' +
+    '<label style="' + L + '">Cuota mensual pactada (₡)<input type="number" id="prCuo" step="0.01" min="0" value="' + esc(p.cuotaMensual || '') + '" placeholder="Se propone al rebajar la cuota"><span style="font-size:11px;font-weight:400;color:#667">' + (p.cuota > 0 && !(p.cuotaMensual > 0) ? 'Tiene una cuota semanal antigua de ' + pmM(p.cuota) + '; al poner la mensual se usa la mensual.' : 'La cuota se rebaja una vez al mes con «Aplicar cuotas».') + '</span></label>' +
     '<label style="' + L + ';grid-column:1/3">Concepto<input id="prCon2" maxlength="160" value="' + esc(p.concepto) + '" placeholder="ej. Adelanto para herramientas"></label>' + (id ? '<label style="' + L + '">Estado<select id="prEst"><option' + (p.estado === 'Activo' ? ' selected' : '') + '>Activo</option><option' + (p.estado === 'Cancelado' ? ' selected' : '') + '>Cancelado</option></select></label>' : '') + '</div></div>' +
     '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;padding-top:12px;border-top:1px solid #e6e9ef">' + (id ? '<button class="btn secondary" onclick="pmPrestamoBorrar(\'' + id + '\')">🗑 Eliminar</button>' : '') + '<span style="flex:1"></span><button class="btn secondary" onclick="pmCerrar()">Cancelar</button><button class="btn primary" onclick="pmPrestamoGuardar(\'' + (id || '') + '\')">Guardar</button></div>', 600);
-  pmPrPintar();
+  pmPrPintar(); pmPrEq();
+}
+function pmPrEq() {
+  const el = $('prEq'); if (!el) return; const v = +$('prTasa').value || 0, m = +$('prMon').value || 0, r1 = x => Math.round(x * 10) / 10;
+  el.innerHTML = '≈ ' + r1(v * 52 / 12) + ' % mensual · ' + r1(v * 52) + ' % anual (simple)' + (m > 0 ? '<br>Sobre ' + pmM(m) + ': <b>' + pmM(m * v / 100) + '</b> por semana · <b>' + pmM(m * v / 100 * 52 / 12) + '</b> por mes' : '') + '<br><i>El interés se acumula por día (' + v + ' % ÷ 7' + (m > 0 ? ' = ' + pmM(m * v / 100 / 7) + ' al día' : '') + '): el primer día solo suma 1/7 de la semana.</i>';
 }
 async function pmPrestamoGuardar(id) {
   const o = pmPrOps[pmPrSelIdx];
   if (!o) { toast('Elige ' + (pmPrTipo === 'Asistente' ? 'al asistente' : 'la móvil') + '.'); return; }
   if (!o.con) { toast('Esa móvil no tiene contratista activo.'); return; }
-  try { await api('guardarPrestamoPmWeb', { id: id, deudorTipo: pmPrTipo, deudorNombre: pmPrTipo === 'Asistente' ? o.nombre : '', movil: o.movil, idCon: o.con.id, fecha: $('prFec').value, monto: $('prMon').value, tasa: $('prTasa').value, cuota: $('prCuo').value, concepto: $('prCon2').value, estado: id ? $('prEst').value : 'Activo' }); pmCerrar(); await pmRenderPst(); toast('Préstamo guardado.'); }
+  try { await api('guardarPrestamoPmWeb', { id: id, deudorTipo: pmPrTipo, deudorNombre: pmPrTipo === 'Asistente' ? o.nombre : '', movil: o.movil, idCon: o.con.id, fecha: $('prFec').value, monto: $('prMon').value, tasa: $('prTasa').value, cuotaMensual: $('prCuo').value, concepto: $('prCon2').value, estado: id ? $('prEst').value : 'Activo' }); pmCerrar(); await pmRenderPst(); toast('Préstamo guardado.'); }
   catch (e) { mostrarError(e, 'No se pudo guardar.'); }
 }
 function pmPrCambio(id) {
@@ -7647,7 +7666,7 @@ async function pmPrCambioOk(id) {
 async function pmPrestamoBorrar(id) { if (!confirm('Se eliminará el préstamo con sus abonos registrados. ¿Seguro?')) return; try { await api('eliminarPrestamoPmWeb', id); pmCerrar(); await pmRenderPst(); toast('Préstamo eliminado.'); } catch (e) { mostrarError(e, 'No se pudo eliminar.'); } }
 function pmPrestamoDetalle(id) {
   const p = pmPr.prestamos.find(x => x.id === id); if (!p) return; const e = p.estadoCalc;
-  pmModal('<h3>Préstamo · ' + esc(p.deudor || p.contratista) + '</h3><div style="font-size:12px;color:#556;margin-bottom:8px">' + esc(p.concepto) + ' · prestado el ' + esc(pmFh(p.fecha)) + ' · ' + p.tasa + ' % semanal' + (p.deudorTipo === 'Asistente' ? ' · asistente ' + esc(p.deudorNombre) : '') + (p.cuota ? ' · cuota semanal ' + pmM(p.cuota) : '') + '</div>' +
+  pmModal('<h3>Préstamo · ' + esc(p.deudor || p.contratista) + '</h3><div style="font-size:12px;color:#556;margin-bottom:8px">' + esc(p.concepto) + ' · prestado el ' + esc(pmFh(p.fecha)) + ' · ' + p.tasa + ' % semanal (≈ ' + pmM(e.capital * p.tasa / 100 / 7) + ' de interés por día sobre el saldo)' + (p.deudorTipo === 'Asistente' ? ' · asistente ' + esc(p.deudorNombre) : '') + (p.cuota ? ' · cuota semanal ' + pmM(p.cuota) : '') + '</div>' +
     '<div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:8px">' + [['Prestado', pmM(e.prestado)], ['Abonado a capital', pmM(e.abonadoCapital)], ['Interés pagado', pmM(e.abonadoInteres)], ['Saldo capital', pmM(e.capital)], ['Interés pendiente', pmM(e.interes)], ['Nos debe a hoy', pmM(e.debe)]].map(x => '<div><div style="color:#667;font-size:11px">' + x[0] + '</div><b>' + x[1] + '</b></div>').join('') + '</div>' +
     '<table class="pmT"><thead><tr><th>Fecha</th><th>Movimiento</th><th>Origen</th><th>Nota</th><th style="text-align:right">Monto</th><th></th></tr></thead><tbody><tr><td>' + esc(pmFh(p.fecha)) + '</td><td>Préstamo inicial</td><td>—</td><td>' + esc(p.concepto) + '</td><td style="text-align:right;color:#9b1c1c">' + pmM(p.monto) + '</td><td></td></tr>' +
     p.movs.map(m => '<tr' + (m.fecha > pmPr.hoy ? ' style="color:#888"' : '') + '><td>' + esc(pmFh(m.fecha)) + (m.fecha > pmPr.hoy ? ' <span class="chip amar">programado</span>' : '') + '</td><td>' + (m.tipo === 'ABONO' ? 'Abono / aporte' : 'Nuevo adelanto') + '</td><td>' + esc(m.origen) + '</td><td>' + esc(m.nota) + '</td><td style="text-align:right;color:' + (m.tipo === 'ABONO' ? '#2d5a1b' : '#9b1c1c') + '">' + (m.tipo === 'ABONO' ? '−' : '+') + pmM(m.monto) + '</td><td>' + (m.origen === 'Manual' ? '<button class="btn secondary" onclick="pmMovBorrar(\'' + m.id + '\',\'' + id + '\')">✕</button>' : '') + '</td></tr>').join('') + '</tbody></table>' +
@@ -14354,6 +14373,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 67 · 14-oct 19:08</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 68 · 14-oct 19:18</div>
 </body>
 </html>

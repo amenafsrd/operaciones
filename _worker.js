@@ -9858,8 +9858,8 @@ const PM = {
     CON: ['ID', 'Nombre', 'Cedula', 'IBAN', 'Moviles', 'Aplica_IVA', 'Telefono', 'Correo', 'Obs', 'Activo', 'Actualizado', 'Titular', 'Banco', 'Factura_Nombre', 'Factura_Cedula', 'Referencia_Banco', 'Movil_Tecnico', 'Correo_Facturacion'],
     SEM: ['ID', 'Desde', 'Hasta', 'Estado', 'Notas', 'Creado_Por', 'Creado', 'Cerrada'],
     ORD: ['ID', 'ID_Semana', 'Contrato', 'Cliente', 'Servicios', 'Cantidad', 'Costo_Archivo', 'Costo_Aplicado', 'Movil', 'Fecha', 'UF_Servicio', 'UF_Costo', 'Obs', 'Tipo', 'Manual', 'N_Orden', 'Validacion'],
-    AJU: ['ID', 'ID_Semana', 'ID_Contratista', 'Tipo', 'Monto', 'Detalle', 'Contrato', 'Movil', 'Creado_Por', 'Creado', 'ID_Prestamo', 'Origen'],
-    PST: ['ID', 'ID_Contratista', 'Fecha', 'Monto', 'Tasa_Mensual', 'Cuota_Semanal', 'Concepto', 'Estado', 'Creado_Por', 'Creado', 'Tasa_Semanal', 'Deudor_Tipo', 'Deudor_Nombre', 'Deudor_Movil', 'Movil_Aviso'],
+    AJU: ['ID', 'ID_Semana', 'ID_Contratista', 'Tipo', 'Monto', 'Detalle', 'Contrato', 'Movil', 'Creado_Por', 'Creado', 'ID_Prestamo', 'Origen', 'N_Cuota'],
+    PST: ['ID', 'ID_Contratista', 'Fecha', 'Monto', 'Tasa_Mensual', 'Cuota_Semanal', 'Concepto', 'Estado', 'Creado_Por', 'Creado', 'Tasa_Semanal', 'Deudor_Tipo', 'Deudor_Nombre', 'Deudor_Movil', 'Movil_Aviso', 'Cuota_Mensual'],
     PMV: ['ID', 'ID_Prestamo', 'Fecha', 'Tipo', 'Monto', 'Nota', 'Creado_Por', 'Creado'],
     PAG: ['ID_Semana', 'ID_Contratista', 'Factura', 'Obs', 'Pagado', 'Actualizado', 'VB_Sin_Factura'],
     EXT: ['ID', 'ID_Semana', 'Nombre', 'Cedula', 'IBAN', 'Monto', 'Concepto', 'Creado'],
@@ -9877,8 +9877,8 @@ const PM = {
   TIPOS: {
     RECLAMO: { txt: 'Reclamo (suma)', signo: 1, fase: 'antes' }, ALQUILER: { txt: 'Alquiler de móvil', signo: -1, fase: 'antes' },
     PENALIZACION: { txt: 'Penalización', signo: -1, fase: 'antes' }, CAMISAS: { txt: 'Camisas / uniformes', signo: -1, fase: 'antes' },
-    ADELANTO: { txt: 'Adelanto / anticipo', signo: -1, fase: 'despues' }, OTROANTES: { txt: 'Otro rebajo que aplica a la factura', signo: -1, fase: 'antes' }, INVENTARIO: { txt: 'Diferencia de inventario', signo: -1, fase: 'despues' }, INS: { txt: 'INS', signo: -1, fase: 'despues' },
-    REBAJO: { txt: 'Rebajo SRD', signo: -1, fase: 'despues' }, PRESTAMO: { txt: 'Préstamo / cuota', signo: -1, fase: 'despues' },
+    ADELANTO: { txt: 'Adelanto de factura', signo: -1, fase: 'despues' }, OTROANTES: { txt: 'Otro rebajo que aplica a la factura', signo: -1, fase: 'antes' }, INVENTARIO: { txt: 'Diferencia de inventario', signo: -1, fase: 'despues' }, INS: { txt: 'INS', signo: -1, fase: 'despues' },
+    REBAJO: { txt: 'Rebajo SRD', signo: -1, fase: 'despues' }, PRESTAMO: { txt: 'Cuota de préstamo', signo: -1, fase: 'despues' }, APORTE: { txt: 'Aporte extraordinario a préstamo', signo: -1, fase: 'despues' }, OTROS: { txt: 'Otros rebajos', signo: -1, fase: 'despues' },
     HERRAMIENTAS: { txt: 'Herramientas / arnés / cleavers', signo: -1, fase: 'despues' }, EXTRA: { txt: 'Pago adicional (suma)', signo: 1, fase: 'despues' }
   },
   /* Lista de precios 2025 (Telecable). Alias = textos con que Telecable nombra el servicio en el archivo semanal */
@@ -10073,7 +10073,7 @@ function pmResumen_(ordenes, ajustes, contratistas, pagos, hasta) {
     f.nOrdenes++; f.detalle += o.costo; f.uf += o.ufCosto;
     const m = f.moviles[o.movil] || (f.moviles[o.movil] = { n: 0, detalle: 0 }); m.n++; m.detalle += o.costo;
   });
-  const campo = { RECLAMO: 'reclamos', ALQUILER: 'alquileres', PENALIZACION: 'penalizaciones', CAMISAS: 'camisas', INVENTARIO: 'inventario', INS: 'ins', REBAJO: 'rebajo', PRESTAMO: 'prestamo', HERRAMIENTAS: 'herramientas', EXTRA: 'extra', ADELANTO: 'adelanto', OTROANTES: 'otros' };
+  const campo = { RECLAMO: 'reclamos', ALQUILER: 'alquileres', PENALIZACION: 'penalizaciones', CAMISAS: 'camisas', INVENTARIO: 'inventario', INS: 'ins', REBAJO: 'rebajo', PRESTAMO: 'prestamo', HERRAMIENTAS: 'herramientas', EXTRA: 'extra', ADELANTO: 'adelanto', OTROANTES: 'otros', APORTE: 'prestamo', OTROS: 'rebajo' };
   ajustes.forEach(a => {
     if (!campo[a.tipo]) return;
     const f = filas[a.idCon] || (conPorId[a.idCon] ? nueva(a.idCon, conPorId[a.idCon]) : null);
@@ -10135,7 +10135,7 @@ function obtenerSemanaPmWeb(token, idSemana) {
     f.tecnicos = Object.keys(f.moviles).map(m => ({ movil: m, tecnico: sisMov[m] ? sisMov[m].tecnico : '' }));
   });
   const dif = ordenes.filter(o => !o.manual && o.costoLista !== null && Math.abs(o.costoLista - o.costo) > 0.005).length;
-  const saldos = {}, prestActivos = []; try { pmPrestamosLista_().forEach(p => { if (p.estadoCalc.debe > 0.005) { saldos[p.idCon] = pmR_((saldos[p.idCon] || 0) + p.estadoCalc.debe); if (p.estado === 'Activo') prestActivos.push({ id: p.id, idCon: p.idCon, concepto: p.concepto, fecha: p.fecha, debe: p.estadoCalc.debe, cuota: p.cuota }); } }); } catch (e) { }
+  const saldos = {}, prestActivos = []; try { pmPrestamosLista_().forEach(p => { if (p.estadoCalc.debe > 0.005) { saldos[p.idCon] = pmR_((saldos[p.idCon] || 0) + p.estadoCalc.debe); if (p.estado === 'Activo') prestActivos.push({ id: p.id, idCon: p.idCon, concepto: p.concepto, fecha: p.fecha, debe: p.estadoCalc.debe, cuota: p.cuotaMensual || p.cuota, cuotaMensual: p.cuotaMensual, ultimaCuota: p.ultimaCuota }); } }); } catch (e) { }
   return { saldosPrestamo: saldos, prestamosActivos: prestActivos, semana: { id: txt_(sem.ID), desde: segFecha_(sem.Desde) || '', hasta: segFecha_(sem.Hasta) || '', estado: txt_(sem.Estado) || 'Abierta', notas: txt_(sem.Notas), fechaPagoEst: pmFechaPagoEst_(segFecha_(sem.Hasta) || '') },
     ordenes: ordenes, ajustes: ajustes, extras: extras, apelaciones: apel, resumen: resumen, diferencias: dif, sinLista: ordenes.filter(o => o.costoLista === null && !o.manual).length };
 }
@@ -10274,16 +10274,22 @@ function guardarAjustePmWeb(token, d) {
   if (!leerObjetos_(pmHoja_('CON')).some(c => txt_(c.ID) === txt_(d.idCon))) throw new Error('Elige el contratista.');
   const idPrestamo = txt_(d.idPrestamo);
   if (idPrestamo) {
-    if (txt_(d.tipo) !== 'PRESTAMO') throw new Error('Solo los rebajos de tipo préstamo se ligan a un préstamo.');
+    if (txt_(d.tipo) !== 'PRESTAMO' && txt_(d.tipo) !== 'APORTE') throw new Error('Solo las cuotas y los aportes extraordinarios se ligan a un préstamo.');
     const pr = leerObjetos_(pmHoja_('PST')).find(x => txt_(x.ID) === idPrestamo);
     if (!pr || txt_(pr.ID_Contratista) !== txt_(d.idCon)) throw new Error('El préstamo no corresponde a ese contratista.');
   }
+  if ((txt_(d.tipo) === 'APORTE' || txt_(d.tipo) === 'PRESTAMO') && !idPrestamo) throw new Error('Elige el préstamo al que corresponde ' + (txt_(d.tipo) === 'APORTE' ? 'el aporte extraordinario.' : 'la cuota.'));
   if (PM.TIPOS[txt_(d.tipo)].fase === 'despues' && txt_(d.detalle).length < 3) throw new Error('Escribe en «Concepto» a qué corresponde el rebajo (ej. adelanto del 12/10).');
   return conBloqueo_(() => {
     pmSemanaAbierta_(d.idSemana);
     const id = pmId_('A');
+    let nCuota = 0;
+    if (txt_(d.tipo) === 'PRESTAMO' && idPrestamo) {
+      nCuota = Math.floor(pmNum_(d.nCuota));
+      if (!(nCuota > 0)) { leerObjetos_(pmHoja_('AJU')).forEach(a => { if (txt_(a.Tipo) === 'PRESTAMO' && txt_(a.ID_Prestamo) === idPrestamo) nCuota = Math.max(nCuota, pmNum_(a.N_Cuota) || 0, 0); }); nCuota += 1; }
+    }
     appendPorEncabezados_(pmHoja_('AJU'), { ID: id, ID_Semana: txt_(d.idSemana), ID_Contratista: txt_(d.idCon), Tipo: txt_(d.tipo), Monto: rh2_(monto), Detalle: txt_(d.detalle).slice(0, 200),
-      Contrato: txt_(d.contrato).slice(0, 30), Movil: pmMovil_(d.movil), Creado_Por: ses.usuario, Creado: segAhora_(), ID_Prestamo: idPrestamo, Origen: 'Manual' });
+      Contrato: txt_(d.contrato).slice(0, 30), Movil: pmMovil_(d.movil), Creado_Por: ses.usuario, Creado: segAhora_(), ID_Prestamo: idPrestamo, Origen: 'Manual', N_Cuota: nCuota || '' });
     return { ok: true, id: id };
   });
 }
@@ -10672,7 +10678,7 @@ function pmMovsPrestamos_() {
     const s = sems[txt_(a.ID_Semana)]; if (!s) return;
     const pg = pagos[txt_(a.ID_Semana) + '|' + txt_(a.ID_Contratista)];
     const fecha = pg ? (segFecha_(pg) || '') : pmFechaPagoEst_(segFecha_(s.Hasta) || '');
-    poner(ip, { id: 'A:' + txt_(a.ID), fecha: fecha, tipo: 'ABONO', monto: pmNum_(a.Monto), nota: 'Rebajo del pago semanal ' + pmSemanaTxt_({ desde: segFecha_(s.Desde), hasta: segFecha_(s.Hasta) }) + (pg ? '' : ' (fecha estimada de pago)'), origen: 'Rebajo semanal', idSemana: txt_(a.ID_Semana), estimada: !pg });
+    poner(ip, { id: 'A:' + txt_(a.ID), fecha: fecha, tipo: 'ABONO', monto: pmNum_(a.Monto), tipoAj: txt_(a.Tipo), nCuota: pmNum_(a.N_Cuota), nota: (txt_(a.Tipo) === 'APORTE' ? 'Aporte extraordinario · ' : (pmNum_(a.N_Cuota) > 0 ? 'Cuota N.º ' + pmNum_(a.N_Cuota) + ' · ' : '')) + 'Rebajo del pago semanal ' + pmSemanaTxt_({ desde: segFecha_(s.Desde), hasta: segFecha_(s.Hasta) }) + (pg ? '' : ' (fecha estimada de pago)'), origen: 'Rebajo semanal', idSemana: txt_(a.ID_Semana), estimada: !pg });
   });
   Object.keys(out).forEach(k => out[k].sort((a, b) => a.fecha.localeCompare(b.fecha)));
   return out;
@@ -10683,8 +10689,9 @@ function pmPrestamosLista_() {
   const sis = pmMovilesSis_();
   const conDeMovil = m => conRows.find(c => c.activo && pmMovilesDe_(c).indexOf(m) >= 0) || null;
   const movs = pmMovsPrestamos_();
+  const ultCuota = {}; leerObjetos_(pmHoja_('AJU')).forEach(a => { if (txt_(a.Tipo) === 'PRESTAMO' && txt_(a.ID_Prestamo)) { const k = txt_(a.ID_Prestamo); ultCuota[k] = Math.max(ultCuota[k] || 0, pmNum_(a.N_Cuota) || ((ultCuota[k] || 0) + 1)); } });
   return leerObjetos_(pmHoja_('PST')).map(p => {
-    const o = { id: txt_(p.ID), idCon: txt_(p.ID_Contratista), contratista: cons[txt_(p.ID_Contratista)] || '(contratista eliminado)', fecha: segFecha_(p.Fecha) || '', monto: pmNum_(p.Monto), tasa: txt_(p.Tasa_Semanal) !== '' ? pmNum_(p.Tasa_Semanal) : pmR_(pmNum_(p.Tasa_Mensual) / 4), cuota: pmNum_(p.Cuota_Semanal), concepto: txt_(p.Concepto), estado: txt_(p.Estado) || 'Activo',
+    const o = { id: txt_(p.ID), idCon: txt_(p.ID_Contratista), contratista: cons[txt_(p.ID_Contratista)] || '(contratista eliminado)', fecha: segFecha_(p.Fecha) || '', monto: pmNum_(p.Monto), tasa: txt_(p.Tasa_Semanal) !== '' ? pmNum_(p.Tasa_Semanal) : pmR_(pmNum_(p.Tasa_Mensual) / 4), cuota: pmNum_(p.Cuota_Semanal), cuotaMensual: pmNum_(p.Cuota_Mensual), ultimaCuota: ultCuota[txt_(p.ID)] || 0, concepto: txt_(p.Concepto), estado: txt_(p.Estado) || 'Activo',
       deudorTipo: txt_(p.Deudor_Tipo) === 'Asistente' ? 'Asistente' : 'Técnico', deudorNombre: txt_(p.Deudor_Nombre) };
     o.deudor = o.deudorTipo === 'Asistente' ? (o.deudorNombre || 'Asistente') : o.contratista;
     o.movs = movs[o.id] || [];
@@ -10712,7 +10719,7 @@ function guardarPrestamoPmWeb(token, d) {
   const ses = requerirSesion_(token, 'admin');
   d = d || {};
   if (!leerObjetos_(pmHoja_('CON')).some(c => txt_(c.ID) === txt_(d.idCon))) throw new Error('Elige el contratista (de cuyo pago se rebajan las cuotas).');
-  const monto = pmNum_(d.monto), tasa = pmNum_(d.tasa), cuota = Math.max(0, pmNum_(d.cuota));
+  const monto = pmNum_(d.monto), tasa = pmNum_(d.tasa), cuota = Math.max(0, pmNum_(d.cuota)), cuotaMes = Math.max(0, pmNum_(d.cuotaMensual));
   const fecha = segFecha_(d.fecha);
   if (!fecha) throw new Error('Indica la fecha en que se prestó.');
   if (!(monto > 0)) throw new Error('El monto prestado debe ser mayor que cero.');
@@ -10727,8 +10734,9 @@ function guardarPrestamoPmWeb(token, d) {
       const sm = pmMovilesSis_()[movD];
       if (sm && !sm.activa) throw new Error('Los préstamos solo se pueden dar a móviles activas (la móvil ' + movD + ' está inactiva).');
     }
-    const o = { Deudor_Movil: movD, Movil_Aviso: '', ID_Contratista: txt_(d.idCon), Fecha: fecha, Monto: monto, Tasa_Semanal: tasa, Tasa_Mensual: pmR_(tasa * 52 / 12), Deudor_Tipo: tipoD, Deudor_Nombre: tipoD === 'Asistente' ? nomD : '', Cuota_Semanal: cuota, Concepto: txt_(d.concepto).slice(0, 160), Estado: txt_(d.estado) === 'Cancelado' ? 'Cancelado' : 'Activo' };
+    const o = { Deudor_Movil: movD, Movil_Aviso: '', ID_Contratista: txt_(d.idCon), Fecha: fecha, Monto: monto, Tasa_Semanal: tasa, Tasa_Mensual: pmR_(tasa * 52 / 12), Deudor_Tipo: tipoD, Deudor_Nombre: tipoD === 'Asistente' ? nomD : '', Cuota_Mensual: cuotaMes, Cuota_Semanal: cuotaMes > 0 ? 0 : cuota, Concepto: txt_(d.concepto).slice(0, 160), Estado: txt_(d.estado) === 'Cancelado' ? 'Cancelado' : 'Activo' };
     if (previoP) delete o.Movil_Aviso;
+    if (d.cuota === undefined && !(cuotaMes > 0)) delete o.Cuota_Semanal; /* préstamo antiguo con cuota semanal: se conserva */
     if (txt_(d.id)) {
       for (let i = 1; i < t.values.length; i++) if (txt_(t.values[i][t.idx.ID]) === txt_(d.id)) { Object.keys(o).forEach(n => sh.getRange(i + 1, t.idx[n] + 1).setValue(o[n])); return { ok: true, id: txt_(d.id) }; }
       throw new Error('No se encontró el préstamo.');
@@ -10804,12 +10812,23 @@ function aplicarCuotasPrestamosPmWeb(token, idSemana) {
   idSemana = txt_(idSemana);
   return conBloqueo_(() => {
     pmSemanaAbierta_(idSemana);
-    const ya = {}; leerObjetos_(pmHoja_('AJU')).forEach(a => { if (txt_(a.ID_Semana) === idSemana && txt_(a.ID_Prestamo)) ya[txt_(a.ID_Prestamo)] = 1; });
+    const sems = {}; leerObjetos_(pmHoja_('SEM')).forEach(sm => { sems[txt_(sm.ID)] = (segFecha_(sm.Hasta) || '').slice(0, 7); });
+    const mesAct = sems[idSemana] || '';
+    const ya = {}, yaMes = {};
+    leerObjetos_(pmHoja_('AJU')).forEach(a => {
+      const ip = txt_(a.ID_Prestamo); if (!ip || txt_(a.Tipo) !== 'PRESTAMO') return;
+      if (txt_(a.ID_Semana) === idSemana) ya[ip] = 1;
+      if (sems[txt_(a.ID_Semana)] === mesAct) yaMes[ip] = 1;
+    });
     let n = 0, i = 0;
     pmPrestamosLista_().forEach(p => {
-      if (p.estado !== 'Activo' || !(p.cuota > 0) || ya[p.id]) return;
+      if (p.estado !== 'Activo' || ya[p.id]) return;
+      const mensual = p.cuotaMensual > 0, cuota = mensual ? p.cuotaMensual : p.cuota;
+      if (!(cuota > 0)) return;
+      if (mensual && yaMes[p.id]) return; /* la cuota mensual se aplica una sola vez en el mes */
       const debe = p.estadoCalc.debe; if (!(debe > 0.005)) return;
-      appendPorEncabezados_(pmHoja_('AJU'), { ID: pmId_('A', i++), ID_Semana: idSemana, ID_Contratista: p.idCon, Tipo: 'PRESTAMO', Monto: rh2_(Math.min(p.cuota, debe)), Detalle: ('Cuota préstamo' + (p.concepto ? ': ' + p.concepto : '')).slice(0, 200), Creado_Por: ses.usuario, Creado: segAhora_(), ID_Prestamo: p.id, Origen: 'Cuota programada' });
+      const nC = (p.ultimaCuota || 0) + 1;
+      appendPorEncabezados_(pmHoja_('AJU'), { ID: pmId_('A', i++), ID_Semana: idSemana, ID_Contratista: p.idCon, Tipo: 'PRESTAMO', Monto: rh2_(Math.min(cuota, debe)), Detalle: ('Cuota ' + nC + (p.concepto ? ' · ' + p.concepto : '')).slice(0, 200), Creado_Por: ses.usuario, Creado: segAhora_(), ID_Prestamo: p.id, Origen: 'Cuota programada', N_Cuota: nC });
       n++;
     });
     return { ok: true, aplicadas: n };
