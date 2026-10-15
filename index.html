@@ -1325,6 +1325,7 @@
           <button id="pmTPre" onclick="pmTab('pre')">Lista de precios</button>
           <button id="pmTBan" onclick="pmTab('ban')">Banco</button>
         </div>
+        <div id="pmAlertP"></div>
         <div id="pmPSem"></div>
         <div id="pmPPag" style="display:none"></div>
         <div id="pmPCon" style="display:none"></div>
@@ -6172,7 +6173,7 @@ function rhRenderCol() {
     '<div class="panel"><div class="panelHead"><h2>Colaboradores internos</h2><span style="font-size:12px;color:#777">' + l.length + '</span></div><div class="tableWrap">' +
     (!l.length ? '<div class="empty">' + (rhDatos.colaboradores.length ? 'No hay colaboradores con este filtro.' : 'Aún no hay colaboradores. Agrega el primero con su fecha de ingreso.') + '</div>' :
       '<table class="table tblRh"><thead><tr><th>Colaborador</th><th>Usuario</th><th>Puesto</th><th>Ingreso</th><th>Salario</th><th>Devengadas</th><th>Tomadas</th><th>Saldo</th><th>Por programar</th><th>Estado</th><th></th></tr></thead><tbody>' +
-      l.map(c => '<tr' + (c.activo ? '' : ' style="opacity:.55"') + '><td><b>' + esc(c.nombre) + '</b></td><td>' + (c.usuario ? esc(c.usuario) : '<span class="muted">sin usuario</span>') + '</td><td>' + esc(c.puesto) + '</td>' +
+      l.map(c => '<tr' + (c.activo ? '' : ' style="opacity:.55"') + '><td><b>' + esc(c.nombre) + '</b>' + (c.activo && c.salario && (!c.banco || !c.referencia || !/^\d{20}$/.test(c.iban || '')) ? '<div><span class="segBadge" style="background:#fdecea;color:#9b1c1c" title="Sin estos datos no entra al archivo del banco">Faltan datos del banco</span></div>' : '') + '</td><td>' + (c.usuario ? esc(c.usuario) : '<span class="muted">sin usuario</span>') + '</td><td>' + esc(c.puesto) + '</td>' +
         '<td>' + (c.ingreso ? esc(rhFecha(c.ingreso)) : '<span class="segBadge" style="background:#fff3cd;color:#8a6100">Falta ingreso</span>') + '</td><td>' + (c.salario ? colones(c.salario) : '<span class="segSinCarga">sin salario</span>') + '<div style="font-size:11px;color:#888">' + esc(c.periodicidad) + '</div></td>' +
         '<td>' + fmtN(c.saldo.devengado) + '</td><td>' + fmtN(c.saldo.tomadas + c.saldo.programadas) + '</td><td><b>' + fmtN(c.saldo.saldo) + '</b></td>' +
         '<td>' + (c.saldo.exigibles > 0 ? '<b style="color:' + (c.saldo.vencidos > 0 ? '#a31616' : '#b8860b') + '">' + fmtN(c.saldo.exigibles) + '</b>' + (c.saldo.vencidos > 0 ? '<div style="font-size:11px;color:#a31616">plazo vencido</div>' : '') : '<span class="segSinCarga">—</span>') + '</td>' +
@@ -6182,7 +6183,7 @@ function rhRenderCol() {
 }
 
 function rhEditarCol(id) {
-  const c = id ? rhDatos.colaboradores.find(x => x.id === id) : { id: '', usuario: '', nombre: '', puesto: '', ingreso: '', salario: '', periodicidad: 'Quincenal', diasSemana: 5, diasPeriodo: 10, previos: 0, activo: true, salida: '', obs: '' };
+  const c = id ? rhDatos.colaboradores.find(x => x.id === id) : { id: '', usuario: '', nombre: '', puesto: '', ingreso: '', salario: '', periodicidad: 'Quincenal', diasSemana: 5, diasPeriodo: 10, previos: 0, activo: true, salida: '', obs: '', banco: '', iban: '', referencia: '', ccss: true };
   const ocupados = {}; rhDatos.colaboradores.forEach(x => { if (x.usuario && x.id !== c.id) ocupados[x.usuario] = 1; });
   const usu = '<option value="">Sin usuario (no se autogestiona)</option>' + rhDatos.usuarios.filter(u => !ocupados[u.usuario]).map(u => '<option value="' + esc(u.usuario) + '"' + (u.usuario === c.usuario ? ' selected' : '') + '>' + esc(u.nombre || u.usuario) + ' (' + esc(u.usuario) + ')</option>').join('');
   rhModal('<h3>' + (id ? 'Editar colaborador' : 'Nuevo colaborador') + '</h3><input type="hidden" id="rcId" value="' + esc(c.id) + '">' +
@@ -6193,6 +6194,11 @@ function rhEditarCol(id) {
     '<div style="display:flex;gap:10px"><div class="field" style="flex:1"><label>Salario base (₡)</label><input type="number" id="rcSalario" min="0" value="' + esc(c.salario) + '"></div>' +
     '<div class="field" style="flex:1"><label>Pago</label><select id="rcPeriodicidad"><option' + (c.periodicidad === 'Quincenal' ? ' selected' : '') + '>Quincenal</option><option' + (c.periodicidad === 'Semanal' ? ' selected' : '') + '>Semanal</option><option' + (c.periodicidad === 'Mensual' ? ' selected' : '') + '>Mensual</option></select></div></div>' +
     '<div style="font-size:12px;color:#777;margin:-4px 0 8px">Quincenal y Mensual: salario base <b>mensual</b>. Semanal: monto que se paga <b>por semana</b>.</div>' +
+    '<fieldset style="border:1px solid #dde3ea;border-radius:8px;padding:8px 10px;margin:0 0 10px"><legend style="font-size:12px;color:#556">Pago por el banco</legend>' +
+    '<div style="display:flex;gap:10px"><div class="field" style="flex:1"><label>Banco</label><input id="rcBanco" maxlength="60" value="' + esc(c.banco || '') + '" placeholder="Ej. BAC"></div><div class="field" style="flex:1"><label>Referencia del banco</label><input id="rcRef" maxlength="60" value="' + esc(c.referencia || '') + '"></div></div>' +
+    '<div class="field"><label>Cuenta IBAN (20 dígitos, sin «CR»)</label><input id="rcIban" maxlength="26" value="' + esc(c.iban || '') + '"></div>' +
+    '<label style="display:flex;gap:6px;align-items:center;font-size:13px"><input type="checkbox" id="rcCcss"' + (c.ccss === false ? '' : ' checked') + '> Asegurado en la CCSS (se deducen las cargas sociales; si no, se paga el bruto)</label>' +
+    '<div style="font-size:11.5px;color:#777;margin-top:4px">Sin banco, referencia e IBAN el colaborador no entra al archivo del banco.</div></fieldset>' +
     '<div style="display:flex;gap:10px"><div class="field" style="flex:1"><label>Semana laboral</label><select id="rcDiasSemana" onchange="rhSugPeriodo()"><option value="5"' + (c.diasSemana === 5 ? ' selected' : '') + '>5 días (lun-vie)</option><option value="6"' + (c.diasSemana === 6 ? ' selected' : '') + '>6 días (lun-sáb)</option></select></div>' +
     '<div class="field" style="flex:1"><label>Días de vacaciones por cada 50 semanas</label><input type="number" id="rcDiasPeriodo" min="1" step="0.5" value="' + esc(c.diasPeriodo) + '"></div></div>' +
     '<div class="field"><label>Días de vacaciones ya tomados antes de usar el sistema</label><input type="number" id="rcPrevios" min="0" step="0.5" value="' + esc(c.previos) + '"></div>' +
@@ -6209,7 +6215,7 @@ async function rhGuardarCol() {
   try {
     await api('guardarColaboradorWeb', { id: $('rcId').value, nombre: $('rcNombre').value, usuario: $('rcUsuario').value, puesto: $('rcPuesto').value, ingreso: $('rcIngreso').value,
       salario: $('rcSalario').value, periodicidad: $('rcPeriodicidad').value, diasSemana: $('rcDiasSemana').value, diasPeriodo: $('rcDiasPeriodo').value, previos: $('rcPrevios').value,
-      activo: $('rcActivo').value === '1', salida: $('rcSalida').value, obs: $('rcObs').value });
+      activo: $('rcActivo').value === '1', salida: $('rcSalida').value, obs: $('rcObs').value, banco: $('rcBanco').value, referencia: $('rcRef').value, iban: $('rcIban').value, ccss: $('rcCcss').checked });
     rhCerrar(); toast('Colaborador guardado.'); await abrirColab();
   } catch (e) { b.disabled = false; mostrarError(e, 'No se pudo guardar el colaborador.'); }
 }
@@ -6549,8 +6555,16 @@ async function abrirPagoMov() {
   try { pmD = await api('obtenerPmWeb'); pmTab(pmTabAct); }
   catch (e) { $('pmPSem').innerHTML = ''; mostrarError(e, 'No se pudo cargar el módulo.'); }
 }
+function pmAlertaPlanilla() {
+  const el = $('pmAlertP'); if (!el) return; const a = pmD && pmD.alertaPlanilla;
+  el.innerHTML = a ? '<div style="margin:0 0 10px;padding:10px 14px;border-radius:8px;background:#fff1f0;border:1px solid #f0b4b0;color:#8a1c14;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b>🚨 Planilla de colaboradores</b><span style="flex:1;min-width:240px">' + esc(a.texto) + '</span><button class="btn primary" onclick="pmIrArchivo()">Generar archivo del banco</button></div>' : '';
+}
+function pmIrArchivo() {
+  if (!pmD.semanas.length) { toast('Primero importa una semana de Telecable: el archivo del banco se genera desde una semana.', 6000); return; }
+  pmTab('sem'); pmVista = 'arc'; pmAbrir(pmD.semanas[0].id);
+}
 function pmTab(t) {
-  pmTabAct = t;
+  pmTabAct = t; pmAlertaPlanilla();
   [['sem', 'Sem'], ['pag', 'Pag'], ['con', 'Con'], ['pst', 'Pst'], ['pnl', 'Pnl'], ['pre', 'Pre'], ['ban', 'Ban']].forEach(x => { $('pmT' + x[1]).classList.toggle('active', x[0] === t); $('pmP' + x[1]).style.display = x[0] === t ? '' : 'none'; });
   if (!pmD) return;
   if (t === 'sem') { if (pmSemId) pmRenderSemana(); else pmRenderSemanas(); }
@@ -6609,6 +6623,7 @@ function pmRenderSemana() {
   if (mk >= 0) { fijo = c.slice(0, mk); c = c.slice(mk + 11); }
   else if (['ape', 'aju', 'ext'].indexOf(pmVista) >= 0) { const j = c.indexOf('</div>') + 6; fijo = c.slice(0, j); c = c.slice(j); }
   $('pmPSem').classList.add('pmFlex'); $('pmPSem').innerHTML = h + (fijo ? '<div class="panel pmFixBar">' + fijo + '</div>' : '') + '<div class="panel pmFill"><div class="tableWrap">' + c + '</div></div>';
+  if (pmVista === 'arc') pmPlCargar();
 }
 
 /* Grupos de la tabla de pago: celdas donde se cargan valores por contratista */
@@ -7325,28 +7340,56 @@ async function pmBanGuardar() {
 
 /* ---------- Archivos de salida ---------- */
 function pmHtmlArc() {
-  return '<div style="padding:14px;display:grid;gap:14px;max-width:760px">' +
-    '<div><h3 style="margin:0 0 4px">Archivo para el banco</h3><div style="font-size:12px;color:#667;margin-bottom:6px">Genera 2 archivos: el .prn de pago de planillas y proveedores (el que se sube al banco) y un Excel con la información usada. Incluye los depósitos de esta semana; las móviles sin factura quedan fuera salvo que tengan visto bueno del administrador,' + (pmS.extras.length ? ' y las líneas adicionales' : '') + '. Antes de subirlo revisa el total.</div><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end"><label>Fecha de pago<input type="date" id="paFec" value="' + (pmD.hoy || '') + '"></label><label>N.º de envío<input type="number" id="paEnv" style="width:90px" value="' + (pmD.banco.ultimoEnvio + 1) + '"></label><button class="btn primary" onclick="pmBanco()">Generar archivos (.prn + Excel)</button></div><div id="pmBanOut" style="margin-top:8px"></div></div>' +
+  return '<div style="padding:14px;display:grid;gap:14px;max-width:1150px">' +
+    '<div><h3 style="margin:0 0 4px">Archivo para el banco</h3><div style="font-size:12px;color:#667;margin-bottom:6px">Genera 2 archivos: el .prn de pago de planillas y proveedores (el que se sube al banco) y un Excel con la información usada. Incluye los depósitos de esta semana; las móviles sin factura quedan fuera salvo que tengan visto bueno del administrador,' + (pmS.extras.length ? ' y las líneas adicionales' : '') + '. Antes de subirlo revisa el total.</div><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end"><label>Fecha de pago<input type="date" id="paFec" value="' + (pmD.hoy || '') + '" onchange="pmPlCargar()"></label><label>N.º de envío<input type="number" id="paEnv" style="width:90px" value="' + (pmD.banco.ultimoEnvio + 1) + '"></label><button class="btn primary" onclick="pmBanco()">Generar archivos (.prn + Excel)</button></div><div id="pmBanOut" style="margin-top:8px"></div></div>' +
+    '<div><h3 style="margin:0 0 4px">Colaboradores en este envío</h3><div style="font-size:12px;color:#667;margin-bottom:6px">Se pagan en el mismo archivo. <b>Semanales:</b> la semana actual (la trabajada). <b>Quincenales:</b> el 15 y el 30. <b>Mensuales:</b> el 30. El neto se calcula descontando las cargas sociales del trabajador (porcentajes de Colaboradores); puedes cambiar el bruto, las cargas (por ejemplo 0 si aún no está asegurado) y el detalle de cada línea.</div><div id="pmPlBox"><div class="loading">Cargando colaboradores...</div></div></div>' +
     '</div>';
+}
+let pmPl = null;
+async function pmPlCargar() {
+  const box = $('pmPlBox'); if (!box) return;
+  try {
+    const R = await api('planillaColaboradoresPmWeb', $('paFec').value);
+    const dd = Math.round((Date.parse(R.fecha) - Date.parse(R.ultimoPago)) / 86400000);
+    R.filas.forEach(f => { f.atrasada = f.periodicidad !== 'Semanal' && dd > 5; f.sel = !f.pagado && !f.faltan.length && f.neto > 0 && !f.atrasada; });
+    pmPl = R; pmPlDibujar();
+  } catch (e) { box.innerHTML = '<span style="color:#9b1c1c">' + esc(e.message || e) + '</span>'; }
+}
+function pmPlNeto(f) { return Math.round(((+f.bruto || 0) - (+f.deducciones || 0)) * 100) / 100; }
+function pmPlTotal() {
+  const L = (pmPl && pmPl.filas || []).filter(f => f.sel), t = L.reduce((a, f) => a + pmPlNeto(f), 0);
+  const el = $('plTot'); if (el) el.innerHTML = '<b>' + L.length + '</b> colaborador(es) marcados · neto total <b>' + pmM(t) + '</b>';
+}
+function pmPlEdit(i, k, v) { const f = pmPl.filas[i]; f[k] = k === 'texto' ? String(v).slice(0, 31) : (k === 'sel' ? !!v : (+v || 0)); if (k === 'bruto' || k === 'deducciones') { const c = $('plN' + i); if (c) c.textContent = pmM(pmPlNeto(f)); } pmPlTotal(); }
+function pmPlDibujar() {
+  const box = $('pmPlBox'); if (!box || !pmPl) return;
+  if (!pmPl.filas.length) { box.innerHTML = '<div style="color:#778;font-size:13px">No hay colaboradores por pagar para esta fecha (sin salario, retirados o fuera de período).</div>'; return; }
+  const inp = (i, k, v, w) => '<input type="number" step="0.01" min="0" style="width:' + w + 'px;text-align:right" value="' + v + '" oninput="pmPlEdit(' + i + ',\'' + k + '\',this.value)">';
+  box.innerHTML = '<table class="pmT"><thead><tr><th></th><th>Colaborador</th><th>Período</th><th style="text-align:right">Bruto</th><th style="text-align:right">Cargas sociales</th><th style="text-align:right">Neto a depositar</th><th>Detalle en el banco (máx. 31)</th><th>Estado</th></tr></thead><tbody>' +
+    pmPl.filas.map((f, i) => '<tr><td><input type="checkbox"' + (f.sel ? ' checked' : '') + (f.faltan.length ? ' disabled' : '') + ' onchange="pmPlEdit(' + i + ',\'sel\',this.checked)"></td><td><b>' + esc(f.nombre) + '</b><div style="font-size:11px;color:#667">' + esc(f.puesto) + ' · ' + esc(f.periodicidad) + (f.ccss ? '' : ' · <span style="color:#9b1c1c">sin CCSS</span>') + '</div></td><td style="white-space:nowrap">' + esc(f.periodo) + (f.parcial ? '<div style="font-size:11px;color:#b8860b">ingreso/salida dentro del período: revisa el monto</div>' : '') + '</td><td style="text-align:right">' + inp(i, 'bruto', f.bruto, 110) + '</td><td style="text-align:right">' + inp(i, 'deducciones', f.deducciones, 100) + '</td><td style="text-align:right;white-space:nowrap" id="plN' + i + '"><b>' + pmM(pmPlNeto(f)) + '</b></td><td><input maxlength="31" style="width:230px" value="' + esc(f.texto) + '" oninput="pmPlEdit(' + i + ',\'texto\',this.value)"></td><td style="font-size:12px">' +
+      (f.faltan.length ? '<span class="chip rojo" title="Edítalo en Colaboradores">Faltan: ' + esc(f.faltan.join(', ')) + '</span>' : (f.pagado ? '<span class="chip verde">Pagado en el envío ' + esc(f.pagado.envio) + '</span><div><label style="font-size:11px"><input type="checkbox" onchange="pmPlEdit(' + i + ',\'sel\',this.checked)"> incluir otra vez</label></div>' : (f.atrasada ? '<span class="chip amar" title="Ya pasó el día de pago de ese período">Período anterior</span><div style="font-size:11px;color:#667">Márcalo solo si no se ha pagado</div>' : '<span class="chip amar">Por pagar</span>'))) + '</td></tr>').join('') + '</tbody></table><div id="plTot" style="margin-top:6px;font-size:13px"></div>';
+  pmPlTotal();
 }
 async function pmBanco() {
   try {
-    const r = await api('generarBancoPmWeb', pmSemId, $('paFec').value, $('paEnv').value);
+    const colabs = (pmPl && pmPl.fecha === $('paFec').value ? pmPl.filas.filter(f => f.sel && !f.faltan.length).map(f => ({ id: f.id, clave: f.clave, periodo: f.periodo, bruto: f.bruto, deducciones: f.deducciones, texto: f.texto, repetir: !!f.pagado })) : []);
+    const r = await api('generarBancoPmWeb', pmSemId, $('paFec').value, $('paEnv').value, colabs);
     pmBajar(new Blob([new Uint8Array(Array.from(r.texto, ch => ch.charCodeAt(0) & 255))], { type: 'application/octet-stream' }), r.nombre);
     await cargarLib('xlsx', SEG_URL_XLSX);
     const A = [['Envío al banco N.º ' + r.envio, '', '', '', '', '', '', '', '', '', '', '', '', ''], ['Convenio ' + r.codigo + ' · período ' + r.periodo + ' · fecha de pago ' + pmFh(r.fechaPago) + ' · semana ' + pmFh(pmS.semana.desde) + ' al ' + pmFh(pmS.semana.hasta)], [],
-      ['N.º', 'Contratista', 'Móvil(es)', 'Titular de la cuenta (archivo)', 'Banco', 'Referencia banco', 'Cuenta IBAN', 'N.º factura', 'Visto bueno sin factura', 'Sub total', 'IVA 13%', 'Total factura', 'Rebajos', 'Monto depositado', 'Texto en el archivo']]
-      .concat(r.lineas.map(l => [l.n, l.contratista, l.movil, l.nombre, l.banco, l.referencia, l.iban, l.factura, l.vb, l.subtotal, l.iva, l.totalFacturado, l.deducciones, l.monto, l.texto]));
-    A.push(['', 'TOTAL (' + r.cantidad + ' pagos)', '', '', '', '', '', '', '', '', '', '', '', r.total, '']);
-    const ws = XLSX.utils.aoa_to_sheet(A); ws['!cols'] = [{ wch: 5 }, { wch: 30 }, { wch: 10 }, { wch: 30 }, { wch: 16 }, { wch: 16 }, { wch: 24 }, { wch: 14 }, { wch: 22 }, { wch: 13 }, { wch: 12 }, { wch: 13 }, { wch: 12 }, { wch: 15 }, { wch: 30 }];
+      ['N.º', 'Contratista', 'Móvil(es)', 'Titular de la cuenta (archivo)', 'Banco', 'Referencia banco', 'Cuenta IBAN', 'N.º factura', 'Visto bueno sin factura', 'Sub total', 'IVA 13%', 'Total factura', 'Rebajos', 'Monto depositado', 'Texto en el archivo', 'Tipo']]
+      .concat(r.lineas.map(l => [l.n, l.contratista, l.movil, l.nombre, l.banco, l.referencia, l.iban, l.factura, l.vb, l.subtotal, l.iva, l.totalFacturado, l.deducciones, l.monto, l.texto, l.tipo || '']));
+    A.push(['', 'TOTAL (' + r.cantidad + ' pagos)', '', '', '', '', '', '', '', '', '', '', '', r.total, '', '']);
+    const ws = XLSX.utils.aoa_to_sheet(A); ws['!cols'] = [{ wch: 5 }, { wch: 30 }, { wch: 10 }, { wch: 30 }, { wch: 16 }, { wch: 16 }, { wch: 24 }, { wch: 14 }, { wch: 22 }, { wch: 13 }, { wch: 12 }, { wch: 13 }, { wch: 12 }, { wch: 15 }, { wch: 30 }, { wch: 13 }];
     Object.keys(ws).forEach(k => { if (k[0] !== '!' && ws[k].t === 'n' && /^[J-N]/.test(k)) ws[k].z = '#,##0.00'; });
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Envío ' + r.envio);
     if (r.avisos.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['No incluidos en el archivo']].concat(r.avisos.map(x => [x]))), 'No incluidos');
     const wbl = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
     setTimeout(() => pmBajar(new Blob([wbl], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), 'Detalle_envio_' + r.envio + '_' + r.codigo + '.xlsx'), 700);
     pmD.banco.ultimoEnvio = r.envio;
-    $('pmBanOut').innerHTML = '<div style="font-size:13px"><b>' + r.cantidad + '</b> pagos · total <b>' + pmM(r.total) + '</b> · envío ' + r.envio + '<div style="color:#556;margin-top:4px">Se descargaron 2 archivos: <b>' + esc(r.nombre) + '</b> (para subir al banco) y <b>Detalle_envio_' + r.envio + '_' + esc(r.codigo) + '.xlsx</b> (la información usada).</div>' + (r.avisos.length ? '<div style="color:#9b1c1c;margin-top:6px">' + r.avisos.map(esc).join('<br>') + '</div>' : '') + '</div>';
+    $('pmBanOut').innerHTML = '<div style="font-size:13px"><b>' + r.cantidad + '</b> pagos' + (r.colaboradores ? ' (' + r.colaboradores + ' de colaboradores)' : '') + ' · total <b>' + pmM(r.total) + '</b> · envío ' + r.envio + '<div style="color:#556;margin-top:4px">Se descargaron 2 archivos: <b>' + esc(r.nombre) + '</b> (para subir al banco) y <b>Detalle_envio_' + r.envio + '_' + esc(r.codigo) + '.xlsx</b> (la información usada).</div>' + (r.avisos.length ? '<div style="color:#9b1c1c;margin-top:6px">' + r.avisos.map(esc).join('<br>') + '</div>' : '') + '</div>';
     try { await api('guardarBancoPmWeb', { codigo: pmD.banco.codigo, ultimoEnvio: r.envio }); } catch (e) { }
+    if ((r.colabIncluidos || []).length) { try { await api('registrarPlanillaRhWeb', { fecha: r.fechaPago, envio: r.envio, lineas: r.colabIncluidos }); pmD.alertaPlanilla = null; pmAlertaPlanilla(); } catch (e) { toast('El archivo se generó, pero no se pudieron registrar los pagos de colaboradores: ' + (e.message || e), 8000); } pmPlCargar(); }
     toast('Archivos generados: ' + r.nombre + ' y su Excel de detalle');
   } catch (e) { mostrarError(e, 'No se pudo generar el archivo.'); }
 }
@@ -14311,6 +14354,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 66 · 14-oct 18:51</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 67 · 14-oct 19:08</div>
 </body>
 </html>

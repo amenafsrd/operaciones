@@ -9085,16 +9085,16 @@ const RH = {
   HEADERS: {
     COLAB: ['ID', 'Usuario', 'Nombre', 'Puesto', 'Fecha_Ingreso', 'Salario_Base', 'Periodicidad', 'Dias_Semana', 'Dias_Por_Periodo',
       'Dias_Tomados_Previos', 'Activo', 'Fecha_Salida', 'Obs', 'Creado', 'Actualizado',
-      'Cedula', 'Fecha_Nacimiento', 'Telefono', 'Correo_Personal', 'Direccion', 'Contacto_Emergencia', 'Tel_Emergencia'],
+      'Cedula', 'Fecha_Nacimiento', 'Telefono', 'Correo_Personal', 'Direccion', 'Contacto_Emergencia', 'Tel_Emergencia', 'Banco', 'IBAN', 'Referencia_Banco', 'Cargas_CCSS'],
     SOL: ['ID', 'ID_Colab', 'Tipo', 'Desde', 'Hasta', 'Dias', 'Motivo', 'Estado', 'Comentario_Admin', 'Resuelto_Por', 'Resuelto', 'Creado_Por', 'Creado'],
-    PAG: ['ID', 'ID_Colab', 'Fecha', 'Periodo', 'Tipo', 'Bruto', 'Deducciones', 'Neto', 'Obs', 'Registrado_Por', 'Creado'],
+    PAG: ['ID', 'ID_Colab', 'Fecha', 'Periodo', 'Tipo', 'Bruto', 'Deducciones', 'Neto', 'Obs', 'Registrado_Por', 'Creado', 'Clave_Planilla', 'Envio_Banco', 'Detalle'],
     ASI: ['ID_Colab', 'Fecha', 'Estado', 'Obs', 'Registrado_Por', 'Actualizado'],
     PAR: ['Clave', 'Valor', 'Actualizado']
   },
   TEXTO: {
-    COLAB: ['ID', 'Usuario', 'Fecha_Ingreso', 'Fecha_Salida', 'Creado', 'Actualizado', 'Cedula', 'Fecha_Nacimiento', 'Telefono', 'Tel_Emergencia'],
+    COLAB: ['ID', 'Usuario', 'Fecha_Ingreso', 'Fecha_Salida', 'Creado', 'Actualizado', 'Cedula', 'Fecha_Nacimiento', 'Telefono', 'Tel_Emergencia', 'IBAN'],
     SOL: ['ID', 'ID_Colab', 'Desde', 'Hasta', 'Resuelto', 'Creado'],
-    PAG: ['ID', 'ID_Colab', 'Fecha', 'Periodo', 'Creado'],
+    PAG: ['ID', 'ID_Colab', 'Fecha', 'Periodo', 'Creado', 'Clave_Planilla'],
     ASI: ['ID_Colab', 'Fecha', 'Actualizado'],
     PAR: ['Clave']
   },
@@ -9155,7 +9155,8 @@ function rhColabInfo_(c) {
     diasPeriodo: rhNum_(c.Dias_Por_Periodo) > 0 ? rhNum_(c.Dias_Por_Periodo) : 2 * ds,
     previos: rhNum_(c.Dias_Tomados_Previos), activo: txt_(c.Activo) !== 'No', salida: segFecha_(c.Fecha_Salida) || '', obs: txt_(c.Obs),
     cedula: txt_(c.Cedula), nacimiento: segFecha_(c.Fecha_Nacimiento) || '', telefono: txt_(c.Telefono), correoPersonal: txt_(c.Correo_Personal),
-    direccion: txt_(c.Direccion), contactoEmergencia: txt_(c.Contacto_Emergencia), telEmergencia: txt_(c.Tel_Emergencia)
+    direccion: txt_(c.Direccion), contactoEmergencia: txt_(c.Contacto_Emergencia), telEmergencia: txt_(c.Tel_Emergencia),
+    banco: txt_(c.Banco), iban: String(txt_(c.IBAN)).replace(/\D/g, ''), referencia: txt_(c.Referencia_Banco), ccss: txt_(c.Cargas_CCSS) !== 'No'
   };
 }
 
@@ -9280,6 +9281,8 @@ function guardarColaboradorWeb(token, d) {
   if (salida && ingreso && salida < ingreso) throw new Error('La fecha de salida no puede ser anterior al ingreso.');
   const ds = Number(d.diasSemana) === 6 ? 6 : 5;
   const usuario = txt_(d.usuario);
+  const ibanCol = String(txt_(d.iban)).replace(/\D/g, '');
+  if (ibanCol && ibanCol.length !== 20) throw new Error('La cuenta IBAN debe tener 20 dígitos (sin «CR»).');
 
   return conBloqueo_(() => {
     const sh = rhHoja_('COLAB');
@@ -9295,7 +9298,8 @@ function guardarColaboradorWeb(token, d) {
       Usuario: usuario, Nombre: nombre, Puesto: txt_(d.puesto).slice(0, 60), Fecha_Ingreso: ingreso, Salario_Base: Math.max(0, rhNum_(d.salario)),
       Periodicidad: rhPeriodicidad_(d.periodicidad), Dias_Semana: ds,
       Dias_Por_Periodo: rhNum_(d.diasPeriodo) > 0 ? rhNum_(d.diasPeriodo) : 2 * ds, Dias_Tomados_Previos: Math.max(0, rhNum_(d.previos)),
-      Activo: d.activo === false || txt_(d.activo) === 'No' ? 'No' : 'Sí', Fecha_Salida: salida, Obs: txt_(d.obs).slice(0, 300), Actualizado: ahora
+      Activo: d.activo === false || txt_(d.activo) === 'No' ? 'No' : 'Sí', Fecha_Salida: salida, Obs: txt_(d.obs).slice(0, 300), Actualizado: ahora,
+      Banco: txt_(d.banco).replace(/\s+/g, ' ').slice(0, 60), IBAN: ibanCol, Referencia_Banco: txt_(d.referencia).replace(/\s+/g, ' ').slice(0, 60), Cargas_CCSS: d.ccss === false || txt_(d.ccss) === 'No' ? 'No' : 'Sí'
     };
     if (fila < 0) {
       o.ID = 'C' + Date.now().toString(36).toUpperCase(); o.Creado = ahora;
@@ -9458,6 +9462,85 @@ function obtenerPagosRhWeb(token, idColab) {
   return { colaborador: col, pagos: pagos, aguinaldo: aguinaldo, saldo: saldo,
     liquidacion: { promedioMensual: rh2_(promMensual), salarioDiario: rh2_(promMensual / 30), vacacionesDias: saldo.saldo,
       vacacionesMonto: rh2_(Math.max(0, saldo.saldo) * promMensual / 30), aguinaldoProporcional: aguinaldo[0].estimado } };
+}
+
+/* ---------- Planilla de colaboradores dentro del archivo del banco ---------- */
+function rhIsoMas_(iso, n) { return formatearFechaISO_(sumarDias_(convertirFecha_(iso), n)); }
+function rhUltimoDia_(y, m) { return new Date(Date.UTC(y, m, 0)).getUTCDate(); }
+function rhP2_(n) { return (n < 10 ? '0' : '') + n; }
+function rhDm_(iso) { const p = String(iso).split('-'); return p[2] + '/' + p[1]; }
+/* Días de pago de quincena/mensual: 15 y 30 (el último día del mes si el mes no llega a 30) */
+function rhDiasPagoMes_(y, m) { return { q1: y + '-' + rhP2_(m) + '-15', q2: y + '-' + rhP2_(m) + '-' + rhP2_(Math.min(30, rhUltimoDia_(y, m))) }; }
+/* Último día de pago (15 o 30) que ya llegó a la fecha indicada */
+function rhUltimoPago_(f) {
+  const p = f.split('-').map(Number), dp = rhDiasPagoMes_(p[0], p[1]);
+  if (f >= dp.q2) return { fecha: dp.q2, q: 2, y: p[0], m: p[1] };
+  if (f >= dp.q1) return { fecha: dp.q1, q: 1, y: p[0], m: p[1] };
+  const y = p[1] === 1 ? p[0] - 1 : p[0], m = p[1] === 1 ? 12 : p[1] - 1;
+  return { fecha: rhDiasPagoMes_(y, m).q2, q: 2, y: y, m: m };
+}
+/* Lo que corresponde pagar a cada colaborador en el archivo de la fecha dada.
+   Semanal: la semana actual (lunes a viernes, o sábado si trabaja 6 días). Quincenal: la última quincena (15 / 30). Mensual: el mes, al pagarse el 30.
+   Cargas sociales del trabajador = % de la ficha de tasas sobre el bruto, salvo que el colaborador no esté asegurado (entonces 0). */
+function rhPlanilla_(fecha) {
+  const f = segFecha_(fecha) || segHoyISO_();
+  const tasaObr = rhTasas_().filter(t => t.clave.indexOf('obr_') === 0).reduce((a, t) => a + t.valor, 0);
+  const pagados = {}; leerObjetos_(rhHoja_('PAG')).forEach(p => { const k = txt_(p.Clave_Planilla); if (k) pagados[txt_(p.ID_Colab) + '|' + k] = { envio: txt_(p.Envio_Banco), fecha: segFecha_(p.Fecha) || '', neto: rhNum_(p.Neto) }; });
+  const up = rhUltimoPago_(f);
+  const dow = new Date(rhMs_(f)).getUTCDay(), lunes = rhIsoMas_(f, -((dow + 6) % 7));
+  const ymm = up.y + '-' + rhP2_(up.m), ult = rhUltimoDia_(up.y, up.m);
+  const filas = [];
+  leerObjetos_(rhHoja_('COLAB')).map(rhColabInfo_).forEach(c => {
+    if (!c.activo || !(c.salario > 0)) return;
+    let clave, desde, hasta, bruto, per;
+    if (c.periodicidad === 'Semanal') { clave = 'S|' + lunes; desde = lunes; hasta = rhIsoMas_(lunes, c.diasSemana === 6 ? 5 : 4); bruto = c.salario; per = 'Semana ' + rhDm_(desde) + ' al ' + rhDm_(hasta); }
+    else if (c.periodicidad === 'Quincenal') { clave = 'Q|' + ymm + '|' + up.q; desde = ymm + '-' + (up.q === 1 ? '01' : '16'); hasta = ymm + '-' + (up.q === 1 ? '15' : rhP2_(ult)); bruto = rh2_(c.salario / 2); per = 'Quincena ' + rhDm_(desde) + ' al ' + rhDm_(hasta); }
+    else { if (up.q !== 2) return; clave = 'M|' + ymm; desde = ymm + '-01'; hasta = ymm + '-' + rhP2_(ult); bruto = c.salario; per = 'Mes ' + rhDm_(desde) + ' al ' + rhDm_(hasta); }
+    if (c.ingreso && c.ingreso > hasta) return;
+    if (c.salida && c.salida < desde) return;
+    const ded = c.ccss ? rh2_(bruto * tasaObr / 100) : 0;
+    const faltan = []; if (!c.banco) faltan.push('banco'); if (!c.referencia) faltan.push('referencia'); if (!/^\d{20}$/.test(c.iban)) faltan.push('cuenta IBAN');
+    filas.push({ id: c.id, nombre: c.nombre, puesto: c.puesto, periodicidad: c.periodicidad, clave: clave, periodo: per, desde: desde, hasta: hasta, bruto: bruto, deducciones: ded, neto: rh2_(bruto - ded), ccss: c.ccss,
+      texto: ('Servicios prestados ' + rhDm_(desde) + '-' + rhDm_(hasta)).slice(0, 31), banco: c.banco, iban: c.iban, referencia: c.referencia, faltan: faltan,
+      parcial: !!(c.periodicidad !== 'Semanal' && ((c.ingreso && c.ingreso > desde) || (c.salida && c.salida < hasta))), pagado: pagados[c.id + '|' + clave] || null });
+  });
+  filas.sort((a, b) => a.nombre.localeCompare(b.nombre));
+  return { fecha: f, filas: filas, tasaObr: tasaObr, ultimoPago: up.fecha };
+}
+function planillaColaboradoresPmWeb(token, fecha) {
+  requerirSesion_(token, 'admin');
+  return rhPlanilla_(fecha);
+}
+/* Alerta: el día de pago (15 / 30) y los 3 siguientes, mientras queden quincenales o mensuales sin incluir en un archivo del banco */
+function rhAlertaPlanilla_() {
+  const hoy = segHoyISO_(), up = rhUltimoPago_(hoy);
+  const dias = Math.round((rhMs_(hoy) - rhMs_(up.fecha)) / 86400000);
+  if (dias < 0 || dias > 3) return null;
+  const pl = rhPlanilla_(hoy);
+  const pend = pl.filas.filter(x => x.periodicidad !== 'Semanal' && !x.pagado);
+  if (!pend.length) return null;
+  return { fechaPago: up.fecha, hoy: dias === 0, dias: dias, pendientes: pend.length, texto: dias === 0 ? 'Hoy es día de pago de quincena (' + rhDm_(up.fecha) + ') y aún no generas el archivo del banco con la planilla de colaboradores (' + pend.length + ' por pagar).' : 'La quincena del ' + rhDm_(up.fecha) + ' sigue sin pagarse en el archivo del banco (' + pend.length + ' colaborador(es) pendientes).' };
+}
+/* Registra como pagados (en el historial de pagos del colaborador) los que se incluyeron en el archivo del banco */
+function registrarPlanillaRhWeb(token, d) {
+  const ses = requerirSesion_(token, 'admin');
+  d = d || {};
+  const fecha = segFecha_(d.fecha) || segHoyISO_(), lineas = Array.isArray(d.lineas) ? d.lineas : [];
+  if (!lineas.length) return { ok: true, registrados: 0 };
+  return conBloqueo_(() => {
+    const sh = rhHoja_('PAG'); const t = leerTabla_(sh); const ahora = segAhora_(); let n = 0;
+    const existentes = {}; leerObjetos_(sh).forEach(p => { if (txt_(p.Clave_Planilla)) existentes[txt_(p.ID_Colab) + '|' + txt_(p.Clave_Planilla)] = p._fila; });
+    lineas.forEach(l => {
+      const bruto = rhNum_(l.bruto), ded = Math.max(0, rhNum_(l.deducciones));
+      if (!txt_(l.id) || !txt_(l.clave) || !(bruto > 0)) return;
+      const o = { ID_Colab: txt_(l.id), Fecha: fecha, Periodo: txt_(l.periodo).slice(0, 40), Tipo: 'SALARIO', Bruto: rh2_(bruto), Deducciones: rh2_(ded), Neto: rh2_(bruto - ded), Obs: ('Envío banco ' + txt_(d.envio) + ' · ' + txt_(l.texto)).slice(0, 200), Detalle: txt_(l.texto).slice(0, 60), Clave_Planilla: txt_(l.clave), Envio_Banco: txt_(d.envio) };
+      const k = o.ID_Colab + '|' + o.Clave_Planilla;
+      if (existentes[k]) { Object.keys(o).forEach(c => sh.getRange(existentes[k], t.idx[c] + 1).setValue(o[c])); }
+      else { o.ID = 'P' + Date.now().toString(36).toUpperCase() + n; o.Registrado_Por = ses.usuario; o.Creado = ahora; appendPorEncabezados_(sh, o); }
+      n++;
+    });
+    return { ok: true, registrados: n };
+  });
 }
 
 function registrarPagoRhWeb(token, d) {
@@ -9966,6 +10049,7 @@ function obtenerPmWeb(token) {
     semanas: (() => { let ps = {}; try { ps = pmFilasPago_().porSemana; } catch (e) { } return sems.map(s => { const a = agg[txt_(s.ID)] || { n: 0, costo: 0, uf: 0, ctos: {}, sin: 0 };
       return { id: txt_(s.ID), desde: segFecha_(s.Desde) || '', hasta: segFecha_(s.Hasta) || '', estado: txt_(s.Estado) || 'Abierta', notas: txt_(s.Notas), ordenes: a.n, contratos: Object.keys(a.ctos).length, sinPrecio: a.sin, costo: rh2_(a.costo), uf: rh2_(a.uf), fechaPagoEst: pmFechaPagoEst_(segFecha_(s.Hasta) || ''), pagosTotal: (ps[txt_(s.ID)] || {}).total || 0, pagosHechos: (ps[txt_(s.ID)] || {}).pagados || 0, depositoTotal: (ps[txt_(s.ID)] || {}).deposito || 0, depositoPendiente: (ps[txt_(s.ID)] || {}).pendiente || 0 }; })
       .sort((a, b) => b.desde.localeCompare(a.desde)); })(),
+    alertaPlanilla: (() => { try { return rhAlertaPlanilla_(); } catch (e) { return null; } })(),
     empresa: pmEmpresa_(), diasPago: Number(pmParam_('pm_dias_pago', '13')),
     banco: { codigo: pmParam_('banco_codigo', PM.BANCO_DEF.codigo), ultimoEnvio: Number(pmParam_('banco_ultimo_envio', PM.BANCO_DEF.ultimoEnvio)), flag: pmParam_('banco_flag', PM.BANCO_DEF.flag) }
   };
@@ -10834,7 +10918,7 @@ function pmFacturaBanco_(f) {
   return 'Fact ' + f.slice(-20);
 }
 
-function generarBancoPmWeb(token, idSemana, fechaPago, envio) {
+function generarBancoPmWeb(token, idSemana, fechaPago, envio, colabs) {
   requerirSesion_(token, 'admin');
   const sd = obtenerSemanaPmWeb(token, idSemana);
   const codigo = pmParam_('banco_codigo', PM.BANCO_DEF.codigo), flag = pmParam_('banco_flag', PM.BANCO_DEF.flag);
@@ -10849,9 +10933,25 @@ function generarBancoPmWeb(token, idSemana, fechaPago, envio) {
     if (!r.banco || !r.referencia) { avisos.push(r.nombre + ': falta ' + (!r.banco && !r.referencia ? 'el banco y la referencia del banco' : (!r.banco ? 'el banco' : 'la referencia del banco')) + ' (obligatorio: indica que está en las planillas y proveedores del banco), no se incluye.'); return; }
     if (!r.factura && !r.vb) { avisos.push(r.nombre + ': sin factura y sin visto bueno del administrador, no se incluye.'); return; }
     items.push({ iban: r.iban, monto: r.deposito, texto: pmFacturaBanco_(r.factura), nombre: r.titular || r.nombre, factura: !!r.factura, contratista: r.nombre, movil: Object.keys(r.moviles).join(', '), banco: r.banco || '', referencia: r.referencia || '', numFactura: r.factura || '', vb: r.vb || '',
-      subtotal: r.subtotal, iva: r.iva, totalFacturado: r.totalFacturado, deducciones: r.deducciones });
+      subtotal: r.subtotal, iva: r.iva, totalFacturado: r.totalFacturado, deducciones: r.deducciones, tipo: 'Móvil' });
   });
-  sd.extras.forEach(e => items.push({ iban: e.iban, monto: e.monto, texto: e.concepto || 'Servicios prestados', nombre: e.nombre, factura: false, contratista: e.nombre, movil: '', banco: '', referencia: '', numFactura: '', vb: '', subtotal: 0, iva: 0, totalFacturado: 0, deducciones: 0 }));
+  sd.extras.forEach(e => items.push({ iban: e.iban, monto: e.monto, texto: e.concepto || 'Servicios prestados', nombre: e.nombre, factura: false, contratista: e.nombre, movil: '', banco: '', referencia: '', numFactura: '', vb: '', subtotal: 0, iva: 0, totalFacturado: 0, deducciones: 0, tipo: 'Adicional' }));
+  /* colaboradores (planilla): los marcados en pantalla, con sus montos y detalle editados; se validan de nuevo aquí */
+  const colabIncluidos = [];
+  const pl = Array.isArray(colabs) && colabs.length ? rhPlanilla_(f) : null;
+  (Array.isArray(colabs) ? colabs : []).forEach(l => {
+    const base = pl && pl.filas.find(x => x.id === txt_(l.id) && x.clave === txt_(l.clave));
+    const col = leerObjetos_(rhHoja_('COLAB')).map(rhColabInfo_).find(x => x.id === txt_(l.id));
+    if (!col || !col.activo) return;
+    const bruto = rh2_(rhNum_(l.bruto)), ded = rh2_(Math.max(0, rhNum_(l.deducciones))), neto = rh2_(bruto - ded);
+    if (!(neto > 0)) { avisos.push(col.nombre + ' (colaborador): neto en cero o negativo, no se incluye.'); return; }
+    if (!/^\d{20}$/.test(col.iban)) { avisos.push(col.nombre + ' (colaborador): falta la cuenta IBAN (20 dígitos), no se incluye.'); return; }
+    if (!col.banco || !col.referencia) { avisos.push(col.nombre + ' (colaborador): falta ' + (!col.banco && !col.referencia ? 'el banco y la referencia del banco' : (!col.banco ? 'el banco' : 'la referencia del banco')) + ', no se incluye.'); return; }
+    if (base && base.pagado && !l.repetir) { avisos.push(col.nombre + ' (colaborador): ya se pagó ese período en el envío ' + base.pagado.envio + ', no se incluye.'); return; }
+    const texto = (txt_(l.texto) || 'Servicios prestados').replace(/\s+/g, ' ').slice(0, 31);
+    items.push({ iban: col.iban, monto: neto, texto: texto, nombre: col.nombre, factura: false, contratista: col.nombre, movil: '', banco: col.banco, referencia: col.referencia, numFactura: '', vb: '', subtotal: bruto, iva: 0, totalFacturado: bruto, deducciones: ded, tipo: 'Colaborador' });
+    colabIncluidos.push({ id: col.id, clave: txt_(l.clave), periodo: txt_(l.periodo), bruto: bruto, deducciones: ded, texto: texto });
+  });
   if (!items.length) throw new Error('No hay pagos para incluir en el archivo.');
   const cents = it => Math.round(it.monto * 100);
   const total = items.reduce((a, it) => a + cents(it), 0);
@@ -10864,7 +10964,8 @@ function generarBancoPmWeb(token, idSemana, fechaPago, envio) {
     out += pmCampo_(l, 181) + '2' + CRLF;
   });
   return { texto: out, nombre: 'INP' + codigo + '_envio_' + nEnvio + '.prn', envio: nEnvio, total: total / 100, cantidad: items.length, avisos: avisos,
-    lineas: items.map((it, i) => ({ n: i + 1, nombre: it.nombre, contratista: it.contratista, movil: it.movil, banco: it.banco, referencia: it.referencia, iban: it.iban, factura: it.numFactura, vb: it.vb, subtotal: it.subtotal, iva: it.iva, totalFacturado: it.totalFacturado, deducciones: it.deducciones, monto: it.monto, texto: it.texto })),
+    lineas: items.map((it, i) => ({ n: i + 1, nombre: it.nombre, contratista: it.contratista, movil: it.movil, banco: it.banco, referencia: it.referencia, iban: it.iban, factura: it.numFactura, vb: it.vb, subtotal: it.subtotal, iva: it.iva, totalFacturado: it.totalFacturado, deducciones: it.deducciones, monto: it.monto, texto: it.texto, tipo: it.tipo || '' })),
+    colabIncluidos: colabIncluidos, colaboradores: colabIncluidos.length,
     codigo: codigo, periodo: periodo, fechaPago: f };
 }
 
@@ -11252,6 +11353,7 @@ function obtenerInicioWeb(token) {
       const pend = leerObjetos_(rhHoja_('SOL')).filter(r => txt_(r.Estado) === 'Pendiente').length;
       add('colaboradores', '🗓️', 'Colaboradores', pend, pend === 1 ? 'solicitud por resolver' : 'solicitudes por resolver', pend > 0);
     } catch (e) { }
+    try { const al = rhAlertaPlanilla_(); if (al) add('pagomov', '🚨', 'Planilla de colaboradores', 'Quincena ' + fmtRh_(al.fechaPago), al.texto, true); } catch (e) { }
     try {
       const sems = leerObjetos_(pmHoja_('SEM')).map(s => ({ id: txt_(s.ID), desde: segFecha_(s.Desde) || '', hasta: segFecha_(s.Hasta) || '', estado: txt_(s.Estado) || 'Abierta' })).sort((a, b) => b.desde.localeCompare(a.desde));
       if (!sems.length) add('pagomov', '💵', 'Pago a móviles', '—', 'Aún no hay semanas importadas', false);
@@ -11471,7 +11573,7 @@ function prepararSistemaWeb(token) {
 
   }
 
-return {loginWeb: loginWeb, miPerfilWeb: miPerfilWeb, guardarFotoPerfilWeb: guardarFotoPerfilWeb, validarSesionWeb: validarSesionWeb, logoutWeb: logoutWeb, cambiarClaveWeb: cambiarClaveWeb, listarUsuariosWeb: listarUsuariosWeb, crearUsuarioWeb: crearUsuarioWeb, actualizarUsuarioWeb: actualizarUsuarioWeb, obtenerDatosWeb: obtenerDatosWeb, obtenerSemanasWeb: obtenerSemanasWeb, obtenerCalendarioWeb: obtenerCalendarioWeb, obtenerRotacionBackupWeb: obtenerRotacionBackupWeb, guardarCalendarioWeb: guardarCalendarioWeb, obtenerHistorialWeb: obtenerHistorialWeb, agregarMovilWeb: agregarMovilWeb, actualizarMovilWeb: actualizarMovilWeb, obtenerHistorialMovilWeb: obtenerHistorialMovilWeb, darDeBajaMovilWeb: darDeBajaMovilWeb, reactivarMovilWeb: reactivarMovilWeb, exportarCalendarioClienteExcelWeb: exportarCalendarioClienteExcelWeb, obtenerResumenWeb: obtenerResumenWeb, obtenerFichasWeb: obtenerFichasWeb, guardarFichasWeb: guardarFichasWeb, obtenerPersonalWeb: obtenerPersonalWeb, buscarPersonaWeb: buscarPersonaWeb, obtenerVehiculosWeb: obtenerVehiculosWeb, deshacerSinTecnicosWeb: deshacerSinTecnicosWeb, guardarSalidaPersonalWeb: guardarSalidaPersonalWeb, obtenerCambiosFichasWeb: obtenerCambiosFichasWeb, exportarFichasExcelWeb: exportarFichasExcelWeb, obtenerSeguimientoWeb: obtenerSeguimientoWeb, guardarJustificacionTiempoWeb: guardarJustificacionTiempoWeb, guardarSeguimientoWeb: guardarSeguimientoWeb, guardarAlmuerzoWeb: guardarAlmuerzoWeb, guardarSalidaWeb: guardarSalidaWeb, corregirCorteWeb: corregirCorteWeb, eliminarCorteWeb: eliminarCorteWeb, obtenerAusenciasWeb: obtenerAusenciasWeb, guardarAusenciaWeb: guardarAusenciaWeb, marcarPenalizacionWeb: marcarPenalizacionWeb, eliminarAusenciaWeb: eliminarAusenciaWeb, importarFinalizadasWeb: importarFinalizadasWeb, guardarSuspendidaWeb: guardarSuspendidaWeb, marcarSuspendidasWeb: marcarSuspendidasWeb, guardarEstadoOtWeb: guardarEstadoOtWeb, eliminarSuspendidaWeb: eliminarSuspendidaWeb, historialBodegaWeb: historialBodegaWeb, obtenerBodegaWeb: obtenerBodegaWeb, guardarAlistosWeb: guardarAlistosWeb, obtenerAlistosWeb: obtenerAlistosWeb, cambiarEstadoAlistoWeb: cambiarEstadoAlistoWeb, aplicarAlistoWeb: aplicarAlistoWeb, obtenerMovimientosInvWeb: obtenerMovimientosInvWeb, guardarMovimientoInvWeb: guardarMovimientoInvWeb, firmarMovimientoInvWeb: firmarMovimientoInvWeb, obtenerFirmaInvWeb: obtenerFirmaInvWeb, eliminarMovimientoInvWeb: eliminarMovimientoInvWeb, guardarObjetivosWeb: guardarObjetivosWeb, aplicarCostosAdendumWeb: aplicarCostosAdendumWeb, guardarMaterialInvWeb: guardarMaterialInvWeb, importarConsumoWeb: importarConsumoWeb, obtenerConsumoDetalleWeb: obtenerConsumoDetalleWeb, eliminarCargaConsumoWeb: eliminarCargaConsumoWeb, importarDevolucionesWeb: importarDevolucionesWeb, obtenerDevolucionesWeb: obtenerDevolucionesWeb, obtenerHistorialDevolucionWeb: obtenerHistorialDevolucionWeb, registrarDevolucionLineaWeb: registrarDevolucionLineaWeb, recibirLineasDevolucionWeb: recibirLineasDevolucionWeb, registrarBoletaDevolucionWeb: registrarBoletaDevolucionWeb, registrarEntregaMovilWeb: registrarEntregaMovilWeb, justificarDevolucionWeb: justificarDevolucionWeb, cambiarEquipoDevolucionWeb: cambiarEquipoDevolucionWeb, revertirDevolucionWeb: revertirDevolucionWeb, eliminarPeriodoDevolucionesWeb: eliminarPeriodoDevolucionesWeb, aceptarAlertasBodegaWeb: aceptarAlertasBodegaWeb, obtenerNotificacionesWeb: obtenerNotificacionesWeb, obtenerConsumoInvWeb: obtenerConsumoInvWeb, obtenerCortesInvWeb: obtenerCortesInvWeb, crearCorteInvWeb: crearCorteInvWeb, obtenerConteoInvWeb: obtenerConteoInvWeb, guardarConteoInvWeb: guardarConteoInvWeb, justificarDiferenciaInvWeb: justificarDiferenciaInvWeb, cerrarCorteInvWeb: cerrarCorteInvWeb, eliminarCorteInvWeb: eliminarCorteInvWeb, reabrirCorteInvWeb: reabrirCorteInvWeb, guardarMapeoInvWeb: guardarMapeoInvWeb, compararClienteWeb: compararClienteWeb, cargarCatalogoOficialWeb: cargarCatalogoOficialWeb, aplicarObjetivoBaseWeb: aplicarObjetivoBaseWeb, unirMaterialInvWeb: unirMaterialInvWeb, eliminarMaterialesInvWeb: eliminarMaterialesInvWeb, kardexMaterialWeb: kardexMaterialWeb, guardarClienteCotWeb: guardarClienteCotWeb, eliminarClienteCotWeb: eliminarClienteCotWeb, guardarMaterialCotWeb: guardarMaterialCotWeb, eliminarMaterialCotWeb: eliminarMaterialCotWeb, importarMaterialesCotWeb: importarMaterialesCotWeb, obtenerCotizacionesWeb: obtenerCotizacionesWeb, obtenerCotizacionWeb: obtenerCotizacionWeb, guardarCotizacionWeb: guardarCotizacionWeb, cambiarEstadoCotWeb: cambiarEstadoCotWeb, subirFotoCotWeb: subirFotoCotWeb, eliminarFotoCotWeb: eliminarFotoCotWeb, obtenerArchivoCotWeb: obtenerArchivoCotWeb, guardarInformeCotWeb: guardarInformeCotWeb, guardarGastoCotWeb: guardarGastoCotWeb, marcarPagoGastoCotWeb: marcarPagoGastoCotWeb, anularGastoCotWeb: anularGastoCotWeb, eliminarGastoCotWeb: eliminarGastoCotWeb, guardarOCCotWeb: guardarOCCotWeb, facturarCotWeb: facturarCotWeb, registrarPagoFacturaCotWeb: registrarPagoFacturaCotWeb, revertirPagoFacturaCotWeb: revertirPagoFacturaCotWeb, revertirFacturaCotWeb: revertirFacturaCotWeb, archivarCotWeb: archivarCotWeb, desarchivarCotWeb: desarchivarCotWeb, enviarCotWeb: enviarCotWeb, eliminarCotizacionWeb: eliminarCotizacionWeb, configurarConsecutivoCotWeb: configurarConsecutivoCotWeb, miAccesoRhWeb: miAccesoRhWeb, obtenerRhWeb: obtenerRhWeb, guardarColaboradorWeb: guardarColaboradorWeb, crearSolicitudRhWeb: crearSolicitudRhWeb, cancelarSolicitudRhWeb: cancelarSolicitudRhWeb, resolverSolicitudRhWeb: resolverSolicitudRhWeb, obtenerPagosRhWeb: obtenerPagosRhWeb, registrarPagoRhWeb: registrarPagoRhWeb, eliminarPagoRhWeb: eliminarPagoRhWeb, obtenerAsistenciaRhWeb: obtenerAsistenciaRhWeb, marcarAsistenciaRhWeb: marcarAsistenciaRhWeb, guardarMiFichaRhWeb: guardarMiFichaRhWeb, guardarTasasRhWeb: guardarTasasRhWeb, obtenerTasasRhWeb: obtenerTasasRhWeb, obtenerReportePagosRhWeb: obtenerReportePagosRhWeb, registrarPagosLoteRhWeb: registrarPagosLoteRhWeb, guardarEmpresaPmWeb: guardarEmpresaPmWeb, obtenerPmWeb: obtenerPmWeb, obtenerSemanaPmWeb: obtenerSemanaPmWeb, importarSemanaPmWeb: importarSemanaPmWeb, eliminarSemanaPmWeb: eliminarSemanaPmWeb, estadoSemanaPmWeb: estadoSemanaPmWeb, editarOrdenPmWeb: editarOrdenPmWeb, aplicarListaPmWeb: aplicarListaPmWeb, guardarAjustePmWeb: guardarAjustePmWeb, eliminarAjustePmWeb: eliminarAjustePmWeb, guardarPagoPmWeb: guardarPagoPmWeb, guardarExtraPmWeb: guardarExtraPmWeb, eliminarExtraPmWeb: eliminarExtraPmWeb, copiarExtrasPmWeb: copiarExtrasPmWeb, guardarContratistaPmWeb: guardarContratistaPmWeb, estadoContratistaPmWeb: estadoContratistaPmWeb, importarContratistasPmWeb: importarContratistasPmWeb, completarNumerosOrdenPmWeb: completarNumerosOrdenPmWeb, historialContratistaPmWeb: historialContratistaPmWeb, limpiarDuplicadosPmWeb: limpiarDuplicadosPmWeb, pagosPmWeb: pagosPmWeb, listarPenalizacionesPmWeb: listarPenalizacionesPmWeb, reasignarPenalizacionPmWeb: reasignarPenalizacionPmWeb, obtenerPrestamosPmWeb: obtenerPrestamosPmWeb, guardarPrestamoPmWeb: guardarPrestamoPmWeb, resolverCambioMovilPrestamoPmWeb: resolverCambioMovilPrestamoPmWeb, eliminarPrestamoPmWeb: eliminarPrestamoPmWeb, registrarMovPrestamoPmWeb: registrarMovPrestamoPmWeb, eliminarMovPrestamoPmWeb: eliminarMovPrestamoPmWeb, aplicarCuotasPrestamosPmWeb: aplicarCuotasPrestamosPmWeb, guardarPreciosPmWeb: guardarPreciosPmWeb, serviciosTelecablePmWeb: serviciosTelecablePmWeb, agregarServiciosPmWeb: agregarServiciosPmWeb, guardarBancoPmWeb: guardarBancoPmWeb, generarBancoPmWeb: generarBancoPmWeb, validarReinstalacionPmWeb: validarReinstalacionPmWeb, editarOrdenesPmWeb: editarOrdenesPmWeb, agregarOrdenPmWeb: agregarOrdenPmWeb, eliminarOrdenPmWeb: eliminarOrdenPmWeb, crearApelacionPmWeb: crearApelacionPmWeb, resolverApelacionPmWeb: resolverApelacionPmWeb, vbSinFacturaPmWeb: vbSinFacturaPmWeb, registrarPagoPmWeb: registrarPagoPmWeb, verificarSemanaPmWeb: verificarSemanaPmWeb, sugerirContratistasPmWeb: sugerirContratistasPmWeb, aplicarSugerenciasPmWeb: aplicarSugerenciasPmWeb, obtenerInicioWeb: obtenerInicioWeb, asignarPrecioServicioPmWeb: asignarPrecioServicioPmWeb, loginPaso1_: loginPaso1_, loginPaso2_: loginPaso2_, refrescarWeb: refrescarWeb, prepararSistemaWeb: prepararSistemaWeb};
+return {loginWeb: loginWeb, miPerfilWeb: miPerfilWeb, guardarFotoPerfilWeb: guardarFotoPerfilWeb, validarSesionWeb: validarSesionWeb, logoutWeb: logoutWeb, cambiarClaveWeb: cambiarClaveWeb, listarUsuariosWeb: listarUsuariosWeb, crearUsuarioWeb: crearUsuarioWeb, actualizarUsuarioWeb: actualizarUsuarioWeb, obtenerDatosWeb: obtenerDatosWeb, obtenerSemanasWeb: obtenerSemanasWeb, obtenerCalendarioWeb: obtenerCalendarioWeb, obtenerRotacionBackupWeb: obtenerRotacionBackupWeb, guardarCalendarioWeb: guardarCalendarioWeb, obtenerHistorialWeb: obtenerHistorialWeb, agregarMovilWeb: agregarMovilWeb, actualizarMovilWeb: actualizarMovilWeb, obtenerHistorialMovilWeb: obtenerHistorialMovilWeb, darDeBajaMovilWeb: darDeBajaMovilWeb, reactivarMovilWeb: reactivarMovilWeb, exportarCalendarioClienteExcelWeb: exportarCalendarioClienteExcelWeb, obtenerResumenWeb: obtenerResumenWeb, obtenerFichasWeb: obtenerFichasWeb, guardarFichasWeb: guardarFichasWeb, obtenerPersonalWeb: obtenerPersonalWeb, buscarPersonaWeb: buscarPersonaWeb, obtenerVehiculosWeb: obtenerVehiculosWeb, deshacerSinTecnicosWeb: deshacerSinTecnicosWeb, guardarSalidaPersonalWeb: guardarSalidaPersonalWeb, obtenerCambiosFichasWeb: obtenerCambiosFichasWeb, exportarFichasExcelWeb: exportarFichasExcelWeb, obtenerSeguimientoWeb: obtenerSeguimientoWeb, guardarJustificacionTiempoWeb: guardarJustificacionTiempoWeb, guardarSeguimientoWeb: guardarSeguimientoWeb, guardarAlmuerzoWeb: guardarAlmuerzoWeb, guardarSalidaWeb: guardarSalidaWeb, corregirCorteWeb: corregirCorteWeb, eliminarCorteWeb: eliminarCorteWeb, obtenerAusenciasWeb: obtenerAusenciasWeb, guardarAusenciaWeb: guardarAusenciaWeb, marcarPenalizacionWeb: marcarPenalizacionWeb, eliminarAusenciaWeb: eliminarAusenciaWeb, importarFinalizadasWeb: importarFinalizadasWeb, guardarSuspendidaWeb: guardarSuspendidaWeb, marcarSuspendidasWeb: marcarSuspendidasWeb, guardarEstadoOtWeb: guardarEstadoOtWeb, eliminarSuspendidaWeb: eliminarSuspendidaWeb, historialBodegaWeb: historialBodegaWeb, obtenerBodegaWeb: obtenerBodegaWeb, guardarAlistosWeb: guardarAlistosWeb, obtenerAlistosWeb: obtenerAlistosWeb, cambiarEstadoAlistoWeb: cambiarEstadoAlistoWeb, aplicarAlistoWeb: aplicarAlistoWeb, obtenerMovimientosInvWeb: obtenerMovimientosInvWeb, guardarMovimientoInvWeb: guardarMovimientoInvWeb, firmarMovimientoInvWeb: firmarMovimientoInvWeb, obtenerFirmaInvWeb: obtenerFirmaInvWeb, eliminarMovimientoInvWeb: eliminarMovimientoInvWeb, guardarObjetivosWeb: guardarObjetivosWeb, aplicarCostosAdendumWeb: aplicarCostosAdendumWeb, guardarMaterialInvWeb: guardarMaterialInvWeb, importarConsumoWeb: importarConsumoWeb, obtenerConsumoDetalleWeb: obtenerConsumoDetalleWeb, eliminarCargaConsumoWeb: eliminarCargaConsumoWeb, importarDevolucionesWeb: importarDevolucionesWeb, obtenerDevolucionesWeb: obtenerDevolucionesWeb, obtenerHistorialDevolucionWeb: obtenerHistorialDevolucionWeb, registrarDevolucionLineaWeb: registrarDevolucionLineaWeb, recibirLineasDevolucionWeb: recibirLineasDevolucionWeb, registrarBoletaDevolucionWeb: registrarBoletaDevolucionWeb, registrarEntregaMovilWeb: registrarEntregaMovilWeb, justificarDevolucionWeb: justificarDevolucionWeb, cambiarEquipoDevolucionWeb: cambiarEquipoDevolucionWeb, revertirDevolucionWeb: revertirDevolucionWeb, eliminarPeriodoDevolucionesWeb: eliminarPeriodoDevolucionesWeb, aceptarAlertasBodegaWeb: aceptarAlertasBodegaWeb, obtenerNotificacionesWeb: obtenerNotificacionesWeb, obtenerConsumoInvWeb: obtenerConsumoInvWeb, obtenerCortesInvWeb: obtenerCortesInvWeb, crearCorteInvWeb: crearCorteInvWeb, obtenerConteoInvWeb: obtenerConteoInvWeb, guardarConteoInvWeb: guardarConteoInvWeb, justificarDiferenciaInvWeb: justificarDiferenciaInvWeb, cerrarCorteInvWeb: cerrarCorteInvWeb, eliminarCorteInvWeb: eliminarCorteInvWeb, reabrirCorteInvWeb: reabrirCorteInvWeb, guardarMapeoInvWeb: guardarMapeoInvWeb, compararClienteWeb: compararClienteWeb, cargarCatalogoOficialWeb: cargarCatalogoOficialWeb, aplicarObjetivoBaseWeb: aplicarObjetivoBaseWeb, unirMaterialInvWeb: unirMaterialInvWeb, eliminarMaterialesInvWeb: eliminarMaterialesInvWeb, kardexMaterialWeb: kardexMaterialWeb, guardarClienteCotWeb: guardarClienteCotWeb, eliminarClienteCotWeb: eliminarClienteCotWeb, guardarMaterialCotWeb: guardarMaterialCotWeb, eliminarMaterialCotWeb: eliminarMaterialCotWeb, importarMaterialesCotWeb: importarMaterialesCotWeb, obtenerCotizacionesWeb: obtenerCotizacionesWeb, obtenerCotizacionWeb: obtenerCotizacionWeb, guardarCotizacionWeb: guardarCotizacionWeb, cambiarEstadoCotWeb: cambiarEstadoCotWeb, subirFotoCotWeb: subirFotoCotWeb, eliminarFotoCotWeb: eliminarFotoCotWeb, obtenerArchivoCotWeb: obtenerArchivoCotWeb, guardarInformeCotWeb: guardarInformeCotWeb, guardarGastoCotWeb: guardarGastoCotWeb, marcarPagoGastoCotWeb: marcarPagoGastoCotWeb, anularGastoCotWeb: anularGastoCotWeb, eliminarGastoCotWeb: eliminarGastoCotWeb, guardarOCCotWeb: guardarOCCotWeb, facturarCotWeb: facturarCotWeb, registrarPagoFacturaCotWeb: registrarPagoFacturaCotWeb, revertirPagoFacturaCotWeb: revertirPagoFacturaCotWeb, revertirFacturaCotWeb: revertirFacturaCotWeb, archivarCotWeb: archivarCotWeb, desarchivarCotWeb: desarchivarCotWeb, enviarCotWeb: enviarCotWeb, eliminarCotizacionWeb: eliminarCotizacionWeb, configurarConsecutivoCotWeb: configurarConsecutivoCotWeb, miAccesoRhWeb: miAccesoRhWeb, obtenerRhWeb: obtenerRhWeb, guardarColaboradorWeb: guardarColaboradorWeb, crearSolicitudRhWeb: crearSolicitudRhWeb, cancelarSolicitudRhWeb: cancelarSolicitudRhWeb, resolverSolicitudRhWeb: resolverSolicitudRhWeb, obtenerPagosRhWeb: obtenerPagosRhWeb, planillaColaboradoresPmWeb: planillaColaboradoresPmWeb, registrarPlanillaRhWeb: registrarPlanillaRhWeb, registrarPagoRhWeb: registrarPagoRhWeb, eliminarPagoRhWeb: eliminarPagoRhWeb, obtenerAsistenciaRhWeb: obtenerAsistenciaRhWeb, marcarAsistenciaRhWeb: marcarAsistenciaRhWeb, guardarMiFichaRhWeb: guardarMiFichaRhWeb, guardarTasasRhWeb: guardarTasasRhWeb, obtenerTasasRhWeb: obtenerTasasRhWeb, obtenerReportePagosRhWeb: obtenerReportePagosRhWeb, registrarPagosLoteRhWeb: registrarPagosLoteRhWeb, guardarEmpresaPmWeb: guardarEmpresaPmWeb, obtenerPmWeb: obtenerPmWeb, obtenerSemanaPmWeb: obtenerSemanaPmWeb, importarSemanaPmWeb: importarSemanaPmWeb, eliminarSemanaPmWeb: eliminarSemanaPmWeb, estadoSemanaPmWeb: estadoSemanaPmWeb, editarOrdenPmWeb: editarOrdenPmWeb, aplicarListaPmWeb: aplicarListaPmWeb, guardarAjustePmWeb: guardarAjustePmWeb, eliminarAjustePmWeb: eliminarAjustePmWeb, guardarPagoPmWeb: guardarPagoPmWeb, guardarExtraPmWeb: guardarExtraPmWeb, eliminarExtraPmWeb: eliminarExtraPmWeb, copiarExtrasPmWeb: copiarExtrasPmWeb, guardarContratistaPmWeb: guardarContratistaPmWeb, estadoContratistaPmWeb: estadoContratistaPmWeb, importarContratistasPmWeb: importarContratistasPmWeb, completarNumerosOrdenPmWeb: completarNumerosOrdenPmWeb, historialContratistaPmWeb: historialContratistaPmWeb, limpiarDuplicadosPmWeb: limpiarDuplicadosPmWeb, pagosPmWeb: pagosPmWeb, listarPenalizacionesPmWeb: listarPenalizacionesPmWeb, reasignarPenalizacionPmWeb: reasignarPenalizacionPmWeb, obtenerPrestamosPmWeb: obtenerPrestamosPmWeb, guardarPrestamoPmWeb: guardarPrestamoPmWeb, resolverCambioMovilPrestamoPmWeb: resolverCambioMovilPrestamoPmWeb, eliminarPrestamoPmWeb: eliminarPrestamoPmWeb, registrarMovPrestamoPmWeb: registrarMovPrestamoPmWeb, eliminarMovPrestamoPmWeb: eliminarMovPrestamoPmWeb, aplicarCuotasPrestamosPmWeb: aplicarCuotasPrestamosPmWeb, guardarPreciosPmWeb: guardarPreciosPmWeb, serviciosTelecablePmWeb: serviciosTelecablePmWeb, agregarServiciosPmWeb: agregarServiciosPmWeb, guardarBancoPmWeb: guardarBancoPmWeb, generarBancoPmWeb: generarBancoPmWeb, validarReinstalacionPmWeb: validarReinstalacionPmWeb, editarOrdenesPmWeb: editarOrdenesPmWeb, agregarOrdenPmWeb: agregarOrdenPmWeb, eliminarOrdenPmWeb: eliminarOrdenPmWeb, crearApelacionPmWeb: crearApelacionPmWeb, resolverApelacionPmWeb: resolverApelacionPmWeb, vbSinFacturaPmWeb: vbSinFacturaPmWeb, registrarPagoPmWeb: registrarPagoPmWeb, verificarSemanaPmWeb: verificarSemanaPmWeb, sugerirContratistasPmWeb: sugerirContratistasPmWeb, aplicarSugerenciasPmWeb: aplicarSugerenciasPmWeb, obtenerInicioWeb: obtenerInicioWeb, asignarPrecioServicioPmWeb: asignarPrecioServicioPmWeb, loginPaso1_: loginPaso1_, loginPaso2_: loginPaso2_, refrescarWeb: refrescarWeb, prepararSistemaWeb: prepararSistemaWeb};
 })();
 
 /* =====================================================================
