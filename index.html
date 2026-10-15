@@ -6007,7 +6007,7 @@ async function plnInternoOk() {
 }
 function rhPlSemTot(f) {
   const rb = rhPlS.rub[f.id] || [], ext = rb.filter(x => x.tipo !== 'rebajo').reduce((a, x) => a + (Number(x.monto) || 0), 0), reb = rb.filter(x => x.tipo === 'rebajo').reduce((a, x) => a + (Number(x.monto) || 0), 0);
-  const bruto = Math.round(((f.base || 0) + ext) * 100) / 100, cargas = f.ccss ? Math.round(bruto * rhPlS.tasaObr) / 100 : 0;
+  const bruto = Math.round(((f.base || 0) + ext) * 100) / 100, cargas = (f.ccss && !f.adicional) ? Math.round(bruto * rhPlS.tasaObr) / 100 : 0;
   return { ext: ext, reb: reb, bruto: bruto, cargas: cargas, neto: Math.round((bruto - cargas - reb) * 100) / 100 };
 }
 function rhPlSemDibujar() {
@@ -6015,19 +6015,20 @@ function rhPlSemDibujar() {
   if (!R.semanas.length) { d.innerHTML = ''; return; }
   const dm = x => x.split('-').reverse().slice(0, 2).join('/');
   const tot = R.filas.filter(f => !R.exc[f.id]).reduce((a, f) => a + rhPlSemTot(f).neto, 0);
-  const yaEn = {}; R.filas.forEach(f => { yaEn[f.id] = 1; });
+  const yaEn = {}; R.filas.forEach(f => { if (!R.exc[f.id]) yaEn[f.id] = 1; });
   const otros = (rhDatos.colaboradores || []).filter(c => c.activo && !yaEn[c.id]);
   d.innerHTML = '<div class="panel" style="margin-bottom:14px"><div class="panelHead" style="flex-wrap:wrap;gap:8px"><h2>Planilla de la semana a pagar</h2>' +
     '<select onchange="rhPlSemCargar(this.value)" style="max-width:280px">' + R.semanas.map(s => '<option value="' + esc(s.id) + '"' + (s.id === R.idSemana ? ' selected' : '') + '>Semana ' + dm(s.desde) + ' al ' + dm(s.hasta) + (s.estado === 'Cerrada' ? ' (cerrada)' : '') + '</option>').join('') + '</select>' +
     '<span style="font-size:12px;color:#667">Pago estimado: ' + esc(R.fechaPago.split('-').reverse().join('/')) + '</span></div>' +
     '<div style="padding:4px 14px 10px;font-size:12px;color:#667">Es la planilla de colaboradores que se paga junto con las móviles de esta semana. Agrega o quita rubros a cada persona (extras suman, rebajos restan) y guarda: al generar el archivo del banco de esta semana, esos montos ya vienen cargados.</div>' +
     '<div class="tableWrap"><table class="table"><thead><tr><th>Colaborador</th><th>Período</th><th class="num">Base</th><th class="num">Extras (+)</th><th class="num">Rebajos (−)</th><th class="num">Cargas</th><th class="num">Neto</th><th>Rubros</th></tr></thead><tbody>' +
-    (R.filas.length ? R.filas.map((f, i) => { const t = rhPlSemTot(f), rb = R.rub[f.id] || []; return '<tr style="' + (R.exc[f.id] ? 'opacity:.45' : '') + '"><td><b>' + esc(f.nombre) + '</b>' + (f.adicional ? ' <span class="segBadge" style="background:#e8f0fe;color:#1d4f91">Pago adicional</span>' : '') + (R.exc[f.id] ? ' <span class="segBadge" style="background:#fdecea;color:#9b1c1c">No se paga en este archivo</span>' : '') + '<div style="font-size:11px;color:#667">' + esc(f.periodicidad) + (f.pagado ? ' · <span style="color:#1e7e34">ya pagado en envío ' + esc(f.pagado.envio) + '</span>' : '') + '</div></td><td style="font-size:12px">' + esc(f.periodo) + '</td>' +
+    (R.filas.some(f => !R.exc[f.id]) ? R.filas.map((f, i) => { if (R.exc[f.id]) return ''; const t = rhPlSemTot(f), rb = R.rub[f.id] || []; return '<tr style="' + (R.exc[f.id] ? 'opacity:.45' : '') + '"><td><b>' + esc(f.nombre) + '</b>' + (f.adicional ? ' <span class="segBadge" style="background:#e8f0fe;color:#1d4f91">Pago adicional</span>' : '') + (R.exc[f.id] ? ' <span class="segBadge" style="background:#fdecea;color:#9b1c1c">No se paga en este archivo</span>' : '') + '<div style="font-size:11px;color:#667">' + esc(f.periodicidad) + (f.pagado ? ' · <span style="color:#1e7e34">ya pagado en envío ' + esc(f.pagado.envio) + '</span>' : '') + '</div></td><td style="font-size:12px">' + esc(f.periodo) + '</td>' +
       '<td class="num">' + pmM(f.base) + '</td><td class="num">' + (t.ext ? pmM(t.ext) : '—') + '</td><td class="num">' + (t.reb ? '−' + pmM(t.reb) : '—') + '</td><td class="num">' + (t.cargas ? '−' + pmM(t.cargas) : '—') + '</td><td class="num"><b>' + pmM(t.neto) + '</b></td>' +
       '<td style="min-width:260px">' + rb.map((x, j) => '<div style="display:flex;gap:4px;align-items:center;margin-bottom:3px"><select onchange="rhPlSemRub(' + i + ',' + j + ',\'tipo\',this.value)" style="width:78px;font-size:12px"><option value="extra"' + (x.tipo !== 'rebajo' ? ' selected' : '') + '>Extra +</option><option value="rebajo"' + (x.tipo === 'rebajo' ? ' selected' : '') + '>Rebajo −</option></select>' +
         '<input value="' + esc(x.concepto || '') + '" placeholder="Concepto" maxlength="60" onchange="rhPlSemRub(' + i + ',' + j + ',\'concepto\',this.value)" style="flex:1;min-width:90px;font-size:12px"><input type="number" min="0" value="' + esc(x.monto || '') + '" placeholder="₡" onchange="rhPlSemRub(' + i + ',' + j + ',\'monto\',this.value)" style="width:86px;font-size:12px"><button class="btnMini" title="Quitar" onclick="rhPlSemQuitar(' + i + ',' + j + ')">✕</button></div>').join('') +
       '<button class="btnMini" onclick="rhPlSemAgregar(' + i + ')">➕ Agregar rubro</button> ' + (f.adicional ? (f.conSalarioPeriodo ? '<button class="btnMini" title="Volver a pagarle el salario de este período" onclick="rhPlSemConSalario(' + i + ')">↩ Pagar con salario</button> ' : '') + '<button class="btnMini" title="Quitar de esta planilla" onclick="rhPlSemQuitarPersona(' + i + ')">🗑 Quitar</button>' : '<button class="btnMini" onclick="rhPlSemExcluir(' + i + ')">' + (R.exc[f.id] ? '↩ Incluir' : '🚫 No pagar aquí') + '</button> <button class="btnMini" title="No se le paga el salario de este período, solo los rubros (por ejemplo un bono)" onclick="rhPlSemSoloRubros(' + i + ')">✂ Solo rubros (sin salario)</button>') + '</td></tr>'; }).join('') + '<tr style="background:#f1f3f6;font-weight:700"><td colspan="6">Neto total de colaboradores</td><td class="num">' + pmM(tot) + '</td><td></td></tr>'
       : '<tr><td colspan="8" class="empty">No hay colaboradores por pagar en esta semana (revisa salario, ingreso y periodicidad).</td></tr>') + '</tbody></table></div>' +
+    (R.filas.some(f => R.exc[f.id]) ? '<div style="padding:8px 14px 0;font-size:12px;color:#667">Fuera de esta planilla: ' + R.filas.map((f, i) => R.exc[f.id] ? '<span style="display:inline-flex;gap:4px;align-items:center;margin-right:10px"><b>' + esc(f.nombre) + '</b><button class="btnMini" onclick="rhPlSemExcluir(' + i + ')">↩ Volver a incluir con salario</button></span>' : '').join('') + '</div>' : '') +
     '<div style="display:flex;gap:8px;align-items:center;padding:10px 14px 0;flex-wrap:wrap"><span style="font-size:13px"><b>Agregar a otra persona</b> (bono u otro pago, aunque no le toque en este archivo):</span><select id="rhPlSemOtro" style="max-width:240px"><option value="">Elige un colaborador</option>' + otros.map(c => '<option value="' + esc(c.id) + '">' + esc(c.nombre) + '</option>').join('') + '</select><button class="btn secondary" onclick="rhPlSemAgregarPersona()">➕ Agregar</button></div>' +
     '<div style="display:flex;gap:8px;justify-content:flex-end;padding:10px 14px;flex-wrap:wrap"><button class="btn secondary" onclick="plnInternoModal()">🚐 Personal interno (móvil)</button><button class="btn secondary" onclick="rhPlSemCopiar()">📋 Copiar tabla</button><button class="btn primary" id="rhPlSemBtn" onclick="rhPlSemGuardar()">💾 Guardar rubros de la semana' + (R.sucio ? ' *' : '') + '</button></div></div>';
 }
@@ -6040,13 +6041,13 @@ async function rhPlSemConSalario(i) { const f = rhPlS.filas[i]; delete rhPlS.inc
 async function rhPlSemQuitarPersona(i) { const f = rhPlS.filas[i]; delete rhPlS.inc[f.id]; delete rhPlS.rub[f.id]; delete rhPlS.exc[f.id]; await rhPlSemGuardar(true); }
 async function rhPlSemAgregarPersona() {
   const id = $('rhPlSemOtro').value; if (!id) return toast('Elige a quién agregar.');
-  rhPlS.inc[id] = true; rhPlS.rub[id] = [{ tipo: 'extra', concepto: 'Bono', monto: 0 }];
+  rhPlS.inc[id] = true; delete rhPlS.exc[id]; rhPlS.rub[id] = [{ tipo: 'extra', concepto: 'Bono', monto: 0 }];
   await rhPlSemGuardar(true);
 }
-function rhPlSemPayload() { const o = {}; const ids = new Set([].concat(Object.keys(rhPlS.rub), Object.keys(rhPlS.exc), Object.keys(rhPlS.inc))); ids.forEach(id => { o[id] = { rubros: rhPlS.rub[id] || [], excluir: !!rhPlS.exc[id], incluir: !!rhPlS.inc[id] }; }); return o; }
+function rhPlSemPayload(pend) { const o = {}; const ids = new Set([].concat(Object.keys(rhPlS.rub), Object.keys(rhPlS.exc), Object.keys(rhPlS.inc))); ids.forEach(id => { o[id] = { rubros: rhPlS.rub[id] || [], excluir: !!rhPlS.exc[id], incluir: !!rhPlS.inc[id], pend: !!pend }; }); return o; }
 async function rhPlSemGuardar(silencio) {
   const b = $('rhPlSemBtn'); if (b) b.disabled = true;
-  try { await api('guardarRubrosPlanillaRhWeb', rhPlS.idSemana, rhPlSemPayload()); if (silencio !== true) toast('Guardado. Se cargará al generar el archivo del banco de esta semana.'); await rhPlSemCargar(rhPlS.idSemana); }
+  try { await api('guardarRubrosPlanillaRhWeb', rhPlS.idSemana, rhPlSemPayload(silencio === true)); if (silencio !== true) toast('Guardado. Se cargará al generar el archivo del banco de esta semana.'); await rhPlSemCargar(rhPlS.idSemana); }
   catch (e) { if (b) b.disabled = false; mostrarError(e, 'No se pudo guardar.'); }
 }
 function rhPlSemCopiar() {
@@ -14661,6 +14662,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 83 · 14-oct 22:17</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 84 · 15-oct 06:18</div>
 </body>
 </html>

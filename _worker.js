@@ -9696,7 +9696,7 @@ function rhPlanilla_(fecha, sem, bor) {
     if (!rb || !rb.incluir || !c.activo || filas.some(x => x.id === c.id)) return;
     let extras = 0, rebajos = 0; const rubros = [];
     (Array.isArray(rb.rubros) ? rb.rubros : []).forEach(x => { const m = rh2_(Math.max(0, rhNum_(x.monto))); if (!m) return; const reb = txt_(x.tipo) === 'rebajo'; if (reb) rebajos += m; else extras += m; rubros.push({ tipo: reb ? 'rebajo' : 'extra', concepto: txt_(x.concepto).slice(0, 60), monto: m }); });
-    const bruto = rh2_(extras), cargas = c.ccss ? rh2_(bruto * tasaObr / 100) : 0, ded = rh2_(cargas + rebajos);
+    const bruto = rh2_(extras), cargas = 0 /* solo rubros: sin cargas sociales */, ded = rh2_(cargas + rebajos);
     const faltan = []; if (!c.banco) faltan.push('banco'); if (!c.referencia) faltan.push('referencia'); if (!/^\d{20}$/.test(c.iban)) faltan.push('cuenta IBAN');
     const concepto = (rubros[0] && rubros[0].concepto) || 'Pago adicional';
     filas.push({ id: c.id, nombre: c.nombre, puesto: c.puesto, periodicidad: c.periodicidad, clave: 'X|' + sem.id, periodo: 'Pago adicional · semana ' + rhDm_(sem.desde) + ' al ' + rhDm_(sem.hasta), desde: sem.desde, hasta: sem.hasta,
@@ -9734,7 +9734,10 @@ function guardarRubrosPlanillaRhWeb(token, idSemana, rubros) {
   Object.keys(rubros || {}).forEach(idc => {
     const ent = Array.isArray(rubros[idc]) ? { rubros: rubros[idc] } : (rubros[idc] || {});
     const l = (Array.isArray(ent.rubros) ? ent.rubros : []).map(x => ({ tipo: txt_(x.tipo) === 'rebajo' ? 'rebajo' : 'extra', concepto: txt_(x.concepto).slice(0, 60), monto: rh2_(Math.max(0, rhNum_(x.monto))) })).filter(x => x.monto > 0);
-    if (l.length || ent.excluir || ent.incluir) limpio[txt_(idc)] = { rubros: l, excluir: !!ent.excluir, incluir: !!ent.incluir };
+    let exc = !!ent.excluir, inc = !!ent.incluir;
+    /* «solo rubros» sin ningún monto: no se le paga nada esa semana, sale de la planilla (si le tocaba salario queda fuera, con opción de volver a incluirlo) */
+    if (inc && !l.length && !ent.pend) { if (rhLeTocaSalario_(idSemana, idc)) exc = true; inc = false; }
+    if (l.length || exc || inc) limpio[txt_(idc)] = { rubros: l, excluir: exc, incluir: inc };
   });
   return conBloqueo_(() => {
     const sh = rhHoja_('PAR'), t = leerTabla_(sh), clave = 'plan|' + txt_(idSemana), ahora = segAhora_(), json = JSON.stringify(limpio);
