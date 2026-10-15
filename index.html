@@ -11031,9 +11031,44 @@ function renderAbastecimiento() {
       '<td class="left"><b style="color:#b71c1c;text-decoration:underline">' + esc(x.referencia || 'sin número') + '</b>' + (x.obs ? '<div style="color:#888;font-size:12px">' + esc(x.obs) + '</div>' : '') + '</td>' +
       '<td>' + x.lineas.length + ' <span style="color:#888">línea' + (x.lineas.length === 1 ? '' : 's') + '</span></td><td>' + firmaCelda(x) + '</td><td>' + esc(x.usuario) + '</td>' +
       (adm ? '<td><button class="btnMini" onclick="event.stopPropagation();eliminarMov(\'' + escJs(x.grupo) + '\')">🗑️</button></td>' : '') + '</tr>').join('') + '</tbody></table>';
+  tablaOrdenable('abTabla');
 }
 
 let abLista = [];
+
+/* Orden por columna para cualquier tabla ya dibujada: clic en el encabezado = ascendente ▲, otro clic = descendente ▼, otro = orden original. */
+const ordEstado = {};
+function ordValor(td) {
+  const t = (td ? td.innerText : '').trim();
+  const f = t.match(/^(\d{2})\/(\d{2})\/(\d{4})/); if (f) return [0, f[3] + f[2] + f[1]];
+  const p = t.split(/\s/)[0];
+  if (/^-?[\d.,]+$/.test(p)) { const v = parseFloat(p.replace(/,/g, '')); if (!isNaN(v)) return [1, v]; }
+  return [2, t.toLowerCase()];
+}
+function tablaOrdenable(idCont) {
+  const tb = document.querySelector('#' + idCont + ' table'); if (!tb || !tb.tHead || !tb.tBodies[0]) return;
+  const ths = Array.from(tb.tHead.rows[0].cells), cuerpo = tb.tBodies[0];
+  Array.from(cuerpo.rows).forEach((r, i) => { r.dataset.o = i; });
+  const st = ordEstado[idCont] || (ordEstado[idCont] = { c: -1, d: 1 });
+  const aplicar = () => {
+    const rows = Array.from(cuerpo.rows);
+    rows.sort((a, b) => {
+      if (st.c < 0) return a.dataset.o - b.dataset.o;
+      const x = ordValor(a.cells[st.c]), y = ordValor(b.cells[st.c]);
+      const r = x[0] !== y[0] ? x[0] - y[0] : x[1] < y[1] ? -1 : x[1] > y[1] ? 1 : 0;
+      return r ? r * st.d : a.dataset.o - b.dataset.o;
+    });
+    rows.forEach(r => cuerpo.appendChild(r));
+    ths.forEach((th, i) => { const s = th.querySelector('.ordF'); if (s) { s.textContent = st.c === i ? (st.d === 1 ? ' ▲' : ' ▼') : ' ⇅'; s.style.opacity = st.c === i ? 1 : .45; } });
+  };
+  ths.forEach((th, i) => {
+    if (!th.textContent.trim()) return;
+    th.style.cursor = 'pointer'; th.style.userSelect = 'none'; th.title = 'Clic para ordenar';
+    th.insertAdjacentHTML('beforeend', '<span class="ordF"></span>');
+    th.onclick = () => { if (st.c === i) { if (st.d === 1) st.d = -1; else { st.c = -1; st.d = 1; } } else { st.c = i; st.d = 1; } aplicar(); };
+  });
+  aplicar();
+}
 
 function abVerTodo() {
   $('abDesde').value = '2020-01-01';
@@ -14706,6 +14741,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 89 · 15-oct 08:54</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 90 · 15-oct 09:10</div>
 </body>
 </html>
