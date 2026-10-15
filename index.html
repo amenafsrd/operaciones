@@ -5977,44 +5977,55 @@ async function rhPlSemCargar(id) {
   try {
     const keep = rhPlS && rhPlS.idSemana === id ? rhPlS.rub : null;
     const R = await api('planillaSemanaRhWeb', id || '');
-    R.rub = {}; R.filas.forEach(f => { R.rub[f.id] = (f.rubros || []).map(x => Object.assign({}, x)); });
+    R.rub = {}; R.exc = {}; R.inc = {}; R.filas.forEach(f => { R.rub[f.id] = (f.rubros || []).map(x => Object.assign({}, x)); if (f.excluido) R.exc[f.id] = true; if (f.adicional) { R.inc[f.id] = true; if (!R.rub[f.id].length) R.rub[f.id] = [{ tipo: 'extra', concepto: 'Bono', monto: 0 }]; } });
     R.sucio = false; rhPlS = R; rhPlSemDibujar();
   } catch (e) { d.innerHTML = '<span style="color:#9b1c1c;font-size:13px">' + esc(e.message || e) + '</span>'; }
 }
 function rhPlSemTot(f) {
   const rb = rhPlS.rub[f.id] || [], ext = rb.filter(x => x.tipo !== 'rebajo').reduce((a, x) => a + (Number(x.monto) || 0), 0), reb = rb.filter(x => x.tipo === 'rebajo').reduce((a, x) => a + (Number(x.monto) || 0), 0);
-  const bruto = Math.round((f.base + ext) * 100) / 100, cargas = f.ccss ? Math.round(bruto * rhPlS.tasaObr) / 100 : 0;
+  const bruto = Math.round(((f.base || 0) + ext) * 100) / 100, cargas = f.ccss ? Math.round(bruto * rhPlS.tasaObr) / 100 : 0;
   return { ext: ext, reb: reb, bruto: bruto, cargas: cargas, neto: Math.round((bruto - cargas - reb) * 100) / 100 };
 }
 function rhPlSemDibujar() {
   const R = rhPlS, d = $('rhPlSem'); if (!d) return;
   if (!R.semanas.length) { d.innerHTML = ''; return; }
   const dm = x => x.split('-').reverse().slice(0, 2).join('/');
-  const tot = R.filas.reduce((a, f) => a + rhPlSemTot(f).neto, 0);
+  const tot = R.filas.filter(f => !R.exc[f.id]).reduce((a, f) => a + rhPlSemTot(f).neto, 0);
+  const yaEn = {}; R.filas.forEach(f => { yaEn[f.id] = 1; });
+  const otros = (rhDatos.colaboradores || []).filter(c => c.activo && !yaEn[c.id]);
   d.innerHTML = '<div class="panel" style="margin-bottom:14px"><div class="panelHead" style="flex-wrap:wrap;gap:8px"><h2>Planilla de la semana a pagar</h2>' +
     '<select onchange="rhPlSemCargar(this.value)" style="max-width:280px">' + R.semanas.map(s => '<option value="' + esc(s.id) + '"' + (s.id === R.idSemana ? ' selected' : '') + '>Semana ' + dm(s.desde) + ' al ' + dm(s.hasta) + (s.estado === 'Cerrada' ? ' (cerrada)' : '') + '</option>').join('') + '</select>' +
     '<span style="font-size:12px;color:#667">Pago estimado: ' + esc(R.fechaPago.split('-').reverse().join('/')) + '</span></div>' +
     '<div style="padding:4px 14px 10px;font-size:12px;color:#667">Es la planilla de colaboradores que se paga junto con las móviles de esta semana. Agrega o quita rubros a cada persona (extras suman, rebajos restan) y guarda: al generar el archivo del banco de esta semana, esos montos ya vienen cargados.</div>' +
     '<div class="tableWrap"><table class="table"><thead><tr><th>Colaborador</th><th>Período</th><th class="num">Base</th><th class="num">Extras (+)</th><th class="num">Rebajos (−)</th><th class="num">Cargas</th><th class="num">Neto</th><th>Rubros</th></tr></thead><tbody>' +
-    (R.filas.length ? R.filas.map((f, i) => { const t = rhPlSemTot(f), rb = R.rub[f.id] || []; return '<tr><td><b>' + esc(f.nombre) + '</b><div style="font-size:11px;color:#667">' + esc(f.periodicidad) + (f.pagado ? ' · <span style="color:#1e7e34">ya pagado en envío ' + esc(f.pagado.envio) + '</span>' : '') + '</div></td><td style="font-size:12px">' + esc(f.periodo) + '</td>' +
+    (R.filas.length ? R.filas.map((f, i) => { const t = rhPlSemTot(f), rb = R.rub[f.id] || []; return '<tr style="' + (R.exc[f.id] ? 'opacity:.45' : '') + '"><td><b>' + esc(f.nombre) + '</b>' + (f.adicional ? ' <span class="segBadge" style="background:#e8f0fe;color:#1d4f91">Pago adicional</span>' : '') + (R.exc[f.id] ? ' <span class="segBadge" style="background:#fdecea;color:#9b1c1c">No se paga en este archivo</span>' : '') + '<div style="font-size:11px;color:#667">' + esc(f.periodicidad) + (f.pagado ? ' · <span style="color:#1e7e34">ya pagado en envío ' + esc(f.pagado.envio) + '</span>' : '') + '</div></td><td style="font-size:12px">' + esc(f.periodo) + '</td>' +
       '<td class="num">' + pmM(f.base) + '</td><td class="num">' + (t.ext ? pmM(t.ext) : '—') + '</td><td class="num">' + (t.reb ? '−' + pmM(t.reb) : '—') + '</td><td class="num">' + (t.cargas ? '−' + pmM(t.cargas) : '—') + '</td><td class="num"><b>' + pmM(t.neto) + '</b></td>' +
       '<td style="min-width:260px">' + rb.map((x, j) => '<div style="display:flex;gap:4px;align-items:center;margin-bottom:3px"><select onchange="rhPlSemRub(' + i + ',' + j + ',\'tipo\',this.value)" style="width:78px;font-size:12px"><option value="extra"' + (x.tipo !== 'rebajo' ? ' selected' : '') + '>Extra +</option><option value="rebajo"' + (x.tipo === 'rebajo' ? ' selected' : '') + '>Rebajo −</option></select>' +
         '<input value="' + esc(x.concepto || '') + '" placeholder="Concepto" maxlength="60" onchange="rhPlSemRub(' + i + ',' + j + ',\'concepto\',this.value)" style="flex:1;min-width:90px;font-size:12px"><input type="number" min="0" value="' + esc(x.monto || '') + '" placeholder="₡" onchange="rhPlSemRub(' + i + ',' + j + ',\'monto\',this.value)" style="width:86px;font-size:12px"><button class="btnMini" title="Quitar" onclick="rhPlSemQuitar(' + i + ',' + j + ')">✕</button></div>').join('') +
-      '<button class="btnMini" onclick="rhPlSemAgregar(' + i + ')">➕ Agregar rubro</button></td></tr>'; }).join('') + '<tr style="background:#f1f3f6;font-weight:700"><td colspan="6">Neto total de colaboradores</td><td class="num">' + pmM(tot) + '</td><td></td></tr>'
+      '<button class="btnMini" onclick="rhPlSemAgregar(' + i + ')">➕ Agregar rubro</button> ' + (f.adicional ? '<button class="btnMini" title="Quitar de esta planilla" onclick="rhPlSemQuitarPersona(' + i + ')">🗑 Quitar</button>' : '<button class="btnMini" onclick="rhPlSemExcluir(' + i + ')">' + (R.exc[f.id] ? '↩ Incluir' : '🚫 No pagar aquí') + '</button>') + '</td></tr>'; }).join('') + '<tr style="background:#f1f3f6;font-weight:700"><td colspan="6">Neto total de colaboradores</td><td class="num">' + pmM(tot) + '</td><td></td></tr>'
       : '<tr><td colspan="8" class="empty">No hay colaboradores por pagar en esta semana (revisa salario, ingreso y periodicidad).</td></tr>') + '</tbody></table></div>' +
+    '<div style="display:flex;gap:8px;align-items:center;padding:10px 14px 0;flex-wrap:wrap"><span style="font-size:13px"><b>Agregar a otra persona</b> (bono u otro pago, aunque no le toque en este archivo):</span><select id="rhPlSemOtro" style="max-width:240px"><option value="">Elige un colaborador</option>' + otros.map(c => '<option value="' + esc(c.id) + '">' + esc(c.nombre) + '</option>').join('') + '</select><button class="btn secondary" onclick="rhPlSemAgregarPersona()">➕ Agregar</button></div>' +
     '<div style="display:flex;gap:8px;justify-content:flex-end;padding:10px 14px;flex-wrap:wrap"><button class="btn secondary" onclick="rhPlSemCopiar()">📋 Copiar tabla</button><button class="btn primary" id="rhPlSemBtn" onclick="rhPlSemGuardar()">💾 Guardar rubros de la semana' + (R.sucio ? ' *' : '') + '</button></div></div>';
 }
 function rhPlSemRub(i, j, k, v) { const f = rhPlS.filas[i]; rhPlS.rub[f.id][j][k] = k === 'monto' ? (Number(v) || 0) : v; rhPlS.sucio = true; rhPlSemDibujar(); }
 function rhPlSemAgregar(i) { const f = rhPlS.filas[i]; (rhPlS.rub[f.id] = rhPlS.rub[f.id] || []).push({ tipo: 'extra', concepto: '', monto: 0 }); rhPlS.sucio = true; rhPlSemDibujar(); }
 function rhPlSemQuitar(i, j) { const f = rhPlS.filas[i]; rhPlS.rub[f.id].splice(j, 1); rhPlS.sucio = true; rhPlSemDibujar(); }
-async function rhPlSemGuardar() {
-  const b = $('rhPlSemBtn'); b.disabled = true;
-  try { await api('guardarRubrosPlanillaRhWeb', rhPlS.idSemana, rhPlS.rub); toast('Rubros guardados. Se cargarán al generar el archivo del banco de esta semana.'); await rhPlSemCargar(rhPlS.idSemana); }
-  catch (e) { b.disabled = false; mostrarError(e, 'No se pudo guardar.'); }
+function rhPlSemExcluir(i) { const f = rhPlS.filas[i]; if (rhPlS.exc[f.id]) delete rhPlS.exc[f.id]; else rhPlS.exc[f.id] = true; rhPlS.sucio = true; rhPlSemDibujar(); }
+async function rhPlSemQuitarPersona(i) { const f = rhPlS.filas[i]; delete rhPlS.inc[f.id]; delete rhPlS.rub[f.id]; delete rhPlS.exc[f.id]; await rhPlSemGuardar(true); }
+async function rhPlSemAgregarPersona() {
+  const id = $('rhPlSemOtro').value; if (!id) return toast('Elige a quién agregar.');
+  rhPlS.inc[id] = true; rhPlS.rub[id] = [{ tipo: 'extra', concepto: 'Bono', monto: 0 }];
+  await rhPlSemGuardar(true);
+}
+function rhPlSemPayload() { const o = {}; const ids = new Set([].concat(Object.keys(rhPlS.rub), Object.keys(rhPlS.exc), Object.keys(rhPlS.inc))); ids.forEach(id => { o[id] = { rubros: rhPlS.rub[id] || [], excluir: !!rhPlS.exc[id], incluir: !!rhPlS.inc[id] }; }); return o; }
+async function rhPlSemGuardar(silencio) {
+  const b = $('rhPlSemBtn'); if (b) b.disabled = true;
+  try { await api('guardarRubrosPlanillaRhWeb', rhPlS.idSemana, rhPlSemPayload()); if (silencio !== true) toast('Guardado. Se cargará al generar el archivo del banco de esta semana.'); await rhPlSemCargar(rhPlS.idSemana); }
+  catch (e) { if (b) b.disabled = false; mostrarError(e, 'No se pudo guardar.'); }
 }
 function rhPlSemCopiar() {
   const R = rhPlS, filas = [['Colaborador', 'Período', 'Base', 'Extras', 'Rebajos', 'Cargas', 'Neto', 'Rubros']];
-  R.filas.forEach(f => { const t = rhPlSemTot(f); filas.push([f.nombre, f.periodo, f.base, t.ext, t.reb, t.cargas, t.neto, (R.rub[f.id] || []).map(x => (x.tipo === 'rebajo' ? '-' : '+') + x.monto + ' ' + (x.concepto || '')).join('; ')]); });
+  R.filas.filter(f => !R.exc[f.id]).forEach(f => { const t = rhPlSemTot(f); filas.push([f.nombre, f.periodo, f.base, t.ext, t.reb, t.cargas, t.neto, (R.rub[f.id] || []).map(x => (x.tipo === 'rebajo' ? '-' : '+') + x.monto + ' ' + (x.concepto || '')).join('; ')]); });
   const txt = filas.map(r => r.join('\t')).join('\n');
   (navigator.clipboard && navigator.clipboard.writeText ? navigator.clipboard.writeText(txt) : Promise.reject()).then(() => toast('Tabla copiada. Pégala en Excel.')).catch(() => { const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); toast('Tabla copiada.'); } catch (e) { toast('No se pudo copiar.'); } ta.remove(); });
 }
@@ -6163,23 +6174,46 @@ function rhPintarAsi(ini, fin) {
 let rhAsiSel = null;
 function rhAsiMarcar(idColab, f) {
   const c = rhAsiData.colaboradores.find(x => x.id === idColab); if (!c) return;
-  const d = rhAsiDia(c, f, rhAsiData.hoy), act = c.dias[f];
+  const act = c.dias[f];
   rhAsiSel = { id: idColab, f: f };
-  rhModal('<h3>' + esc(c.nombre) + ' · ' + esc(rhFecha(f)) + '</h3>' +
-    '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px">' + ['LAB', 'AUS', 'LIB', 'FER'].map(k => '<button class="btn ' + ((act && act.e === k) ? 'primary' : 'secondary') + '" onclick="rhAsiAplicar(\'' + k + '\')">' + rhAsiEst[k][0] + ' ' + rhAsiEst[k][1] + '</button>').join('') +
-    (act ? '<button class="btn secondary" onclick="rhAsiAplicar(\'\')">↩ Quitar marca</button>' : '') + '</div>' +
-    '<div class="field"><label>Nota (opcional)</label><input id="raObs" maxlength="120" autocomplete="off" value="' + esc(act ? act.obs || '' : '') + '"></div>' +
-    '<label style="font-size:13px;display:flex;gap:6px;align-items:center;margin:6px 0"><input type="checkbox" id="raTodos"> Aplicar a todos los de esta lista en este día (ej. feriado)</label>' +
-    '<div style="font-size:12px;color:#777">Día libre = no se esperaba que trabajara (no se descuenta). Feriado = se paga aunque no se labore.</div>' +
+  const btn = k => '<button class="btn ' + ((act && act.e === k) ? 'primary' : 'secondary') + '" style="padding:6px 10px" onclick="rhAsiAplicar(\'' + k + '\')">' + rhAsiEst[k][0] + ' ' + rhAsiEst[k][1] + '</button>';
+  rhModal('<h3>' + esc(c.nombre) + '</h3>' +
+    '<div style="display:flex;gap:10px;align-items:end;margin-bottom:8px"><div class="field" style="flex:1;margin:0"><label>Del día</label><input type="date" id="raD1" value="' + f + '"></div><div class="field" style="flex:1;margin:0"><label>Al día</label><input type="date" id="raD2" value="' + f + '"></div></div>' +
+    '<div style="font-size:12px;color:#667;margin-bottom:8px">Para varios días seguidos, cambia «Al día». Solo se marcan los días hábiles (y los que no estén ya cubiertos por un permiso aprobado).</div>' +
+    '<div style="font-size:12px;font-weight:700;margin:6px 0 4px">Asistencia</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">' + ['LAB', 'AUS', 'LIB', 'FER'].map(btn).join('') +
+    (act && !act.auto ? '<button class="btn secondary" style="padding:6px 10px" onclick="rhAsiAplicar(\'\')">↩ Quitar marca</button>' : '') + '</div>' +
+    '<div style="font-size:12px;font-weight:700;margin:6px 0 4px">Vacaciones, permisos e incapacidad <span style="font-weight:400;color:#667">(quedan aprobados; las vacaciones descuentan del saldo)</span></div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">' + ['VAC', 'PCG', 'PSG', 'INC'].map(btn).join('') + '</div>' +
+    '<div class="field"><label>Nota / motivo (obligatorio en permisos e incapacidad)</label><input id="raObs" maxlength="120" autocomplete="off" value="' + esc(act ? act.obs || '' : '') + '"></div>' +
+    '<label style="font-size:13px;display:flex;gap:6px;align-items:center;margin:6px 0"><input type="checkbox" id="raTodos"> Aplicar a todos los de esta lista (solo asistencia; ej. feriado)</label>' +
+    '<div style="font-size:12px;color:#777">Día libre = no se esperaba que trabajara (no se descuenta). Feriado = se paga aunque no se labore. Permiso sin goce = se descuenta el día.</div>' +
     '<div style="text-align:right;margin-top:12px"><button class="btn secondary" onclick="rhCerrar()">Cancelar</button></div>');
 }
 
 async function rhAsiAplicar(estado) {
   const sel = rhAsiSel; if (!sel) return;
-  const todos = $('raTodos') && $('raTodos').checked, obs = $('raObs') ? $('raObs').value : '';
-  const ids = todos ? rhAsiData.colaboradores.filter(c => (rhAsiTipo === 'Todos' || c.periodicidad === rhAsiTipo) && !(c.dias[sel.f] && c.dias[sel.f].auto)).map(c => c.id) : [sel.id];
+  const todos = $('raTodos') && $('raTodos').checked, obs = $('raObs') ? $('raObs').value.trim() : '';
+  const d1 = $('raD1').value || sel.f, d2 = $('raD2').value || d1;
+  if (d2 < d1) return toast('«Al día» no puede ser anterior a «Del día».');
+  const rango = []; for (let t = rhMsC(d1); t <= rhMsC(d2); t += 86400000) rango.push(rhIso(t));
+  if (rango.length > 120) return toast('El rango es muy largo (máximo 120 días).');
+  const sol = ['VAC', 'PCG', 'PSG', 'INC'].indexOf(estado) >= 0;
   try {
-    for (const id of ids) await api('marcarAsistenciaRhWeb', id, [sel.f], estado, obs);
+    if (sol) {
+      if (estado !== 'VAC' && !obs) return toast('Escribe el motivo del permiso o la incapacidad.');
+      const r = await api('crearSolicitudRhWeb', { idColab: sel.id, tipo: estado, desde: d1, hasta: d2, motivo: obs });
+      await api('resolverSolicitudRhWeb', r.id, 'Aprobada', '');
+      toast(rhAsiEst[estado][1] + ': ' + r.dias + ' día(s) registrados y aprobados.');
+    } else {
+      const cols = todos ? rhAsiData.colaboradores.filter(c => rhAsiTipo === 'Todos' || c.periodicidad === rhAsiTipo) : rhAsiData.colaboradores.filter(c => c.id === sel.id);
+      for (const c of cols) {
+        const fechas = rango.filter(f => {
+          if (c.dias[f] && c.dias[f].auto) return false;
+          if (estado === 'LIB' || rango.length === 1) return true;
+          const wd = new Date(rhMsC(f)).getUTCDay(); return !(wd === 0 || (wd === 6 && c.diasSemana !== 6));
+        });
+        for (let i = 0; i < fechas.length; i += 40) await api('marcarAsistenciaRhWeb', c.id, fechas.slice(i, i + 40), estado, obs);
+      }
+    }
     rhCerrar(); rhRenderAsi();
   } catch (e) { mostrarError(e, 'No se pudo guardar la asistencia.'); }
 }
@@ -7583,7 +7617,7 @@ async function pmPlCargar() {
   try {
     const R = await api('planillaColaboradoresPmWeb', $('paFec').value, pmSemId);
     const dd = Math.round((Date.parse(R.fecha) - Date.parse(R.ultimoPago)) / 86400000);
-    R.filas.forEach(f => { f.atrasada = f.periodicidad !== 'Semanal' && dd > 5; f.sel = !f.pagado && !f.faltan.length && f.neto > 0 && !f.atrasada; });
+    R.filas.forEach(f => { f.atrasada = f.periodicidad !== 'Semanal' && dd > 5; f.sel = !f.pagado && !f.faltan.length && f.neto > 0 && !f.atrasada && !f.excluido; });
     pmPl = R; pmPlDibujar();
   } catch (e) { box.innerHTML = '<span style="color:#9b1c1c">' + esc(e.message || e) + '</span>'; }
 }
@@ -14590,6 +14624,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 79 · 14-oct 21:23</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 80 · 14-oct 21:35</div>
 </body>
 </html>

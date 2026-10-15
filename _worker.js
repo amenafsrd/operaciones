@@ -9683,13 +9683,27 @@ function rhPlanilla_(fecha, sem, bor) {
       rubros.push({ tipo: reb ? 'rebajo' : 'extra', concepto: txt_(x.concepto).slice(0, 60), monto: m });
     });
     const base = bruto; bruto = rh2_(base + extras);
+    const excluido = !!(rb && rb.excluir);
     const cargas = c.ccss ? rh2_(bruto * tasaObr / 100) : 0;
     const ded = rh2_(cargas + rebajos);
     const faltan = []; if (!c.banco) faltan.push('banco'); if (!c.referencia) faltan.push('referencia'); if (!/^\d{20}$/.test(c.iban)) faltan.push('cuenta IBAN');
     filas.push({ id: c.id, nombre: c.nombre, puesto: c.puesto, periodicidad: c.periodicidad, clave: clave, periodo: per, desde: desde, hasta: hasta, bruto: bruto, deducciones: ded, neto: rh2_(bruto - ded), ccss: c.ccss,
-      base: base, extras: rh2_(extras), rebajos: rh2_(rebajos), cargas: cargas, rubros: rubros,
+      base: base, extras: rh2_(extras), rebajos: rh2_(rebajos), cargas: cargas, rubros: rubros, excluido: excluido, tipoPago: 'SALARIO',
       texto: ('Servicios prestados ' + rhDm_(desde) + '-' + rhDm_(hasta)).slice(0, 31), banco: c.banco, iban: c.iban, referencia: c.referencia, faltan: faltan,
       parcial: !!(c.periodicidad !== 'Semanal' && ((c.ingreso && c.ingreso > desde) || (c.salida && c.salida < hasta))), pagado: pagados[c.id + '|' + clave] || null });
+  });
+  /* personas agregadas a mano a esta planilla (p. ej. un bono a quien no se le paga la quincena en este archivo) */
+  if (bor && sem && sem.id) leerObjetos_(rhHoja_('COLAB')).map(rhColabInfo_).forEach(c => {
+    const rb = bor[c.id];
+    if (!rb || !rb.incluir || !c.activo || filas.some(x => x.id === c.id)) return;
+    let extras = 0, rebajos = 0; const rubros = [];
+    (Array.isArray(rb.rubros) ? rb.rubros : []).forEach(x => { const m = rh2_(Math.max(0, rhNum_(x.monto))); if (!m) return; const reb = txt_(x.tipo) === 'rebajo'; if (reb) rebajos += m; else extras += m; rubros.push({ tipo: reb ? 'rebajo' : 'extra', concepto: txt_(x.concepto).slice(0, 60), monto: m }); });
+    const bruto = rh2_(extras), cargas = c.ccss ? rh2_(bruto * tasaObr / 100) : 0, ded = rh2_(cargas + rebajos);
+    const faltan = []; if (!c.banco) faltan.push('banco'); if (!c.referencia) faltan.push('referencia'); if (!/^\d{20}$/.test(c.iban)) faltan.push('cuenta IBAN');
+    const concepto = (rubros[0] && rubros[0].concepto) || 'Pago adicional';
+    filas.push({ id: c.id, nombre: c.nombre, puesto: c.puesto, periodicidad: c.periodicidad, clave: 'X|' + sem.id, periodo: 'Pago adicional · semana ' + rhDm_(sem.desde) + ' al ' + rhDm_(sem.hasta), desde: sem.desde, hasta: sem.hasta,
+      bruto: bruto, deducciones: ded, neto: rh2_(bruto - ded), ccss: c.ccss, base: 0, extras: rh2_(extras), rebajos: rh2_(rebajos), cargas: cargas, rubros: rubros, excluido: !!rb.excluir, tipoPago: 'BONO', adicional: true,
+      texto: concepto.slice(0, 31), banco: c.banco, iban: c.iban, referencia: c.referencia, faltan: faltan, parcial: false, pagado: pagados[c.id + '|X|' + sem.id] || null });
   });
   filas.sort((a, b) => a.nombre.localeCompare(b.nombre));
   return { fecha: f, filas: filas, tasaObr: tasaObr, ultimoPago: up.fecha };
@@ -9709,7 +9723,7 @@ function planillaSemanaRhWeb(token, idSemana) {
   const sel = sems.find(x => txt_(x.ID) === txt_(idSemana)) || sems.find(x => txt_(x.Estado) !== 'Cerrada') || sems[0];
   const id = txt_(sel.ID), desde = segFecha_(sel.Desde), hasta = segFecha_(sel.Hasta);
   const fecha = pmFechaPagoEst_(hasta) || segHoyISO_();
-  const pl = rhPlanilla_(fecha, { desde: desde, hasta: hasta }, rhRubrosSemana_(id));
+  const pl = rhPlanilla_(fecha, { id: id, desde: desde, hasta: hasta }, rhRubrosSemana_(id));
   return { semanas: sems.slice(0, 16).map(x => ({ id: txt_(x.ID), desde: segFecha_(x.Desde), hasta: segFecha_(x.Hasta), estado: txt_(x.Estado) || 'Abierta' })),
     idSemana: id, desde: desde, hasta: hasta, fechaPago: fecha, filas: pl.filas, tasaObr: pl.tasaObr };
 }
@@ -9720,8 +9734,9 @@ function guardarRubrosPlanillaRhWeb(token, idSemana, rubros) {
   if (!leerObjetos_(pmHoja_('SEM')).some(x => txt_(x.ID) === txt_(idSemana))) throw new Error('No se encontró la semana.');
   const limpio = {};
   Object.keys(rubros || {}).forEach(idc => {
-    const l = (Array.isArray(rubros[idc]) ? rubros[idc] : []).map(x => ({ tipo: txt_(x.tipo) === 'rebajo' ? 'rebajo' : 'extra', concepto: txt_(x.concepto).slice(0, 60), monto: rh2_(Math.max(0, rhNum_(x.monto))) })).filter(x => x.monto > 0);
-    if (l.length) limpio[txt_(idc)] = { rubros: l };
+    const ent = Array.isArray(rubros[idc]) ? { rubros: rubros[idc] } : (rubros[idc] || {});
+    const l = (Array.isArray(ent.rubros) ? ent.rubros : []).map(x => ({ tipo: txt_(x.tipo) === 'rebajo' ? 'rebajo' : 'extra', concepto: txt_(x.concepto).slice(0, 60), monto: rh2_(Math.max(0, rhNum_(x.monto))) })).filter(x => x.monto > 0);
+    if (l.length || ent.excluir || ent.incluir) limpio[txt_(idc)] = { rubros: l, excluir: !!ent.excluir, incluir: !!ent.incluir };
   });
   return conBloqueo_(() => {
     const sh = rhHoja_('PAR'), t = leerTabla_(sh), clave = 'plan|' + txt_(idSemana), ahora = segAhora_(), json = JSON.stringify(limpio);
@@ -9735,7 +9750,7 @@ function guardarRubrosPlanillaRhWeb(token, idSemana, rubros) {
 function planillaColaboradoresPmWeb(token, fecha, idSemana) {
   requerirSesion_(token, 'admin');
   const sm = idSemana ? leerObjetos_(pmHoja_('SEM')).find(x => txt_(x.ID) === txt_(idSemana)) : null;
-  return rhPlanilla_(fecha, sm ? { desde: segFecha_(sm.Desde) || '', hasta: segFecha_(sm.Hasta) || '' } : null, sm ? rhRubrosSemana_(idSemana) : null);
+  return rhPlanilla_(fecha, sm ? { id: txt_(sm.ID), desde: segFecha_(sm.Desde) || '', hasta: segFecha_(sm.Hasta) || '' } : null, sm ? rhRubrosSemana_(idSemana) : null);
 }
 /* Alerta: el día de pago (15 / 30) y los 3 siguientes, mientras queden quincenales o mensuales sin incluir en un archivo del banco */
 function rhAlertaPlanilla_() {
@@ -9759,7 +9774,7 @@ function registrarPlanillaRhWeb(token, d) {
     lineas.forEach(l => {
       const bruto = rhNum_(l.bruto), ded = Math.max(0, rhNum_(l.deducciones));
       if (!txt_(l.id) || !txt_(l.clave) || !(bruto > 0)) return;
-      const o = { ID_Colab: txt_(l.id), Fecha: fecha, Periodo: txt_(l.periodo).slice(0, 40), Tipo: 'SALARIO', Bruto: rh2_(bruto), Deducciones: rh2_(ded), Neto: rh2_(bruto - ded), Obs: ('Envío banco ' + txt_(d.envio) + ' · ' + txt_(l.texto)).slice(0, 200), Detalle: txt_(l.texto).slice(0, 60), Clave_Planilla: txt_(l.clave), Envio_Banco: txt_(d.envio) };
+      const o = { ID_Colab: txt_(l.id), Fecha: fecha, Periodo: txt_(l.periodo).slice(0, 40), Tipo: RH.TIPOS_PAGO[txt_(l.tipo)] ? txt_(l.tipo) : 'SALARIO', Bruto: rh2_(bruto), Deducciones: rh2_(ded), Neto: rh2_(bruto - ded), Obs: ('Envío banco ' + txt_(d.envio) + ' · ' + txt_(l.texto)).slice(0, 200), Detalle: txt_(l.texto).slice(0, 60), Clave_Planilla: txt_(l.clave), Envio_Banco: txt_(d.envio) };
       const k = o.ID_Colab + '|' + o.Clave_Planilla;
       if (existentes[k]) { Object.keys(o).forEach(c => sh.getRange(existentes[k], t.idx[c] + 1).setValue(o[c])); }
       else { o.ID = 'P' + Date.now().toString(36).toUpperCase() + n; o.Registrado_Por = ses.usuario; o.Creado = ahora; appendPorEncabezados_(sh, o); }
@@ -11212,7 +11227,7 @@ function generarBancoPmWeb(token, idSemana, fechaPago, envio, colabs) {
     if (base && base.pagado && !l.repetir) { avisos.push(col.nombre + ' (colaborador): ya se pagó ese período en el envío ' + base.pagado.envio + ', no se incluye.'); return; }
     const texto = (txt_(l.texto) || 'Servicios prestados').replace(/\s+/g, ' ').slice(0, 31);
     items.push({ iban: col.iban, monto: neto, texto: texto, nombre: col.nombre, factura: false, contratista: col.nombre, movil: '', banco: col.banco, referencia: col.referencia, numFactura: '', vb: '', subtotal: bruto, iva: 0, totalFacturado: bruto, deducciones: ded, tipo: 'Colaborador' });
-    colabIncluidos.push({ id: col.id, clave: txt_(l.clave), periodo: txt_(l.periodo), bruto: bruto, deducciones: ded, texto: texto });
+    colabIncluidos.push({ id: col.id, clave: txt_(l.clave), tipo: (base && base.tipoPago) || 'SALARIO', periodo: txt_(l.periodo), bruto: bruto, deducciones: ded, texto: texto });
   });
   if (!items.length) throw new Error('No hay pagos para incluir en el archivo.');
   const cents = it => Math.round(it.monto * 100);
