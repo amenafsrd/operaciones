@@ -6371,6 +6371,7 @@ function cambiarEstadoAlistoWeb(token, alisto, accion) {
 
     if (accion === 'ANULAR') {
       for (let k = filas.length - 1; k >= 0; k--) sh.deleteRow(filas[k] + 1);
+      try { invLog_(ses, 'Alisto: ' + txt_(accion), 'Alisto ' + txt_(alisto), txt_(alisto)); } catch (e) { }
       return { ok: true };
     }
     const nuevo = accion === 'ALISTAR' ? 'ALISTADO' : accion === 'REABRIR' ? 'BORRADOR' : '';
@@ -6380,6 +6381,7 @@ function cambiarEstadoAlistoWeb(token, alisto, accion) {
       sh.getRange(i + 1, t.idx.Estado + 1).setValue(nuevo);
       sh.getRange(i + 1, t.idx.Alistado + 1).setValue(marca);
     });
+    try { invLog_(ses, 'Alisto: ' + txt_(accion), 'Alisto ' + txt_(alisto), txt_(alisto)); } catch (e) { }
     return { ok: true, estado: nuevo };
   });
 }
@@ -6607,6 +6609,7 @@ function firmarMovimientoInvWeb(token, grupo, nombre, imagen) {
     invAgregar_(invHoja_('FIR'), 'FIR', [{
       Grupo: grupo, Consecutivo: txt_(doc[0].Consecutivo), Nombre: nombre, Fecha_Hora: segAhora_(), Usuario: ses.usuario, Firma: imagen
     }]);
+    try { invLog_(ses, 'Movimiento firmado', 'Grupo ' + grupo + ' · ' + txt_(nombre), txt_(grupo)); } catch (e) { }
     return { ok: true, nombre: nombre };
   });
 }
@@ -6650,7 +6653,7 @@ function eliminarMovimientoInvWeb(token, grupo) {
 /* Stock objetivo por móvil y material: lista [{idMovil, clave, cantidad}]; cantidad vacía o 0 lo quita */
 function guardarObjetivosWeb(token, lista) {
 
-  requerirSesion_(token, 'admin');
+  const ses = requerirSesion_(token, 'admin');
   lista = lista || [];
 
   return conBloqueo_(() => {
@@ -6669,6 +6672,7 @@ function guardarObjetivosWeb(token, lista) {
     });
 
     invReescribir_(sh, 'OBJ', Object.keys(mapa).map(k => mapa[k]));
+    try { invLog_(ses, 'Objetivos de materiales guardados', Object.keys(mapa).length + ' material(es)', ''); } catch (e) { }
     return { ok: true, total: Object.keys(mapa).length };
   });
 }
@@ -6685,7 +6689,7 @@ const INV_COSTOS_ADENDUM = {
 /* Carga los costos del adendum por código y, si se indica, deja el stock completo de bodega = N × el stock por móvil */
 function aplicarCostosAdendumWeb(token, multiplicador) {
 
-  requerirSesion_(token, 'admin');
+  const ses = requerirSesion_(token, 'admin');
   const mult = Number(multiplicador) || 0;
 
   return conBloqueo_(() => {
@@ -6722,6 +6726,7 @@ function aplicarCostosAdendumWeb(token, multiplicador) {
 
     if (t.values.length > 1) sh.getRange(2, 1, t.values.length - 1, t.values[0].length).setValues(t.values.slice(1));
 
+    try { invLog_(ses, 'Costos de adendum aplicados', 'Multiplicador ' + multiplicador, ''); } catch (e) { }
     return {
       ok: true, conCosto: conCosto, conCompleto: conCompleto,
       codigosSinMaterial: Object.keys(INV_COSTOS_ADENDUM).filter(c => !usados[c]),
@@ -6917,6 +6922,7 @@ function importarConsumoWeb(token, filas, archivo, mapa) {
       Nuevas: nNuevas, Cambiadas: nCamb, Sin_Cambios: nSin, Cambios: JSON.stringify(cambios.slice(0, 40)).slice(0, 3000)
     }]);
 
+    try { invLog_(ses, 'Consumo importado', 'Archivo ' + txt_(archivo), ''); } catch (e) { }
     return {
       ok: true, filas: filas.length, ordenes: ordenes.length, lineas: lineas, sinMovil: sinMovil,
       nuevas: nNuevas, sinCambios: nSin, cambiadas: nCamb, cambios: cambios.slice(0, 60),
@@ -6956,7 +6962,7 @@ function obtenerConsumoDetalleWeb(token, desde, hasta) {
 /* Elimina una importación completa: quita sus líneas de consumo (el stock de las móviles vuelve a lo que era sin ellas) */
 function eliminarCargaConsumoWeb(token, hora) {
 
-  requerirSesion_(token, 'admin');
+  const ses = requerirSesion_(token, 'admin');
   hora = txt_(hora);
   if (!hora) throw new Error('Indica la importación.');
 
@@ -6984,6 +6990,7 @@ function eliminarCargaConsumoWeb(token, hora) {
 
     shCar.deleteRow(car._fila);
 
+    try { invLog_(ses, 'Carga de consumo eliminada', txt_(archivo) + ' · ' + quitadas + ' línea(s)', txt_(hora)); } catch (e) { }
     return { ok: true, lineas: quitadas, ordenes: Object.keys(otsQuitadas).length, archivo: archivo };
   });
 }
@@ -7078,6 +7085,7 @@ function importarDevolucionesWeb(token, filas, archivo, periodo) {
     devEscribir_(sh, todas);
     invAgregar_(invHoja_('DEVH'), 'DEVH', [{ Fecha_Hora: ahora, Usuario: ses.usuario, Linea: '', Accion: 'IMPORTAR', Detalle: archivo + ' · ' + periodo + ' · ' + nuevas + ' líneas nuevas, ' + repetidas + ' ya existían' }]);
 
+    try { invLog_(ses, 'Devoluciones importadas', 'Período ' + periodo + ' · ' + nuevas + ' nueva(s) · archivo ' + archivo, periodo); } catch (e) { }
     return { ok: true, periodo: periodo, nuevas: nuevas, repetidas: repetidas, ordenes: Object.keys(ots).length, unidades: unidades,
       sinMovil: sinMovil, movilesSinFicha: Object.keys(sinMovilTxt) };
   });
@@ -7135,6 +7143,7 @@ function registrarDevolucionLineaWeb(token, linea, cantidad, fecha, boleta) {
     devEscribir_(sh, todas);
     invAgregar_(invHoja_('DEVE'), 'DEVE', [{ Entrega: 'L' + Date.now(), Fecha: dia, ID_Movil: o.ID_Movil, Movil: o.Movil, Boleta: txt_(boleta), Equipo: o.Equipo, Cantidad: q, Linea: o.Linea, Usuario: ses.usuario, Creado: segAhora_() }]);
     devHist_(ses, o.Linea, 'DEVOLUCION', q + ' ' + o.Equipo + (txt_(boleta) ? ' · boleta ' + txt_(boleta) : '') + ' · ' + dia);
+    try { invLog_(ses, 'Devolución registrada', 'Línea ' + txt_(linea) + ' · cantidad ' + txt_(cantidad) + ' · boleta ' + txt_(boleta), txt_(boleta)); } catch (e) { }
     return { ok: true, pendiente: devPend_(o) };
   });
 }
@@ -7200,6 +7209,7 @@ function registrarBoletaDevolucionWeb(token, periodo, fecha, boleta, cantidades,
     });
     devEscribir_(sh, todas);
     invAgregar_(invHoja_('DEVE'), 'DEVE', filas);
+    try { invLog_(ses, 'Boleta de devolución', 'Boleta ' + boleta + ' · período ' + periodo + ' · móvil ' + idMovil + ' · ' + pedidos.reduce((a, p) => a + p.q, 0) + ' unidad(es)', boleta); } catch (e) { }
     return { ok: true, lineas: plan.length, unidades: pedidos.reduce((a, p) => a + p.q, 0) };
   });
 }
@@ -7237,6 +7247,7 @@ function registrarEntregaMovilWeb(token, idMovil, fecha, boleta, cantidades) {
     const id = 'E' + Date.now();
     invAgregar_(invHoja_('DEVE'), 'DEVE', pedidos.map(p => ({ Entrega: id, Fecha: dia, ID_Movil: idMovil, Movil: delMovil[0].Movil, Boleta: txt_(boleta), Equipo: p.equipo, Cantidad: p.q, Linea: '', Usuario: ses.usuario, Creado: segAhora_() })));
     plan.forEach(x => devHist_(ses, x.o.Linea, 'DEVOLUCION', x.t + ' ' + x.o.Equipo + (txt_(boleta) ? ' · boleta ' + txt_(boleta) : '') + ' · entrega de ' + nombre + ' · ' + dia));
+    try { invLog_(ses, 'Entrega a móvil', 'Boleta ' + txt_(boleta) + ' · móvil ' + idMovil + ' · ' + pedidos.reduce((a, p) => a + p.q, 0) + ' unidad(es)', txt_(boleta)); } catch (e) { }
     return { ok: true, aplicadas: plan.length, unidades: pedidos.reduce((a, p) => a + p.q, 0) };
   });
 }
@@ -7345,6 +7356,7 @@ function eliminarPeriodoDevolucionesWeb(token, periodo, confirmacion) {
     const quedan = ent.filter(e => !set[txt_(e.Linea)]);
     if (quedan.length !== ent.length) invReescribir_(she, 'DEVE', quedan);
     devHist_(ses, '', 'ELIMINAR_SEMANA', periodo + ' · ' + delPeriodo.length + ' líneas (devueltos ' + dev + ', justificados ' + jus + ') · ' + (ent.length - quedan.length) + ' entregas');
+    try { invLog_(ses, 'Período de devoluciones eliminado', periodo + ' · ' + delPeriodo.length + ' línea(s)', periodo); } catch (e) { }
     return { ok: true, eliminadas: delPeriodo.length };
   });
 }
@@ -7408,6 +7420,7 @@ function aceptarAlertasBodegaWeb(token, claves) {
     const ahora = segAhora_();
     const nuevas = claves.filter(c => disp[c] !== undefined).map(c => ({ Clave: c, Usuario: ses.usuario, Fecha_Hora: ahora, Disponible: disp[c] }));
     invReescribir_(sh, 'ALE', previas.concat(nuevas));
+    try { invLog_(ses, 'Alertas de bodega aceptadas', nuevas.length + ' alerta(s)', ''); } catch (e) { }
     return { ok: true, aceptadas: nuevas.length };
   });
 }
@@ -7704,7 +7717,7 @@ function obtenerConteoInvWeb(token, corte) {
 /* Guarda lo contado: lista [{ubicacion, clave, fisico}]; fisico vacío = no contado */
 function guardarConteoInvWeb(token, corte, lista) {
 
-  requerirSesion_(token, 'operador');
+  const ses = requerirSesion_(token, 'operador');
   corte = txt_(corte);
   lista = lista || [];
 
@@ -7738,6 +7751,7 @@ function guardarConteoInvWeb(token, corte, lista) {
     });
 
     invReescribir_(sh, 'CONTEO', otros.concat(Object.keys(mapa).map(k => mapa[k])));
+    try { invLog_(ses, 'Conteo guardado', txt_(corte) + ' · ' + Object.keys(mapa).length + ' material(es) contados', txt_(corte)); } catch (e) { }
     return { ok: true, contados: Object.keys(mapa).length };
   });
 }
@@ -7772,6 +7786,7 @@ function justificarDiferenciaInvWeb(token, corte, lista) {
     });
 
     invReescribir_(sh, 'CONTEO', todos);
+    try { invLog_(ses, 'Diferencias justificadas', txt_(corte) + ' · ' + n + ' cambio(s)', txt_(corte)); } catch (e) { }
     return { ok: true, cambiadas: n };
   });
 }
@@ -7848,7 +7863,7 @@ function cerrarCorteInvWeb(token, corte) {
 /* Elimina un corte creado por error. Solo si está abierto (si ya se cerró, primero se reabre). Lo borra el administrador o quien lo creó. */
 function eliminarCorteInvWeb(token, corte) {
 
-  const ses = requerirSesion_(token, 'operador');
+  const ses = requerirSesion_(token, 'admin');
   corte = txt_(corte);
 
   return conBloqueo_(() => {
@@ -7859,7 +7874,6 @@ function eliminarCorteInvWeb(token, corte) {
     for (let i = 1; i < tc.values.length; i++) { if (txt_(tc.values[i][tc.idx.Corte]) === corte) { fila = i; break; } }
     if (fila < 0) throw new Error('No se encontró el corte.');
     if (txt_(tc.values[fila][tc.idx.Estado]) === 'Cerrado') throw new Error('Este corte está cerrado y ya generó ajustes. Primero reábrelo y luego elimínalo.');
-    if (ses.rol !== 'admin' && txt_(tc.values[fila][tc.idx.Usuario]) !== ses.usuario) throw new Error('Solo el administrador o quien creó el corte puede eliminarlo.');
 
     const sh = invHoja_('CONTEO');
     const resto = leerObjetos_(sh).filter(r => txt_(r.Corte) !== corte).map(invConteoFila_);
@@ -7914,7 +7928,7 @@ function reabrirCorteInvWeb(token, corte) {
    Guarda el código y la descripción como alias para que la próxima vez se reconozcan solos. */
 function guardarMapeoInvWeb(token, lista) {
 
-  requerirSesion_(token, 'operador');
+  const ses = requerirSesion_(token, 'operador');
   lista = lista || [];
 
   return conBloqueo_(() => {
@@ -7965,6 +7979,7 @@ function guardarMapeoInvWeb(token, lista) {
 
     if (cambiados) sh.getRange(2, 1, t.values.length - 1, t.values[0].length).setValues(t.values.slice(1));
     invAgregar_(sh, 'MAT', nuevas);
+    try { invLog_(ses, 'Mapeo de materiales guardado', creados + ' material(es) creados', ''); } catch (e) { }
     return { ok: true, mapa: mapa, creados: creados };
   });
 }
@@ -8027,7 +8042,7 @@ function compararClienteWeb(token, desde, hasta) {
 /* lista: [{codigo, descripcion, objetivo}] — los materiales oficiales (los del inventario físico) */
 function cargarCatalogoOficialWeb(token, lista, aplicarMoviles, desdeCero) {
 
-  requerirSesion_(token, 'admin');
+  const ses = requerirSesion_(token, 'admin');
   lista = lista || [];
   if (!lista.length) throw new Error('No hay materiales para cargar.');
 
@@ -8105,6 +8120,7 @@ function cargarCatalogoOficialWeb(token, lista, aplicarMoviles, desdeCero) {
     let puestos = 0;
     if (aplicarMoviles !== false) puestos = invAplicarBase_(false).puestos;
 
+    try { invLog_(ses, 'Catálogo oficial cargado', nuevas.length + ' creados · ' + actualizados + ' actualizados · ' + eliminados + ' eliminados', ''); } catch (e) { }
     return { ok: true, creados: nuevas.length, actualizados: actualizados, objetivos: puestos, eliminados: eliminados };
   });
 }

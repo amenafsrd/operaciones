@@ -1226,7 +1226,7 @@
 
         <!-- Catálogo -->
         <div id="bodPanelHis" style="display:none">
-          <div class="toolbar" style="flex-wrap:wrap"><label>Desde <input type="date" id="bhDesde"></label><label>Hasta <input type="date" id="bhHasta"></label><input id="bhQ" placeholder="Buscar usuario, acción o detalle" style="min-width:240px" onkeydown="if(event.key==='Enter')cargarHistBodega()"><button class="btn secondary" onclick="cargarHistBodega()">Buscar</button></div>
+          <div class="toolbar" style="flex-wrap:wrap"><label>Desde <input type="date" id="bhDesde"></label><label>Hasta <input type="date" id="bhHasta"></label><input id="bhQ" placeholder="Buscar usuario, acción o detalle" style="min-width:240px" onkeydown="if(event.key==='Enter')cargarHistBodega()"><button class="btn secondary" onclick="cargarHistBodega()">Buscar</button><button class="btn secondary" onclick="exportarHistBodega()">⬇ Excel</button></div>
           <div class="panel"><div class="panelHead"><h2>🕘 Historial de cambios de bodega</h2><span id="bhTotal"></span></div><div id="bodHisLista" class="hist"></div></div>
         </div>
         <div id="bodPanelCat" style="display:none">
@@ -10509,6 +10509,17 @@ async function cargarHistBodega() {
   } catch (e) { $('bodHisLista').innerHTML = ''; mostrarError(e, 'No se pudo cargar el historial.'); }
 }
 
+async function exportarHistBodega() {
+  try {
+    await cargarLib('xlsx', SEG_URL_XLSX);
+    const r = await api('historialBodegaWeb', $('bhDesde').value, $('bhHasta').value, $('bhQ').value);
+    if (!r.filas.length) { toast('No hay cambios para exportar.'); return; }
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['Fecha y hora', 'Usuario', 'Cambio', 'Detalle', 'Referencia']].concat(r.filas.map(x => [x.hora, x.usuario, x.accion, x.detalle, x.ref]))), 'Historial');
+    await xlsxMarca(wb, 'Historial_bodega_' + hoyISO() + '.xlsx', 'Historial de cambios de bodega');
+  } catch (e) { mostrarError(e, 'No se pudo exportar.'); }
+}
+
 function bodLlenarFiltros() {
   const ab = $('abMovil'), actualAb = ab.value;
   ab.innerHTML = '<option value="">Todas</option>' + bodDatos.moviles.map(x => '<option value="' + esc(x.idMovil) + '">M' + esc(x.movil) + ' · ' + esc(x.tecnico) + '</option>').join('');
@@ -11997,7 +12008,7 @@ function renderCortes() {
       '<td>' + c.contados + '</td><td>' + (c.diferencias ? '<b class="segNeg">' + c.diferencias + '</b>' : '0') + '</td>' +
       '<td>' + esc(c.usuario) + '</td><td>' + (c.cerrado ? esc(c.cerradoPor) + '<div style="font-size:11px;color:#888">' + esc(c.cerrado) + '</div>' : '—') + '</td>' +
       '<td style="white-space:nowrap"><button class="btnMini" onclick="abrirCorte(\'' + escJs(c.corte) + '\')">' + (c.estado === 'Cerrado' ? '👁️ Ver' : '📝 Contar') + '</button>' +
-        (c.estado !== 'Cerrado' && puedeEditar() && (esAdmin() || c.usuario === sesion.usuario) ? ' <button class="btnMini" title="Eliminar este corte" style="color:#b71c1c" onclick="eliminarCorte(\'' + escJs(c.corte) + '\')">🗑️ Eliminar</button>' : '') + '</td></tr>').join('') + '</tbody></table>';
+        (c.estado !== 'Cerrado' && esAdmin() ? ' <button class="btnMini" title="Eliminar este corte" style="color:#b71c1c" onclick="eliminarCorte(\'' + escJs(c.corte) + '\')">🗑️ Eliminar</button>' : '') + '</td></tr>').join('') + '</tbody></table>';
 }
 
 function invTipoCambio() {
@@ -14662,6 +14673,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 84 · 15-oct 06:18</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 86 · 15-oct 07:49</div>
 </body>
 </html>
