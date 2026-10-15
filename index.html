@@ -7533,19 +7533,73 @@ function pmDibujarPst() {
     '<div class="panel"><div style="display:flex;gap:22px;flex-wrap:wrap;padding:12px 14px;font-size:13px">' + [['Prestado', pmM(tot.pr)], ['Abonado (capital + interés)', pmM(tot.ab)], ['Interés generado', pmM(tot.ig)], ['Saldo de capital', pmM(tot.cap)], ['Interés pendiente', pmM(tot.int)], ['Nos deben', pmM(tot.d)]].map(x => '<div><div style="color:#667;font-size:11px">' + x[0] + '</div><b style="font-size:15px">' + x[1] + '</b></div>').join('') + '</div></div>' +
     '<div class="panel"><div class="panelHead"><h2>Préstamos</h2><span>' + P.length + '</span></div><div style="padding:6px 12px;font-size:12px;color:#667">Interés simple <b>semanal</b> sobre el saldo de capital (no se capitaliza). Cada abono (rebajo del pago semanal o aporte directo) paga primero el interés y luego el capital.</div><div class="tableWrap">' +
     (P.length ? '<table class="pmT"><thead><tr><th>Deudor</th><th>Fecha</th><th>Concepto</th><th style="text-align:right">Prestado</th><th style="text-align:right">Interés semanal</th><th style="text-align:right">Cuota semanal</th><th style="text-align:right">Abonado</th><th style="text-align:right">Saldo capital</th><th style="text-align:right">Interés pend.</th><th style="text-align:right">Nos debe</th><th></th></tr></thead><tbody>' +
-      P.map(p => { const e = p.estadoCalc; return '<tr><td><b>' + esc(p.deudor || p.contratista) + '</b>' + (p.deudorTipo === 'Asistente' ? ' <span class="chip azul" title="Se rebaja del pago de ' + esc(p.contratista) + '">Asistente</span>' : '') + (p.estado === 'Cancelado' ? ' <span class="chip rojo">Cancelado</span>' : (e.debe <= 0.005 ? ' <span class="chip verde">Pagado</span>' : '')) + '</td><td>' + esc(pmFh(p.fecha)) + '</td><td>' + esc(p.concepto) + '</td>' + num(pmM(e.prestado)) + num(p.tasa + ' % <span style="color:#889;font-size:10.5px" title="Equivalente mensual (52/12 semanas)">≈' + (Math.round(p.tasa * 52 / 12 * 10) / 10) + '%/mes</span>') + num(p.cuota ? pmM(p.cuota) : '—') + num(pmM(e.abonadoCapital + e.abonadoInteres)) + num(pmM(e.capital)) + num(pmM(e.interes)) + num('<b>' + pmM(e.debe) + '</b>') +
+      P.map(p => { const e = p.estadoCalc; return '<tr><td><b>' + esc(p.deudor || p.contratista) + '</b>' + (p.deudorTipo === 'Asistente' ? ' <span class="chip azul" title="Se rebaja del pago de ' + esc(p.contratista) + '">Asistente</span>' : '') + (p.movil ? '<div style="font-size:11px;color:#667">Móvil ' + esc(p.movil) + (p.deudorTipo === 'Asistente' ? ' · paga ' + esc(p.contratista) : '') + '</div>' : (p.deudorTipo === 'Asistente' ? '<div style="font-size:11px;color:#667">Paga ' + esc(p.contratista) + '</div>' : '')) + (p.cambio ? '<div><button class="btn secondary" style="padding:1px 8px;font-size:11px;border-color:#c9a227;background:#fff8e1" onclick="pmPrCambio(\'' + p.id + '\')">⚠ Pasó a la móvil ' + esc(p.cambio.a) + ': decidir</button></div>' : '') + (p.sinMovilActiva && p.estadoCalc.debe > 0.005 && p.estado !== 'Cancelado' ? '<div style="font-size:11px;color:#9b1c1c">⚠ ya no figura en ninguna móvil activa</div>' : '') + (p.estado === 'Cancelado' ? ' <span class="chip rojo">Cancelado</span>' : (e.debe <= 0.005 ? ' <span class="chip verde">Pagado</span>' : '')) + '</td><td>' + esc(pmFh(p.fecha)) + '</td><td>' + esc(p.concepto) + '</td>' + num(pmM(e.prestado)) + num(p.tasa + ' % <span style="color:#889;font-size:10.5px" title="Equivalente mensual (52/12 semanas)">≈' + (Math.round(p.tasa * 52 / 12 * 10) / 10) + '%/mes</span>') + num(p.cuota ? pmM(p.cuota) : '—') + num(pmM(e.abonadoCapital + e.abonadoInteres)) + num(pmM(e.capital)) + num(pmM(e.interes)) + num('<b>' + pmM(e.debe) + '</b>') +
         '<td style="white-space:nowrap"><button class="btn secondary" onclick="pmPrestamoDetalle(\'' + p.id + '\')">Detalle</button> <button class="btn secondary" onclick="pmPrestamoModal(\'' + p.id + '\')">Editar</button></td></tr>'; }).join('') + '</tbody></table>' : '<div class="loading">No hay préstamos en esta vista.</div>') + '</div></div>';
 }
+let pmPrOps = [], pmPrTipo = 'Técnico', pmPrSelIdx = -1, pmPrEdit = null;
+/* Opciones: solo móviles activas, una por móvil; el contratista que paga es el que factura esa móvil */
+function pmPrConDe(m) { return pmD.contratistas.find(c => c.activo && String(c.moviles).split(/[^0-9]+/).filter(Boolean).map(x => String(Number(x))).indexOf(String(m)) >= 0) || null; }
+function pmPrArmar(tipo) {
+  const ops = (pmD.movilesSis || []).filter(m => m.activa).map(m => ({ movil: m.numero, nombre: tipo === 'Asistente' ? m.asistente : (m.tecnico || ''), con: pmPrConDe(m.numero), tecnico: m.tecnico || '' })).filter(o => o.nombre || tipo !== 'Asistente');
+  ops.forEach(o => { if (!o.nombre) o.nombre = o.con ? o.con.nombre : 'Móvil ' + o.movil; });
+  pmPrOps = ops.sort((a, b) => Number(a.movil) - Number(b.movil));
+}
+function pmPrPintar() {
+  const sel = $('prOp'); if (!sel) return;
+  sel.innerHTML = '<option value="">— Elige ' + (pmPrTipo === 'Asistente' ? 'al asistente' : 'la móvil') + ' —</option>' + pmPrOps.map((o, i) => '<option value="' + i + '"' + (o.con || o.actual ? '' : ' disabled') + (i === pmPrSelIdx ? ' selected' : '') + '>' + (o.actual ? '(actual) ' : '') + 'Móvil ' + esc(o.movil || '—') + ' · ' + esc(o.nombre) + (pmPrTipo === 'Asistente' && o.tecnico ? ' (técnico: ' + esc(o.tecnico) + ')' : '') + (o.con && pmNorm(o.con.nombre) !== pmNorm(o.nombre) ? ' → paga ' + esc(o.con.nombre) : '') + (o.con || o.actual ? '' : ' — sin contratista') + '</option>').join('');
+  pmPrInfo();
+}
+function pmPrInfo() {
+  const o = pmPrOps[pmPrSelIdx], el = $('prInfo'); if (!el) return;
+  el.innerHTML = o ? '<div><span style="color:#667">Móvil</span> <b>' + esc(o.movil || '—') + '</b>' + (o.tecnico ? ' · técnico <b>' + esc(o.tecnico) + '</b>' : '') + '</div><div><span style="color:#667">Las cuotas se rebajan del pago de</span> <b>' + esc(o.con ? o.con.nombre : '—') + '</b></div>' : '<span style="color:#778">Solo aparecen móviles activas. Al elegir se carga la móvil y el contratista al que se le rebaja.</span>';
+}
+function pmPrCambiarTipo(t) {
+  pmPrTipo = t; pmPrSelIdx = -1; pmPrArmar(t);
+  ['Técnico', 'Asistente'].forEach(x => { const b = $('prT' + (x === 'Asistente' ? 'A' : 'T')); if (b) b.className = 'btn ' + (x === t ? 'primary' : 'secondary'); });
+  pmPrPintar();
+}
 function pmPrestamoModal(id) {
-  const p = id ? pmPr.prestamos.find(x => x.id === id) : { idCon: '', fecha: pmD.hoy, monto: '', tasa: 5, cuota: '', concepto: '', estado: 'Activo', deudorTipo: 'Técnico', deudorNombre: '' };
-  pmModal('<h3>' + (id ? 'Editar' : 'Nuevo') + ' préstamo</h3><div style="display:grid;gap:8px;grid-template-columns:1fr 1fr"><label>Quién solicita<select id="prTipo" onchange="$(\'prAsiW\').style.display=this.value===\'Asistente\'?\'\':\'none\'"><option value="Técnico"' + (p.deudorTipo !== 'Asistente' ? ' selected' : '') + '>Técnico (contratista)</option><option value="Asistente"' + (p.deudorTipo === 'Asistente' ? ' selected' : '') + '>Asistente</option></select></label><label id="prAsiW" style="' + (p.deudorTipo === 'Asistente' ? '' : 'display:none') + '">Nombre del asistente<input id="prAsi" maxlength="100" value="' + esc(p.deudorNombre) + '"></label><label style="grid-column:1/3">Cuotas se rebajan del pago de (contratista)<select id="prCon">' + pmD.contratistas.map(c => '<option value="' + c.id + '"' + (c.id === p.idCon ? ' selected' : '') + '>' + esc(c.nombre) + (c.moviles ? ' (' + esc(c.moviles) + ')' : '') + (c.activo ? '' : ' · inactivo') + '</option>').join('') + '</select></label>' +
-    '<label>Fecha en que se prestó<input type="date" id="prFec" value="' + esc(p.fecha) + '"></label><label>Monto prestado (₡)<input type="number" id="prMon" step="0.01" min="0" value="' + esc(p.monto) + '"></label><label>Interés semanal (%) sobre el saldo<input type="number" id="prTasa" step="0.01" min="0" value="' + esc(p.tasa) + '" oninput="const v=+this.value||0;$(\'prEq\').textContent=\'≈ \'+(Math.round(v*52/12*10)/10)+\' % mensual · \'+(Math.round(v*52*10)/10)+\' % anual (simple)\'"><span id="prEq" style="font-size:11px;color:#667">≈ ' + (Math.round(p.tasa * 52 / 12 * 10) / 10) + ' % mensual · ' + (Math.round(p.tasa * 52 * 10) / 10) + ' % anual (simple)</span></label><label>Cuota semanal a rebajar (₡, opcional)<input type="number" id="prCuo" step="0.01" min="0" value="' + esc(p.cuota || '') + '"></label>' +
-    '<label style="grid-column:1/3">Concepto<input id="prCon2" maxlength="160" value="' + esc(p.concepto) + '" placeholder="ej. Adelanto para herramientas"></label>' + (id ? '<label>Estado<select id="prEst"><option' + (p.estado === 'Activo' ? ' selected' : '') + '>Activo</option><option' + (p.estado === 'Cancelado' ? ' selected' : '') + '>Cancelado</option></select></label>' : '') + '</div>' +
-    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">' + (id ? '<button class="btn secondary" onclick="pmPrestamoBorrar(\'' + id + '\')">🗑 Eliminar</button>' : '') + '<span style="flex:1"></span><button class="btn secondary" onclick="pmCerrar()">Cancelar</button><button class="btn primary" onclick="pmPrestamoGuardar(\'' + (id || '') + '\')">Guardar</button></div>');
+  const p = id ? pmPr.prestamos.find(x => x.id === id) : { idCon: '', fecha: pmD.hoy, monto: '', tasa: 5, cuota: '', concepto: '', estado: 'Activo', deudorTipo: 'Técnico', deudorNombre: '', movil: '' };
+  pmPrEdit = p; pmPrTipo = p.deudorTipo === 'Asistente' ? 'Asistente' : 'Técnico'; pmPrArmar(pmPrTipo);
+  if (id) { /* al editar: se busca la opción actual; si ya no está activa se conserva como «actual» */
+    let i = pmPrOps.findIndex(o => (pmPrTipo === 'Asistente' ? pmNorm(o.nombre) === pmNorm(p.deudorNombre) && (!p.movil || o.movil === p.movil) : o.con && o.con.id === p.idCon && (!p.movil || o.movil === p.movil)));
+    if (i < 0) { pmPrOps.unshift({ movil: p.movil || '', nombre: p.deudor || p.contratista, tecnico: '', con: pmD.contratistas.find(c => c.id === p.idCon) || { id: p.idCon, nombre: p.contratista }, actual: true }); i = 0; }
+    pmPrSelIdx = i;
+  } else pmPrSelIdx = -1;
+  const L = 'display:grid;gap:4px;font-size:12px;font-weight:600;color:#445';
+  const sec = t => '<div style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#8a93a3;font-weight:700;margin:2px 0 -2px">' + t + '</div>';
+  pmModal('<style>.prF input,.prF select{width:100%;box-sizing:border-box;min-width:0}.prF label{min-width:0}</style><h3 style="margin:0 0 12px">' + (id ? 'Editar' : 'Nuevo') + ' préstamo</h3><div class="prF" style="display:grid;gap:12px;max-height:74vh;overflow:auto;padding:2px 6px 2px 0">' +
+    sec('Quién solicita') +
+    '<div style="display:flex;gap:6px"><button type="button" id="prTT" class="btn ' + (pmPrTipo === 'Técnico' ? 'primary' : 'secondary') + '" style="flex:1" onclick="pmPrCambiarTipo(\'Técnico\')">Técnico</button><button type="button" id="prTA" class="btn ' + (pmPrTipo === 'Asistente' ? 'primary' : 'secondary') + '" style="flex:1" onclick="pmPrCambiarTipo(\'Asistente\')">Asistente</button></div>' +
+    '<label style="' + L + '">Móvil y persona<select id="prOp" onchange="pmPrSelIdx=this.value===\'\'?-1:+this.value;pmPrInfo()"></select></label>' +
+    '<div id="prInfo" style="font-size:12.5px;background:#f4f9ff;border:1px solid #dbe7f5;border-radius:8px;padding:8px 10px;display:grid;gap:2px"></div>' +
+    sec('Condiciones') +
+    '<div style="display:grid;gap:12px;grid-template-columns:1fr 1fr"><label style="' + L + '">Fecha en que se prestó<input type="date" id="prFec" value="' + esc(p.fecha) + '"></label><label style="' + L + '">Monto prestado (₡)<input type="number" id="prMon" step="0.01" min="0" value="' + esc(p.monto) + '"></label>' +
+    '<label style="' + L + '">Interés semanal (%) sobre el saldo<input type="number" id="prTasa" step="0.01" min="0" value="' + esc(p.tasa) + '" oninput="const v=+this.value||0;$(\'prEq\').textContent=\'≈ \'+(Math.round(v*52/12*10)/10)+\' % mensual · \'+(Math.round(v*52*10)/10)+\' % anual (simple)\'"><span id="prEq" style="font-size:11px;font-weight:400;color:#667">≈ ' + (Math.round(p.tasa * 52 / 12 * 10) / 10) + ' % mensual · ' + (Math.round(p.tasa * 52 * 10) / 10) + ' % anual (simple)</span></label>' +
+    '<label style="' + L + '">Cuota semanal a rebajar (₡, opcional)<input type="number" id="prCuo" step="0.01" min="0" value="' + esc(p.cuota || '') + '"></label>' +
+    '<label style="' + L + ';grid-column:1/3">Concepto<input id="prCon2" maxlength="160" value="' + esc(p.concepto) + '" placeholder="ej. Adelanto para herramientas"></label>' + (id ? '<label style="' + L + '">Estado<select id="prEst"><option' + (p.estado === 'Activo' ? ' selected' : '') + '>Activo</option><option' + (p.estado === 'Cancelado' ? ' selected' : '') + '>Cancelado</option></select></label>' : '') + '</div></div>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;padding-top:12px;border-top:1px solid #e6e9ef">' + (id ? '<button class="btn secondary" onclick="pmPrestamoBorrar(\'' + id + '\')">🗑 Eliminar</button>' : '') + '<span style="flex:1"></span><button class="btn secondary" onclick="pmCerrar()">Cancelar</button><button class="btn primary" onclick="pmPrestamoGuardar(\'' + (id || '') + '\')">Guardar</button></div>', 600);
+  pmPrPintar();
 }
 async function pmPrestamoGuardar(id) {
-  try { await api('guardarPrestamoPmWeb', { id: id, deudorTipo: $('prTipo').value, deudorNombre: $('prAsi').value, idCon: $('prCon').value, fecha: $('prFec').value, monto: $('prMon').value, tasa: $('prTasa').value, cuota: $('prCuo').value, concepto: $('prCon2').value, estado: id ? $('prEst').value : 'Activo' }); pmCerrar(); await pmRenderPst(); toast('Préstamo guardado.'); }
+  const o = pmPrOps[pmPrSelIdx];
+  if (!o) { toast('Elige ' + (pmPrTipo === 'Asistente' ? 'al asistente' : 'la móvil') + '.'); return; }
+  if (!o.con) { toast('Esa móvil no tiene contratista activo.'); return; }
+  try { await api('guardarPrestamoPmWeb', { id: id, deudorTipo: pmPrTipo, deudorNombre: pmPrTipo === 'Asistente' ? o.nombre : '', movil: o.movil, idCon: o.con.id, fecha: $('prFec').value, monto: $('prMon').value, tasa: $('prTasa').value, cuota: $('prCuo').value, concepto: $('prCon2').value, estado: id ? $('prEst').value : 'Activo' }); pmCerrar(); await pmRenderPst(); toast('Préstamo guardado.'); }
   catch (e) { mostrarError(e, 'No se pudo guardar.'); }
+}
+function pmPrCambio(id) {
+  const p = pmPr.prestamos.find(x => x.id === id); if (!p || !p.cambio) return; const c = p.cambio;
+  const card = (v, t, d, ok) => '<label style="display:flex;gap:10px;align-items:flex-start;border:1px solid #dde3ec;border-radius:8px;padding:10px;cursor:pointer"><input type="radio" name="prCam" value="' + v + '"' + (ok ? ' checked' : '') + ' style="margin-top:3px"><span><b>' + t + '</b><div style="font-size:12px;color:#556;margin-top:2px">' + d + '</div></span></label>';
+  pmModal('<h3 style="margin:0 0 8px">Cambio de móvil del asistente</h3><div style="font-size:13px;margin-bottom:10px"><b>' + esc(p.deudorNombre) + '</b> ahora figura en la móvil <b>' + esc(c.a) + '</b> (el préstamo se dio en la móvil <b>' + esc(c.de) + '</b>). Saldo actual: <b>' + pmM(p.estadoCalc.debe) + '</b>.</div><div style="display:grid;gap:8px">' +
+    card('mantener', 'Mantener el rebajo en la móvil ' + esc(c.de), 'Las cuotas se siguen descontando del pago de <b>' + esc(p.contratista) + '</b>.', true) +
+    card('actualizar', 'Actualizar a la móvil ' + esc(c.a), c.idConNuevo ? 'Las cuotas futuras se descontarán del pago de <b>' + esc(c.contratistaNuevo) + '</b>. Lo ya rebajado no cambia.' : '<span style="color:#9b1c1c">La móvil ' + esc(c.a) + ' no tiene contratista activo; asígnala primero en Contratistas.</span>', false) + '</div>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button class="btn secondary" onclick="pmCerrar()">Decidir después</button><button class="btn primary" onclick="pmPrCambioOk(\'' + id + '\')">Aplicar</button></div>', 520);
+}
+async function pmPrCambioOk(id) {
+  const v = (document.querySelector('input[name=prCam]:checked') || {}).value || 'mantener';
+  try { await api('resolverCambioMovilPrestamoPmWeb', { id: id, accion: v }); pmCerrar(); await pmRenderPst(); toast(v === 'actualizar' ? 'Rebajo actualizado a la nueva móvil.' : 'Se mantiene el rebajo en la móvil original.'); }
+  catch (e) { mostrarError(e, 'No se pudo aplicar.'); }
 }
 async function pmPrestamoBorrar(id) { if (!confirm('Se eliminará el préstamo con sus abonos registrados. ¿Seguro?')) return; try { await api('eliminarPrestamoPmWeb', id); pmCerrar(); await pmRenderPst(); toast('Préstamo eliminado.'); } catch (e) { mostrarError(e, 'No se pudo eliminar.'); } }
 function pmPrestamoDetalle(id) {
@@ -14257,6 +14311,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 65 · 14-oct 16:51</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 66 · 14-oct 18:51</div>
 </body>
 </html>
