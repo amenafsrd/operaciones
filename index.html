@@ -1577,7 +1577,7 @@
       <div id="docDatos" style="font-size:13px;line-height:1.6;margin-bottom:10px"></div>
       <div id="docLineas" class="tableWrap" style="max-height:50vh"></div>
       <div id="docFirma" style="margin-top:12px;padding:10px;border:1px dashed #bbb;border-radius:8px;font-size:13px"></div>
-      <div class="modalActions"><button class="btn secondary" onclick="compartirDoc(docActual)">📄 PDF / Compartir</button><button id="docBtnFirmar" class="btn primary" onclick="abrirFirmaDoc()">✍️ Firma de recibido</button><button id="docBtnEditar" class="btn primary" style="display:none" onclick="editarDoc()">✏️ Editar documento</button><button class="btn secondary" onclick="$('modalDoc').classList.remove('show')">Cerrar</button></div>
+      <div class="modalActions"><button class="btn secondary" onclick="compartirDoc(docActual)">📄 PDF / Compartir</button><button id="docBtnAdmin" class="btn secondary" style="display:none" onclick="aplicarAdminDoc()">🛡️ Aplicado por administrador</button><button id="docBtnFirmar" class="btn primary" onclick="abrirFirmaDoc()">✍️ Firma de recibido</button><button id="docBtnEditar" class="btn primary" style="display:none" onclick="editarDoc()">✏️ Editar documento</button><button class="btn secondary" onclick="$('modalDoc').classList.remove('show')">Cerrar</button></div>
     </div>
   </div>
 
@@ -7435,7 +7435,18 @@ async function pmPreTeleGuardar() {
 }
 
 /* ---------- Contratistas (ligados a las móviles del sistema) ---------- */
-let pmConFiltro = 'vigentes', pmConQ = '';
+let pmConFiltro = 'vigentes', pmConQ = '', pmConOrd = { k: '', d: 1 };
+const PMCON_COLS = [['nom', 'Contratista'], ['mov', 'Móviles'], ['est', 'Estado'], ['ban', 'Banco · cuenta'], ['cor', 'Correo'], ['iva', 'IVA']];
+function pmConClave(c, k) {
+  if (k === 'nom') return pmNorm(c.nombre || '');
+  if (k === 'mov') { const n = parseInt(String(c.movilTecnico || c.moviles || '').replace(/\D+/g, ' ').trim().split(' ')[0], 10); return isNaN(n) ? 1e9 : n; }
+  if (k === 'est') return c.activo ? (c.estadoSis === 'activa' ? 'a' : c.estadoSis === 'inactiva' ? 'b' : 'c') : 'z';
+  if (k === 'ban') return c.iban ? pmNorm((c.banco || '') + ' ' + c.iban) : '\uffff';
+  if (k === 'cor') return pmNorm(c.correoFact || c.correo || '') || '\uffff';
+  if (k === 'iva') return c.aplicaIva ? 1 : 0;
+  return '';
+}
+function pmConOrdenar(k) { pmConOrd = pmConOrd.k === k ? (pmConOrd.d === 1 ? { k: k, d: -1 } : { k: '', d: 1 }) : { k: k, d: 1 }; pmRenderCon(); }
 function pmConEstadoHtml(c) {
   if (!c.activo) return '<span class="chip">Historial</span>';
   if (c.estadoSis === 'activa') return '<span class="chip verde">Móvil activa</span>';
@@ -7447,9 +7458,10 @@ function pmConFaltan(c) { const f = []; if (!c.banco) f.push('banco'); if (!c.re
 function pmRenderCon() {
   const nV = pmD.contratistas.filter(pmConVigente).length, nH = pmD.contratistas.length - nV;
   const C = pmD.contratistas.filter(c => pmConFiltro === 'todos' ? true : (pmConFiltro === 'vigentes' ? pmConVigente(c) : !pmConVigente(c)));
+  if (pmConOrd.k) { const K = pmConOrd.k, D = pmConOrd.d; C.sort((a, b) => { const x = pmConClave(a, K), y = pmConClave(b, K); return (x < y ? -1 : x > y ? 1 : pmConClave(a, 'nom') < pmConClave(b, 'nom') ? -1 : 1) * (x === y ? 1 : D); }); }
   let h = '<div class="toolbar"><button class="btn primary" onclick="pmConModal()">➕ Nuevo contratista</button><button class="btn secondary" onclick="pmSugerirModal()" title="Revisa el módulo Móviles y agrega a la lista las móviles que faltan, sin duplicar personas">🔄 Actualizar móviles</button><button class="btn secondary" onclick="pmLimpiarDup()">🧹 Unir duplicados</button><button class="btn secondary" onclick="pmImportarConModal()">⬆ Importar desde la hoja «Pago»</button><span style="flex:1"></span><input id="pcBuscar" placeholder="Buscar nombre, móvil, cédula…" style="min-width:210px" value="' + esc(pmConQ) + '" oninput="pmConQ=this.value;pmConFiltrar()"><label>Ver <select onchange="pmConFiltro=this.value;pmRenderCon()">' + [['vigentes', 'Vigentes (' + nV + ')'], ['historial', 'Historial: ya no trabajan con nosotros (' + nH + ')'], ['todos', 'Todos (' + pmD.contratistas.length + ')']].map(x => '<option value="' + x[0] + '"' + (pmConFiltro === x[0] ? ' selected' : '') + '>' + x[1] + '</option>').join('') + '</select></label></div><div class="panel"><div class="panelHead"><h2>Contratistas</h2><span id="pcCuenta">' + C.length + '</span></div><div style="padding:8px 12px;font-size:12px;color:#667">El estado sale del módulo Móviles: una móvil inactiva sigue en la lista de pagos hasta ' + (pmD.diasPago || 13) + ' días después de su salida; pasado ese plazo (o si lo pasas a historial) queda solo como historial, con todos sus pagos y rebajos consultables.</div><div class="tableWrap">';
   if (!C.length) h += '<div class="loading">No hay contratistas en esta vista. Usa «Actualizar móviles» o importa la hoja «Pago» de tu Excel.</div>';
-  else h += '<table class="pmT" id="pcTb"><thead><tr><th>Contratista</th><th>Móviles</th><th>Estado</th><th>Banco · cuenta</th><th>Correo</th><th>IVA</th><th></th></tr></thead><tbody>' + C.map(c => { const hist = !pmConVigente(c), falta = pmConFaltan(c);
+  else h += '<table class="pmT" id="pcTb"><thead><tr>' + PMCON_COLS.map(x => '<th style="cursor:pointer;user-select:none" title="Clic para ordenar" onclick="pmConOrdenar(\'' + x[0] + '\')">' + x[1] + (pmConOrd.k === x[0] ? (pmConOrd.d === 1 ? ' ▲' : ' ▼') : ' <span style="opacity:.45">⇅</span>') + '</th>').join('') + '<th></th></tr></thead><tbody>' + C.map(c => { const hist = !pmConVigente(c), falta = pmConFaltan(c);
     const tecMov = c.movilTecnico ? '<div><span class="chip azul">técnico</span> <b>' + esc(c.movilTecnico) + '</b>' + ((c.tecnicos.find(t => t.movil === c.movilTecnico) || {}).tecnico ? ' · ' + esc(c.tecnicos.find(t => t.movil === c.movilTecnico).tecnico) : '') + '</div>' : '';
     const fact = (c.tecnicos || []).filter(t => t.movil !== c.movilTecnico).map(t => '<b>' + esc(t.movil) + '</b>' + (t.tecnico ? ' <span style="color:#667">(' + esc(t.tecnico) + ')</span>' : '')).join(', ');
     const q = pmNorm([c.nombre, c.cedula, c.moviles, c.banco, c.referencia, c.correo, c.correoFact, (c.tecnicos || []).map(t => t.tecnico).join(' ')].join(' '));
@@ -10686,7 +10698,13 @@ function bodExportarPdf() {
 
 let ingDatos = null, abDatos = null;
 
-function firmaCelda(x) { return x.firmado ? '<span title="Recibió ' + esc(x.firmado.nombre) + ' · ' + esc(x.firmado.hora) + '">✅ ' + esc(x.firmado.nombre) + '</span>' : '<span style="color:#bbb">pendiente</span>'; }
+function firmaEtq(f) { return f.admin ? 'Aplicado por administrador (' + f.nombre + ')' : 'Recibido por ' + f.nombre; }
+async function aplicarAdminDoc() {
+  const x = docActual; if (!x || !esAdmin()) return;
+  if (!confirm('¿Dar este documento por aplicado como administrador, sin firma del móvil? Quedará registrado tu usuario y la hora.')) return;
+  try { await api('aplicarAdminMovimientoInvWeb', x.grupo); toast('Documento aplicado por administrador.'); $('modalDoc').classList.remove('show'); if (docFuente === abDatos) await cargarAbastecimiento(); else await cargarIngresos(); } catch (e) { mostrarError(e, 'No se pudo aplicar el documento.'); }
+}
+function firmaCelda(x) { return x.firmado ? '<span title="' + esc(firmaEtq(x.firmado)) + ' · ' + esc(x.firmado.hora) + '">✅ ' + esc(x.firmado.admin ? 'Admin · ' + x.firmado.nombre : x.firmado.nombre) + '</span>' : '<span style="color:#bbb">pendiente</span>'; }
 
 function bodMovDeA(x) {
   if (x.tipo === 'TRASLADO') return '<b>M' + esc(x.movil) + '</b> → <b>M' + esc(x.movilDestino || '?') + '</b>';
@@ -10781,7 +10799,8 @@ function verDoc(i, ab) {
     '</tbody></table>';
   $('docBtnFirmar').style.display = puedeEditar() ? '' : 'none';
   $('docBtnFirmar').textContent = x.firmado ? '✍️ Firmar de nuevo' : '✍️ Firma de recibido';
-  $('docFirma').innerHTML = x.firmado ? '✅ <b>Recibido por ' + esc(x.firmado.nombre) + '</b> <span style="color:#888">' + esc(x.firmado.hora) + '</span><div id="docFirmaImg" style="margin-top:6px;color:#888">Cargando firma...</div>' :
+  $('docBtnAdmin').style.display = esAdmin() ? '' : 'none';
+  $('docFirma').innerHTML = x.firmado ? '✅ <b>' + esc(firmaEtq(x.firmado)) + '</b> <span style="color:#888">' + esc(x.firmado.hora) + '</span><div id="docFirmaImg" style="margin-top:6px;color:#888">Cargando firma...</div>' :
     '<span style="color:#888">Sin firma de recibido.</span>';
   if (x.firmado) api('obtenerFirmaInvWeb', x.grupo).then(f => { const e = $('docFirmaImg'); if (e && docActual === x) e.innerHTML = f && f.imagen ? '<img src="' + f.imagen + '" style="max-width:260px;border:1px solid #ccc;border-radius:6px;background:#fff">' : ''; }).catch(() => {});
   $('modalDoc').classList.add('show');
@@ -10877,7 +10896,7 @@ async function compartirDoc(x) {
     const doc = docArmarPdf(x, f);
     const nombre = (x.consecutivo || 'documento') + (x.firmado ? '_firmado' : '') + '.pdf';
     compFile = new File([doc.output('blob')], nombre, { type: 'application/pdf' });
-    $('compEstado').innerHTML = x.firmado ? '✅ <b>PDF firmado listo</b> · recibido por ' + esc(x.firmado.nombre) : '⚠️ Este documento <b>aún no está firmado</b>. El PDF saldrá con el espacio de firma en blanco.';
+    $('compEstado').innerHTML = x.firmado ? '✅ <b>PDF firmado listo</b> · ' + esc(firmaEtq(x.firmado)) : '⚠️ Este documento <b>aún no está firmado</b>. El PDF saldrá con el espacio de firma en blanco.';
     $('compBtnCompartir').disabled = false; $('compBtnDescargar').disabled = false;
   } catch (e) {
     $('compEstado').innerHTML = '<span style="color:#b71c1c">No se pudo generar el PDF.</span>';
@@ -10927,7 +10946,7 @@ function docArmarPdf(x, f) {
   d.line(M, y + 22, M + 80, y + 22); d.line(W - M - 80, y + 22, W - M, y + 22);
   d.setFontSize(9);
   if (f && f.imagen) d.addImage(f.imagen, 'PNG', M + 5, y - 2, 60, 24);
-  d.setFont('helvetica', 'bold'); d.text('Recibido por: ' + (f ? f.nombre : ''), M, y + 27);
+  d.setFont('helvetica', 'bold'); d.text(f && f.admin ? 'Aplicado por administrador: ' + f.nombre : 'Recibido por: ' + (f ? f.nombre : ''), M, y + 27);
   d.setFont('helvetica', 'normal'); d.text(f ? f.hora : 'Nombre y firma', M, y + 32);
   d.setFont('helvetica', 'bold'); d.text('Entregado por: ' + (x.usuario || ''), W - M - 80, y + 27);
   return d;
@@ -10972,7 +10991,7 @@ async function docImprimir() {
     docEncabezado(tipo, x.consecutivo || '') + '<div class="d"><b>Consecutivo:</b> ' + esc(x.consecutivo || '—') + ' &nbsp; <b>Fecha:</b> ' + esc(fmtFechaSeg(x.fecha)) + (de ? ' &nbsp; <b>' + de + '</b>' : '') +
     '<br><b>Documento / referencia:</b> ' + esc(x.referencia || 's/n') + (x.concepto ? ' &nbsp; <b>Tipo:</b> ' + esc(x.concepto) : '') + (x.obs ? '<br><b>Observación:</b> ' + esc(x.obs) : '') + '<br><b>Registró:</b> ' + esc(x.usuario) + '</div>' +
     '<table><thead><tr><th>Línea</th><th>Código</th><th>Material</th><th>Und.</th><th>Cantidad</th></tr></thead><tbody>' + lin + '</tbody></table>' +
-    '<div class="f"><div>' + (f && f.imagen ? '<img src="' + f.imagen + '" style="max-height:80px"><br>' : '') + '<b>Recibido por: ' + esc(f ? f.nombre : '') + '</b>' + (f ? '<br>' + esc(f.hora) : '<br>Nombre y firma') + '</div><div><b>Entregado por</b><br>' + esc(x.usuario) + '</div></div></body></html>';
+    '<div class="f"><div>' + (f && f.imagen ? '<img src="' + f.imagen + '" style="max-height:80px"><br>' : '') + '<b>' + (f && f.admin ? 'Aplicado por administrador: ' : 'Recibido por: ') + esc(f ? f.nombre : '') + '</b>' + (f ? '<br>' + esc(f.hora) : '<br>Nombre y firma') + '</div><div><b>Entregado por</b><br>' + esc(x.usuario) + '</div></div></body></html>';
   const fr = document.createElement('iframe');
   fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
   document.body.appendChild(fr);
@@ -14687,6 +14706,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 87 · 15-oct 08:12</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 89 · 15-oct 08:54</div>
 </body>
 </html>
