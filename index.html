@@ -6193,7 +6193,7 @@ function rhEditarCol(id) {
     '<div class="field" style="flex:1"><label>Fecha de ingreso</label><input type="date" id="rcIngreso" value="' + esc(c.ingreso) + '"></div></div>' +
     '<div style="display:flex;gap:10px"><div class="field" style="flex:1"><label>Salario base (₡)</label><input type="number" id="rcSalario" min="0" value="' + esc(c.salario) + '"></div>' +
     '<div class="field" style="flex:1"><label>Pago</label><select id="rcPeriodicidad"><option' + (c.periodicidad === 'Quincenal' ? ' selected' : '') + '>Quincenal</option><option' + (c.periodicidad === 'Semanal' ? ' selected' : '') + '>Semanal</option><option' + (c.periodicidad === 'Mensual' ? ' selected' : '') + '>Mensual</option></select></div></div>' +
-    '<div style="font-size:12px;color:#777;margin:-4px 0 8px">Quincenal y Mensual: salario base <b>mensual</b>. Semanal: monto que se paga <b>por semana</b>.</div>' +
+    '<div style="font-size:12px;color:#777;margin:-4px 0 8px">El salario base es siempre <b>mensual</b>. Quincenal = ÷2 · Semanal = ÷4 · Mensual = completo.</div>' +
     '<fieldset style="border:1px solid #dde3ea;border-radius:8px;padding:8px 10px;margin:0 0 10px"><legend style="font-size:12px;color:#556">Pago por el banco</legend>' +
     '<div style="display:flex;gap:10px"><div class="field" style="flex:1"><label>Banco</label><input id="rcBanco" maxlength="60" value="' + esc(c.banco || '') + '" placeholder="Ej. BAC"></div><div class="field" style="flex:1"><label>Referencia del banco</label><input id="rcRef" maxlength="60" value="' + esc(c.referencia || '') + '"></div></div>' +
     '<div class="field"><label>Cuenta IBAN (20 dígitos, sin «CR»)</label><input id="rcIban" maxlength="26" value="' + esc(c.iban || '') + '"></div>' +
@@ -7357,14 +7357,14 @@ async function pmBanGuardar() {
 function pmHtmlArc() {
   return '<div style="padding:14px;display:grid;gap:14px;max-width:1150px">' +
     '<div><h3 style="margin:0 0 4px">Archivo para el banco</h3><div style="font-size:12px;color:#667;margin-bottom:6px">Genera 2 archivos: el .prn de pago de planillas y proveedores (el que se sube al banco) y un Excel con la información usada. Incluye los depósitos de esta semana; las móviles sin factura quedan fuera salvo que tengan visto bueno del administrador,' + (pmS.extras.length ? ' y las líneas adicionales' : '') + '. Antes de subirlo revisa el total.</div><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end"><label>Fecha de pago<input type="date" id="paFec" value="' + (pmD.hoy || '') + '" onchange="pmPlCargar()"></label><label>N.º de envío<input type="number" id="paEnv" style="width:90px" value="' + (pmD.banco.ultimoEnvio + 1) + '"></label><button class="btn primary" onclick="pmBanco()">Generar archivos (.prn + Excel)</button></div><div id="pmBanOut" style="margin-top:8px"></div></div>' +
-    '<div><h3 style="margin:0 0 4px">Colaboradores en este envío</h3><div style="font-size:12px;color:#667;margin-bottom:6px">Se pagan en el mismo archivo. <b>Semanales:</b> la semana actual (la trabajada). <b>Quincenales:</b> el 15 y el 30. <b>Mensuales:</b> el 30. El neto se calcula descontando las cargas sociales del trabajador (porcentajes de Colaboradores); puedes cambiar el bruto, las cargas (por ejemplo 0 si aún no está asegurado) y el detalle de cada línea.</div><div id="pmPlBox"><div class="loading">Cargando colaboradores...</div></div></div>' +
+    '<div><h3 style="margin:0 0 4px">Colaboradores en este envío</h3><div style="font-size:12px;color:#667;margin-bottom:6px">Se pagan en el mismo archivo. <b>Semanales:</b> el mismo período que las móviles de esta semana. <b>Quincenales:</b> el 15 y el 30. <b>Mensuales:</b> el 30. El neto se calcula descontando las cargas sociales del trabajador (porcentajes de Colaboradores); puedes cambiar el bruto, las cargas (por ejemplo 0 si aún no está asegurado) y el detalle de cada línea.</div><div id="pmPlBox"><div class="loading">Cargando colaboradores...</div></div></div>' +
     '</div>';
 }
 let pmPl = null;
 async function pmPlCargar() {
   const box = $('pmPlBox'); if (!box) return;
   try {
-    const R = await api('planillaColaboradoresPmWeb', $('paFec').value);
+    const R = await api('planillaColaboradoresPmWeb', $('paFec').value, pmSemId);
     const dd = Math.round((Date.parse(R.fecha) - Date.parse(R.ultimoPago)) / 86400000);
     R.filas.forEach(f => { f.atrasada = f.periodicidad !== 'Semanal' && dd > 5; f.sel = !f.pagado && !f.faltan.length && f.neto > 0 && !f.atrasada; });
     pmPl = R; pmPlDibujar();
@@ -14373,6 +14373,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 68 · 14-oct 19:18</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 70 · 14-oct 19:25</div>
 </body>
 </html>

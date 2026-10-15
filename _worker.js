@@ -9480,9 +9480,9 @@ function rhUltimoPago_(f) {
   return { fecha: rhDiasPagoMes_(y, m).q2, q: 2, y: y, m: m };
 }
 /* Lo que corresponde pagar a cada colaborador en el archivo de la fecha dada.
-   Semanal: la semana actual (lunes a viernes, o sábado si trabaja 6 días). Quincenal: la última quincena (15 / 30). Mensual: el mes, al pagarse el 30.
+   Semanal: el mismo período que las móviles (la semana que se está pagando). Quincenal: la última quincena (15 / 30). Mensual: el mes, al pagarse el 30.
    Cargas sociales del trabajador = % de la ficha de tasas sobre el bruto, salvo que el colaborador no esté asegurado (entonces 0). */
-function rhPlanilla_(fecha) {
+function rhPlanilla_(fecha, sem) {
   const f = segFecha_(fecha) || segHoyISO_();
   const tasaObr = rhTasas_().filter(t => t.clave.indexOf('obr_') === 0).reduce((a, t) => a + t.valor, 0);
   const pagados = {}; leerObjetos_(rhHoja_('PAG')).forEach(p => { const k = txt_(p.Clave_Planilla); if (k) pagados[txt_(p.ID_Colab) + '|' + k] = { envio: txt_(p.Envio_Banco), fecha: segFecha_(p.Fecha) || '', neto: rhNum_(p.Neto) }; });
@@ -9493,7 +9493,7 @@ function rhPlanilla_(fecha) {
   leerObjetos_(rhHoja_('COLAB')).map(rhColabInfo_).forEach(c => {
     if (!c.activo || !(c.salario > 0)) return;
     let clave, desde, hasta, bruto, per;
-    if (c.periodicidad === 'Semanal') { clave = 'S|' + lunes; desde = lunes; hasta = rhIsoMas_(lunes, c.diasSemana === 6 ? 5 : 4); bruto = c.salario; per = 'Semana ' + rhDm_(desde) + ' al ' + rhDm_(hasta); }
+    if (c.periodicidad === 'Semanal') { const sd0 = sem && sem.desde ? sem.desde : lunes; clave = 'S|' + sd0; desde = sd0; hasta = sem && sem.hasta ? sem.hasta : rhIsoMas_(lunes, c.diasSemana === 6 ? 5 : 4); bruto = rh2_(c.salario / 4); per = 'Semana ' + rhDm_(desde) + ' al ' + rhDm_(hasta); }
     else if (c.periodicidad === 'Quincenal') { clave = 'Q|' + ymm + '|' + up.q; desde = ymm + '-' + (up.q === 1 ? '01' : '16'); hasta = ymm + '-' + (up.q === 1 ? '15' : rhP2_(ult)); bruto = rh2_(c.salario / 2); per = 'Quincena ' + rhDm_(desde) + ' al ' + rhDm_(hasta); }
     else { if (up.q !== 2) return; clave = 'M|' + ymm; desde = ymm + '-01'; hasta = ymm + '-' + rhP2_(ult); bruto = c.salario; per = 'Mes ' + rhDm_(desde) + ' al ' + rhDm_(hasta); }
     if (c.ingreso && c.ingreso > hasta) return;
@@ -9507,9 +9507,10 @@ function rhPlanilla_(fecha) {
   filas.sort((a, b) => a.nombre.localeCompare(b.nombre));
   return { fecha: f, filas: filas, tasaObr: tasaObr, ultimoPago: up.fecha };
 }
-function planillaColaboradoresPmWeb(token, fecha) {
+function planillaColaboradoresPmWeb(token, fecha, idSemana) {
   requerirSesion_(token, 'admin');
-  return rhPlanilla_(fecha);
+  const sm = idSemana ? leerObjetos_(pmHoja_('SEM')).find(x => txt_(x.ID) === txt_(idSemana)) : null;
+  return rhPlanilla_(fecha, sm ? { desde: segFecha_(sm.Desde) || '', hasta: segFecha_(sm.Hasta) || '' } : null);
 }
 /* Alerta: el día de pago (15 / 30) y los 3 siguientes, mientras queden quincenales o mensuales sin incluir en un archivo del banco */
 function rhAlertaPlanilla_() {
@@ -10957,7 +10958,7 @@ function generarBancoPmWeb(token, idSemana, fechaPago, envio, colabs) {
   sd.extras.forEach(e => items.push({ iban: e.iban, monto: e.monto, texto: e.concepto || 'Servicios prestados', nombre: e.nombre, factura: false, contratista: e.nombre, movil: '', banco: '', referencia: '', numFactura: '', vb: '', subtotal: 0, iva: 0, totalFacturado: 0, deducciones: 0, tipo: 'Adicional' }));
   /* colaboradores (planilla): los marcados en pantalla, con sus montos y detalle editados; se validan de nuevo aquí */
   const colabIncluidos = [];
-  const pl = Array.isArray(colabs) && colabs.length ? rhPlanilla_(f) : null;
+  const pl = Array.isArray(colabs) && colabs.length ? rhPlanilla_(f, sd.semana) : null;
   (Array.isArray(colabs) ? colabs : []).forEach(l => {
     const base = pl && pl.filas.find(x => x.id === txt_(l.id) && x.clave === txt_(l.clave));
     const col = leerObjetos_(rhHoja_('COLAB')).map(rhColabInfo_).find(x => x.id === txt_(l.id));
