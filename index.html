@@ -10904,6 +10904,22 @@ async function compartirDoc(x) {
   }
 }
 
+/* Encabezado PDF con el formato de la hoja de alisto: logo + datos de la empresa a la izquierda, título a la derecha y línea roja. Devuelve la Y donde sigue el contenido. */
+function pdfEncHoja(d, W, M, titulo, sub) {
+  const L = empresaLineas(), y0 = 12, lw = 36, lh = lw * CT_LOGO_H / CT_LOGO_W, xe = M + lw + 5, we = W - 2 * M - lw - 5 - 58;
+  try { d.addImage(CT_LOGO, 'PNG', M, y0, lw, lh); } catch (e) { }
+  let ye = y0 + 4;
+  d.setTextColor(29, 36, 51); d.setFont('helvetica', 'bold'); d.setFontSize(11); d.text(d.splitTextToSize(String(L[0] || ''), we)[0], xe, ye);
+  d.setFont('helvetica', 'normal'); d.setFontSize(8); d.setTextColor(68, 68, 85);
+  [L[1], L[2]].filter(Boolean).forEach(t => { d.splitTextToSize(String(t), we).forEach(z => { ye += 3.7; d.text(z, xe, ye); }); });
+  d.setFont('helvetica', 'bold'); d.setFontSize(13); d.setTextColor(163, 22, 22); d.text(String(titulo || ''), W - M, y0 + 4, { align: 'right' });
+  d.setFont('helvetica', 'normal'); d.setFontSize(8); d.setTextColor(68, 68, 85);
+  let yd = y0 + 4; if (sub) { yd += 4; d.text(String(sub), W - M, yd, { align: 'right' }); }
+  yd += 4; d.text('Generado: ' + new Date().toLocaleString('es-CR'), W - M, yd, { align: 'right' });
+  const yl = Math.max(y0 + lh, ye, yd) + 3;
+  d.setDrawColor(163, 22, 22); d.setLineWidth(0.8); d.line(M, yl, W - M, yl); d.setLineWidth(0.2); d.setDrawColor(0); d.setTextColor(0);
+  return yl + 8;
+}
 function docArmarPdf(x, f) {
   const J = window.jspdf.jsPDF;
   const d = new J({ unit: 'mm', format: 'a4' });
@@ -10911,19 +10927,18 @@ function docArmarPdf(x, f) {
   const tipo = (docFuente.tipos || {})[x.tipo] || x.tipo;
   const mv = n => 'M' + n;
   const de = x.tipo === 'TRASLADO' ? 'Presta ' + mv(x.movil) + ' a ' + mv(x.movilDestino || '?') : x.tipo === 'ENTREGA' ? 'Bodega a ' + mv(x.movil) : x.tipo === 'DEV_MOVIL' ? mv(x.movil) + ' a Bodega' : x.movil ? mv(x.movil) : '';
-  d.setFillColor(183, 28, 28); d.rect(0, 0, W, 22, 'F');
-  d.setTextColor(255); d.setFont('helvetica', 'bold'); d.setFontSize(15); d.text('Soluciones Red Dorada SRL', M, 10);
-  d.setFontSize(11); d.text(tipo + (x.consecutivo ? ' - ' + x.consecutivo : ''), M, 17);
-  d.setTextColor(0); d.setFont('helvetica', 'normal'); d.setFontSize(10);
-  let y = 31;
-  const dato = (k, v) => { if (!v) return; d.setFont('helvetica', 'bold'); d.text(k + ':', M, y); d.setFont('helvetica', 'normal'); const t = d.splitTextToSize(String(v), W - 2 * M - 38); d.text(t, M + 38, y); y += 5.5 * t.length; };
-  dato('Fecha', fmtFechaSeg(x.fecha)); dato('Movimiento', de); dato('Documento / ref.', x.referencia || 's/n'); dato('Tipo', x.concepto); dato('Observacion', x.obs); dato('Registro', x.usuario);
-  y += 3;
-  const cols = [{ t: 'Linea', w: 14, a: 'c' }, { t: 'Codigo', w: 28, a: 'l' }, { t: 'Material', w: 90, a: 'l' }, { t: 'Und.', w: 14, a: 'c' }, { t: 'Cantidad', w: 34, a: 'r' }];
+  let y = pdfEncHoja(d, W, M, tipo, x.consecutivo || '');
+  d.setFont('helvetica', 'bold'); d.setFontSize(15); d.setTextColor(163, 22, 22);
+  d.splitTextToSize(tipo + (x.consecutivo ? ' ' + x.consecutivo : '') + (de ? ' · ' + de : ''), W - 2 * M).forEach(t => { d.text(t, M, y); y += 6.5; });
+  d.setTextColor(0); d.setFontSize(10);
+  const dato = (k, v) => { if (!v) return; d.setFont('helvetica', 'bold'); d.text(k + ':', M, y); d.setFont('helvetica', 'normal'); const t = d.splitTextToSize(String(v), W - 2 * M - 40); d.text(t, M + 40, y); y += 5 * t.length; };
+  dato('Fecha', fmtFechaSeg(x.fecha)); dato('Documento / ref.', x.referencia || 's/n'); dato('Tipo', x.concepto); dato('Observación', x.obs); dato('Registró', x.usuario);
+  y += 4;
+  const cols = [{ t: 'Línea', w: 14, a: 'c' }, { t: 'Código', w: 26, a: 'c' }, { t: 'Material', w: 92, a: 'l' }, { t: 'Und.', w: 14, a: 'c' }, { t: 'Cantidad', w: 34, a: 'c' }];
   const cab = () => {
-    d.setFillColor(183, 28, 28); d.rect(M, y - 5, W - 2 * M, 7, 'F'); d.setTextColor(255); d.setFont('helvetica', 'bold'); d.setFontSize(9);
+    d.setFillColor(163, 22, 22); d.setDrawColor(125, 17, 17); d.rect(M, y - 5, W - 2 * M, 7.5, 'FD'); d.setTextColor(255); d.setFont('helvetica', 'bold'); d.setFontSize(9.5);
     let cx = M; cols.forEach(c => { d.text(c.t, c.a === 'r' ? cx + c.w - 2 : c.a === 'c' ? cx + c.w / 2 : cx + 2, y, { align: c.a === 'r' ? 'right' : c.a === 'c' ? 'center' : 'left' }); cx += c.w; });
-    d.setTextColor(0); d.setFont('helvetica', 'normal'); y += 6;
+    d.setTextColor(29, 36, 51); d.setFont('helvetica', 'normal'); y += 7.5;
   };
   cab();
   x.lineas.map((l, i) => ({ l: l, i: i })).sort((a, b) => (a.l.linea || a.i + 1) - (b.l.linea || b.i + 1)).forEach(o => {
@@ -10931,13 +10946,13 @@ function docArmarPdf(x, f) {
     const nom = d.splitTextToSize(String(o.l.material), cols[2].w - 3);
     const h = Math.max(6.5, 4.5 * nom.length + 2);
     if (y + h > 265) { d.addPage(); y = 20; cab(); }
-    d.setFontSize(9); d.setDrawColor(190); d.rect(M, y - 4.5, W - 2 * M, h);
-    let cx = M;
+    d.setFontSize(9.5); d.setDrawColor(190); d.rect(M, y - 4.5, W - 2 * M, h);
+    let cx = M; for (let k = 0, gx = M; k < cols.length - 1; k++) { gx += cols[k].w; d.line(gx, y - 4.5, gx, y - 4.5 + h); }
     d.text(String(o.l.linea || o.i + 1), cx + cols[0].w / 2, y, { align: 'center' }); cx += cols[0].w;
-    d.text(codP(m.codigo), cx + 2, y); cx += cols[1].w;
+    d.text(codP(m.codigo), cx + cols[1].w / 2, y, { align: 'center' }); cx += cols[1].w;
     d.text(nom, cx + 2, y); cx += cols[2].w;
     d.text(String(m.unidad || ''), cx + cols[3].w / 2, y, { align: 'center' }); cx += cols[3].w;
-    d.setFont('helvetica', 'bold'); d.text(fmtN(o.l.cantidad), cx + cols[4].w - 2, y, { align: 'right' }); d.setFont('helvetica', 'normal');
+    d.setFont('helvetica', 'bold'); d.text(fmtN(o.l.cantidad), cx + cols[4].w / 2, y, { align: 'center' }); d.setFont('helvetica', 'normal');
     y += h;
   });
   if (y > 215) { d.addPage(); y = 20; }
@@ -12308,19 +12323,15 @@ async function cobroConstruir(sel) {
     const d = new J({ unit: 'mm', format: 'a4' });
     const W = 210, M = 15, info = invActual.info;
     const band = (tit) => {
-      d.setFillColor(183, 28, 28); d.rect(0, 0, W, 26, 'F');
-      d.setFillColor(255, 255, 255); d.rect(M, 3, 44, 20, 'F');
-      try { d.addImage(CT_LOGO, 'PNG', M + 2, 5, 40, 40 * CT_LOGO_H / CT_LOGO_W); } catch (e) { /* sin logo */ }
-      d.setTextColor(255); d.setFont('helvetica', 'bold'); d.setFontSize(14); d.text('Soluciones Red Dorada SRL', M + 50, 12);
-      d.setFontSize(9.5); d.text(tit, M + 50, 19);
-      d.setTextColor(0); d.setFont('helvetica', 'normal'); d.setFontSize(10);
+      let y = pdfEncHoja(d, W, M, 'Documento de cobro', info.corte ? 'Corte ' + info.corte : '');
+      d.setFont('helvetica', 'bold'); d.setFontSize(13); d.setTextColor(163, 22, 22); d.text(tit, M, y); d.setTextColor(0); d.setFont('helvetica', 'normal'); d.setFontSize(10);
+      return y + 8;
     };
     const dato = (k, v, y) => { d.setFont('helvetica', 'bold'); d.text(k + ':', M, y); d.setFont('helvetica', 'normal'); d.text(String(v || ''), M + 36, y); };
     let primera = true;
 
     if (datos.length > 1) {
-      band('Resumen de cobro por diferencias de inventario - Corte ' + info.corte);
-      let y = 36; dato('Corte', info.corte + ' (' + fmtFechaSeg(info.fecha) + ')', y); y += 5.5; dato('Generado', fmtFechaSeg(hoyISO()) + ' por ' + sesion.nombre, y); y += 10;
+      let y = band('Resumen de cobro por diferencias de inventario - Corte ' + info.corte); dato('Corte', info.corte + ' (' + fmtFechaSeg(info.fecha) + ')', y); y += 5.5; dato('Generado', fmtFechaSeg(hoyISO()) + ' por ' + sesion.nombre, y); y += 10;
       const cw = [26, 60, 28, 30, 36];
       const cab = ['Ubicacion', 'Responsable', 'Lineas', 'Justificado', 'A cobrar'];
       d.setFillColor(183, 28, 28); d.rect(M, y - 5, W - 2 * M, 7, 'F'); d.setTextColor(255); d.setFont('helvetica', 'bold'); d.setFontSize(9);
@@ -12342,8 +12353,7 @@ async function cobroConstruir(sel) {
     datos.forEach(x => {
       if (!primera) d.addPage();
       primera = false;
-      band('Documento de cobro por diferencias de inventario');
-      let y = 36;
+      let y = band('Documento de cobro por diferencias de inventario');
       dato('N° documento', 'COB-' + info.corte + '-' + x.u.nombre, y); y += 5.5;
       dato('Corte', info.corte + ' (' + fmtFechaSeg(info.fecha) + ')', y); y += 5.5;
       dato('Ubicacion', x.u.nombre, y); y += 5.5;
@@ -14741,6 +14751,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 90 · 15-oct 09:10</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 91 · 15-oct 09:27</div>
 </body>
 </html>
