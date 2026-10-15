@@ -69,7 +69,7 @@
     #plbForm label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; }
     #plbForm input, #plbForm select { width: 100%; box-sizing: border-box; }
     table.pmT { width: 100%; border-collapse: collapse; }
-    .pmT th { background: var(--rojo); color: #fff; padding: 9px 8px; text-align: left; font-size: 12px; white-space: nowrap; }
+    .pmT th { background: var(--rojo); color: #fff; padding: 9px 8px; text-align: left; font-size: 12px; white-space: nowrap; border: 1px solid var(--rojo-osc); }
     .pmT td { border: 1px solid #ddd; padding: 7px 8px; font-size: 12px; vertical-align: middle; }
     .pmT tbody tr:hover td { background: #f6f9fc; }
 
@@ -145,7 +145,7 @@
     .resMov .card.sel { border-color: var(--rojo); }
     .resMov .card .n { font-size: 26px; }
     .tblMov { width: 100%; border-collapse: collapse; min-width: 980px; }
-    .tblMov th { background: #f4f4f6; color: #555; font-size: 11px; text-transform: uppercase; letter-spacing: .04em;
+    .tblMov th { background: var(--rojo); color: #fff; font-size: 11px; text-transform: uppercase; letter-spacing: .04em;
                  text-align: left; padding: 10px 12px; border-bottom: 2px solid #e5e5e8; white-space: nowrap; }
     .tblMov td { padding: 10px 12px; border-bottom: 1px solid #eee; vertical-align: top; font-size: 13px; }
     .tblMov tr:hover td { background: #fcf5f5; }
@@ -366,7 +366,7 @@
     input:focus, select:focus, textarea:focus { outline: 2px solid #a3161633; border-color: var(--rojo); }
     .panelHead { background: #fafbfc; border-bottom: 1px solid var(--borde); }
     .panelHead h2 { color: var(--navy2); font-weight: 700; }
-    .table th { background: var(--navy2); color: #fff; font-weight: 600; letter-spacing: .3px; border: 1px solid #1d3558; }
+    .table th { background: var(--rojo); color: #fff; font-weight: 600; letter-spacing: .3px; border: 1px solid var(--rojo-osc); }
     .table td { border: 1px solid #e1e5ea; }
     .table tbody tr:hover td { background: #f6f8fb; }
     .subtabs button { background: #e3e7ed; color: #374151; font-weight: 600; }
@@ -513,7 +513,7 @@
 
     /* Tablas */
     .table { font-size: 13px; }
-    .table th { padding: 7px 8px; font-size: 12px; font-weight: 600; background: var(--navy2); color: #fff; border: 1px solid #1d3558; }
+    .table th { padding: 7px 8px; font-size: 12px; font-weight: 600; background: var(--rojo); color: #fff; border: 1px solid var(--rojo-osc); }
     .table td { padding: 5px 8px; font-size: 13px; border: 1px solid var(--linea); }
     .table tbody tr:nth-child(even) td { background: #fafbfd; }
     .table tbody tr:hover td { background: #f1f5fb; }
@@ -730,6 +730,7 @@
         <button id="navCotizaciones" onclick="mostrarVista('cotizaciones')"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="7.5" width="17" height="12" rx="1.5"/><path d="M9 7.5v-2a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M3.5 12.5h17"/></svg></span><span class="nt"> Cotizaciones</span></button>
         <button id="navColaboradores" onclick="mostrarVista('colaboradores')" style="display:none"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="1.8"/><circle cx="9" cy="11" r="2.2"/><path d="M5.5 16c.4-1.6 1.8-2.5 3.5-2.5s3.1.9 3.5 2.5M14.5 10h4M14.5 13.5h3"/></svg></span><span class="nt"> Colaboradores</span></button>
         <button id="navPagomov" onclick="mostrarVista('pagomov')" style="display:none"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v.01M18 14.5v.01"/></svg></span><span class="nt"> Pago a móviles</span></button>
+        <button id="navPlanillas" onclick="mostrarVista('planillas')" style="display:none"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></span><span class="nt"> Planillas</span></button>
         <button id="navUsuarios" onclick="mostrarVista('usuarios')" style="display:none"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8.5" r="3.2"/><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5M16 5.6a3.2 3.2 0 0 1 0 5.8M18 14.8c1.8.6 3 2.3 3 5.2"/></svg></span><span class="nt"> Usuarios</span></button>
       </div>
 
@@ -1299,6 +1300,7 @@
         </div>
       </section>
 
+        <div id="rhModalBg" class="modalBg" style="z-index:90"><div class="modal" id="rhModal" style="max-width:560px"></div></div>
       <section id="vistaColab" style="display:none">
         <div class="subtabs" id="rhTabs">
           <button id="rhTMis" onclick="rhTab('mis')">Mis vacaciones y permisos</button>
@@ -1312,9 +1314,9 @@
         <div id="rhPCol" style="display:none"></div>
         <div id="rhPAsi" style="display:none"></div>
         <div id="rhPPag" style="display:none"></div>
-        <div id="rhModalBg" class="modalBg" style="z-index:90"><div class="modal" id="rhModal" style="max-width:560px"></div></div>
       </section>
 
+      <section id="vistaPlanillas" style="display:none"><div id="plnTop"></div><div id="rhPlSem"></div><div id="plnDesg"></div></section>
       <section id="vistaPagoMov" style="display:none">
         <div class="subtabs" id="pmTabs">
           <button id="pmTSem" onclick="pmTab('sem')">Semanas</button>
@@ -2741,10 +2743,6 @@ function iniciales(n) {
   const p = String(n || '?').trim().split(/\s+/).filter(Boolean);
   return ((p[0] || '?').charAt(0) + (p.length > 1 ? p[p.length - 1].charAt(0) : '')).toUpperCase();
 }
-function avatarHtml(foto, nombre, cls) {
-  const ok = foto && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+\/=]+$/.test(foto);
-  return '<span class="avatar ' + (cls || '') + '">' + (ok ? '<img src="' + foto + '" alt="">' : esc(iniciales(nombre))) + '</span>';
-}
 function pintarAvatar() {
   const h = $('hAvatar'); if (!h || !sesion) return;
   const ok = sesion.foto && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+\/=]+$/.test(sesion.foto);
@@ -2830,6 +2828,8 @@ function mostrarApp() {
   const primera = Object.keys(MODULOS_NAV).find(v => puedeModulo(MODULOS_NAV[v]));
   $('navColaboradores').style.display = esAdmin() ? '' : 'none';
   $('navPagomov').style.display = esAdmin() ? '' : 'none';
+  $('navPlanillas').style.display = esAdmin() ? '' : 'none';
+  empresaCargar();
   if (!primera) {
     if (esAdmin()) toast('Todavía no tienes módulos asignados. Pídele al administrador que te los active.');
     else api('miAccesoRhWeb').then(r => {
@@ -3049,11 +3049,6 @@ function calFiltrosLlenar() {
   llenar('calFContrata', u('Contrata'));
   llenar('calFZona', u('Domicilio'));
   llenar('calFEstado', ESTADOS, '<option value="">Todos</option><option value="__vacio">Con días sin definir</option>');
-}
-
-function calLimpiarFiltros() {
-  $('calBuscar').value = ''; $('calFContrata').value = ''; $('calFZona').value = ''; $('calFEstado').value = ''; $('calFCambios').checked = false;
-  renderizarCalendario();
 }
 
 function renderizarCalendario() {
@@ -5966,11 +5961,10 @@ async function rhHistGuardar() {
 
 /* ---- Planilla de la semana a pagar (mismos períodos que las móviles) con rubros por colaborador ---- */
 let rhPlS = null;
-function rhPlSemMontar() {
-  const box = $('rhPPag'); if (!box || !rhDatos || !rhDatos.admin) return;
-  let d = $('rhPlSem'); if (!d) { d = document.createElement('div'); d.id = 'rhPlSem'; box.insertBefore(d, box.firstChild); }
-  d.innerHTML = '<div class="loading">Cargando la planilla de la semana...</div>';
-  rhPlSemCargar(rhPlS && rhPlS.idSemana);
+async function abrirPlanillas() {
+  const d = $('rhPlSem'); d.innerHTML = '<div class="loading">Cargando la planilla...</div>'; $('plnDesg').innerHTML = '';
+  $('plnTop').innerHTML = '<div style="padding:0 2px 10px;font-size:13px;color:#667">Aquí se arma la planilla de colaboradores de la semana: con la asistencia ya actualizada se calcula el monto, y puedes quitar el salario de alguien y pagarle solo un bono, agregar personal o cargar personal interno de las móviles. Cuando esté lista, mira cuánto queda disponible de la factura de Telecable. El archivo del banco se genera en <b>Pago a móviles → Banco</b>.</div>';
+  try { rhDatos = await api('obtenerRhWeb'); await rhPlSemCargar(rhPlS && rhPlS.idSemana); } catch (e) { d.innerHTML = '<span style="color:#9b1c1c">' + esc(e.message || e) + '</span>'; }
 }
 async function rhPlSemCargar(id) {
   const d = $('rhPlSem'); if (!d) return;
@@ -5978,8 +5972,38 @@ async function rhPlSemCargar(id) {
     const keep = rhPlS && rhPlS.idSemana === id ? rhPlS.rub : null;
     const R = await api('planillaSemanaRhWeb', id || '');
     R.rub = {}; R.exc = {}; R.inc = {}; R.filas.forEach(f => { R.rub[f.id] = (f.rubros || []).map(x => Object.assign({}, x)); if (f.excluido) R.exc[f.id] = true; if (f.adicional) { R.inc[f.id] = true; if (!R.rub[f.id].length) R.rub[f.id] = [{ tipo: 'extra', concepto: 'Bono', monto: 0 }]; } });
-    R.sucio = false; rhPlS = R; rhPlSemDibujar();
+    R.sucio = false; rhPlS = R; rhPlSemDibujar(); plnDesgCargar();
   } catch (e) { d.innerHTML = '<span style="color:#9b1c1c;font-size:13px">' + esc(e.message || e) + '</span>'; }
+}
+let plnD = null;
+async function plnDesgCargar() {
+  const box = $('plnDesg'); if (!box || !rhPlS || !rhPlS.idSemana) return;
+  try { plnD = await api('desgloseFacturaPmWeb', rhPlS.idSemana); plnDesgDibujar(); } catch (e) { box.innerHTML = '<span style="color:#9b1c1c;font-size:13px">' + esc(e.message || e) + '</span>'; }
+}
+function plnDesgDibujar() {
+  const D = plnD, box = $('plnDesg'); if (!D || !box) return;
+  const ap = D.ahorro && D.ahorro.aplicado, cu = D.cuenta, cuOk = /^\d{20}$/.test(cu.iban) && cu.banco && cu.referencia;
+  const monto = ap ? D.ahorro.monto : Math.max(0, Math.floor(D.disponible));
+  const fil = (t, v, c) => '<tr><td>' + t + '</td><td class="num"' + (c ? ' style="color:' + c + '"' : '') + '>' + v + '</td></tr>';
+  box.innerHTML = '<div class="panel" style="margin-bottom:14px"><div class="panelHead"><h2>Desglose de la factura de Telecable</h2></div>' +
+    '<div style="padding:4px 14px 10px;font-size:12px;color:#667">Factura (UF Telecable) de la semana menos lo que se paga a las móviles y a los colaboradores. Guarda primero los rubros de la planilla para que se actualice.</div>' +
+    '<div style="display:grid;grid-template-columns:1fr;gap:14px;padding:0 14px 14px">' +
+    '<div><h3 style="margin:0 0 4px;font-size:14px">Móviles / contratistas</h3><div class="tableWrap" style="max-height:300px"><table class="table"><thead><tr><th>Contratista</th><th>Móvil(es)</th><th class="num">Depósito</th></tr></thead><tbody>' + (D.moviles.length ? D.moviles.map(x => '<tr><td>' + esc(x.nombre) + '</td><td>' + esc(x.movil) + '</td><td class="num">' + pmM(x.deposito) + '</td></tr>').join('') : '<tr><td colspan="3" class="empty">Sin pagos de móviles.</td></tr>') + '<tr style="background:#f1f3f6;font-weight:700"><td colspan="2">Total móviles</td><td class="num">' + pmM(D.totMov) + '</td></tr></tbody></table></div></div>' +
+    '<div><h3 style="margin:0 0 4px;font-size:14px">Colaboradores</h3><div class="tableWrap" style="max-height:300px"><table class="table"><thead><tr><th>Colaborador</th><th>Período</th><th class="num">Bruto</th></tr></thead><tbody>' + (D.colab.length ? D.colab.map(x => '<tr><td>' + esc(x.nombre) + '</td><td style="font-size:12px">' + esc(x.periodo) + '</td><td class="num">' + pmM(x.bruto) + '</td></tr>').join('') : '<tr><td colspan="3" class="empty">Sin colaboradores.</td></tr>') + '<tr style="background:#f1f3f6;font-weight:700"><td colspan="2">Total colaboradores</td><td class="num">' + pmM(D.totCol) + '</td></tr></tbody></table></div></div>' +
+    '<div><h3 style="margin:0 0 4px;font-size:14px">Disponible</h3><table class="table"><tbody>' + fil('Factura Telecable (UF) de la semana', pmM(D.uf)) + fil('− Móviles', pmM(D.totMov)) + fil('− Colaboradores', pmM(D.totCol)) + fil('<b>Disponible</b>', '<b>' + pmM(D.disponible) + '</b>', D.disponible < 0 ? '#9b1c1c' : '#1e7e34') + (ap ? fil('− Ahorro aplicado', pmM(D.ahorro.monto)) + fil('<b>Queda</b>', '<b>' + pmM(D.disponible - D.ahorro.monto) + '</b>') : '') + '</tbody></table>' +
+    '<div style="margin-top:10px;font-size:13px"><b>Línea de ahorro a la cuenta de la empresa</b>' + (cuOk ? '<div style="font-size:12px;color:#667">' + esc(cu.nombre || 'Cuenta de la empresa') + ' · ' + esc(cu.banco) + ' · CR' + esc(cu.iban) + '</div>' : '<div style="font-size:12px;color:#9b1c1c">Falta configurar la cuenta (IBAN, banco y referencia) en Pago a móviles → Banco.</div>') +
+    '<div style="display:flex;gap:8px;align-items:end;margin-top:6px;flex-wrap:wrap"><label>Monto<input type="number" id="plnAho" min="0" step="0.01" style="width:140px" value="' + monto + '"' + (ap ? ' disabled' : '') + '></label>' + (ap ? '<button class="btn secondary" onclick="plnAplicar(false)">Quitar de la factura</button>' : '<button class="btn primary" onclick="plnAplicar(true)">Descontar de la factura</button>') + '</div>' +
+    (ap ? '<div style="font-size:12px;color:#1e7e34;margin-top:4px">✔ Aplicado. En Banco podrás incluirlo como una línea más del archivo.</div>' : '') + '</div></div></div></div>';
+}
+async function plnAplicar(si) {
+  try { await api('guardarDesgloseFacturaPmWeb', rhPlS.idSemana, si ? $('plnAho').value : 0, !!si); await plnDesgCargar(); toast(si ? 'Ahorro descontado de la factura.' : 'Ahorro quitado de la factura.'); } catch (e) { mostrarError(e, 'No se pudo guardar.'); }
+}
+function plnInternoModal() {
+  const L = (rhDatos.colaboradores || []).filter(c => c.activo), op = '<option value="">—</option>' + L.map(c => '<option value="' + esc(c.id) + '">' + esc(c.nombre) + '</option>').join('');
+  rhModal('<h3>Personal interno de una móvil</h3><div style="font-size:12px;color:#667;margin-bottom:8px">Agrega el monto del técnico y del asistente. Entran a la planilla de esta semana como rubros «Móvil N · técnico/asistente». Los cálculos automáticos por facturación se conectan después.</div><div style="display:grid;gap:8px"><label>N.º de móvil<input id="piMov" inputmode="numeric" maxlength="4"></label><label>Técnico<select id="piTec">' + op + '</select></label><label>Monto técnico<input id="piTecM" type="number" min="0" step="0.01"></label><label>Asistente<select id="piAsi">' + op + '</select></label><label>Monto asistente<input id="piAsiM" type="number" min="0" step="0.01"></label></div><div style="margin-top:12px;display:flex;gap:8px"><button class="btn primary" onclick="plnInternoOk()">Agregar a la planilla</button><button class="btn secondary" onclick="rhCerrar()">Cancelar</button></div>');
+}
+async function plnInternoOk() {
+  try { await api('agregarPersonalInternoPlWeb', rhPlS.idSemana, $('piMov').value, { idColab: $('piTec').value, monto: $('piTecM').value }, { idColab: $('piAsi').value, monto: $('piAsiM').value }); rhCerrar(); await rhPlSemCargar(rhPlS.idSemana); toast('Personal interno agregado a la planilla.'); } catch (e) { mostrarError(e, 'No se pudo agregar.'); }
 }
 function rhPlSemTot(f) {
   const rb = rhPlS.rub[f.id] || [], ext = rb.filter(x => x.tipo !== 'rebajo').reduce((a, x) => a + (Number(x.monto) || 0), 0), reb = rb.filter(x => x.tipo === 'rebajo').reduce((a, x) => a + (Number(x.monto) || 0), 0);
@@ -6002,15 +6026,17 @@ function rhPlSemDibujar() {
       '<td class="num">' + pmM(f.base) + '</td><td class="num">' + (t.ext ? pmM(t.ext) : '—') + '</td><td class="num">' + (t.reb ? '−' + pmM(t.reb) : '—') + '</td><td class="num">' + (t.cargas ? '−' + pmM(t.cargas) : '—') + '</td><td class="num"><b>' + pmM(t.neto) + '</b></td>' +
       '<td style="min-width:260px">' + rb.map((x, j) => '<div style="display:flex;gap:4px;align-items:center;margin-bottom:3px"><select onchange="rhPlSemRub(' + i + ',' + j + ',\'tipo\',this.value)" style="width:78px;font-size:12px"><option value="extra"' + (x.tipo !== 'rebajo' ? ' selected' : '') + '>Extra +</option><option value="rebajo"' + (x.tipo === 'rebajo' ? ' selected' : '') + '>Rebajo −</option></select>' +
         '<input value="' + esc(x.concepto || '') + '" placeholder="Concepto" maxlength="60" onchange="rhPlSemRub(' + i + ',' + j + ',\'concepto\',this.value)" style="flex:1;min-width:90px;font-size:12px"><input type="number" min="0" value="' + esc(x.monto || '') + '" placeholder="₡" onchange="rhPlSemRub(' + i + ',' + j + ',\'monto\',this.value)" style="width:86px;font-size:12px"><button class="btnMini" title="Quitar" onclick="rhPlSemQuitar(' + i + ',' + j + ')">✕</button></div>').join('') +
-      '<button class="btnMini" onclick="rhPlSemAgregar(' + i + ')">➕ Agregar rubro</button> ' + (f.adicional ? '<button class="btnMini" title="Quitar de esta planilla" onclick="rhPlSemQuitarPersona(' + i + ')">🗑 Quitar</button>' : '<button class="btnMini" onclick="rhPlSemExcluir(' + i + ')">' + (R.exc[f.id] ? '↩ Incluir' : '🚫 No pagar aquí') + '</button>') + '</td></tr>'; }).join('') + '<tr style="background:#f1f3f6;font-weight:700"><td colspan="6">Neto total de colaboradores</td><td class="num">' + pmM(tot) + '</td><td></td></tr>'
+      '<button class="btnMini" onclick="rhPlSemAgregar(' + i + ')">➕ Agregar rubro</button> ' + (f.adicional ? (f.conSalarioPeriodo ? '<button class="btnMini" title="Volver a pagarle el salario de este período" onclick="rhPlSemConSalario(' + i + ')">↩ Pagar con salario</button> ' : '') + '<button class="btnMini" title="Quitar de esta planilla" onclick="rhPlSemQuitarPersona(' + i + ')">🗑 Quitar</button>' : '<button class="btnMini" onclick="rhPlSemExcluir(' + i + ')">' + (R.exc[f.id] ? '↩ Incluir' : '🚫 No pagar aquí') + '</button> <button class="btnMini" title="No se le paga el salario de este período, solo los rubros (por ejemplo un bono)" onclick="rhPlSemSoloRubros(' + i + ')">✂ Solo rubros (sin salario)</button>') + '</td></tr>'; }).join('') + '<tr style="background:#f1f3f6;font-weight:700"><td colspan="6">Neto total de colaboradores</td><td class="num">' + pmM(tot) + '</td><td></td></tr>'
       : '<tr><td colspan="8" class="empty">No hay colaboradores por pagar en esta semana (revisa salario, ingreso y periodicidad).</td></tr>') + '</tbody></table></div>' +
     '<div style="display:flex;gap:8px;align-items:center;padding:10px 14px 0;flex-wrap:wrap"><span style="font-size:13px"><b>Agregar a otra persona</b> (bono u otro pago, aunque no le toque en este archivo):</span><select id="rhPlSemOtro" style="max-width:240px"><option value="">Elige un colaborador</option>' + otros.map(c => '<option value="' + esc(c.id) + '">' + esc(c.nombre) + '</option>').join('') + '</select><button class="btn secondary" onclick="rhPlSemAgregarPersona()">➕ Agregar</button></div>' +
-    '<div style="display:flex;gap:8px;justify-content:flex-end;padding:10px 14px;flex-wrap:wrap"><button class="btn secondary" onclick="rhPlSemCopiar()">📋 Copiar tabla</button><button class="btn primary" id="rhPlSemBtn" onclick="rhPlSemGuardar()">💾 Guardar rubros de la semana' + (R.sucio ? ' *' : '') + '</button></div></div>';
+    '<div style="display:flex;gap:8px;justify-content:flex-end;padding:10px 14px;flex-wrap:wrap"><button class="btn secondary" onclick="plnInternoModal()">🚐 Personal interno (móvil)</button><button class="btn secondary" onclick="rhPlSemCopiar()">📋 Copiar tabla</button><button class="btn primary" id="rhPlSemBtn" onclick="rhPlSemGuardar()">💾 Guardar rubros de la semana' + (R.sucio ? ' *' : '') + '</button></div></div>';
 }
 function rhPlSemRub(i, j, k, v) { const f = rhPlS.filas[i]; rhPlS.rub[f.id][j][k] = k === 'monto' ? (Number(v) || 0) : v; rhPlS.sucio = true; rhPlSemDibujar(); }
 function rhPlSemAgregar(i) { const f = rhPlS.filas[i]; (rhPlS.rub[f.id] = rhPlS.rub[f.id] || []).push({ tipo: 'extra', concepto: '', monto: 0 }); rhPlS.sucio = true; rhPlSemDibujar(); }
 function rhPlSemQuitar(i, j) { const f = rhPlS.filas[i]; rhPlS.rub[f.id].splice(j, 1); rhPlS.sucio = true; rhPlSemDibujar(); }
 function rhPlSemExcluir(i) { const f = rhPlS.filas[i]; if (rhPlS.exc[f.id]) delete rhPlS.exc[f.id]; else rhPlS.exc[f.id] = true; rhPlS.sucio = true; rhPlSemDibujar(); }
+async function rhPlSemSoloRubros(i) { const f = rhPlS.filas[i]; rhPlS.inc[f.id] = true; delete rhPlS.exc[f.id]; if (!(rhPlS.rub[f.id] || []).length) rhPlS.rub[f.id] = [{ tipo: 'extra', concepto: 'Bono', monto: 0 }]; await rhPlSemGuardar(true); }
+async function rhPlSemConSalario(i) { const f = rhPlS.filas[i]; delete rhPlS.inc[f.id]; await rhPlSemGuardar(true); }
 async function rhPlSemQuitarPersona(i) { const f = rhPlS.filas[i]; delete rhPlS.inc[f.id]; delete rhPlS.rub[f.id]; delete rhPlS.exc[f.id]; await rhPlSemGuardar(true); }
 async function rhPlSemAgregarPersona() {
   const id = $('rhPlSemOtro').value; if (!id) return toast('Elige a quién agregar.');
@@ -6489,7 +6515,7 @@ function rhPagFechas() { rhPagDesde = $('rpgD').value || rhPagDesde; rhPagHasta 
 function rhPagEstado(e) { rhEstado = e; rhColSel = ''; rhRenderPag(); }
 function rhPagColab(id) { rhColSel = id; rhRenderPag(); }
 
-async function rhRenderPag() { await rhRenderPag0(); rhPlSemMontar(); }
+async function rhRenderPag() { await rhRenderPag0(); }
 async function rhRenderPag0() {
   if (!rhPagDesde) rhRangoRapido('anio', true);
   const cols = rhDatos.colaboradores;
@@ -6704,7 +6730,7 @@ function rhReporteHtml() {
   const R = rhRep, T = R.totales, m = n => colones(n);
   const persona = rhColSel && rhPagos ? rhPagos.colaborador : null;
   const est = { activos: 'Colaboradores activos', fuera: 'Fuera de la operativa', todos: 'Todos los colaboradores' }[R.estado];
-  let h = '<h1>Reporte de pagos ' + (persona ? '· ' + esc(persona.nombre) : '· General') + '</h1><div class="sub">Soluciones Red Dorada SRL · Período ' + esc(rhFecha(R.desde)) + ' al ' + esc(rhFecha(R.hasta)) + (persona ? '' : ' · ' + est) + ' · Generado ' + esc(rhFecha(R.hoy)) + '</div>';
+  let h = docEncabezado('Reporte de pagos', persona ? persona.nombre : 'General') + '<div class="sub">Período ' + esc(rhFecha(R.desde)) + ' al ' + esc(rhFecha(R.hasta)) + (persona ? '' : ' · ' + est) + ' · Generado ' + esc(rhFecha(R.hoy)) + '</div>';
   if (persona) h += '<div class="sub">' + [persona.puesto, persona.cedula ? 'Cédula ' + persona.cedula : '', persona.ingreso ? 'Ingreso ' + rhFecha(persona.ingreso) : '', persona.salida ? 'Salida ' + rhFecha(persona.salida) : ''].filter(Boolean).map(esc).join(' · ') + '</div>';
   h += '<table class="k"><tr><td>Total bruto<b>' + m(T.bruto) + '</b></td><td>Cargas patronales (' + fmtN(R.totalPatronal) + '%)<b>' + m(T.cargas) + '</b></td><td>Costo total<b>' + m(T.costo) + '</b></td><td>Deducciones<b>' + m(T.deducciones) + '</b></td><td>Neto pagado<b>' + m(T.neto) + '</b></td><td>Aguinaldo ciclo (÷12)<b>' + m(T.aguEstimado) + '</b></td></tr></table>';
   if (!persona) {
@@ -6722,7 +6748,7 @@ function rhReporteHtml() {
       R.pagos.map(p => '<tr><td>' + esc(rhFecha(p.fecha)) + '</td>' + (persona ? '' : '<td>' + esc(p.nombre) + '</td>') + '<td>' + esc(p.periodo) + '</td><td>' + esc(p.tipoTxt) + '</td><td>' + m(p.bruto) + '</td><td>' + m(p.cargas) + '</td><td>' + m(p.deducciones) + '</td><td>' + m(p.neto) + '</td></tr>').join('') + '</tbody></table>';
   }
   h += '<div class="sub" style="margin-top:14px">Las cargas patronales se calculan sobre salario, horas extra, comisiones/bonos salariales y vacaciones pagadas, con los porcentajes configurados. Cálculo de referencia: confírmalo con la planilla de la CCSS y tu contador.</div>';
-  return '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Reporte de pagos</title><style>body{font-family:Arial,Helvetica,sans-serif;color:#1d2433;margin:24px;font-size:12px}h1{font-size:20px;margin:0 0 4px;color:#0f1b2d}h2{font-size:14px;margin:18px 0 6px;color:#7a1b1b;border-bottom:1px solid #ccc;padding-bottom:3px}.sub{color:#666;margin:2px 0}table{border-collapse:collapse;width:100%;margin-top:4px}th,td{border:1px solid #d5d9e0;padding:4px 6px;text-align:right}th:first-child,td:first-child{text-align:left}thead th{background:#0f1b2d;color:#fff}tr.t td{font-weight:700;background:#eef0f4}table.k td{text-align:left;font-size:11px;color:#666}table.k b{display:block;font-size:14px;color:#1d2433}@media print{body{margin:10mm}}</style></head><body>' + h + '</body></html>';
+  return '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Reporte de pagos</title><style>' + DOC_CSS + 'td,th{text-align:right}th:first-child,td:first-child{text-align:left}table.k td{text-align:left}</style></head><body>' + h + '</body></html>';
 }
 
 function rhImprimir() {
@@ -6737,7 +6763,7 @@ function rhImprimir() {
 function mostrarVista(v, forzar) {
 
   if (MODULOS_NAV[v] && !puedeModulo(MODULOS_NAV[v]) && !forzar) { toast('No tienes acceso a ese módulo.'); return; }
-  if (v === 'pagomov' && !esAdmin()) { toast('No tienes acceso a ese módulo.'); return; }
+  if ((v === 'pagomov' || v === 'planillas') && !esAdmin()) { toast('No tienes acceso a ese módulo.'); return; }
 
   if (!forzar && v !== 'calendario' && Object.keys(cambios).length &&
       !confirm('Hay cambios sin guardar en el cronograma. ¿Quieres cambiar de vista sin guardarlos?')) {
@@ -6765,11 +6791,12 @@ function mostrarVista(v, forzar) {
   $('vistaUsuarios').style.display = v === 'usuarios' ? 'block' : 'none';
   $('vistaColab').style.display = v === 'colaboradores' ? 'block' : 'none';
   $('vistaPagoMov').style.display = (v === 'pagomov' && admin) ? 'block' : 'none';
+  $('vistaPlanillas').style.display = (v === 'planillas' && admin) ? 'block' : 'none';
   $('vistaSeguimiento').style.display = v === 'seguimiento' ? 'block' : 'none';
   $('vistaBodega').style.display = v === 'bodega' ? 'block' : 'none';
   $('vistaCotiz').style.display = v === 'cotizaciones' ? 'block' : 'none';
 
-  ['calendario', 'moviles', 'resumen', 'seguimiento', 'bodega', 'cotizaciones', 'colaboradores', 'pagomov', 'usuarios'].forEach(x => {
+  ['calendario', 'moviles', 'resumen', 'seguimiento', 'bodega', 'cotizaciones', 'colaboradores', 'pagomov', 'planillas', 'usuarios'].forEach(x => {
     const id = 'nav' + x.charAt(0).toUpperCase() + x.slice(1);
     $(id).classList.toggle('active', x === v);
   });
@@ -6781,6 +6808,7 @@ function mostrarVista(v, forzar) {
   if (v === 'usuarios') cargarUsuarios();
   if (v === 'colaboradores') abrirColab();
   if (v === 'pagomov') abrirPagoMov();
+  if (v === 'planillas') abrirPlanillas();
   if (v === 'moviles' && admin) abrirFichas();
   if (v === 'calendario' && calendarioObsoleto && !Object.keys(cambios).length) cargarCalendario();
   sideRefrescar(); setTimeout(sideRefrescar, 300);
@@ -6811,8 +6839,7 @@ function pmAlertaPlanilla() {
   el.innerHTML = a ? '<div style="margin:0 0 10px;padding:10px 14px;border-radius:8px;background:#fff1f0;border:1px solid #f0b4b0;color:#8a1c14;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b>🚨 Planilla de colaboradores</b><span style="flex:1;min-width:240px">' + esc(a.texto) + '</span><button class="btn primary" onclick="pmIrArchivo()">Generar archivo del banco</button></div>' : '';
 }
 function pmIrArchivo() {
-  if (!pmD.semanas.length) { toast('Primero importa una semana de Telecable: el archivo del banco se genera desde una semana.', 6000); return; }
-  pmTab('sem'); pmVista = 'arc'; pmAbrir(pmD.semanas[0].id);
+  pmTab('ban');
 }
 function pmTab(t) {
   pmTabAct = t; pmAlertaPlanilla();
@@ -6859,7 +6886,7 @@ function pmRenderSemana() {
     [['Órdenes', T.nOrdenes], ['Costo detalle', pmM(T.detalle)], ['UF Telecable', pmM(T.uf)], ['Margen (UF − costo)', pmM(margen)], ['Total facturado', pmM(T.totalFacturado)], ['Total a depositar', pmM(T.deposito)]]
       .map(x => '<span>' + x[0] + ' <b style="font-size:13px;color:#1d2433">' + x[1] + '</b></span>').join('') + '</div></div>';
   if (S.diferencias || S.sinLista) h += '<div class="panel" style="padding:10px 14px;font-size:13px;background:#fff8e1">' + (S.diferencias ? '⚠ <b>' + S.diferencias + '</b> orden(es) con costo distinto a la lista de precios. ' + (cerr ? '' : '<button class="btn secondary" onclick="pmAplicarLista()">Aplicar precio de lista</button> ') : '') + (S.sinLista ? '⚠ <b>' + S.sinLista + '</b> orden(es) sin precio de pago (el servicio no está en la lista). ' + (cerr ? '' : '<button class="btn primary" onclick="pmSinPrecioModal()">Asignar precio</button>') : '') + '</div>';
-  h += '<div class="subtabs">' + tb('mov', 'Resumen por móvil') + tb('ord', 'Órdenes') + tb('res', 'Pago por contratista') + tb('ape', 'Apelaciones' + (S.apelaciones.some(a => a.estado === 'Pendiente') ? ' •' : '')) + tb('aju', 'Ajustes') + tb('ext', 'Adicionales') + tb('ver', 'Verificación') + tb('arc', 'Archivos') + '</div>';
+  h += '<div class="subtabs">' + tb('mov', 'Resumen por móvil') + tb('ord', 'Órdenes') + tb('res', 'Pago por contratista') + tb('ape', 'Apelaciones' + (S.apelaciones.some(a => a.estado === 'Pendiente') ? ' •' : '')) + tb('aju', 'Ajustes') + tb('ext', 'Adicionales') + tb('ver', 'Verificación') + '</div>';
   let c = '';
   if (pmVista === 'mov') c = pmHtmlMov();
   if (pmVista === 'res') c = pmHtmlRes(cerr);
@@ -6868,13 +6895,11 @@ function pmRenderSemana() {
   if (pmVista === 'aju') c = pmHtmlAju(cerr);
   if (pmVista === 'ext') c = pmHtmlExt(cerr);
   if (pmVista === 'ver') c = pmHtmlVer();
-  if (pmVista === 'arc') c = pmHtmlArc();
   /* botones y filtros de cada vista quedan fijos arriba; solo la tabla se desplaza */
   let fijo = ''; const mk = c.indexOf('<!--/FIX-->');
   if (mk >= 0) { fijo = c.slice(0, mk); c = c.slice(mk + 11); }
   else if (['ape', 'aju', 'ext'].indexOf(pmVista) >= 0) { const j = c.indexOf('</div>') + 6; fijo = c.slice(0, j); c = c.slice(j); }
   $('pmPSem').classList.add('pmFlex'); $('pmPSem').innerHTML = h + (fijo ? '<div class="panel pmFixBar">' + fijo + '</div>' : '') + '<div class="panel pmFill"><div class="tableWrap">' + c + '</div></div>';
-  if (pmVista === 'arc') pmPlCargar();
 }
 
 /* Grupos de la tabla de pago: celdas donde se cargan valores por contratista */
@@ -6900,7 +6925,7 @@ function pmHtmlRes(cerr) {
   return '<div style="padding:6px 12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn primary" title="Un estado de cuenta (PDF y/o Excel) por cada contratista, comprimidos en un ZIP" onclick="pmExportarModal()">📦 Exportar archivos de pago</button>' +
     '<label style="font-size:12px"><input type="checkbox" ' + (pmSinOrd ? 'checked' : '') + ' onchange="pmSinOrd=this.checked;pmRenderSemana()"> Mostrar sin órdenes' + (nOcultas ? ' (' + nOcultas + ' ocultos)' : '') + '</label>' +
     '<span style="color:#778;font-size:11.5px">Clic en las celdas Apelaciones, Penalizaciones, Alquiler y Rebajos para ver o cargar valores · 📄 en cada fila: estado de cuenta (PDF, Excel o correo).</span></div><!--/FIX-->' +
-    '<table class="pmT pmGrid"><thead><tr><th colspan="3"></th><th colspan="3" style="text-align:center;background:#7a1a1a;color:#fff">Antes de facturar · afectan la factura</th><th colspan="3"></th><th style="text-align:center;background:#444;color:#fff">Después de facturar</th><th colspan="4"></th></tr><tr>' + th('Contratista (factura)') + th('Órd.', 'right') + th('Detalle', 'right') + th('Apelaciones (+)', 'right') + th('Penaliz. (−)', 'right') + th('Alquiler / otros (−)', 'right') + th('A facturar', 'right') + th('IVA 13%', 'right') + th('Total factura', 'right') + th('Rebajos (−)', 'right') + th('A depositar', 'right') + th('N.º factura') + th('Pagado') + '<th></th></tr></thead><tbody>' +
+    '<table class="pmT pmGrid"><thead><tr><th colspan="3"></th><th colspan="3" style="text-align:center;background:#7a1a1a;color:#fff">Antes de facturar · afectan la factura</th><th colspan="3"></th><th style="text-align:center;background:var(--rojo-osc);color:#fff">Después de facturar</th><th colspan="4"></th></tr><tr>' + th('Contratista (factura)') + th('Órd.', 'right') + th('Detalle', 'right') + th('Apelaciones (+)', 'right') + th('Penaliz. (−)', 'right') + th('Alquiler / otros (−)', 'right') + th('A facturar', 'right') + th('IVA 13%', 'right') + th('Total factura', 'right') + th('Rebajos (−)', 'right') + th('A depositar', 'right') + th('N.º factura') + th('Pagado') + '<th></th></tr></thead><tbody>' +
     visibles.map(f => {
       const tec = (f.tecnicos || []).map(t => 'M' + esc(t.movil) + (t.tecnico && pmNorm(t.tecnico) !== pmNorm(f.nombre) ? ' · ' + esc(t.tecnico) : '')).join(' | ');
       const sinIban = !f.sinContratista && !/^\d{20}$/.test(f.iban || '');
@@ -7126,7 +7151,7 @@ async function pmVerExcel() {
     await cargarLib('xlsx', SEG_URL_XLSX);
     const filas = [['Fecha', 'Móvil', 'N.º orden', 'Contrato', 'Servicio', 'En seguimiento', 'Con materiales']].concat(pmVer.noPagadas.map(o => [o.fecha, o.movil, o.nOrden, o.contrato, o.servicio, o.enSeg ? o.estado : 'No', o.enMat ? 'Sí' : 'No']));
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(filas), 'Reclamo');
-    XLSX.writeFile(wb, 'Reclamo_OT_no_pagadas_' + pmS.semana.desde + '_' + pmS.semana.hasta + '.xlsx');
+    await xlsxMarca(wb, 'Reclamo_OT_no_pagadas_' + pmS.semana.desde + '_' + pmS.semana.hasta + '.xlsx', 'Reclamo de OT no pagadas');
   } catch (e) { mostrarError(e, 'No se pudo generar el Excel.'); }
 }
 
@@ -7497,119 +7522,81 @@ async function pmSugerirCrear() {
 /* ---------- Lista de contratos y corte por móvil ---------- */
 let pmCtoMovil = '', pmCtoQ = '', pmCtoSin = false;
 const pmR2 = n => Math.round((Number(n) || 0) * 100) / 100;
-function pmContratos() {
-  const m = {};
-  pmS.ordenes.forEach(o => {
-    if (pmCtoMovil && String(Number(o.movil)) !== pmCtoMovil) return;
-    const k = o.contrato + '|' + String(Number(o.movil));
-    const x = m[k] || (m[k] = { contrato: o.contrato, movil: String(Number(o.movil)), cliente: o.cliente, fecha: o.fecha, lineas: 0, servicios: [], costo: 0, uf: 0, ordenes: [] });
-    x.lineas++; if (!o.manual && o.costoLista === null) x.sinPrecio = (x.sinPrecio || 0) + 1; x.servicios.push((o.tipo || o.servicios) + (o.cantidad > 1 ? ' ×' + o.cantidad : '')); x.costo += o.costo; x.uf += o.ufCosto; x.ordenes.push(o.nOrden || '');
-  });
-  const q = pmCtoQ.trim().toLowerCase();
-  return Object.keys(m).map(k => m[k]).filter(x => !pmCtoSin || x.sinPrecio).filter(x => !q || (x.contrato + ' ' + x.cliente + ' ' + x.servicios.join(' ')).toLowerCase().indexOf(q) >= 0)
-    .sort((a, b) => Number(a.movil) - Number(b.movil) || a.fecha.localeCompare(b.fecha));
-}
-function pmHtmlCto() {
-  const L = pmContratos(), moviles = Array.from(new Set(pmS.ordenes.map(o => String(Number(o.movil))))).sort((a, b) => a - b);
-  const tc = L.reduce((a, x) => a + x.costo, 0), uf = L.reduce((a, x) => a + x.uf, 0);
-  return '<div style="padding:8px 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><input placeholder="Buscar contrato, cliente o servicio" style="min-width:220px" value="' + esc(pmCtoQ) + '" onchange="pmCtoQ=this.value;pmRenderSemana()"><select onchange="pmCtoMovil=this.value;pmRenderSemana()"><option value="">Todas las móviles</option>' + moviles.map(m => '<option value="' + m + '"' + (pmCtoMovil === m ? ' selected' : '') + '>Móvil ' + m + '</option>').join('') + '</select><label style="font-size:12px"><input type="checkbox" ' + (pmCtoSin ? 'checked' : '') + ' onchange="pmCtoSin=this.checked;pmRenderSemana()"> Solo con líneas sin precio</label><span style="color:#667;font-size:12px">' + L.length + ' contrato(s) · costo ' + pmM(tc) + ' · UF ' + pmM(uf) + '</span><span style="flex:1"></span><button class="btn secondary" onclick="pmCortesExcel(pmCtoMovil)">⬇ Excel' + (pmCtoMovil ? ' de la móvil ' + pmCtoMovil : '') + '</button></div>' +
-    '<table class="pmT"><thead><tr><th>Móvil</th><th>Fecha</th><th>Contrato</th><th>N.º orden</th><th>Cliente</th><th>Servicios</th><th>Precio</th><th>Pago móvil</th><th>UF</th></tr></thead><tbody>' + L.slice(0, 500).map(x => '<tr' + (x.sinPrecio ? ' style="background:#fdecea"' : '') + '><td>' + esc(x.movil) + '</td><td>' + esc(pmFh(x.fecha)) + '</td><td>' + esc(x.contrato) + '</td><td>' + esc(x.ordenes.filter(Boolean).join(', ')) + '</td><td>' + esc(x.cliente) + '</td><td>' + esc(x.servicios.join(' + ')) + '</td><td>' + (x.sinPrecio ? '<span class="chip rojo">' + x.sinPrecio + ' sin precio</span>' : '<span class="chip verde">OK</span>') + '</td><td>' + pmM(x.costo) + '</td><td>' + pmM(x.uf) + '</td></tr>').join('') + '</tbody></table>' + (L.length > 500 ? '<div class="loading">Se muestran 500 de ' + L.length + '. Filtra por móvil.</div>' : '');
-}
-function pmCortesMoviles() {
-  const m = {};
-  pmS.ordenes.forEach(o => { const k = String(Number(o.movil)); const x = m[k] || (m[k] = { movil: k, ordenes: [], costo: 0, uf: 0 }); x.ordenes.push(o); x.costo += o.costo; x.uf += o.ufCosto; });
-  return Object.keys(m).map(k => m[k]).sort((a, b) => a.movil - b.movil);
-}
-async function pmCortesExcel(movil) {
-  try {
-    await cargarLib('xlsx', SEG_URL_XLSX);
-    const C = pmCortesMoviles().filter(x => !movil || x.movil === String(movil));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['Móvil', 'Contratista', 'Órdenes', 'Pago a la móvil', 'UF Telecable', 'Margen']].concat(C.map(x => [x.movil, (pmS.resumen.filas.find(f => f.moviles[x.movil]) || {}).nombre || '', x.ordenes.length, pmR2(x.costo), pmR2(x.uf), pmR2(x.uf - x.costo)]))), 'Resumen');
-    C.forEach(x => XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['Fecha', 'Contrato', 'N.º orden', 'Cliente', 'Servicio (Telecable)', 'Tipo aplicado', 'Cant.', 'Pago móvil', 'UF']].concat(x.ordenes.map(o => [o.fecha, o.contrato, o.nOrden, o.cliente, o.servicios, o.tipo, o.cantidad || 1, o.costo, o.ufCosto])).concat([['TOTAL', '', '', '', '', '', '', pmR2(x.costo), pmR2(x.uf)]])), 'Móvil ' + x.movil));
-    XLSX.writeFile(wb, 'Corte_' + (movil ? 'movil_' + movil + '_' : 'moviles_') + pmS.semana.desde + '_' + pmS.semana.hasta + '.xlsx');
-  } catch (e) { mostrarError(e, 'No se pudo generar el Excel.'); }
-}
-
 /* PDF real (descarga) del corte de una móvil: órdenes de la semana con su pago */
-async function pmCortePdfFile(movil, silencioso) {
-  try {
-    await cargarLib('jspdf', URL_JSPDF);
-    const x = pmCortesMoviles().find(c => c.movil === String(movil)); if (!x) { toast('No hay órdenes de esa móvil.'); return; }
-    const S = pmS, E = pmD.empresa || { nombre: 'Soluciones Red Dorada SRL' }, f = S.resumen.filas.find(r => r.moviles[x.movil]) || {};
-    const d = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4' }), M = 14, W = 210 - 2 * M, mon = v => ctMoneyPdf(v, 'CRC');
-    const cut = (t, n) => { t = String(t == null ? '' : t); return t.length > n ? t.slice(0, n - 1) + '…' : t; };
-    const cols = [['Fecha', 18, 'l'], ['N.º orden', 22, 'l'], ['Contrato', 20, 'l'], ['Cliente', 50, 'l'], ['Servicio', 50, 'l'], ['Cant.', 9, 'r'], ['Pago', 13, 'r']];
-    let y = M;
-    const enc = () => {
-      d.setFont('helvetica', 'bold'); d.setFontSize(15); d.setTextColor(15, 27, 45); d.text('Corte de la móvil ' + x.movil, M, y + 5);
-      d.setFont('helvetica', 'normal'); d.setFontSize(9); d.setTextColor(85, 95, 110);
-      d.text(E.nombre + ' · Semana ' + pmFh(S.semana.desde) + ' al ' + pmFh(S.semana.hasta), M, y + 11);
-      const tec = ((f.tecnicos || []).find(t => t.movil === x.movil) || {}).tecnico;
-      d.text((f.nombre ? 'Contratista: ' + f.nombre : '') + (tec ? ' · Técnico: ' + tec : ''), M, y + 16);
-      y += 22;
-      d.setFillColor(238, 242, 247); d.rect(M, y, W, 7, 'F'); d.setFont('helvetica', 'bold'); d.setFontSize(8); d.setTextColor(15, 27, 45);
-      let cx = M; cols.forEach(c => { d.text(c[0], c[2] === 'r' ? cx + c[1] - 1 : cx + 1, y + 4.7, { align: c[2] === 'r' ? 'right' : 'left' }); cx += c[1]; });
-      y += 8;
-    };
-    enc();
-    d.setFont('helvetica', 'normal'); d.setFontSize(7.5);
-    x.ordenes.forEach(o => {
-      if (y > 280) { d.addPage(); y = M; enc(); d.setFont('helvetica', 'normal'); d.setFontSize(7.5); }
-      const v = [pmFh(o.fecha), o.nOrden || '—', o.contrato, cut(o.cliente, 30), cut(o.tipo || o.servicios, 32), String(o.cantidad || 1), mon(o.costo)];
-      let cx = M; d.setTextColor(29, 36, 51);
-      cols.forEach((c, i) => { d.text(v[i], c[2] === 'r' ? cx + c[1] - 1 : cx + 1, y + 3.4, { align: c[2] === 'r' ? 'right' : 'left' }); cx += c[1]; });
-      d.setDrawColor(225, 230, 238); d.line(M, y + 4.6, M + W, y + 4.6); y += 5;
-    });
-    if (y > 270) { d.addPage(); y = M; }
-    y += 3; d.setFont('helvetica', 'bold'); d.setFontSize(10); d.setTextColor(15, 27, 45);
-    d.text(x.ordenes.length + ' orden(es)', M, y + 4); d.text('Total a pagar a la móvil: ' + mon(x.costo), M + W, y + 4, { align: 'right' });
-    d.save('Corte_movil_' + x.movil + '_' + S.semana.desde + '_' + S.semana.hasta + '.pdf');
-  } catch (e) { if (!silencioso) mostrarError(e, 'No se pudo generar el PDF.'); else throw e; }
-}
 /* Un archivo por cada móvil (descargas seguidas; el navegador puede pedir permiso para varias descargas) */
-async function pmCorteTodos(fmt) {
-  const L = pmCortesMoviles(); if (!L.length) return;
-  if (!confirm('Se descargarán ' + L.length + ' archivos ' + (fmt === 'pdf' ? 'PDF' : 'Excel') + ', uno por móvil. Si el navegador pregunta, permite las descargas múltiples. ¿Continuar?')) return;
-  try {
-    for (const x of L) { if (fmt === 'pdf') await pmCortePdfFile(x.movil, true); else await pmCortesExcel(x.movil); await new Promise(r => setTimeout(r, 600)); }
-    toast(L.length + ' archivos descargados.');
-  } catch (e) { mostrarError(e, 'No se pudieron descargar todos los archivos.'); }
-}
-function pmCortePdf(movil) {
-  const C = pmCortesMoviles().filter(x => !movil || x.movil === String(movil)), m = pmM, S = pmS;
-  if (!C.length) { toast('No hay órdenes de esa móvil.'); return; }
-  const cuerpo = C.map(x => {
-    const f = S.resumen.filas.find(r => r.moviles[x.movil]);
-    return '<div class="pg"><h1>Corte de la móvil ' + esc(x.movil) + '</h1><div class="sub">Soluciones Red Dorada SRL · Semana ' + esc(pmFh(S.semana.desde)) + ' al ' + esc(pmFh(S.semana.hasta)) + (f ? ' · ' + esc(f.nombre) : '') + '</div>' +
-      '<table class="k"><tr><td>Órdenes<b>' + x.ordenes.length + '</b></td><td>Pago a la móvil<b>' + m(x.costo) + '</b></td></tr></table>' +
-      '<table><thead><tr><th>Fecha</th><th>Contrato</th><th>Cliente</th><th>Servicio</th><th>Cant.</th><th>Pago</th></tr></thead><tbody>' + x.ordenes.map(o => '<tr><td>' + esc(pmFh(o.fecha)) + '</td><td>' + esc(o.contrato) + '</td><td>' + esc(o.cliente) + '</td><td>' + esc(o.tipo || o.servicios) + '</td><td>' + (o.cantidad || 1) + '</td><td>' + m(o.costo) + '</td></tr>').join('') + '<tr class="t"><td colspan="5">Total</td><td>' + m(x.costo) + '</td></tr></tbody></table></div>';
-  }).join('');
-  const html = '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Corte por móvil</title><style>body{font-family:Arial,Helvetica,sans-serif;color:#1d2433;margin:24px;font-size:11px}h1{font-size:18px;margin:0 0 4px;color:#0f1b2d}.sub{color:#556;margin-bottom:8px}table{border-collapse:collapse;width:100%;margin-bottom:6px}td,th{border:1px solid #cfd6df;padding:3px 6px;text-align:left}th{background:#eef2f7}tr.t td{font-weight:700;background:#f3f6fa}table.k td{font-size:11px;color:#556}table.k b{display:block;font-size:14px;color:#0f1b2d}.pg{page-break-after:always}.pg:last-child{page-break-after:auto}</style></head><body>' + cuerpo + '</body></html>';
-  const fr = document.createElement('iframe'); fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0'; document.body.appendChild(fr);
-  fr.onload = () => { try { fr.contentWindow.focus(); fr.contentWindow.print(); } catch (e) { toast('No se pudo abrir la impresión.'); } setTimeout(() => fr.remove(), 60000); };
-  fr.srcdoc = html;
-}
-
 /* ---------- Banco ---------- */
 function pmRenderBan() {
   const b = pmD.banco, E = pmD.empresa || { nombre: '', cedula: '', telefono: '', correo: '', direccion: '' };
-  $('pmPBan').innerHTML = '<div class="panel" style="padding:14px"><h2 style="margin:0 0 8px">Archivo de pago de planillas y proveedores (BAC)</h2><div style="font-size:13px;color:#555;margin-bottom:10px">Datos del archivo .prn que se sube al banco. Cada envío lleva un número consecutivo.</div><div style="display:grid;gap:8px;max-width:360px"><label>Código del convenio (4 caracteres)<input id="pbCod" maxlength="4" value="' + esc(b.codigo) + '"></label><label>Último número de envío usado<input id="pbEnv" type="number" value="' + b.ultimoEnvio + '"></label><label>Indicador (columna tras el período)<input id="pbFlag" maxlength="1" value="' + esc(b.flag) + '"></label></div><div style="margin-top:12px"><button class="btn primary" onclick="pmBanGuardar()">Guardar</button></div></div>' +
-    '<div class="panel" style="padding:14px;margin-top:12px"><h2 style="margin:0 0 8px">Datos de la empresa (encabezado del estado de cuenta)</h2><div style="display:grid;gap:8px;max-width:460px"><label>Nombre<input id="peeNom" value="' + esc(E.nombre) + '" maxlength="100"></label><label>Cédula jurídica<input id="peeCed" value="' + esc(E.cedula) + '"></label><label>Teléfono<input id="peeTel" value="' + esc(E.telefono) + '"></label><label>Correo<input id="peeCor" value="' + esc(E.correo) + '"></label><label>Dirección<input id="peeDir" value="' + esc(E.direccion) + '" maxlength="160"></label></div><div style="margin-top:12px"><button class="btn primary" onclick="pmEmpGuardar()">Guardar</button></div></div>';
+  $('pmPBan').innerHTML = '<div class="panel" id="pmBanEnv"></div><div class="panel" style="padding:14px;margin-top:12px"><h2 style="margin:0 0 8px">Archivo de pago de planillas y proveedores (BAC)</h2><div style="font-size:13px;color:#555;margin-bottom:10px">Datos del archivo .prn que se sube al banco. Cada envío lleva un número consecutivo.</div><div style="display:grid;gap:8px;max-width:360px"><label>Código del convenio (4 caracteres)<input id="pbCod" maxlength="4" value="' + esc(b.codigo) + '"></label><label>Último número de envío usado<input id="pbEnv" type="number" value="' + b.ultimoEnvio + '"></label><label>Indicador (columna tras el período)<input id="pbFlag" maxlength="1" value="' + esc(b.flag) + '"></label></div><div style="margin-top:12px"><button class="btn primary" onclick="pmBanGuardar()">Guardar</button></div></div>' +
+    '<div class="panel" style="padding:14px;margin-top:12px"><h2 style="margin:0 0 8px">Datos de la empresa (encabezado del estado de cuenta)</h2><div style="display:grid;gap:8px;max-width:460px"><label>Nombre<input id="peeNom" value="' + esc(E.nombre) + '" maxlength="100"></label><label>Cédula jurídica<input id="peeCed" value="' + esc(E.cedula) + '"></label><label>Teléfono<input id="peeTel" value="' + esc(E.telefono) + '"></label><label>Correo<input id="peeCor" value="' + esc(E.correo) + '"></label><label>Dirección<input id="peeDir" value="' + esc(E.direccion) + '" maxlength="160"></label></div><div style="margin-top:12px"><button class="btn primary" onclick="pmEmpGuardar()">Guardar</button></div></div>' +
+    '<div class="panel" style="padding:14px;margin-top:12px"><h2 style="margin:0 0 8px">Cuenta de ahorro de la empresa</h2><div style="font-size:13px;color:#555;margin-bottom:10px">Cuenta a la que se envía el ahorro que se descuenta de la factura (Planillas). Debe estar registrada en las planillas y proveedores del banco.</div><div style="display:grid;gap:8px;max-width:460px"><label>Nombre del titular<input id="pcaNom" maxlength="60" value="' + esc((pmD.ahorroCuenta || {}).nombre || '') + '"></label><label>Cuenta IBAN (20 dígitos, sin CR)<input id="pcaIban" maxlength="20" value="' + esc((pmD.ahorroCuenta || {}).iban || '') + '"></label><label>Banco<input id="pcaBan" maxlength="40" value="' + esc((pmD.ahorroCuenta || {}).banco || '') + '"></label><label>Referencia del banco<input id="pcaRef" maxlength="20" value="' + esc((pmD.ahorroCuenta || {}).referencia || '') + '"></label></div><div style="margin-top:12px"><button class="btn primary" onclick="pmAhorroGuardar()">Guardar</button></div></div>';
+  pmBanEnvioIni();
+}
+async function pmAhorroGuardar() {
+  try { await api('guardarCuentaAhorroPmWeb', { nombre: $('pcaNom').value, iban: $('pcaIban').value, banco: $('pcaBan').value, referencia: $('pcaRef').value }); pmD = await api('obtenerPmWeb'); toast('Cuenta de ahorro guardada.'); } catch (e) { mostrarError(e, 'No se pudo guardar.'); }
 }
 async function pmEmpGuardar() {
-  try { await api('guardarEmpresaPmWeb', { nombre: $('peeNom').value, cedula: $('peeCed').value, telefono: $('peeTel').value, correo: $('peeCor').value, direccion: $('peeDir').value }); pmD = await api('obtenerPmWeb'); toast('Datos de la empresa guardados.'); } catch (e) { mostrarError(e, 'No se pudo guardar.'); }
+  try { await api('guardarEmpresaPmWeb', { nombre: $('peeNom').value, cedula: $('peeCed').value, telefono: $('peeTel').value, correo: $('peeCor').value, direccion: $('peeDir').value }); pmD = await api('obtenerPmWeb'); empresaCargar(); toast('Datos de la empresa guardados.'); } catch (e) { mostrarError(e, 'No se pudo guardar.'); }
 }
 async function pmBanGuardar() {
   try { await api('guardarBancoPmWeb', { codigo: $('pbCod').value, ultimoEnvio: $('pbEnv').value, flag: $('pbFlag').value }); pmD = await api('obtenerPmWeb'); toast('Datos del banco guardados.'); } catch (e) { mostrarError(e, 'No se pudo guardar.'); }
 }
 
 /* ---------- Archivos de salida ---------- */
-function pmHtmlArc() {
-  return '<div style="padding:14px;display:grid;gap:14px;max-width:1150px">' +
-    '<div><h3 style="margin:0 0 4px">Archivo para el banco</h3><div style="font-size:12px;color:#667;margin-bottom:6px">Genera 2 archivos: el .prn de pago de planillas y proveedores (el que se sube al banco) y un Excel con la información usada. Incluye los depósitos de esta semana; las móviles sin factura quedan fuera salvo que tengan visto bueno del administrador,' + (pmS.extras.length ? ' y las líneas adicionales' : '') + '. Antes de subirlo revisa el total.</div><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end"><label>Fecha de pago<input type="date" id="paFec" value="' + (pmD.hoy || '') + '" onchange="pmPlCargar()"></label><label>N.º de envío<input type="number" id="paEnv" style="width:90px" value="' + (pmD.banco.ultimoEnvio + 1) + '"></label><button class="btn primary" onclick="pmBanco()">Generar archivos (.prn + Excel)</button></div><div id="pmBanOut" style="margin-top:8px"></div></div>' +
-    '<div><h3 style="margin:0 0 4px">Colaboradores en este envío</h3><div style="font-size:12px;color:#667;margin-bottom:6px">Se pagan en el mismo archivo. <b>Semanales:</b> el mismo período que las móviles de esta semana. <b>Quincenales:</b> el 15 y el 30. <b>Mensuales:</b> el 30. El neto se calcula descontando las cargas sociales del trabajador (porcentajes de Colaboradores); puedes cambiar el bruto, las cargas (por ejemplo 0 si aún no está asegurado) y el detalle de cada línea.</div><div id="pmPlBox"><div class="loading">Cargando colaboradores...</div></div></div>' +
-    '</div>';
+let pmBE = { semId: '', sel: {} };
+function pmBanEnvioIni() {
+  const box = $('pmBanEnv'); if (!box) return;
+  if (!pmD.semanas.length) { box.innerHTML = '<div style="padding:14px;font-size:13px;color:#667">Primero importa una semana de Telecable: el archivo del banco se genera con los pagos de una semana.</div>'; return; }
+  if (!pmBE.semId || !pmD.semanas.some(s => s.id === pmBE.semId)) pmBE.semId = pmD.semanas[0].id;
+  pmBanSem(pmBE.semId);
+}
+async function pmBanSem(id) {
+  const box = $('pmBanEnv'); pmBE.semId = id; pmSemId = id; box.innerHTML = '<div class="loading">Cargando semana...</div>';
+  try {
+    pmS = await api('obtenerSemanaPmWeb', id); pmBE.sel = {};
+    try { pmBE.desg = await api('desgloseFacturaPmWeb', id); } catch (e) { pmBE.desg = null; }
+    pmS.resumen.filas.forEach(f => { pmBE.sel[f.idCon] = !f.sinContratista && f.deposito > 0 && !f.pagado && (!!f.factura || !!f.vb) && /^\d{20}$/.test(f.iban || '') && !!f.banco && !!f.referencia; });
+    pmBanEnvioDibujar(); pmPlCargar();
+  } catch (e) { box.innerHTML = '<span style="color:#9b1c1c;padding:14px;display:block">' + esc(e.message || e) + '</span>'; }
+}
+function pmBanSelCon(id, v) { pmBE.sel[id] = !!v; pmBanTot(); }
+function pmBanTot() {
+  const F = pmS.resumen.filas.filter(f => pmBE.sel[f.idCon]), t = F.reduce((a, f) => a + f.deposito, 0) + pmS.extras.reduce((a, e) => a + e.monto, 0);
+  const el = $('pmBanTotCon'); if (el) el.innerHTML = '<b>' + F.length + '</b> móvil(es) marcadas' + (pmS.extras.length ? ' + ' + pmS.extras.length + ' adicional(es)' : '') + ' · total <b>' + pmM(t) + '</b>';
+}
+function pmBanEnvioDibujar() {
+  const S = pmS, F = S.resumen.filas.filter(f => !f.sinContratista);
+  const ahora = pmD.hoy || '';
+  const estado = f => {
+    if (f.pagado) return '<span class="chip verde">Pagado ' + esc(pmFh(f.pagado)) + '</span>';
+    const falt = []; if (!(f.deposito > 0)) falt.push('depósito en cero'); if (!/^\d{20}$/.test(f.iban || '')) falt.push('IBAN'); if (!f.banco || !f.referencia) falt.push('banco/referencia'); if (!f.factura && !f.vb) falt.push('factura');
+    return falt.length ? '<span class="chip rojo" title="Corrígelo en Contratistas o en la semana">Falta: ' + esc(falt.join(', ')) + '</span>' : '<span class="chip amar">Por pagar</span>';
+  };
+  const envs = pmD.envios || [];
+  $('pmBanEnv').innerHTML = '<div style="padding:14px;display:grid;gap:14px">' +
+    '<div><h2 style="margin:0 0 4px">Envío de pago al banco</h2><div style="font-size:12px;color:#667;margin-bottom:8px">Elige la semana, marca a quién pagar (móviles y colaboradores), indica el <b>día y la hora del depósito</b> (uno solo para todo el envío) y genera el .prn y su Excel. El envío queda <b>Programado</b> y pasa solo a <b>Pagado</b> cuando llegue esa fecha y hora; en ese momento se marcan pagados los contratistas incluidos.</div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end"><label>Semana de móviles<select id="pbSem" onchange="pmBanSem(this.value)">' + pmD.semanas.map(s => '<option value="' + s.id + '"' + (s.id === pmBE.semId ? ' selected' : '') + '>' + esc(pmFh(s.desde)) + ' al ' + esc(pmFh(s.hasta)) + '</option>').join('') + '</select></label>' +
+    '<label>Fecha del depósito<input type="date" id="paFec" value="' + ahora + '" onchange="pmPlCargar()"></label><label>Hora<input type="time" id="paHora" value="09:00"></label><label>N.º de envío<input type="number" id="paEnv" style="width:90px" value="' + (pmD.banco.ultimoEnvio + 1) + '"></label><button class="btn primary" onclick="pmBanco()">Generar archivos (.prn + Excel)</button></div><div id="pmBanOut" style="margin-top:8px"></div></div>' +
+    '<div><h3 style="margin:0 0 4px">Móviles / contratistas</h3><div style="font-size:12px;color:#667;margin-bottom:6px">Las móviles sin factura quedan fuera salvo visto bueno del administrador' + (S.extras.length ? '. Las líneas adicionales de la semana (' + S.extras.length + ') siempre van en el archivo' : '') + '.</div>' +
+    (F.length ? '<div class="tableWrap"><table class="pmT"><thead><tr><th></th><th>Contratista</th><th>Móvil(es)</th><th>Banco</th><th>Factura</th><th style="text-align:right">Depósito</th><th>Estado</th></tr></thead><tbody>' + F.map(f => '<tr><td><input type="checkbox" ' + (pmBE.sel[f.idCon] ? 'checked ' : '') + 'onchange="pmBanSelCon(\'' + f.idCon + '\',this.checked)"></td><td><b>' + esc(f.nombre) + '</b></td><td>' + esc(Object.keys(f.moviles).join(', ')) + '</td><td>' + esc(f.banco || '—') + '</td><td>' + esc(f.factura || (f.vb ? 'Visto bueno' : '—')) + '</td><td style="text-align:right">' + pmM(f.deposito) + '</td><td>' + estado(f) + '</td></tr>').join('') + '</tbody></table></div>' : '<div class="loading">Esta semana no tiene contratistas con pago.</div>') +
+    '<div id="pmBanTotCon" style="margin-top:6px;font-size:13px"></div></div>' +
+    '<div><h3 style="margin:0 0 4px">Colaboradores en este envío</h3><div style="font-size:12px;color:#667;margin-bottom:6px">La planilla se arma en el módulo <b>Planillas</b>. <b>Semanales:</b> el mismo período que las móviles. <b>Quincenales:</b> el 15 y el 30. <b>Mensuales:</b> el 30. Desmarca a quien no vayas a pagar en este archivo, cambia bruto o cargas si hace falta, o agrega a alguien (bono u otro pago). <button class="btn secondary" onclick="pmBanAgregarColab()">➕ Agregar colaborador</button></div><div id="pmPlBox"><div class="loading">Cargando colaboradores...</div></div></div>' +
+    (pmBE.desg && pmBE.desg.ahorro && pmBE.desg.ahorro.aplicado ? '<div><label style="font-size:13px"><input type="checkbox" id="pbAho" checked> Incluir la línea de <b>ahorro a la cuenta de la empresa</b> por <b>' + pmM(pmBE.desg.ahorro.monto) + '</b> (descontada de la factura en Planillas)</label></div>' : '<div style="font-size:12px;color:#778">Sin línea de ahorro: se aplica desde Planillas → «Descontar de la factura».</div>') +
+    '<div><h3 style="margin:0 0 4px">Envíos anteriores</h3>' + (envs.length ? '<div class="tableWrap"><table class="pmT"><thead><tr><th>Envío</th><th>Depósito</th><th>Pagos</th><th style="text-align:right">Total</th><th>Estado</th><th></th></tr></thead><tbody>' + envs.map(e => '<tr><td><b>' + e.envio + '</b></td><td>' + esc(pmFh(e.deposito.slice(0, 10))) + ' ' + esc(e.deposito.slice(11)) + '</td><td>' + (e.nCon || 0) + ' móvil(es), ' + (e.nColab || 0) + ' colaborador(es)' + (e.nExtra ? ', ' + e.nExtra + ' adicional(es)' : '') + '</td><td style="text-align:right">' + pmM(e.total) + '</td><td>' + (e.estado === 'Pagado' ? '<span class="chip verde">Pagado</span>' : (e.estado === 'Anulado' ? '<span class="chip rojo">Anulado</span>' : '<span class="chip amar">Programado</span>')) + '</td><td>' + (e.estado === 'Programado' ? '<button class="btn secondary" onclick="pmBanAnular(' + e.envio + ')">Anular</button>' : '') + '</td></tr>').join('') + '</tbody></table></div>' : '<div style="font-size:13px;color:#778">Aún no hay envíos con fecha de depósito.</div>') + '</div></div>';
+  pmBanTot();
+}
+async function pmBanAnular(n) {
+  if (!confirm('¿Anular el envío ' + n + '? Los contratistas no se marcarán como pagados por este envío.')) return;
+  try { await api('anularEnvioPmWeb', n); pmD = await api('obtenerPmWeb'); pmBanEnvioDibujar(); pmPlCargar(); toast('Envío anulado.'); } catch (e) { mostrarError(e, 'No se pudo anular.'); }
+}
+async function pmBanAgregarColab() {
+  try {
+    const R = await api('obtenerRhWeb'); const L = (R.colaboradores || []).filter(c => c.activo);
+    pmModal('<h3>Agregar colaborador al envío</h3><div style="display:grid;gap:8px"><label>Colaborador<select id="pbcId"><option value="">Elige</option>' + L.map(c => '<option value="' + esc(c.id) + '">' + esc(c.nombre) + '</option>').join('') + '</select></label><label>Concepto<input id="pbcCon" value="Bono" maxlength="60"></label><label>Monto bruto<input id="pbcMon" type="number" min="0" step="0.01"></label></div><div style="margin-top:12px;display:flex;gap:8px"><button class="btn primary" onclick="pmBanAgregarOk()">Agregar</button><button class="btn secondary" onclick="pmCerrar()">Cancelar</button></div>');
+  } catch (e) { mostrarError(e, 'No se pudo cargar los colaboradores.'); }
+}
+async function pmBanAgregarOk() {
+  try { await api('agregarColaboradorEnvioPmWeb', pmBE.semId, $('pbcId').value, $('pbcCon').value, $('pbcMon').value); pmCerrar(); await pmPlCargar(); toast('Colaborador agregado.'); } catch (e) { mostrarError(e, 'No se pudo agregar.'); }
 }
 let pmPl = null;
 async function pmPlCargar() {
@@ -7617,7 +7604,7 @@ async function pmPlCargar() {
   try {
     const R = await api('planillaColaboradoresPmWeb', $('paFec').value, pmSemId);
     const dd = Math.round((Date.parse(R.fecha) - Date.parse(R.ultimoPago)) / 86400000);
-    R.filas.forEach(f => { f.atrasada = f.periodicidad !== 'Semanal' && dd > 5; f.sel = !f.pagado && !f.faltan.length && f.neto > 0 && !f.atrasada && !f.excluido; });
+    R.filas.forEach(f => { f.atrasada = f.periodicidad !== 'Semanal' && dd > 5 && !f.adicional; f.sel = !f.pagado && !f.faltan.length && f.neto > 0 && !f.atrasada && !f.excluido; });
     pmPl = R; pmPlDibujar();
   } catch (e) { box.innerHTML = '<span style="color:#9b1c1c">' + esc(e.message || e) + '</span>'; }
 }
@@ -7639,7 +7626,10 @@ function pmPlDibujar() {
 async function pmBanco() {
   try {
     const colabs = (pmPl && pmPl.fecha === $('paFec').value ? pmPl.filas.filter(f => f.sel && !f.faltan.length).map(f => ({ id: f.id, clave: f.clave, periodo: f.periodo, bruto: f.bruto, deducciones: f.deducciones, texto: f.texto, repetir: !!f.pagado })) : []);
-    const r = await api('generarBancoPmWeb', pmSemId, $('paFec').value, $('paEnv').value, colabs);
+    if (!$('paFec').value || !$('paHora').value) { toast('Indica la fecha y la hora del depósito.'); return; }
+    const idsCon = pmS.resumen.filas.filter(f => pmBE.sel[f.idCon]).map(f => f.idCon);
+    if (!idsCon.length && !colabs.length && !pmS.extras.length && !($('pbAho') && $('pbAho').checked)) { toast('Marca al menos un pago.'); return; }
+    const r = await api('generarBancoPmWeb', pmSemId, $('paFec').value, $('paEnv').value, colabs, { deposito: $('paFec').value + 'T' + $('paHora').value, idsCon: idsCon, ahorro: !!($('pbAho') && $('pbAho').checked) });
     pmBajar(new Blob([new Uint8Array(Array.from(r.texto, ch => ch.charCodeAt(0) & 255))], { type: 'application/octet-stream' }), r.nombre);
     await cargarLib('xlsx', SEG_URL_XLSX);
     const A = [['Envío al banco N.º ' + r.envio, '', '', '', '', '', '', '', '', '', '', '', '', ''], ['Convenio ' + r.codigo + ' · período ' + r.periodo + ' · fecha de pago ' + pmFh(r.fechaPago) + ' · semana ' + pmFh(pmS.semana.desde) + ' al ' + pmFh(pmS.semana.hasta)], [],
@@ -7650,28 +7640,16 @@ async function pmBanco() {
     Object.keys(ws).forEach(k => { if (k[0] !== '!' && ws[k].t === 'n' && /^[J-N]/.test(k)) ws[k].z = '#,##0.00'; });
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Envío ' + r.envio);
     if (r.avisos.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['No incluidos en el archivo']].concat(r.avisos.map(x => [x]))), 'No incluidos');
-    const wbl = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const wbl = await xlsxMarcaBuf(wb, 'Detalle del envío ' + r.envio);
     setTimeout(() => pmBajar(new Blob([wbl], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), 'Detalle_envio_' + r.envio + '_' + r.codigo + '.xlsx'), 700);
     pmD.banco.ultimoEnvio = r.envio;
-    $('pmBanOut').innerHTML = '<div style="font-size:13px"><b>' + r.cantidad + '</b> pagos' + (r.colaboradores ? ' (' + r.colaboradores + ' de colaboradores)' : '') + ' · total <b>' + pmM(r.total) + '</b> · envío ' + r.envio + '<div style="color:#556;margin-top:4px">Se descargaron 2 archivos: <b>' + esc(r.nombre) + '</b> (para subir al banco) y <b>Detalle_envio_' + r.envio + '_' + esc(r.codigo) + '.xlsx</b> (la información usada).</div>' + (r.avisos.length ? '<div style="color:#9b1c1c;margin-top:6px">' + r.avisos.map(esc).join('<br>') + '</div>' : '') + '</div>';
+    const salida = '<div style="font-size:13px"><b>' + r.cantidad + '</b> pagos' + (r.colaboradores ? ' (' + r.colaboradores + ' de colaboradores)' : '') + ' · total <b>' + pmM(r.total) + '</b> · envío ' + r.envio + '<div style="color:#556;margin-top:4px">Se descargaron 2 archivos: <b>' + esc(r.nombre) + '</b> (para subir al banco) y <b>Detalle_envio_' + r.envio + '_' + esc(r.codigo) + '.xlsx</b> (la información usada).</div>' + (r.avisos.length ? '<div style="color:#9b1c1c;margin-top:6px">' + r.avisos.map(esc).join('<br>') + '</div>' : '') + '</div>';
+    $('pmBanOut').innerHTML = salida;
     try { await api('guardarBancoPmWeb', { codigo: pmD.banco.codigo, ultimoEnvio: r.envio }); } catch (e) { }
-    if ((r.colabIncluidos || []).length) { try { await api('registrarPlanillaRhWeb', { fecha: r.fechaPago, envio: r.envio, lineas: r.colabIncluidos }); pmD.alertaPlanilla = null; pmAlertaPlanilla(); } catch (e) { toast('El archivo se generó, pero no se pudieron registrar los pagos de colaboradores: ' + (e.message || e), 8000); } pmPlCargar(); }
+    if ((r.colabIncluidos || []).length) { try { await api('registrarPlanillaRhWeb', { fecha: r.fechaPago, envio: r.envio, lineas: r.colabIncluidos }); pmD.alertaPlanilla = null; pmAlertaPlanilla(); } catch (e) { toast('El archivo se generó, pero no se pudieron registrar los pagos de colaboradores: ' + (e.message || e), 8000); } }
+    try { pmD = await api('obtenerPmWeb'); pmBanEnvioDibujar(); $('pmBanOut').innerHTML = salida; pmPlCargar(); } catch (e) { }
     toast('Archivos generados: ' + r.nombre + ' y su Excel de detalle');
   } catch (e) { mostrarError(e, 'No se pudo generar el archivo.'); }
-}
-async function pmResumenExcel() {
-  try {
-    await cargarLib('xlsx', SEG_URL_XLSX);
-    const S = pmS, R = S.resumen;
-    const det = [['Móvil(es)', 'Técnico', 'Órdenes', 'Detalle', 'Reclamos', 'Alquileres', 'Penalizaciones', 'Camisas', 'Otros antes', 'Sub total', 'IVA', 'Total']].concat(R.filas.map(f => [Object.keys(f.moviles).join(','), f.nombre, f.nOrdenes, f.detalle, f.reclamos, f.alquileres, f.penalizaciones, f.camisas, f.otros, f.subtotal, f.iva, f.totalFacturado]));
-    const pag = [['Móvil(es)', 'Referencia', 'Nombre', 'Cédula', 'Sub-total', 'IVA 13%', 'Total facturado', 'N.º factura', 'Inventarios', 'INS', 'Rebajos SRD', 'Adelantos', 'Préstamos', 'Herramientas', 'Pago adicional', 'Total depósito']].concat(R.filas.map(f => [Object.keys(f.moviles).join(','), f.iban, f.titular || f.nombre, f.cedula, f.subtotal, f.iva, f.totalFacturado, f.factura, f.inventario, f.ins, f.rebajo, f.adelanto, f.prestamo, f.herramientas, f.extra, f.deposito]))
-      .concat(S.extras.map(e => ['', e.iban, e.nombre, e.cedula, '', '', '', e.concepto, '', '', '', '', '', '', '', e.monto]));
-    const ord = [['Fecha', 'Móvil', 'Contrato', 'Cliente', 'Servicios', 'Costo archivo', 'Precio lista', 'Costo aplicado', 'UF costo']].concat(S.ordenes.map(o => [o.fecha, o.movil, o.contrato, o.cliente, o.servicios, o.costoArchivo, o.costoLista === null ? '' : o.costoLista, o.costo, o.ufCosto]));
-    const aju = [['Contratista', 'Tipo', 'Detalle', 'Contrato', 'Monto']].concat(S.ajustes.map(a => [pmConNombre(a.idCon), (pmD.tipos[a.tipo] || {}).txt || a.tipo, a.detalle, a.contrato, a.monto]));
-    const wb = XLSX.utils.book_new();
-    [['Detalle', det], ['Pago', pag], ['Ordenes', ord], ['Ajustes', aju]].forEach(x => XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(x[1]), x[0]));
-    XLSX.writeFile(wb, 'Pago_servicios_' + S.semana.desde + '_' + S.semana.hasta + '.xlsx');
-  } catch (e) { mostrarError(e, 'No se pudo generar el Excel.'); }
 }
 function pmEstadoCuenta(idCon, modo) {
   const S = pmS, filas = S.resumen.filas.filter(f => !f.sinContratista && (!idCon || f.idCon === idCon));
@@ -7710,7 +7688,7 @@ function pmEstadoCuenta(idCon, modo) {
       '<h2>Órdenes de la semana</h2>' + ordHtml + '<table class="o"><tbody><tr class="t"><td>Total detalle de órdenes (' + f.nOrdenes + ')</td><td class="n" style="width:140px">' + m(f.detalle) + '</td></tr></tbody></table>' +
       '<div class="pie">Documento generado el ' + hoy + ' · ' + esc(E.nombre) + '</div></div>';
   }).join('');
-  const css = 'body{font-family:Arial,Helvetica,sans-serif;color:#1d2433;margin:20px;font-size:11px}h2{font-size:12px;margin:14px 0 4px;color:#0f1b2d;border-bottom:2px solid #c9a227;padding-bottom:2px}table{border-collapse:collapse;width:100%;margin-bottom:6px}td,th{border:1px solid #cfd6df;padding:3px 6px;text-align:left;vertical-align:top}th{background:#eef2f7}.n{text-align:right;white-space:nowrap}table.enc td{padding:2px 6px}table.ct td{width:33%}table.ct span{display:block;font-size:9px;color:#667;text-transform:uppercase}table.ct b{font-size:12px}table.r td{font-size:12px}table.r tr.t td{font-weight:700;background:#f3f6fa}table.r tr.d td{font-weight:700;background:#0f1b2d;color:#fff;font-size:13px}div.mv{background:#fff6dc;font-weight:700;border:1px solid #cfd6df;border-bottom:0;padding:4px 6px;margin-top:8px;font-size:12px}tr.s td{background:#f7f9fc;font-style:italic}.o tr.t td{font-weight:700;background:#f3f6fa}.nota{font-size:10px;color:#667;margin-bottom:4px}.pie{margin-top:10px;font-size:9px;color:#889;text-align:center}.pg{page-break-after:always}.pg:last-child{page-break-after:auto}';
+  const css = 'body{font-family:Arial,Helvetica,sans-serif;color:#1d2433;margin:20px;font-size:11px}h2{font-size:12px;margin:14px 0 4px;color:#7d1111;border-bottom:2px solid #a31616;padding-bottom:2px}table{border-collapse:collapse;width:100%;margin-bottom:6px}td,th{border:1px solid #cfd6df;padding:3px 6px;text-align:left;vertical-align:top}th{background:#a31616;color:#fff;border-color:#7d1111;-webkit-print-color-adjust:exact;print-color-adjust:exact}.n{text-align:right;white-space:nowrap}table.enc td{padding:2px 6px}table.ct td{width:33%}table.ct span{display:block;font-size:9px;color:#667;text-transform:uppercase}table.ct b{font-size:12px}table.r td{font-size:12px}table.r tr.t td{font-weight:700;background:#f3f6fa}table.r tr.d td{font-weight:700;background:#0f1b2d;color:#fff;font-size:13px}div.mv{background:#fff6dc;font-weight:700;border:1px solid #cfd6df;border-bottom:0;padding:4px 6px;margin-top:8px;font-size:12px}tr.s td{background:#f7f9fc;font-style:italic}.o tr.t td{font-weight:700;background:#f3f6fa}.nota{font-size:10px;color:#667;margin-bottom:4px}.pie{margin-top:10px;font-size:9px;color:#889;text-align:center}.pg{page-break-after:always}.pg:last-child{page-break-after:auto}';
   const html = '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Estado de cuenta</title><style>' + css + '</style></head><body>' + cuerpo + '</body></html>';
   if (modo === 'html') { pmBajar(new Blob([html], { type: 'text/html' }), 'Estado_cuenta_' + filas[0].nombre.replace(/[^\w]+/g, '_') + '_' + S.semana.desde + '.html'); return; }
   const f = document.createElement('iframe'); f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0'; document.body.appendChild(f);
@@ -7824,7 +7802,7 @@ async function pmPnExcel() {
     await cargarLib('xlsx', SEG_URL_XLSX);
     const F = pmPnFiltradas(), wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['Semana desde', 'Semana hasta', 'Móvil', 'Contratista', 'Contrato', 'Motivo', 'Fuente', 'Monto']].concat(F.map(f => [f.desde, f.hasta, f.movil, f.contratista, f.contrato, f.detalle, f.origen, f.monto]))), 'Penalizaciones');
-    XLSX.writeFile(wb, 'Penalizaciones_moviles.xlsx');
+    await xlsxMarca(wb, 'Penalizaciones_moviles.xlsx', 'Penalizaciones de móviles');
   } catch (e) { mostrarError(e, 'No se pudo generar el Excel.'); }
 }
 
@@ -7930,8 +7908,8 @@ async function pmMovGuardar(id) {
 }
 async function pmMovBorrar(mid, id) { if (!confirm('¿Eliminar este movimiento?')) return; try { await api('eliminarMovPrestamoPmWeb', mid); await pmRenderPst(); pmPrestamoDetalle(id); } catch (e) { mostrarError(e, 'No se pudo eliminar.'); } }
 function pmPrestamoImprimir(id) {
-  const p = pmPr.prestamos.find(x => x.id === id); if (!p) return; const e = p.estadoCalc, E = pmD.empresa || { nombre: 'Soluciones Red Dorada SRL' }, logo = ($('hLogo') && $('hLogo').src) || '';
-  const html = '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Estado de préstamo</title><style>body{font-family:Arial,sans-serif;color:#1d2433;margin:24px;font-size:12px}h2{font-size:13px;border-bottom:2px solid #c9a227;padding-bottom:2px;margin:14px 0 6px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #cfd6df;padding:4px 6px;text-align:left}th{background:#eef2f7}.n{text-align:right}</style></head><body><table style="border:0"><tr><td style="border:0;width:150px">' + (logo ? '<img src="' + logo + '" style="max-width:140px">' : '') + '</td><td style="border:0"><b style="font-size:15px">' + esc(E.nombre) + '</b></td><td style="border:0;text-align:right"><b style="font-size:16px">ESTADO DE PRÉSTAMO</b><br>' + esc(new Date().toLocaleDateString('es-CR')) + '</td></tr></table>' +
+  const p = pmPr.prestamos.find(x => x.id === id); if (!p) return; const e = p.estadoCalc;
+  const html = '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Estado de préstamo</title><style>' + DOC_CSS + '</style></head><body>' + docEncabezado('Estado de préstamo', p.contratista) +
     '<h2>Datos</h2><table><tr><td>Contratista</td><td><b>' + esc(p.contratista) + '</b></td><td>Fecha del préstamo</td><td>' + esc(pmFh(p.fecha)) + '</td></tr><tr><td>Concepto</td><td>' + esc(p.concepto) + '</td><td>Interés semanal</td><td>' + p.tasa + ' %</td></tr></table>' +
     '<h2>Resumen</h2><table><tr><td>Prestado</td><td class="n">' + pmM(e.prestado) + '</td></tr><tr><td>Abonado a capital</td><td class="n">' + pmM(e.abonadoCapital) + '</td></tr><tr><td>Interés generado</td><td class="n">' + pmM(e.interesGenerado) + '</td></tr><tr><td>Interés pagado</td><td class="n">' + pmM(e.abonadoInteres) + '</td></tr><tr><td>Saldo de capital</td><td class="n">' + pmM(e.capital) + '</td></tr><tr><td>Interés pendiente</td><td class="n">' + pmM(e.interes) + '</td></tr><tr><td><b>Total adeudado a la fecha</b></td><td class="n"><b>' + pmM(e.debe) + '</b></td></tr></table>' +
     '<h2>Movimientos</h2><table><thead><tr><th>Fecha</th><th>Movimiento</th><th>Nota</th><th class="n">Monto</th></tr></thead><tbody><tr><td>' + esc(pmFh(p.fecha)) + '</td><td>Préstamo inicial</td><td>' + esc(p.concepto) + '</td><td class="n">' + pmM(p.monto) + '</td></tr>' + p.movs.map(m => '<tr><td>' + esc(pmFh(m.fecha)) + '</td><td>' + (m.tipo === 'ABONO' ? 'Abono' : 'Nuevo adelanto') + '</td><td>' + esc(m.nota) + '</td><td class="n">' + (m.tipo === 'ABONO' ? '−' : '+') + pmM(m.monto) + '</td></tr>').join('') + '</tbody></table></body></html>';
@@ -8011,7 +7989,7 @@ async function pmEcExcel(idCon, silencioso) {
     await cargarLib('xlsx', SEG_URL_XLSX);
     const D = pmEcDatos(idCon); if (!D) { toast('Ese contratista no tiene estado.'); return; }
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, pmEcHoja(pmEcAoa(D)), 'Estado de cuenta');
-    XLSX.writeFile(wb, pmEcNom(D) + '.xlsx');
+    await xlsxMarca(wb, pmEcNom(D) + '.xlsx', 'Estado de cuenta');
   } catch (e) { if (!silencioso) mostrarError(e, 'No se pudo generar el Excel.'); else throw e; }
 }
 /* Exportar archivos de pago: un PDF y/o Excel por contratista, comprimidos en un ZIP o sueltos */
@@ -8023,9 +8001,9 @@ function pmExportarModal() {
     '<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="pxZip" checked> Comprimir todo en un solo archivo ZIP</label></div>' +
     '<div style="font-size:11px;color:#778;margin-top:8px">Sin comprimir, se descargan los archivos uno por uno (el navegador puede pedir permiso para descargas múltiples).</div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn secondary" onclick="pmCerrar()">Cancelar</button><button class="btn primary" id="pxBtn" onclick="pmExportarOk()">Exportar</button></div>', 460);
 }
-function pmEcExcelBuf(D) {
+async function pmEcExcelBuf(D) {
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, pmEcHoja(pmEcAoa(D)), 'Estado de cuenta');
-  return XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  return xlsxMarcaBuf(wb, 'Estado de cuenta');
 }
 async function pmExportarOk() {
   const pdf = $('pxPdf').checked, xls = $('pxXls').checked, zip = $('pxZip').checked;
@@ -8039,7 +8017,7 @@ async function pmExportarOk() {
       btn.textContent = 'Generando ' + (++n) + ' de ' + L.length + '…';
       const D = pmEcDatos(f.idCon); if (!D) continue; const nom = pmEcNom(D);
       if (pdf) { const d = new window.jspdf.jsPDF({ unit: 'mm', format: 'letter' }); pmEcDibujar(d, D); pmEcPie(d, D.emp.nombre); if (Z) Z.file(nom + '.pdf', d.output('arraybuffer')); else { d.save(nom + '.pdf'); await new Promise(r => setTimeout(r, 700)); } }
-      if (xls) { const buf = pmEcExcelBuf(D); if (Z) Z.file(nom + '.xlsx', buf); else { pmBajar(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), nom + '.xlsx'); await new Promise(r => setTimeout(r, 700)); } }
+      if (xls) { const buf = await pmEcExcelBuf(D); if (Z) Z.file(nom + '.xlsx', buf); else { pmBajar(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), nom + '.xlsx'); await new Promise(r => setTimeout(r, 700)); } }
     }
     if (Z) { btn.textContent = 'Comprimiendo…'; pmBajar(await Z.generateAsync({ type: 'blob', compression: 'DEFLATE' }), 'Archivos_de_pago_' + S.desde + '_' + S.hasta + '.zip'); }
     pmCerrar(); toast('Archivos de pago exportados' + (Z ? ' en un ZIP.' : '.'));
@@ -8062,7 +8040,7 @@ function pmEcDibujar(d, D) {
   if (c1) d.text(fit(c1, wi), xi, y + 9.2); if (D.emp.correo) d.text(fit(D.emp.correo, wi), xi, y + 12.8); if (D.emp.direccion) d.text(fit(D.emp.direccion, wi), xi, y + 16.4);
   d.setFont('helvetica', 'bold'); d.setFontSize(14); d.setTextColor(15, 27, 45); d.text('ESTADO DE CUENTA', M + W, y + 5, { align: 'right' });
   d.setFont('helvetica', 'normal'); d.setFontSize(8.5); d.text('Servicios prestados', M + W, y + 10, { align: 'right' }); d.text(pmRangoTxt(D.sem.desde, D.sem.hasta), M + W, y + 14, { align: 'right' }); d.setFontSize(7.5); d.setTextColor(85, 95, 110); d.text('Pago estimado: ' + pmFh(D.fechaPago), M + W, y + 18, { align: 'right' });
-  y += 22; d.setDrawColor(201, 162, 39); d.setLineWidth(0.6); d.line(M, y, M + W, y); y += 4;
+  y += 22; d.setDrawColor(163, 22, 22); d.setLineWidth(0.6); d.line(M, y, M + W, y); y += 4;
   const w3 = W / 3;
   const caja = (x, yy, w, et, val) => { d.setFont('helvetica', 'normal'); d.setFontSize(6.5); d.setTextColor(110, 120, 135); d.text(et.toUpperCase(), x, yy); d.setFontSize(9); d.setFont('helvetica', 'bold'); d.setTextColor(15, 27, 45); d.text(fit(val, w - 4), x, yy + 4.2); };
   caja(M, y + 2, w3, 'Factura a nombre de', f.nombre); caja(M + w3, y + 2, w3, 'Cédula', f.cedula || '—'); caja(M + 2 * w3, y + 2, w3, 'N.º de factura', f.factura || 'Pendiente');
@@ -8080,7 +8058,7 @@ function pmEcDibujar(d, D) {
   d.text(D.saldo > 0.005 ? 'Saldo pendiente de préstamo: ' + mon(D.saldo) : 'Los rebajos no modifican la factura: se descuentan solo del depósito.', M, y + 4); y += 9;
   titulo('Órdenes de la semana · ' + D.nCon + ' contratos · ' + D.nLin + ' líneas');
   const cols = [['Fecha', 19, 'l'], ['N.º orden', 20, 'l'], ['Contrato', 18, 'l'], ['Cliente', 56, 'l'], ['Servicio', 49, 'l'], ['Cant.', 9, 'r'], ['Pago', 17, 'r']];
-  const encT = () => { d.setFillColor(238, 242, 247); d.rect(M, y, W, 6, 'F'); d.setFont('helvetica', 'bold'); d.setFontSize(7.5); d.setTextColor(15, 27, 45); let cx = M; cols.forEach(c => { d.text(c[0], c[2] === 'r' ? cx + c[1] - 1.5 : cx + 1.5, y + 4, { align: c[2] === 'r' ? 'right' : 'left' }); cx += c[1]; }); y += 7; };
+  const encT = () => { d.setFillColor(163, 22, 22); d.rect(M, y, W, 6, 'F'); d.setFont('helvetica', 'bold'); d.setFontSize(7.5); d.setTextColor(255, 255, 255); let cx = M; cols.forEach(c => { d.text(c[0], c[2] === 'r' ? cx + c[1] - 1.5 : cx + 1.5, y + 4, { align: c[2] === 'r' ? 'right' : 'left' }); cx += c[1]; }); d.setTextColor(15, 27, 45); y += 7; };
   D.moviles.forEach(m => {
     necesita(24);
     if (multi) { d.setFont('helvetica', 'bold'); d.setFontSize(9); d.setTextColor(15, 27, 45); d.text(fit(pmEcCab(m), W), M, y + 3.5); y += 6; }
@@ -8144,7 +8122,7 @@ async function pmOrdExcel() {
     A.push(['Total (' + F.length + ')', '', '', '', '', '', F.reduce((a, x) => a + x.ufCosto, 0), '', F.reduce((a, x) => a + x.costo, 0), F.reduce((a, x) => a + x.dif, 0), '', '']);
     const ws = XLSX.utils.aoa_to_sheet(A); ws['!cols'] = [{ wch: 11 }, { wch: 7 }, { wch: 11 }, { wch: 10 }, { wch: 36 }, { wch: 38 }, { wch: 14 }, { wch: 30 }, { wch: 14 }, { wch: 14 }, { wch: 9 }, { wch: 40 }];
     Object.keys(ws).forEach(k => { if (k[0] !== '!' && ws[k].t === 'n' && /^[GIJ]/.test(k)) ws[k].z = '#,##0.00'; });
-    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Ordenes'); XLSX.writeFile(wb, 'Ordenes_' + pmS.semana.desde + '_' + pmS.semana.hasta + '.xlsx');
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Ordenes'); await xlsxMarca(wb, 'Ordenes_' + pmS.semana.desde + '_' + pmS.semana.hasta + '.xlsx', 'Órdenes de la semana');
   } catch (e) { mostrarError(e, 'No se pudo generar el Excel.'); }
 }
 async function pmOrdPdf() {
@@ -8155,8 +8133,11 @@ async function pmOrdPdf() {
     const cols = [['Fecha', 17, 'l', 10], ['Móvil', 11, 'l', 5], ['N.º orden', 19, 'l', 10], ['Contrato', 17, 'l', 9], ['Cliente', 44, 'l', 29], ['Servicio (Telecable)', 42, 'l', 28], ['Precio Tel.', 19, 'r', 0], ['Tipo asignado', 31, 'l', 21], ['Pago móvil', 19, 'r', 0], ['Diferencia', 19, 'r', 0], ['Observaciones', 33, 'l', 22]];
     const cut = (t, n) => { t = String(t == null ? '' : t); return t.length > n ? t.slice(0, n - 1) + '…' : t; };
     let y = M, pagina = 1;
-    const enc = () => { d.setFont('helvetica', 'bold'); d.setFontSize(11); d.setTextColor(15, 27, 45); d.text('Órdenes · semana ' + pmFh(S.desde) + ' al ' + pmFh(S.hasta) + ' · ' + F.length + ' línea(s)', M, y + 4); y += 8;
-      d.setFillColor(238, 242, 247); d.rect(M, y, 271 - 2 * 0, 6, 'F'); d.setFontSize(7); let cx = M; cols.forEach(c => { d.text(c[0], c[2] === 'r' ? cx + c[1] - 1 : cx + 1, y + 4, { align: c[2] === 'r' ? 'right' : 'left' }); cx += c[1]; }); y += 7; };
+    const enc = () => { d.setFont('helvetica', 'bold'); d.setFontSize(11); d.setTextColor(15, 27, 45); d.text('Órdenes · semana ' + pmFh(S.desde) + ' al ' + pmFh(S.hasta) + ' · ' + F.length + ' línea(s)', M, y + 4);
+      d.setFont('helvetica', 'normal'); d.setFontSize(7.5); d.setTextColor(85, 95, 110); d.text(empresaLineas().filter(Boolean).join(' · '), M, y + 8.5);
+      try { d.addImage(CT_LOGO, 'PNG', 269 - 26, y - 2, 26, 26 * CT_LOGO_H / CT_LOGO_W); } catch (e) { }
+      d.setDrawColor(163, 22, 22); d.setLineWidth(0.6); d.line(M, y + 11.5, 269, y + 11.5); d.setTextColor(15, 27, 45); y += 14;
+      d.setFillColor(163, 22, 22); d.rect(M, y, 271 - 2 * 0, 6, 'F'); d.setFontSize(7); d.setTextColor(255, 255, 255); let cx = M; cols.forEach(c => { d.text(c[0], c[2] === 'r' ? cx + c[1] - 1 : cx + 1, y + 4, { align: c[2] === 'r' ? 'right' : 'left' }); cx += c[1]; }); d.setTextColor(15, 27, 45); y += 7; };
     enc();
     F.forEach(x => {
       if (y > 198) { d.addPage(); y = M; enc(); }
@@ -8214,7 +8195,7 @@ async function pmValExcel() {
     await cargarLib('xlsx', SEG_URL_XLSX);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['Fecha', 'Móvil', 'N.º orden', 'Contrato', 'Cliente', 'Fibra', 'RG6', 'Resultado', 'Motivo', 'Pago antes', 'Pago después']].concat(pmValRes.filas.map(x => [x.fecha, x.movil, x.nOrden, x.contrato, x.cliente, x.fibra, x.rg6, x.resultado === 'COMPLETA' ? 'Instalación completa' : (x.resultado === 'ACOMETIDA' ? 'Cambio de acometida' : (x.resultado === 'INTERNA' ? 'Reinstalación interna' : 'Revisar')), x.motivo, x.antes, x.despues]))), 'Reinstalaciones');
-    XLSX.writeFile(wb, 'Validacion_reinstalaciones_' + pmS.semana.desde + '.xlsx');
+    await xlsxMarca(wb, 'Validacion_reinstalaciones_' + pmS.semana.desde + '.xlsx', 'Validación de reinstalaciones');
   } catch (e) { mostrarError(e, 'No se pudo generar el Excel.'); }
 }
 
@@ -8292,17 +8273,89 @@ function cargarLib(clave, url) {
   return segLibs[clave];
 }
 
-/* Nombre del corte según la hora real en que se importó ('yyyy-MM-dd HH:mm:ss') */
-function segCortePorHora(fh) {
-  const h = parseInt(String(fh).slice(11, 13), 10);
-  if (isNaN(h)) return '';
-  if (h < 6) return '6am';
-  if (h < 12) return h + 'am';
-  if (h === 12) return '12md';
-  if (h < 19) return (h - 12) + 'pm';
-  return 'Cierre';
+/* ---------- Exportación con marca: encabezado con logo y datos de la empresa, tablas en rojo ---------- */
+let EMP = { nombre: 'Soluciones Red Dorada SRL', cedula: '', telefono: '', correo: '', direccion: '' };
+async function empresaCargar() { try { const e = await api('obtenerEmpresaWeb'); if (e && e.nombre) EMP = e; } catch (e) { } return EMP; }
+function empresaLineas() {
+  return [EMP.nombre || 'Soluciones Red Dorada SRL', [EMP.cedula ? 'Céd. jurídica ' + EMP.cedula : '', EMP.telefono ? 'Tel. ' + EMP.telefono : '', EMP.correo].filter(Boolean).join(' · '), EMP.direccion || ''];
+}
+/* Encabezado de los documentos imprimibles (logo + datos de la empresa + título) y su CSS; todos los documentos usan el mismo */
+const DOC_CSS = 'body{font-family:Arial,Helvetica,sans-serif;color:#1d2433;margin:22px;font-size:11px}h1{font-size:17px;margin:0 0 2px;color:#a31616}h2{font-size:12px;margin:14px 0 4px;color:#7d1111;border-bottom:2px solid #a31616;padding-bottom:2px}h3{font-size:12px;margin:10px 0 4px;color:#7d1111}table{border-collapse:collapse;width:100%;margin-bottom:8px}td,th{border:1px solid #cfd6df;padding:3px 6px;text-align:left;vertical-align:top}th{background:#a31616;color:#fff;border-color:#7d1111}.n,.num{text-align:right;white-space:nowrap}.sub{color:#556;margin:2px 0}tr.t td{font-weight:700;background:#f3f6fa}table.k td{font-size:11px;color:#556}table.k b{display:block;font-size:14px;color:#1d2433}.pg{page-break-after:always}.pg:last-child{page-break-after:auto}th{-webkit-print-color-adjust:exact;print-color-adjust:exact}.docEnc{display:flex;align-items:center;gap:14px;border-bottom:3px solid #a31616;padding-bottom:8px;margin-bottom:12px}.docEnc img{max-height:54px;max-width:170px}.docEnc .emp{flex:1;font-size:10.5px;color:#445;line-height:1.35}.docEnc .emp b{font-size:14px;color:#1d2433}.docEnc .tit{text-align:right;font-size:10.5px;color:#445}.docEnc .tit b{display:block;font-size:15px;color:#a31616}@media print{body{margin:10mm}}';
+function docEncabezado(titulo, sub) {
+  const L = empresaLineas(), logo = (typeof CT_LOGO !== 'undefined' ? CT_LOGO : '');
+  const e = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  return '<div class="docEnc">' + (logo ? '<img src="' + logo + '" alt="">' : '') + '<div class="emp"><b>' + e(L[0]) + '</b>' + (L[1] ? '<br>' + e(L[1]) : '') + (L[2] ? '<br>' + e(L[2]) : '') + '</div><div class="tit"><b>' + e(titulo) + '</b>' + (sub ? e(sub) + '<br>' : '') + 'Generado: ' + new Date().toLocaleString('es-CR') + '</div></div>';
+}
+/* Escritor mínimo de .xlsx (JSZip): hojas con logo y encabezado de la empresa, títulos de columnas en rojo, bordes y formato de moneda */
+const XM_MONEDA = /monto|total|precio|costo|saldo|pago|dep[oó]sito|iva|sub ?total|neto|bruto|cargas|rebajo|valor|importe|salario|uf|cuota|inter[eé]s|factur|adelanto|pr[eé]stamo|ahorro|extra|bono/i;
+function xmEsc(s) { return String(s == null ? '' : s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function xmCol(i) { let s = ''; i++; while (i > 0) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; }
+function xmEsEnc(f, ancho) { const t = f.filter(v => typeof v === 'string' && v.trim() !== '').length; return t >= Math.max(2, Math.ceil(ancho * 0.6)); }
+async function xlsxMarcaBuf(wb, titulo) {
+  if (typeof JSZip === 'undefined') await cargarLib('jszip', URL_JSZIP);
+  const logo = (typeof CT_LOGO !== 'undefined' ? CT_LOGO : ''), png = logo.indexOf('base64,') > 0 ? logo.split('base64,')[1] : '';
+  const L = empresaLineas(), ahora = new Date().toLocaleString('es-CR');
+  const z = new JSZip(), N = wb.SheetNames.length;
+  z.file('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>' + (png ? '<Default Extension="png" ContentType="image/png"/>' : '') + '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' + wb.SheetNames.map((s, i) => '<Override PartName="/xl/worksheets/sheet' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' + (png ? '<Override PartName="/xl/drawings/drawing' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>' : '')).join('') + '</Types>');
+  z.file('_rels/.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>');
+  z.file('xl/workbook.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>' + wb.SheetNames.map((s, i) => '<sheet name="' + xmEsc(String(s).replace(/[\\\/\?\*\[\]:]/g, ' ').slice(0, 31) || 'Hoja' + (i + 1)) + '" sheetId="' + (i + 1) + '" r:id="rId' + (i + 1) + '"/>').join('') + '</sheets></workbook>');
+  z.file('xl/_rels/workbook.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + wb.SheetNames.map((s, i) => '<Relationship Id="rId' + (i + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' + (i + 1) + '.xml"/>').join('') + '<Relationship Id="rId' + (N + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>');
+  /* estilos: 0 normal · 1 título de columna (rojo) · 2 empresa · 3 datos empresa · 4 título del documento · 5 texto con borde · 6 moneda con borde · 7 número con borde · 8 total texto · 9 total moneda · 10 negrita sin borde */
+  const bd = '<border><left style="thin"><color rgb="FFCFD6DF"/></left><right style="thin"><color rgb="FFCFD6DF"/></right><top style="thin"><color rgb="FFCFD6DF"/></top><bottom style="thin"><color rgb="FFCFD6DF"/></bottom><diagonal/></border>';
+  z.file('xl/styles.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="6"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font><font><b/><sz val="14"/><color rgb="FF1D2433"/><name val="Calibri"/></font><font><sz val="10"/><color rgb="FF445566"/><name val="Calibri"/></font><font><b/><sz val="13"/><color rgb="FFA31616"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts>' +
+    '<fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFA31616"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF1F3F6"/><bgColor indexed="64"/></patternFill></fill></fills>' +
+    '<borders count="3"><border><left/><right/><top/><bottom/><diagonal/></border>' + bd + '<border><left style="thin"><color rgb="FF7D1111"/></left><right style="thin"><color rgb="FF7D1111"/></right><top style="thin"><color rgb="FF7D1111"/></top><bottom style="thin"><color rgb="FF7D1111"/></bottom><diagonal/></border></borders>' +
+    '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="11">' +
+    '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +
+    '<xf numFmtId="0" fontId="1" fillId="2" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>' +
+    '<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1"/>' +
+    '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"/><xf numFmtId="4" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1"/><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"/>' +
+    '<xf numFmtId="0" fontId="5" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/><xf numFmtId="4" fontId="5" fillId="3" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1"/><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs></styleSheet>');
+  const hojas = wb.SheetNames.map(n => {
+    const ws = wb.Sheets[n]; let A = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: true });
+    while (A.length && A[A.length - 1].every(v => v === '' || v == null)) A.pop();
+    return { n: n, A: A, cols: ws['!cols'] || [] };
+  });
+  hojas.forEach((H, hi) => {
+    const A = H.A, ancho = A.reduce((m, f) => Math.max(m, f.length), 1);
+    /* fila de títulos de columna: la primera con textos en la mayoría de las columnas */
+    let enc = A.findIndex(f => xmEsEnc(f, ancho)); if (enc < 0) enc = 0;
+    const w = []; for (let c = 0; c < ancho; c++) { const dado = H.cols[c] && H.cols[c].wch; let m = 6; A.forEach((f, r) => { const v = f[c]; if (v === '' || v == null) return; const len = typeof v === 'number' ? 12 : String(v).length; if (r === 0 && ancho > 2 && enc > 0 && c === 0 && len > 25) return; m = Math.max(m, Math.min(len + 2, 48)); }); w.push(dado ? dado : m); }
+    const px = c => Math.round(w[c] * 7 + 5); let ac = 0, tc = 0; while (tc < ancho - 1 && ac < 175) { ac += px(tc); tc++; } /* columna donde empiezan los datos de la empresa (tras el logo) */
+    const R = [], fila = (r, cells, ht) => '<row r="' + r + '"' + (ht ? ' ht="' + ht + '" customHeight="1"' : '') + '>' + cells + '</row>';
+    const tx = (r, c, s, st) => s === '' ? '' : '<c r="' + xmCol(c) + r + '" s="' + st + '" t="inlineStr"><is><t xml:space="preserve">' + xmEsc(s) + '</t></is></c>';
+    R.push(fila(1, tx(1, tc, L[0], 2), 20)); R.push(fila(2, tx(2, tc, L[1], 3), 16)); R.push(fila(3, tx(3, tc, L[2], 3), 16)); R.push(fila(4, tx(4, tc, (titulo || H.n) + ' · generado ' + ahora, 4), 20)); R.push(fila(5, '', 8));
+    A.forEach((f, i) => {
+      const r = 6 + i; let cells = '';
+      const esTot = i > enc && /^\s*total/i.test(String(f[0] !== '' ? f[0] : (f[1] || '')));
+      for (let c = 0; c < ancho; c++) {
+        const v = f[c]; const ref = xmCol(c) + r;
+        if (i < enc) { cells += tx(r, c, v, 10); continue; }
+        if (i === enc) { cells += '<c r="' + ref + '" s="1" t="inlineStr"><is><t xml:space="preserve">' + xmEsc(v) + '</t></is></c>'; continue; }
+        if (typeof v === 'number' && isFinite(v)) { const mon = XM_MONEDA.test(String(A[enc][c] || '')); cells += '<c r="' + ref + '" s="' + (esTot ? 9 : (mon ? 6 : 7)) + '"><v>' + v + '</v></c>'; }
+        else if (v instanceof Date) cells += '<c r="' + ref + '" s="5" t="inlineStr"><is><t>' + xmEsc(v.toLocaleDateString('es-CR')) + '</t></is></c>';
+        else cells += (v === '' || v == null) ? '<c r="' + ref + '" s="' + (esTot ? 8 : 5) + '"/>' : '<c r="' + ref + '" s="' + (esTot ? 8 : 5) + '" t="inlineStr"><is><t xml:space="preserve">' + xmEsc(v) + '</t></is></c>';
+      }
+      R.push(fila(r, cells, i === enc ? 30 : 0));
+    });
+    const dim = 'A1:' + xmCol(Math.max(ancho, 1) - 1) + (5 + A.length);
+    z.file('xl/worksheets/sheet' + (hi + 1) + '.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="' + dim + '"/><sheetViews><sheetView workbookViewId="0" showGridLines="0">' + (A.length > enc + 1 ? '<pane ySplit="' + (6 + enc) + '" topLeftCell="A' + (7 + enc) + '" activePane="bottomLeft" state="frozen"/>' : '') + '</sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols>' + w.map((x, c) => '<col min="' + (c + 1) + '" max="' + (c + 1) + '" width="' + x + '" customWidth="1"/>').join('') + '</cols><sheetData>' + R.join('') + '</sheetData><pageMargins left="0.5" right="0.5" top="0.6" bottom="0.6" header="0.3" footer="0.3"/>' + (png ? '<drawing r:id="rId1"/>' : '') + '</worksheet>');
+    if (png) {
+      z.file('xl/worksheets/_rels/sheet' + (hi + 1) + '.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing' + (hi + 1) + '.xml"/></Relationships>');
+      z.file('xl/drawings/_rels/drawing' + (hi + 1) + '.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/logo.png"/></Relationships>');
+      const cx = Math.round(150 * 9525), cy = Math.round(150 * (typeof CT_LOGO_H !== 'undefined' ? CT_LOGO_H / CT_LOGO_W : 0.37) * 9525);
+      z.file('xl/drawings/drawing' + (hi + 1) + '.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:oneCellAnchor><xdr:from><xdr:col>0</xdr:col><xdr:colOff>38100</xdr:colOff><xdr:row>0</xdr:row><xdr:rowOff>38100</xdr:rowOff></xdr:from><xdr:ext cx="' + cx + '" cy="' + cy + '"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="2" name="Logo"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="' + cx + '" cy="' + cy + '"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor></xdr:wsDr>');
+    }
+  });
+  if (png) z.file('xl/media/logo.png', png, { base64: true });
+  return z.generateAsync({ type: 'uint8array', compression: 'DEFLATE' });
+}
+async function xlsxMarca(wb, nombre, titulo) {
+  const buf = await xlsxMarcaBuf(wb, titulo);
+  pmBajar(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), nombre);
 }
 
+/* Nombre del corte según la hora real en que se importó ('yyyy-MM-dd HH:mm:ss') */
 function segCorteSugerido() {
   const h = new Date().getHours();
   if (h < 6) return '6am';
@@ -9132,7 +9185,7 @@ async function ausExportar() {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Incidencias');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(res), 'Resumen por tipo');
-  XLSX.writeFile(wb, 'Incidencias_' + ausDatos.desde + '_a_' + ausDatos.hasta + '.xlsx');
+  await xlsxMarca(wb, 'Incidencias_' + ausDatos.desde + '_a_' + ausDatos.hasta + '.xlsx', 'Incidencias de asistencia');
   toast('Excel descargado (' + l.length + ' incidencias).');
 }
 
@@ -10043,8 +10096,6 @@ const fmtN = n => (Math.round((Number(n) || 0) * 100) / 100).toLocaleString('es-
 
 function bodMats(todos) { return bodDatos.materiales.filter(m => todos || m.activo); }
 function bodMatNombre(c) { const m = bodDatos.materiales.find(x => x.clave === c); return m ? m.material : c; }
-function bodMatUnidad(c) { const m = bodDatos.materiales.find(x => x.clave === c); return m ? m.unidad : ''; }
-
 function abrirBodega() {
   const h = hoyISO();
   if (!$('bodConsDesde').value) {
@@ -10402,18 +10453,6 @@ function devGuardarBoleta() {
   devLlamar('registrarBoletaDevolucionWeb', [k === '(sin periodo)' ? '' : k, $('dvFecha').value, $('dvBol').value.trim(), c, $('dvMovSel').value && (devDatos.lineas.find(o => (o.idMovil || o.movil) === $('dvMovSel').value) || {}).idMovil || ''], 'Boleta registrada (' + t + ' equipos).');
 }
 
-function devEntregaElegir() {
-  const g = {};
-  devDatos.lineas.forEach(o => {
-    if (o.pendiente <= 0 || !o.idMovil) return;
-    const r = g[o.idMovil] || (g[o.idMovil] = { id: o.idMovil, movil: o.movil, pen: 0, eq: {} });
-    r.pen += o.pendiente; r.eq[o.equipo] = (r.eq[o.equipo] || 0) + o.pendiente;
-  });
-  devMovilesLista = Object.keys(g).map(k => g[k]).sort((a, b) => String(a.movil).localeCompare(String(b.movil), 'es', { numeric: true }));
-  if (!devMovilesLista.length) { toast('No hay móviles con equipos pendientes.'); return; }
-  devEntregaMovil(Math.max(0, devMovilesLista.findIndex(r => r.id === $('devMovil').value)));
-}
-
 function devEntregaMovil(i) {
   const r = devMovilesLista[i]; if (!r) return;
   window._devM = r;
@@ -10440,7 +10479,7 @@ async function devExportar() {
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Devoluciones');
   const res = [['Móvil', 'Debe', 'Devuelto', 'Justificado', 'Pendiente']].concat(devMovilesLista.map(r => [r.movil, r.debe, r.dev, r.jus, r.pen]));
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(res), 'Resumen por móvil');
-  XLSX.writeFile(wb, 'Devoluciones_de_cambio_' + hoyISO() + '.xlsx');
+  await xlsxMarca(wb, 'Devoluciones_de_cambio_' + hoyISO() + '.xlsx', 'Devoluciones de cambio');
 }
 
 function bodSubtab(s) {
@@ -10605,13 +10644,13 @@ function bodHtmlReporte() {
     (t.hayOtros ? '<td>' + n(f.otros) + '</td>' : '') + '<td class="t">' + n(f.mov) + '</td><td class="g">' + n(f.tot) + '</td></tr>').join('');
 
   return '<!doctype html><html><head><meta charset="utf-8"><title>Inventario general SRD</title><style>' +
-    '@page{size:A4 landscape;margin:10mm}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
+    '@page{size:A4 landscape;margin:10mm}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}' + DOC_CSS + 'body{margin:0}' +
     'body{font-family:Arial,Helvetica,sans-serif;color:#222}h1{font-size:16px;margin:0 0 2px}' +
     '.s{font-size:11px;color:#666;margin-bottom:8px}table{border-collapse:collapse;width:100%;font-size:' + fs + 'px}' +
-    'th,td{border:1px solid #bbb;padding:3px 4px;text-align:right}th{background:#eee;color:#111;text-align:center;border-bottom:2px solid #b71c1c}.l{text-align:left}' +
+    'th,td{border:1px solid #bbb;padding:3px 4px;text-align:right}th{background:#a31616;color:#fff;text-align:center;border-color:#7d1111}.l{text-align:left}' +
     'td.b{background:#e8f5e9;font-weight:700}td.t{background:#fff8e1;font-weight:700}td.g{background:#fde7e7;font-weight:700}.neg{color:#b71c1c;font-weight:700}' +
     'tr{page-break-inside:avoid}thead{display:table-header-group}</style></head><body>' +
-    '<h1>Soluciones Red Dorada · Inventario general de materiales' + ($('panCat').value ? ' · ' + esc($('panCat').value) : '') + '</h1>' +
+    docEncabezado('Inventario general de materiales', $('panCat').value || '') +
     '<div class="s">Bodega general + ' + movs.length + ' móviles activas con material · ' + mats.length + ' materiales · Generado: ' + esc(ahora) + '</div>' +
     '<table><thead>' + head + '</thead><tbody>' + rows + '</tbody></table></body></html>';
 }
@@ -10665,8 +10704,6 @@ async function cargarIngresos() {
 
 /* Qué documentos tocan la bodega principal y si entran (E) o salen (S) */
 const ING_DIR = { INGRESO: 'E', AJ_BODEGA: 'E', DEV_PROV: 'S' };
-
-function bodCodigoDe(c) { const m = bodDatos.materiales.find(x => x.clave === c); return m ? m.codigo : ''; }
 
 function renderIngresos() {
   if (!ingDatos) return;
@@ -10919,8 +10956,8 @@ async function docImprimir() {
     return '<tr><td>' + (o.y.linea || o.i + 1) + '</td><td>' + esc(codP(m.codigo)) + '</td><td style="text-align:left">' + esc(o.y.material) + '</td><td>' + esc(m.unidad || '') + '</td><td><b>' + fmtN(o.y.cantidad) + '</b></td></tr>';
   }).join('');
   const de = x.tipo === 'TRASLADO' ? 'Presta: M' + esc(x.movil) + ' → Recibe: M' + esc(x.movilDestino || '') : x.tipo === 'ENTREGA' ? 'Bodega → M' + esc(x.movil) : x.tipo === 'DEV_MOVIL' ? 'M' + esc(x.movil) + ' → Bodega' : x.movil ? 'M' + esc(x.movil) : '';
-  const html = '<!doctype html><html><head><meta charset="utf-8"><title>' + esc(x.consecutivo || 'Documento') + '</title><style>body{font-family:Arial,sans-serif;font-size:12px;margin:24px;color:#111}h1{font-size:18px;margin:0}table{border-collapse:collapse;width:100%;margin-top:12px}th{background:#b71c1c;color:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}th,td{border:1px solid #999;padding:5px 7px;text-align:center}.d{margin:10px 0;line-height:1.6}.f{margin-top:40px;display:flex;gap:40px}.f div{flex:1;border-top:1px solid #111;padding-top:4px;text-align:center;min-height:90px}</style></head><body>' +
-    '<h1>Soluciones Red Dorada SRL · ' + esc(tipo) + '</h1><div class="d"><b>Consecutivo:</b> ' + esc(x.consecutivo || '—') + ' &nbsp; <b>Fecha:</b> ' + esc(fmtFechaSeg(x.fecha)) + (de ? ' &nbsp; <b>' + de + '</b>' : '') +
+  const html = '<!doctype html><html><head><meta charset="utf-8"><title>' + esc(x.consecutivo || 'Documento') + '</title><style>' + DOC_CSS + 'body{font-family:Arial,sans-serif;font-size:12px;margin:24px;color:#111}h1{font-size:18px;margin:0}table{border-collapse:collapse;width:100%;margin-top:12px}th{background:#b71c1c;color:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}th,td{border:1px solid #999;padding:5px 7px;text-align:center}.d{margin:10px 0;line-height:1.6}.f{margin-top:40px;display:flex;gap:40px}.f div{flex:1;border-top:1px solid #111;padding-top:4px;text-align:center;min-height:90px}</style></head><body>' +
+    docEncabezado(tipo, x.consecutivo || '') + '<div class="d"><b>Consecutivo:</b> ' + esc(x.consecutivo || '—') + ' &nbsp; <b>Fecha:</b> ' + esc(fmtFechaSeg(x.fecha)) + (de ? ' &nbsp; <b>' + de + '</b>' : '') +
     '<br><b>Documento / referencia:</b> ' + esc(x.referencia || 's/n') + (x.concepto ? ' &nbsp; <b>Tipo:</b> ' + esc(x.concepto) : '') + (x.obs ? '<br><b>Observación:</b> ' + esc(x.obs) : '') + '<br><b>Registró:</b> ' + esc(x.usuario) + '</div>' +
     '<table><thead><tr><th>Línea</th><th>Código</th><th>Material</th><th>Und.</th><th>Cantidad</th></tr></thead><tbody>' + lin + '</tbody></table>' +
     '<div class="f"><div>' + (f && f.imagen ? '<img src="' + f.imagen + '" style="max-height:80px"><br>' : '') + '<b>Recibido por: ' + esc(f ? f.nombre : '') + '</b>' + (f ? '<br>' + esc(f.hora) : '<br>Nombre y firma') + '</div><div><b>Entregado por</b><br>' + esc(x.usuario) + '</div></div></body></html>';
@@ -11308,8 +11345,8 @@ function aliImprimir(id) {
   const l = id ? aliDatos.alistos.filter(a => a.alisto === id) : aliDatos.alistos.filter(a => a.estado === 'BORRADOR' || a.estado === 'ALISTADO').sort((a, b) => (Number(a.movil) || 0) - (Number(b.movil) || 0));
   if (!l.length) { toast('No hay alistos pendientes para imprimir.'); return; }
   const mov = m => (bodDatos && bodDatos.moviles.find(x => x.idMovil === m) || {}).tecnico || '';
-  const html = '<!doctype html><html><head><meta charset="utf-8"><title>Hojas de alisto</title><style>body{font-family:Arial,sans-serif;font-size:12px;margin:0}.p{padding:24px;page-break-after:always}h1{font-size:17px;margin:0 0 4px}table{border-collapse:collapse;width:100%;margin-top:10px}th{background:#b71c1c;color:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}th,td{border:1px solid #999;padding:6px 7px;text-align:center}td.l{text-align:left}.f{margin-top:30px;display:flex;gap:40px}.f div{flex:1;border-top:1px solid #111;padding-top:4px}  </style></head><body>' +
-    l.map(a => '<div class="p"><h1>Hoja de alisto ' + esc(a.alisto) + ' · Móvil ' + esc(a.movil) + '</h1><div>' + esc(mov(a.idMovil)) + ' &nbsp; <b>Fecha:</b> ' + esc(fmtFechaSeg(a.fecha)) + ' &nbsp; <b>Estado:</b> ' + esc((ALI_EST[a.estado] || [a.estado])[0]) + (a.obs ? '<br><b>Obs.:</b> ' + esc(a.obs) : '') + '</div>' +
+  const html = '<!doctype html><html><head><meta charset="utf-8"><title>Hojas de alisto</title><style>' + DOC_CSS + 'body{font-family:Arial,sans-serif;font-size:12px;margin:0}.p{padding:24px;page-break-after:always}h1{font-size:17px;margin:0 0 4px}table{border-collapse:collapse;width:100%;margin-top:10px}th{background:#b71c1c;color:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}th,td{border:1px solid #999;padding:6px 7px;text-align:center}td.l{text-align:left}.f{margin-top:30px;display:flex;gap:40px}.f div{flex:1;border-top:1px solid #111;padding-top:4px}  </style></head><body>' +
+    l.map(a => '<div class="p">' + docEncabezado('Hoja de alisto', a.alisto) + '<h1>Hoja de alisto ' + esc(a.alisto) + ' · Móvil ' + esc(a.movil) + '</h1><div>' + esc(mov(a.idMovil)) + ' &nbsp; <b>Fecha:</b> ' + esc(fmtFechaSeg(a.fecha)) + ' &nbsp; <b>Estado:</b> ' + esc((ALI_EST[a.estado] || [a.estado])[0]) + (a.obs ? '<br><b>Obs.:</b> ' + esc(a.obs) : '') + '</div>' +
       '<table><thead><tr><th style="width:36px">✔</th><th>Línea</th><th>Código</th><th>Material</th><th>Und.</th><th>Cantidad</th></tr></thead><tbody>' +
       a.lineas.slice().sort((x, y) => x.linea - y.linea).map(y => { const m = aliMatInfo(y.clave); return '<tr><td>☐</td><td>' + y.linea + '</td><td>' + esc(codP(m.codigo)) + '</td><td class="l"><b>' + esc(y.material) + '</b></td><td>' + esc(m.unidad || '') + '</td><td><b>' + fmtN(y.cantidad) + '</b></td></tr>'; }).join('') +
       '</tbody></table><div class="f"><div>Alistó (bodega): ____________</div><div>Recibe (móvil): ____________</div></div></div>').join('') + '</body></html>';
@@ -11531,14 +11568,14 @@ function bodVistaCons(v) {
   if (bodVista !== 'matriz') renderBodConsDet();
 }
 
-function bodConsExcel() {
+async function bodConsExcel() {
   const l = bodConsDetFiltrado();
   if (!l.length) { toast('No hay datos para exportar.'); return; }
   const filas = [];
   l.forEach(o => o.items.forEach(i => filas.push({ Fecha: o.fecha, OT: o.orden, Contrato: o.contrato || '', Móvil: 'M' + o.movil, Material: i.material, Cantidad: i.cantidad, Archivo: o.archivo })));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(filas), 'Consumo');
-  XLSX.writeFile(wb, 'Consumo_por_OT_' + $('bodConsDesde').value + '_' + $('bodConsHasta').value + '.xlsx');
+  await xlsxMarca(wb, 'Consumo_por_OT_' + $('bodConsDesde').value + '_' + $('bodConsHasta').value + '.xlsx', 'Consumo de materiales por OT');
 }
 
 async function bodEliminarCarga(hora) {
@@ -12349,7 +12386,7 @@ async function cobroExcel() {
     const w1 = XLSX.utils.aoa_to_sheet(r); w1['!cols'] = [{ wch: 14 }, { wch: 28 }, { wch: 16 }, { wch: 16 }];
     const w2 = XLSX.utils.aoa_to_sheet(a); w2['!cols'] = [{ wch: 12 }, { wch: 24 }, { wch: 10 }, { wch: 40 }, { wch: 6 }, { wch: 10 }, { wch: 10 }, { wch: 11 }, { wch: 14 }, { wch: 16 }, { wch: 12 }, { wch: 40 }];
     XLSX.utils.book_append_sheet(wb, w1, 'Resumen'); XLSX.utils.book_append_sheet(wb, w2, 'Detalle');
-    XLSX.writeFile(wb, 'Cobro_inventario_' + invActual.info.corte + '.xlsx');
+    await xlsxMarca(wb, 'Cobro_inventario_' + invActual.info.corte + '.xlsx', 'Cobro de inventario');
   } catch (e) {
     mostrarError(e, 'No se pudo generar el Excel.');
   }
@@ -12809,7 +12846,7 @@ async function invDescargarHoja() {
       ws['!cols'] = [{ wch: 12 }, { wch: 60 }, { wch: 14 }];
       XLSX.utils.book_append_sheet(wb, ws, (u.id === 'BODEGA' ? 'Bodega' : u.nombre).slice(0, 30));
     });
-    XLSX.writeFile(wb, 'Inventario_fisico_' + d.info.corte + '.xlsx');
+    await xlsxMarca(wb, 'Inventario_fisico_' + d.info.corte + '.xlsx', 'Inventario físico');
   } catch (e) {
     mostrarError(e, 'No se pudo generar la hoja de conteo.');
   }
@@ -12941,7 +12978,7 @@ async function cmpExcel() {
     const ws = XLSX.utils.aoa_to_sheet(a);
     ws['!cols'] = [{ wch: 10 }, { wch: 46 }, { wch: 30 }].concat(Array(18).fill({ wch: 13 }));
     XLSX.utils.book_append_sheet(wb, ws, 'Comparación');
-    XLSX.writeFile(wb, 'Comparacion_inventario_cliente_' + $('cmpHasta').value + '.xlsx');
+    await xlsxMarca(wb, 'Comparacion_inventario_cliente_' + $('cmpHasta').value + '.xlsx', 'Comparación de inventario con el cliente');
   } catch (e) {
     mostrarError(e, 'No se pudo generar el Excel.');
   }
@@ -14319,7 +14356,7 @@ async function ecExcel() {
     Object.keys(dat.tot).forEach(m => filas.push(['', '', '', '', '', '', '', m, dat.tot[m], 'TOTAL POR COBRAR']));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(filas), 'Estado de cuenta');
-    XLSX.writeFile(wb, 'Estado_de_cuenta_' + hoyISO() + '.xlsx');
+    await xlsxMarca(wb, 'Estado_de_cuenta_' + hoyISO() + '.xlsx', 'Estado de cuenta');
   } catch (e) { mostrarError(e, 'No se pudo exportar el Excel.'); }
 }
 
@@ -14624,6 +14661,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 80 · 14-oct 21:35</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 83 · 14-oct 22:17</div>
 </body>
 </html>
