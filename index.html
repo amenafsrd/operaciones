@@ -1016,7 +1016,6 @@
           <button id="stBodCons" onclick="bodSubtab('cons')">📥 Consumo (OT)</button>
           <button id="stBodInv" onclick="bodSubtab('inv')">🧮 Cortes de inventario</button>
           <button id="stBodDev" onclick="bodSubtab('dev')">🔁 Devoluciones de cambio</button>
-          <button id="stBodHis" onclick="bodSubtab('his')">🕘 Historial de cambios</button>
           <button id="stBodCat" onclick="bodSubtab('cat')">⚙️ Materiales</button>
         </div>
         <div id="bodAlertaBox"></div>
@@ -1028,7 +1027,7 @@
               <div style="font-size:12px;color:#777;margin-top:3px">Lo que hay hoy: bodega + stock de las móviles activas. Se muestran solo las móviles activas que tienen material.</div></div>
               <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
                 <select id="panCat" onchange="panCambiarCat()" title="Filtrar por categoría" style="padding:8px 10px;border-radius:8px;border:1px solid #ccc">
-                  <option value="">Todas las categorías</option><option>Consumo</option><option>De corte</option><option>Equipos</option></select>
+                  <option value="">Todas las categorías</option></select>
                 <div style="position:relative">
                   <button class="btn secondary" onclick="panToggleMats(event)">🧪 Materiales <span id="panMatsN"></span></button>
                   <div id="panMatsBox" onclick="event.stopPropagation()" style="display:none;position:absolute;right:0;top:100%;z-index:30;background:#fff;border:1px solid #ccc;border-radius:8px;padding:10px;max-height:340px;overflow:auto;min-width:270px;box-shadow:0 6px 18px rgba(0,0,0,.18);text-align:left"></div>
@@ -1080,6 +1079,10 @@
               <div style="font-size:12px;color:#777;margin-top:3px">Cada fila es un documento de la bodega principal (RQ del cliente, devolución a proveedor, ajuste). Las entregas y devoluciones de las móviles están en «Abastecimiento de móviles».</div></div></div>
             <div id="ingTabla" class="tableWrap"></div>
           </div>
+          <div class="panel" style="margin-top:12px">
+            <div class="panelHead"><h2>🕘 Historial de modificaciones</h2><span id="ingHisTit"></span></div>
+            <div id="ingHisCont"><div class="loading">Cargando historial...</div></div>
+          </div>
         </div>
 
         <!-- Abastecimiento de móviles -->
@@ -1101,6 +1104,10 @@
             <div class="panelHead"><div><h2>Movimientos de móviles</h2>
               <div style="font-size:12px;color:#777;margin-top:3px">Cada fila es un movimiento (abastecimiento desde bodega, préstamo entre móviles, devolución, ajuste). Haz clic en una fila para ver sus líneas. Un préstamo deja el material registrado entre las dos móviles sin pasar por la bodega.</div></div></div>
             <div id="abTabla" class="tableWrap"></div>
+          </div>
+          <div class="panel" style="margin-top:12px">
+            <div class="panelHead"><h2>🕘 Historial de modificaciones</h2><span id="abHisTit"></span></div>
+            <div id="abHisCont"><div class="loading">Cargando historial...</div></div>
           </div>
         </div>
 
@@ -1249,16 +1256,13 @@
         </div>
 
         <!-- Catálogo -->
-        <div id="bodPanelHis" style="display:none">
-          <div class="toolbar" style="flex-wrap:wrap"><label>Desde <input type="date" id="bhDesde"></label><label>Hasta <input type="date" id="bhHasta"></label><input id="bhQ" placeholder="Buscar usuario, acción o detalle" style="min-width:240px" onkeydown="if(event.key==='Enter')cargarHistBodega()"><button class="btn secondary" onclick="cargarHistBodega()">Buscar</button><button class="btn secondary" onclick="exportarHistBodega()">⬇ Excel</button></div>
-          <div class="panel"><div class="panelHead"><h2>🕘 Historial de cambios de bodega</h2><span id="bhTotal"></span></div><div id="bodHisLista" class="hist"></div></div>
-        </div>
 
         <div id="bodPanelCat" style="display:none">
           <div class="panel">
             <div class="panelHead"><div><h2>Catálogo de materiales</h2>
               <div style="font-size:12px;color:#777;margin-top:3px">Los materiales oficiales son los del inventario físico (con código). «Stock por móvil» es lo que debe llevar cada móvil; después se ajusta móvil por móvil en Stock de móviles → 🎯. Alias = otros nombres (p. ej. el que trae el reporte de gastos), separados por «;».</div></div>
               <div id="catAdmin" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" onclick="abrirCatOficial()">📋 Cargar catálogo oficial</button>
+                <button class="btn secondary" onclick="catAbrir()">🏷️ Categorías</button>
                 <button class="btn secondary" onclick="borrarSinCodigo()">🗑️ Borrar los que no tienen código</button>
                 <button class="btn secondary" onclick="aplicarCostosAdendum()">💲 Cargar costos del adendum + stock completo</button></div></div>
             <div id="bodTablaCat" class="tableWrap"></div>
@@ -10324,8 +10328,8 @@ let bodSucio = false;
 
 /* Tras guardar un movimiento solo se recarga lo que se está viendo; el resto se actualiza al entrar a esa pestaña */
 async function refrescarTrasMov() {
-  if (bodSub === 'ing') { bodSucio = true; return cargarIngresos(); }
-  if (bodSub === 'abas') { bodSucio = true; return cargarAbastecimiento(); }
+  if (bodSub === 'ing') { bodSucio = true; cargarCambiosBodega('ing'); return cargarIngresos(); }
+  if (bodSub === 'abas') { bodSucio = true; cargarCambiosBodega('abas'); return cargarAbastecimiento(); }
   if (bodSub === 'ali') { bodSucio = true; return cargarAlistos(); }
   return cargarBodega();
 }
@@ -10795,43 +10799,53 @@ async function ingDevolverDanados() {
   mvActualizarSentido();
 }
 
+/* ---------- Historial de modificaciones (quién hizo cambios), con el estilo de Cronogramas ---------- */
+async function cargarCambiosBodega(ambito) {
+  const id = ambito === 'abas' ? 'abHis' : 'ingHis', cont = $(id + 'Cont');
+  if (!cont) return;
+  try {
+    const hasta = hoyISO(), d = new Date(); d.setDate(d.getDate() - 60);
+    const desde = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    const r = await api('historialBodegaWeb', desde, hasta, '', ambito);
+    $(id + 'Tit').textContent = 'últimos 60 días';
+    if (!r.filas.length) { cont.innerHTML = '<div class="hist"><div class="vacio">Aún no hay modificaciones registradas en los últimos 60 días.</div></div>'; return; }
+    const porUsuario = {}, dias = {}, ordenDias = [];
+    r.filas.forEach(x => {
+      const u = x.usuario || '—';
+      const pu = porUsuario[u] || (porUsuario[u] = { n: 0, ultimo: x.hora }); pu.n++;
+      const k = x.hora.slice(0, 10) + '|' + u;
+      if (!dias[k]) { dias[k] = { fecha: x.hora.slice(0, 10), usuario: u, filas: [] }; ordenDias.push(k); }
+      dias[k].filas.push(x);
+    });
+    const fh = h => String(h || '').slice(8, 10) + '/' + String(h || '').slice(5, 7) + '/' + String(h || '').slice(0, 4) + ' ' + String(h || '').slice(11, 16);
+    let h = '<div class="hist"><div class="quien"><b>Han hecho cambios:</b><br>' + Object.keys(porUsuario).map(u => '👤 <b>' + esc(u) + '</b> · ' + porUsuario[u].n + (porUsuario[u].n === 1 ? ' cambio' : ' cambios') + ' · último: ' + esc(fh(porUsuario[u].ultimo))).join('<br>') + '</div>';
+    ordenDias.forEach((k, i) => {
+      const g = dias[k];
+      h += '<details' + (i < 1 ? ' open' : '') + '><summary><b>' + esc(fmtFechaSeg(g.fecha)) + '</b> · ' + esc(g.usuario) + ' · ' + g.filas.length + (g.filas.length === 1 ? ' cambio' : ' cambios') + '</summary>' +
+        '<div class="tableWrap"><table class="table" style="min-width:0"><thead><tr><th>Hora</th><th class="left">Cambio</th><th class="left">Detalle</th></tr></thead><tbody>' +
+        g.filas.map(x => '<tr><td style="white-space:nowrap">' + esc(x.hora.slice(11, 16)) + '</td><td class="left"><b>' + esc(x.accion) + '</b></td><td class="left">' + esc(x.detalle) + '</td></tr>').join('') + '</tbody></table></div></details>';
+    });
+    cont.innerHTML = h + '</div>';
+  } catch (e) { cont.innerHTML = '<div class="empty">No se pudo cargar el historial.</div>'; }
+}
+
 function bodSubtab(s) {
   bodSub = s;
-  const m = { res: 'Res', moviles: 'Moviles', dan: 'Dan', ing: 'Ing', abas: 'Abas', ali: 'Ali', cons: 'Cons', inv: 'Inv', dev: 'Dev', his: 'His', cat: 'Cat' };
+  const m = { res: 'Res', moviles: 'Moviles', dan: 'Dan', ing: 'Ing', abas: 'Abas', ali: 'Ali', cons: 'Cons', inv: 'Inv', dev: 'Dev', cat: 'Cat' };
   Object.keys(m).forEach(k => {
     $('bodPanel' + m[k]).style.display = k === s ? 'block' : 'none';
     $('stBod' + m[k]).classList.toggle('active', k === s);
   });
   if (bodSucio && ['res', 'moviles', 'cat', 'cons', 'inv'].indexOf(s) >= 0) cargarBodega();
   if (s === 'dan') cargarDanados();
-  if (s === 'ing') cargarIngresos();
-  if (s === 'abas') cargarAbastecimiento();
+  if (s === 'ing') { cargarIngresos(); cargarCambiosBodega('ing'); }
+  if (s === 'abas') { cargarAbastecimiento(); cargarCambiosBodega('abas'); }
   if (s === 'ali') cargarAlistos();
   if (s === 'cons') cargarBodCons();
   if (s === 'inv') cargarCortes();
   if (s === 'dev') cargarDevoluciones();
-  if (s === 'his') cargarHistBodega();
 }
 
-async function cargarHistBodega() {
-  $('bodHisLista').innerHTML = '<div class="loading">Cargando historial...</div>';
-  try {
-    const r = await api('historialBodegaWeb', $('bhDesde').value, $('bhHasta').value, $('bhQ').value);
-    $('bhTotal').textContent = r.total + ' cambio(s)' + (r.total > r.filas.length ? ' · se muestran los ' + r.filas.length + ' más recientes' : '');
-    $('bodHisLista').innerHTML = r.filas.length ? '<div class="tableWrap"><table class="table" style="min-width:0"><thead><tr><th>Fecha y hora</th><th class="left">Usuario</th><th class="left">Cambio</th><th class="left">Detalle</th></tr></thead><tbody>' + r.filas.map(x => '<tr><td style="white-space:nowrap">' + esc(x.hora) + '</td><td class="left">' + esc(x.usuario) + '</td><td class="left"><b>' + esc(x.accion) + '</b></td><td class="left">' + esc(x.detalle) + '</td></tr>').join('') + '</tbody></table></div>' : '<div class="vacio">Aún no hay cambios registrados (se registran desde esta versión).</div>';
-  } catch (e) { $('bodHisLista').innerHTML = ''; mostrarError(e, 'No se pudo cargar el historial.'); }
-}
-
-async function exportarHistBodega() {
-  try {
-    await cargarLib('xlsx', SEG_URL_XLSX);
-    const r = await api('historialBodegaWeb', $('bhDesde').value, $('bhHasta').value, $('bhQ').value);
-    if (!r.filas.length) { toast('No hay cambios para exportar.'); return; }
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['Fecha y hora', 'Usuario', 'Cambio', 'Detalle', 'Referencia']].concat(r.filas.map(x => [x.hora, x.usuario, x.accion, x.detalle, x.ref]))), 'Historial');
-    await xlsxMarca(wb, 'Historial_bodega_' + hoyISO() + '.xlsx', 'Historial de cambios de bodega');
-  } catch (e) { mostrarError(e, 'No se pudo exportar.'); }
-}
 
 function bodLlenarFiltros() {
   const ab = $('abMovil'), actualAb = ab.value;
@@ -10917,6 +10931,45 @@ function panGuardar() { try { localStorage.setItem('srd_pan_ocultos', JSON.strin
 
 function panCambiarCat() { renderBodPanorama(); }
 
+/* Categorías de materiales: las del catálogo (editables) */
+function bodCategorias() {
+  const l = ((bodDatos && bodDatos.categorias) || ['Consumo', 'De corte', 'Equipos']).slice();
+  ((bodDatos && bodDatos.materiales) || []).forEach(m => { if (m.categoria && l.indexOf(m.categoria) < 0) l.push(m.categoria); });
+  return l;
+}
+function panPoblarCats() {
+  const sel = $('panCat'); if (!sel) return;
+  const v = sel.value, l = bodCategorias();
+  sel.innerHTML = '<option value="">Todas las categorías</option>' + l.map(c => '<option>' + esc(c) + '</option>').join('');
+  sel.value = l.indexOf(v) >= 0 ? v : '';
+}
+
+/* Administrar categorías (crear, renombrar, quitar) */
+let catEdit = [];
+function catAbrir() {
+  const uso = {};
+  (bodDatos.materiales || []).forEach(m => { uso[m.categoria] = (uso[m.categoria] || 0) + 1; });
+  catEdit = bodCategorias().map(c => ({ nombre: c, original: c, n: uso[c] || 0 }));
+  devModal('<h3>🏷️ Categorías de materiales</h3><div style="font-size:12.5px;color:#666;margin-bottom:8px">Aparecen en el catálogo y en el filtro del inventario general de bodega. Si renombras una, los materiales que la usan pasan a la nueva. Solo se puede quitar una que no tenga materiales.</div><div id="catLista"></div>' +
+    '<button class="btn secondary" type="button" onclick="catNueva()">➕ Agregar categoría</button>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn primary" id="catGuardarBtn" onclick="catGuardar()">Guardar</button><button class="btn secondary" onclick="devCerrar()">Cancelar</button></div>');
+  catPintar();
+}
+function catPintar() {
+  $('catLista').innerHTML = catEdit.map((c, i) => '<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px"><input value="' + esc(c.nombre) + '" maxlength="40" oninput="catEdit[' + i + '].nombre=this.value" style="flex:1" placeholder="Nombre de la categoría">' +
+    '<span style="font-size:12px;color:#777;min-width:78px">' + (c.n ? c.n + ' material(es)' : 'sin materiales') + '</span>' +
+    '<button class="btnMini" title="Quitar" ' + (c.n ? 'disabled style="opacity:.35"' : '') + ' onclick="catQuitar(' + i + ')">✕</button></div>').join('');
+}
+function catNueva() { catEdit.push({ nombre: '', original: '', n: 0 }); catPintar(); const i = $('catLista').querySelectorAll('input'); if (i.length) i[i.length - 1].focus(); }
+function catQuitar(i) { catEdit.splice(i, 1); catPintar(); }
+async function catGuardar() {
+  const btn = $('catGuardarBtn'); btn.disabled = true;
+  try {
+    await api('guardarCategoriasInvWeb', catEdit.filter(c => c.nombre.trim()).map(c => ({ nombre: c.nombre.trim(), original: c.original })));
+    devCerrar(); toast('Categorías guardadas.'); bodSucio = true; await cargarBodega();
+  } catch (e) { mostrarError(e, 'No se pudieron guardar las categorías.'); btn.disabled = false; }
+}
+
 function panMatsVisibles() {
   const c = $('panCat').value;
   return bodMats(false).filter(m => !panOcultos[m.clave] && (!c || m.categoria === c));
@@ -10925,7 +10978,14 @@ function panMatsVisibles() {
 function panToggleMats(ev) {
   if (ev) ev.stopPropagation();
   const b = $('panMatsBox');
-  b.style.display = b.style.display === 'none' ? 'block' : 'none';
+  if (b.style.display !== 'none') { b.style.display = 'none'; return; }
+  /* posición fija para que ningún contenedor lo recorte */
+  const r = ev && ev.currentTarget ? ev.currentTarget.getBoundingClientRect() : { bottom: 120, right: window.innerWidth - 20 };
+  b.style.display = 'block'; b.style.position = 'fixed'; b.style.zIndex = 400; b.style.right = 'auto'; b.style.bottom = 'auto';
+  const w = Math.min(b.offsetWidth || 280, window.innerWidth - 16);
+  b.style.left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8)) + 'px';
+  b.style.top = (r.bottom + 4) + 'px';
+  b.style.maxHeight = Math.max(160, window.innerHeight - r.bottom - 20) + 'px';
 }
 
 document.addEventListener('click', () => { const b = document.getElementById('panMatsBox'); if (b) b.style.display = 'none'; });
@@ -11353,6 +11413,7 @@ function renderAbastecimiento() {
   const mv = $('abMovil').value;
   if (mv) l = l.filter(x => x.idMovil === mv || x.idMovilDestino === mv);
   if (!l.length) { $('abTabla').innerHTML = '<div class="empty">No hay movimientos de móviles en ese rango.</div>'; return; }
+  l = l.slice().sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0) || (String(a.creado) < String(b.creado) ? -1 : String(a.creado) > String(b.creado) ? 1 : 0));
   abLista = l;
   $('abTabla').innerHTML = '<table class="table" style="min-width:880px"><thead><tr><th>Consecutivo</th><th>Fecha</th><th class="left">Tipo</th><th>De → A</th><th class="left">Documento</th><th>Materiales</th><th>Recibido</th><th>Registró</th>' +
     (adm ? '<th></th>' : '') + '</tr></thead><tbody>' +
@@ -11361,7 +11422,6 @@ function renderAbastecimiento() {
       '<td class="left"><b style="color:#b71c1c;text-decoration:underline">' + esc(x.referencia || 'sin número') + '</b>' + (x.obs ? '<div style="color:#888;font-size:12px">' + esc(x.obs) + '</div>' : '') + '</td>' +
       '<td>' + x.lineas.length + ' <span style="color:#888">línea' + (x.lineas.length === 1 ? '' : 's') + '</span></td><td>' + firmaCelda(x) + '</td><td>' + esc(x.usuario) + '</td>' +
       (adm ? '<td><button class="btnMini" onclick="event.stopPropagation();eliminarMov(\'' + escJs(x.grupo) + '\')">🗑️</button></td>' : '') + '</tr>').join('') + '</tbody></table>';
-  tablaOrdenable('abTabla');
 }
 
 let abLista = [];
@@ -12349,8 +12409,8 @@ function notifIr(vista) { $('notifPanel').style.display = 'none'; if (vista && p
 document.addEventListener('click', e => { const p = $('notifPanel'); if (p && p.style.display !== 'none' && !p.contains(e.target)) p.style.display = 'none'; });
 
 function renderBodPanorama() {
-
   if (!bodDatos) return;
+  panPoblarCats();
   bodRenderAlertas();
   const mats = panMatsVisibles();
   panRenderBox();
@@ -13547,7 +13607,7 @@ function renderBodCat() {
 
   $('bodTablaCat').innerHTML = '<table class="table" style="min-width:1000px"><thead><tr><th>Código</th><th class="left">Material</th><th>Categoría</th><th>Unidad</th><th>Stock por móvil</th><th>Mínimo en bodega</th><th title="Stock al 100% (móviles + reserva de bodega). Si lo disponible en bodega llega al 20% de esta cantidad se genera la alerta.">Stock completo bodega (100%)</th><th>Costo unitario (₡)</th><th class="left">Alias (otros nombres: reporte de gastos, inventario)</th><th>Activo</th>' + (adm ? '<th></th>' : '') + '</tr></thead><tbody>' +
     l.map((m, i) => adm
-      ? '<tr><td><input id="cat_c_' + i + '" value="' + esc(m.codigo) + '" style="width:80px"></td><td><input id="cat_n_' + i + '" value="' + esc(m.material) + '" style="width:260px"></td><td><select id="cat_k_' + i + '">' + ['Consumo', 'De corte', 'Equipos'].map(k => '<option' + (m.categoria === k ? ' selected' : '') + '>' + k + '</option>').join('') + '</select></td><td><input id="cat_u_' + i + '" value="' + esc(m.unidad) + '" style="width:60px"></td>' +
+      ? '<tr><td><input id="cat_c_' + i + '" value="' + esc(m.codigo) + '" style="width:80px"></td><td><input id="cat_n_' + i + '" value="' + esc(m.material) + '" style="width:260px"></td><td><select id="cat_k_' + i + '">' + bodCategorias().map(k => '<option' + (m.categoria === k ? ' selected' : '') + '>' + k + '</option>').join('') + '</select></td><td><input id="cat_u_' + i + '" value="' + esc(m.unidad) + '" style="width:60px"></td>' +
         '<td><input id="cat_b_' + i + '" type="number" min="0" step="any" value="' + (m.base || '') + '" style="width:80px"></td>' +
         '<td><input id="cat_m_' + i + '" type="number" min="0" step="any" value="' + (m.minimo || '') + '" style="width:80px"></td>' +
         '<td><input id="cat_f_' + i + '" type="number" min="0" step="any" value="' + (m.completo || '') + '" style="width:90px"></td>' +
@@ -13557,7 +13617,7 @@ function renderBodCat() {
         '<td><button class="btnMini" onclick="guardarMaterial(' + i + ')">💾</button>' +
           (!m.codigo && l.some(x => x.codigo) ? ' <button class="btnMini" title="Relacionar con un material oficial" onclick="abrirUnir(' + i + ')">🔗</button>' : '') + '</td></tr>'
       : '<tr><td>' + esc(codP(m.codigo)) + (String(m.codigo || '').indexOf(';') >= 0 ? '<div style="font-size:11px;color:#999" title="Otros códigos con los que el sistema reconoce este material en los archivos importados (se quitan con ✏️ Editar)">también: ' + esc(String(m.codigo).split(';').slice(1).join(', ')) + '</div>' : '') + '</td><td class="left"><b>' + esc(m.material) + '</b></td><td>' + esc(m.categoria) + '</td><td>' + esc(m.unidad) + '</td><td>' + (m.base || '—') + '</td><td>' + (m.minimo || '—') + '</td><td>' + (m.completo || '—') + '</td><td>' + (m.costo ? colones(m.costo) : '—') + '</td><td class="left">' + esc(m.alias) + '</td><td>' + (m.activo ? 'Sí' : 'No') + '</td></tr>').join('') +
-    (adm ? '<tr style="background:#f6f6f6"><td><input id="cat_c_new" placeholder="Código" style="width:80px"></td><td><input id="cat_n_new" placeholder="Nuevo material" style="width:260px"></td><td><select id="cat_k_new"><option>Consumo</option><option>De corte</option><option>Equipos</option></select></td><td><input id="cat_u_new" value="u" style="width:60px"></td>' +
+    (adm ? '<tr style="background:#f6f6f6"><td><input id="cat_c_new" placeholder="Código" style="width:80px"></td><td><input id="cat_n_new" placeholder="Nuevo material" style="width:260px"></td><td><select id="cat_k_new">' + bodCategorias().map(k => '<option>' + esc(k) + '</option>').join('') + '</select></td><td><input id="cat_u_new" value="u" style="width:60px"></td>' +
       '<td><input id="cat_b_new" type="number" min="0" step="any" style="width:80px"></td><td><input id="cat_m_new" type="number" min="0" step="any" style="width:80px"></td><td><input id="cat_f_new" type="number" min="0" step="any" style="width:90px"></td><td><input id="cat_p_new" type="number" min="0" step="any" style="width:90px"></td><td></td><td></td><td><button class="btnMini" onclick="guardarMaterial(-1)">➕ Agregar</button></td></tr>' : '') +
     '</tbody></table>';
 }
@@ -15208,6 +15268,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 113 · 16-oct 10:57</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 115 · 16-oct 14:56</div>
 </body>
 </html>
