@@ -1065,10 +1065,11 @@
             <div class="field" style="min-width:200px"><label>Tipo de movimiento</label><select id="ingTipo" onchange="renderIngresos()">
               <option value="">Todos</option>
               <option value="INGRESO">Ingreso a bodega (RQ)</option><option value="AJ_BODEGA">Ajuste de bodega</option>
-              <option value="DEV_PROV">Devolución a proveedor</option></select></div>
+              <option value="DEV_PROV">Devolución a proveedor (incluye dañados)</option></select></div>
             <div class="field" style="min-width:150px"><label>Vista</label><select id="ingVista" onchange="renderIngresos()"><option value="doc">Por documento</option><option value="mat">Matriz material × documento</option></select></div>
             <button class="btn secondary" onclick="cargarIngresos()">↻ Actualizar</button>
             <button class="btn secondary" onclick="ingVerTodo()">📅 Ver todo el historial</button>
+            <button class="btn primary" onclick="ingDevolverDanados()">↩️ Devolver equipos dañados</button>
           </div>
           <div class="toolbar ingEd">
             <button class="btn primary" onclick="abrirMov('INGRESO')">➕ Registrar documento</button>
@@ -1113,13 +1114,14 @@
             <div class="field"><label>Desde</label><input type="date" id="danDesde" onchange="renderDanados()"></div>
             <div class="field"><label>Hasta</label><input type="date" id="danHasta" onchange="renderDanados()"></div>
             <button class="btn primary" onclick="danForm()">➕ Registrar dañados de bodega</button>
+            <button class="btn primary" onclick="ingDevolverDanados()">↩️ Devolver equipos dañados</button>
             <button class="btn secondary" onclick="danExcel()">📥 Excel</button>
             <button class="btn secondary" onclick="cargarDanados()">↻</button>
           </div>
           <div id="danCards" class="cards segCards"></div>
           <div class="panel">
             <div class="panelHead"><div><h2>Equipos dañados · lista</h2>
-              <div style="font-size:12px;color:#777;margin-top:3px">Cuando una móvil devuelve material dañado (en <b>Abastecimiento de móviles → Devolución de móvil</b>) entra a la bodega y aparece aquí solo, con la móvil que lo trajo. Los que ya estaban dañados en bodega se registran con «Registrar dañados de bodega». Siguen contando en el inventario pero no están disponibles. Para devolverlos al proveedor haz el documento de <b>Devolución a proveedor</b> en <b>Bodega principal</b>: aquí pasan solos a «Devuelto al proveedor».</div></div></div>
+              <div style="font-size:12px;color:#777;margin-top:3px">Cuando una móvil devuelve material dañado (en <b>Abastecimiento de móviles → Devolución de móvil</b>) entra a la bodega y aparece aquí solo, con la móvil que lo trajo. Los que ya estaban dañados en bodega se registran con «Registrar dañados de bodega». Siguen contando en el inventario pero no están disponibles. Para devolverlos al proveedor usa <b>Devolver equipos dañados</b> (aquí o en <b>Bodega principal</b>): trae todos los pendientes, tú escoges cuáles y al guardar aquí pasan a «Devuelto al proveedor».</div></div></div>
             <div id="danTabla" class="tableWrap"></div>
           </div>
         </div>
@@ -10717,13 +10719,12 @@ function renderDanados() {
     '<div class="card"><div class="n" style="color:#2e7d32">' + fmtN(sum(h => h.tipo === 'BAJA')) + '</div><div class="t">Devueltos al proveedor (histórico)</div></div>';
   const L = danFilas();
   let pend = '';
-  if (pendMats.length) pend = '<div style="font-weight:700;margin:4px 0">Pendientes por material</div><table class="table" style="font-size:13px;margin-bottom:14px"><thead><tr><th>Código</th><th class="left">Material</th><th>Existencia (inventariado)</th><th>Dañados</th><th>Disponible</th><th></th></tr></thead><tbody>' +
-    pendMats.map(m => { const b = B(m.clave); return '<tr><td>' + esc(codP(m.codigo)) + '</td><td class="left"><b>' + esc(m.material) + '</b></td><td>' + fmtN(b.existencia || 0) + '</td><td style="color:#b26a00;font-weight:700">' + fmtN(b.danado) + '</td><td style="font-weight:700">' + fmtN(b.disponible || 0) + '</td>' +
-      '<td style="text-align:right"><button class="btn secondary" onclick="danQuitar(\'' + escJs(m.clave) + '\')" title="Ya no están dañados (se repararon o fue falsa alarma): vuelven a estar disponibles">✔ Ya están buenos</button></td></tr>'; }).join('') + '</tbody></table>';
+  if (pendMats.length) pend = '<div style="font-weight:700;margin:4px 0">Pendientes por material</div><table class="table" style="font-size:13px;margin-bottom:14px"><thead><tr><th>Código</th><th class="left">Material</th><th>Existencia (inventariado)</th><th>Dañados</th><th>Disponible</th></tr></thead><tbody>' +
+    pendMats.map(m => { const b = B(m.clave); return '<tr><td>' + esc(codP(m.codigo)) + '</td><td class="left"><b>' + esc(m.material) + '</b></td><td>' + fmtN(b.existencia || 0) + '</td><td style="color:#b26a00;font-weight:700">' + fmtN(b.danado) + '</td><td style="font-weight:700">' + fmtN(b.disponible || 0) + '</td>' + '</tr>'; }).join('') + '</tbody></table>';
   $('danTabla').innerHTML = pend + '<div style="font-weight:700;margin:4px 0">Registro (' + L.length + ')</div>' + (L.length ? '<table class="table" style="font-size:12.5px;min-width:900px"><thead><tr><th>Fecha</th><th class="left">Material</th><th>Cant.</th><th class="left">Movimiento</th><th class="left">Origen / quién</th><th class="left">Categoría</th><th class="left">Detalle</th><th class="left">Documento</th><th class="left">Registró</th><th></th></tr></thead><tbody>' +
     L.map(h => '<tr><td>' + esc(fmtFechaSeg ? fmtFechaSeg(h.fecha) : h.fecha) + '</td><td class="left"><b>' + esc(h.material) + '</b></td><td><b>' + fmtN(h.cantidad) + '</b></td><td class="left">' + (DAN_TIPO[h.tipo] || esc(h.tipo)) + '</td>' +
       '<td class="left">' + (h.tipo !== 'DANADO' ? '—' : h.fuente === 'MOVIL' ? '🚐 Móvil <b>M' + esc(h.movil) + '</b>' : '🏭 Bodega') + '</td><td class="left">' + esc(h.categoria || '—') + '</td><td class="left">' + esc(h.motivo) + '</td><td class="left">' + (h.documento ? '<b>' + esc(h.documento) + '</b>' : '—') + '</td><td class="left">' + esc(h.usuario) + '</td>' +
-      '<td>' + (adm && !h.origen ? '<button class="btnMini" title="Eliminar este registro" onclick="danEliminar(\'' + escJs(h.id) + '\')">✕</button>' : '') + '</td></tr>').join('') + '</tbody></table>' : '<div class="loading">No hay registros con ese filtro.</div>');
+      '<td style="white-space:nowrap">' + (puedeEditar() && h.tipo === 'DANADO' ? '<button class="btnMini" title="Corregir cantidad, categoría o detalle" onclick="danEditar(\'' + escJs(h.id) + '\')">✏️</button> ' : '') + (adm && !h.origen ? '<button class="btnMini" title="Eliminar este registro" onclick="danEliminar(\'' + escJs(h.id) + '\')">✕</button>' : '') + '</td></tr>').join('') + '</tbody></table>' : '<div class="loading">No hay registros con ese filtro.</div>');
 }
 function danForm() {
   devModal('<h3>🛠️ Registrar equipos dañados que están en bodega</h3>' +
@@ -10755,17 +10756,19 @@ async function danGuardar() {
     devCerrar(); bodSucio = true; toast('Registrado: ya no cuenta como disponible.', 4000); await cargarDanados();
   } catch (e) { mostrarError(e, 'No se pudo guardar.'); btn.disabled = false; }
 }
-function danQuitar(clave) {
-  const m = bodDatos.materiales.find(x => x.clave === clave), d = (bodDatos.bodega[clave] || {}).danado || 0;
-  devModal('<h3>✔ Ya están buenos</h3><div style="font-size:13px;margin-bottom:8px"><b>' + esc(m.material) + '</b> · dañados registrados: <b>' + fmtN(d) + '</b><br>Se quitan de la lista de dañados y vuelven a estar disponibles.</div>' +
-    '<div style="display:grid;grid-template-columns:130px 150px 1fr;gap:8px"><label>Cantidad (máx. ' + fmtN(d) + ')<input id="dqCant" type="number" min="0" step="any" max="' + d + '" value="' + d + '"></label><label>Fecha<input id="dqFecha" type="date" value="' + hoyISO() + '"></label><label>Detalle<input id="dqMot" maxlength="200" placeholder="Ej. se reparó / era falsa alarma" autocomplete="off"></label></div>' +
-    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn primary" onclick="danQuitarOk(\'' + escJs(clave) + '\')">Guardar</button><button class="btn secondary" onclick="devCerrar()">Cancelar</button></div>');
+function danEditar(id) {
+  const h = (danDatos.historial || []).find(x => x.id === id); if (!h) return;
+  devModal('<h3>✏️ Corregir registro de dañados</h3><div style="font-size:13px;margin-bottom:8px"><b>' + esc(h.material) + '</b> · ' + esc(fmtFechaSeg(h.fecha)) + (h.fuente === 'MOVIL' ? ' · móvil M' + esc(h.movil) + ' (' + esc(h.documento) + ')' : '') + '</div>' +
+    '<div style="display:grid;grid-template-columns:130px 1fr;gap:8px;margin-bottom:8px"><label>Cantidad<input id="deCant" type="number" min="0" step="any" value="' + h.cantidad + '"></label><label>Categoría del daño<select id="deCat">' + (danDatos.categorias || DAN_CATS).map(c => '<option' + (c === h.categoria ? ' selected' : '') + '>' + esc(c) + '</option>').join('') + '</select></label></div>' +
+    '<label style="display:block">Detalle<input id="deMot" maxlength="200" value="' + esc(h.motivo) + '" autocomplete="off"></label>' +
+    (h.origen ? '<div style="font-size:12px;color:#9b6a00;margin-top:6px">Este registro nació de una devolución de móvil. Si luego editas ese documento, se vuelve a calcular con lo que digas allá.</div>' : '') +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn primary" onclick="danEditarOk(\'' + escJs(id) + '\')">Guardar</button><button class="btn secondary" onclick="devCerrar()">Cancelar</button></div>');
 }
-async function danQuitarOk(clave) {
+async function danEditarOk(id) {
   try {
-    await api('registrarDanadoInvWeb', { tipo: 'REPARADO', fecha: $('dqFecha').value, motivo: $('dqMot').value, lineas: [{ clave: clave, cantidad: $('dqCant').value }] });
-    devCerrar(); bodSucio = true; toast('Listo: vuelven a estar disponibles.', 4000); await cargarDanados();
-  } catch (e) { mostrarError(e, 'No se pudo guardar.'); }
+    await api('editarDanadoInvWeb', id, $('deCant').value, $('deCat').value, $('deMot').value);
+    devCerrar(); bodSucio = true; toast('Registro corregido.'); await cargarDanados();
+  } catch (e) { mostrarError(e, 'No se pudo corregir.'); }
 }
 async function danEliminar(id) {
   if (!confirm('¿Eliminar este registro? El material vuelve al estado anterior.')) return;
@@ -10778,6 +10781,18 @@ async function danExcel() {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Equipos dañados');
   await xlsxMarca(wb, 'Equipos_danados_' + hoyISO() + '.xlsx', 'Equipos dañados');
+}
+
+/* Devolver al proveedor los equipos dañados: abre el documento con todos los pendientes ya cargados para escoger cuáles se devuelven */
+async function ingDevolverDanados() {
+  try { await cargarBodega(); } catch (e) { return; }
+  const lineas = (bodDatos.materiales || []).filter(m => ((bodDatos.bodega[m.clave] || {}).danado || 0) > 0).map(m => ({ clave: m.clave, cantidad: bodDatos.bodega[m.clave].danado }));
+  if (!lineas.length) { toast('No hay equipos dañados pendientes de devolver.'); return; }
+  abrirMov('INGRESO', '', lineas);
+  $('mvConcepto').value = 'Devolución de equipos dañados';
+  $('mvTitulo').textContent = '↩️ Devolver equipos dañados al proveedor';
+  $('mvEtiquetaRef').textContent = 'N.º de boleta / guía de devolución (obligatorio)';
+  mvActualizarSentido();
 }
 
 function bodSubtab(s) {
@@ -11409,7 +11424,7 @@ function abVerTodo() {
 /* ---------- Formulario de movimiento ---------- */
 
 const MV_CONC = {
-  INGRESO: ['Abastecimiento del cliente (RQ)', 'Devolución a proveedor', 'Reposición por garantía', 'Otro'],
+  INGRESO: ['Abastecimiento del cliente (RQ)', 'Devolución a proveedor', 'Devolución de equipos dañados', 'Reposición por garantía', 'Otro'],
   DEV_PROV: ['Devolución por material dañado', 'Devolución por excedente', 'Otro']
 };
 
@@ -11785,7 +11800,7 @@ function editarDoc() {
   $('mvRef').value = x.referencia || '';
   $('mvObs').value = x.obs || '';
   if (MV_CONC[tipoForm]) {
-    const c = x.tipo === 'DEV_PROV' ? 'Devolución a proveedor' : x.concepto;
+    const c = x.tipo === 'DEV_PROV' ? (x.concepto === 'Devolución de equipos dañados' ? x.concepto : 'Devolución a proveedor') : x.concepto;
     if (c && MV_CONC[tipoForm].indexOf(c) >= 0) $('mvConcepto').value = c;
     mvActualizarSentido();
   }
@@ -11794,8 +11809,8 @@ function editarDoc() {
 function mvActualizarSentido() {
   const el = $('mvSentido');
   if (!MV_CONC[mvTipo]) { el.textContent = ''; return; }
-  const resta = $('mvConcepto').value === 'Devolución a proveedor';
-  el.innerHTML = resta ? '<span style="color:#b71c1c">⬆ Resta de la bodega (sale hacia el proveedor)</span>' : '<span style="color:#2e7d32">⬇ Suma a la bodega</span>';
+  const cv = $('mvConcepto').value, resta = cv === 'Devolución a proveedor' || cv === 'Devolución de equipos dañados';
+  el.innerHTML = cv === 'Devolución de equipos dañados' ? '<span style="color:#b71c1c">⬆ Resta de la bodega (sale hacia el proveedor) y pasan a «Devuelto al proveedor» en Equipos dañados.</span> <span style="color:#666">Quita las líneas que no devuelves o baja la cantidad; el máximo es lo que está pendiente de cada material.</span>' : resta ? '<span style="color:#b71c1c">⬆ Resta de la bodega (sale hacia el proveedor)</span>' : '<span style="color:#2e7d32">⬇ Suma a la bodega</span>';
 }
 
 function cerrarMov() { $('modalMov').classList.remove('show'); }
@@ -11834,7 +11849,7 @@ async function guardarMov() {
       if (falta.length) { toast('Falta: ' + falta.join(', ') + '.'); btn.disabled = false; return; }
     }
     if (mvTipo === 'DEV_MOVIL' && lineas.some(l => Number(l.danados) > Number(l.cantidad))) { toast('Los dañados no pueden ser más que la cantidad devuelta.'); btn.disabled = false; return; }
-    const tipoReal = mvTipo === 'INGRESO' && $('mvConcepto').value === 'Devolución a proveedor' ? 'DEV_PROV' : mvTipo;
+    const tipoReal = mvTipo === 'INGRESO' && ($('mvConcepto').value === 'Devolución a proveedor' || $('mvConcepto').value === 'Devolución de equipos dañados') ? 'DEV_PROV' : mvTipo;
     if (mvTipo === 'TRASLADO' && $('mvMovil').value) {
       const st = bodDatos.stockMovil[$('mvMovil').value] || {};
       const cortos = lineas.filter(l => ((st[l.clave] || {}).actual || 0) < Number(l.cantidad)).map(l => bodMatNombre(l.clave) + ' (tiene ' + fmtN((st[l.clave] || {}).actual || 0) + ')');
@@ -12346,7 +12361,7 @@ function renderBodPanorama() {
     t.movs.map(m => '<th title="' + esc(m.tecnico) + '">M' + esc(m.movil) + '</th>').join('') +
     (t.hayOtros ? '<th title="' + esc(t.otrosTxt) + '">Otras / inactivas ⓘ</th>' : '') + '<th>🚐 Total móviles</th><th>TOTAL GENERAL</th></tr></thead><tbody>' +
     t.filas.map(f => '<tr style="cursor:pointer" title="Ver el historial de este material" onclick="verKardex(\'' + escJs(f.m.clave) + '\')"><td>' + esc(codP(f.m.codigo)) + '</td><td class="left"><b>' + esc(f.m.material) + '</b></td><td>' + esc(f.m.unidad) + '</td>' +
-      ((alertSet[f.m.clave] ? '<td style="background:#fde8e8;color:#b71c1c;font-weight:700" title="Disponible al 20% o menos">⚠ ' + fmtN(Math.round((f.bod + f.dan) * 1000) / 1000) + '</td>' : n(Math.round((f.bod + f.dan) * 1000) / 1000)).replace(/<\/td>$/, (f.dan ? ' <span style="font-size:11px;color:#b26a00;font-weight:600" title="Dañados o defectuosos pendientes de devolver al proveedor: cuentan en el inventario pero no se pueden entregar (disponible: ' + fmtN(f.bod) + ')">(' + fmtN(f.dan) + ' dañados)</span>' : '') + '</td>')) +
+      ((alertSet[f.m.clave] ? '<td style="background:#fde8e8;color:#b71c1c;font-weight:700" title="Disponible al 20% o menos">⚠ ' + fmtN(Math.round((f.bod + f.dan) * 1000) / 1000) + '</td>' : n(Math.round((f.bod + f.dan) * 1000) / 1000)).replace(/<\/td>$/, (f.dan ? '<div style="font-size:10.5px;font-weight:600;white-space:nowrap" title="Los dañados cuentan en el inventario pero no se pueden entregar"><span style="color:#2e7d32">' + fmtN(f.bod) + ' buenos</span> · <span style="color:#b26a00">' + fmtN(f.dan) + ' dañados</span></div>' : '') + '</td>')) +
       t.movs.map(x => n(t.mov(x.idMovil, f.m.clave))).join('') + (t.hayOtros ? n(f.otros) : '') + n(f.mov) +
       '<td style="font-weight:700;font-size:14px;' + (f.tot < 0 ? 'color:#b71c1c' : '') + '">' + (f.tot === 0 ? '—' : fmtN(f.tot)) + '</td></tr>').join('') + '</tbody></table>';
 }
@@ -13614,7 +13629,7 @@ function fpPintar() {
       '<canvas id="fpCanvas" width="400" height="190" style="width:100%;border:2px solid #999;border-radius:8px;background:#fff;touch-action:none"></canvas>' +
       '<div style="display:flex;gap:8px;margin-top:8px"><button class="btn secondary" onclick="fpBorrar()">🧹 Borrar</button><button id="fpGuardar" class="btn primary" style="flex:1;font-size:15px" onclick="fpGuardar()">✅ Confirmo que recibí esto y firmo</button></div></div>';
   }
-  h += '<div style="margin-top:14px"><button class="btn secondary" style="width:100%" onclick="fpPdf()">⬇️ Descargar documento (PDF)</button></div><div style="margin-top:10px;font-size:11px;color:#888;text-align:center">Enlace válido hasta ' + esc(String(x.vence).slice(0, 10)) + '</div>';
+  h += '<div style="margin-top:14px"><button class="btn secondary" style="width:100%" onclick="fpPdf()">⬇️ Descargar documento (PDF)</button></div><div style="margin-top:10px;font-size:11px;color:#888;text-align:center">Enlace válido hasta ' + esc(String(x.vence).slice(0, 16)) + '</div>';
   $('fpCuerpo').innerHTML = h;
   const c = $('fpCanvas');
   if (c) {
@@ -15192,6 +15207,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 110 · 16-oct 10:22</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 112 · 16-oct 10:45</div>
 </body>
 </html>
