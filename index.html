@@ -1032,6 +1032,7 @@
                   <button class="btn secondary" onclick="panToggleMats(event)">🧪 Materiales <span id="panMatsN"></span></button>
                   <div id="panMatsBox" onclick="event.stopPropagation()" style="display:none;position:absolute;right:0;top:100%;z-index:30;background:#fff;border:1px solid #ccc;border-radius:8px;padding:10px;max-height:340px;overflow:auto;min-width:270px;box-shadow:0 6px 18px rgba(0,0,0,.18);text-align:left"></div>
                 </div>
+                <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer" title="Si hay equipos o material dañado, el reporte muestra el total y entre paréntesis cuántos están dañados"><input type="checkbox" id="panDetDan" checked> Detallar dañados</label>
                 <button class="btn primary" onclick="bodExportarPdf()">📄 Exportar PDF</button>
                 <button class="btn secondary" onclick="cargarBodega()">↻</button>
               </div></div>
@@ -1646,6 +1647,7 @@
           <option value="DEV_MOVIL">Devolución de móvil a bodega</option>
           <option value="AJ_MOVIL">Ajuste de móvil (saldo inicial, conteo)</option></select><div id="mvSentidoMov" style="font-size:12px;margin-top:3px"></div></div>
         <div class="field" id="mvCampoMovil"><label id="mvEtiquetaMovil">Móvil</label><select id="mvMovil" onchange="mvRefrescarInfo()"></select></div>
+        <div class="field" id="mvCampoMotivo" style="grid-column:1/-1;display:none"><label>Motivo de la devolución</label><select id="mvMotivo" onchange="mvDanVis()"><option value="">Devolución normal (sobrante, cambio de stock…)</option><option value="EQUIPO">Equipo dañado</option><option value="MATERIAL">Material dañado</option></select><div style="font-size:12px;color:#777;margin-top:3px">Si el motivo es equipo o material dañado, todo lo devuelto entra a la bodega pero queda marcado como dañado (cuenta en el inventario, no se puede entregar). Para una devolución mixta deja «normal» y anota los dañados en cada línea.</div></div>
         <div class="field" id="mvCampoDestino" style="display:none"><label>Móvil que recibe</label><select id="mvMovilDestino"></select></div>
         <div class="field" id="mvCampoConcepto" style="grid-column:1/-1;display:none"><label>Tipo de movimiento *</label><select id="mvConcepto" onchange="mvActualizarSentido()"></select><div id="mvSentido" style="font-size:12px;margin-top:3px"></div></div>
         <div class="field" style="grid-column:1/-1"><label id="mvEtiquetaRef">Referencia</label><input id="mvRef" autocomplete="off"></div>
@@ -10818,10 +10820,12 @@ function bodHtmlReporte() {
   const n = v => v === 0 ? '–' : fmtN(v);
   const ahora = new Date().toLocaleString('es-CR');
   const movs = t.movs;
+  const det = !$('panDetDan') || $('panDetDan').checked;
+  const totDan = Math.round(t.filas.reduce((a, f) => a + f.dan, 0) * 1000) / 1000;
   const fs = movs.length > 16 ? 7 : movs.length > 12 ? 8 : 9;
 
   const head = '<tr><th>Código</th><th class="l">Material</th><th>Und.</th><th>Bodega</th>' + movs.map(m => '<th>M' + esc(m.movil) + '</th>').join('') + (t.hayOtros ? '<th>Otras / inactivas</th>' : '') + '<th>Total móviles</th><th>TOTAL GENERAL</th></tr>';
-  const rows = t.filas.map(f => '<tr><td>' + esc(codP(f.m.codigo)) + '</td><td class="l">' + esc(f.m.material) + '</td><td>' + esc(f.m.unidad) + '</td><td class="b">' + n(f.bod) + '</td>' +
+  const rows = t.filas.map(f => '<tr><td>' + esc(codP(f.m.codigo)) + '</td><td class="l">' + esc(f.m.material) + '</td><td>' + esc(f.m.unidad) + '</td><td class="b">' + n(Math.round((f.bod + f.dan) * 1000) / 1000) + (det && f.dan ? ' <span class="dn">(' + fmtN(f.dan) + ' dañados)</span>' : '') + '</td>' +
     movs.map(x => { const v = t.mov(x.idMovil, f.m.clave); return '<td' + (v < 0 ? ' class="neg"' : '') + '>' + n(v) + '</td>'; }).join('') +
     (t.hayOtros ? '<td>' + n(f.otros) + '</td>' : '') + '<td class="t">' + n(f.mov) + '</td><td class="g">' + n(f.tot) + '</td></tr>').join('');
 
@@ -10830,10 +10834,10 @@ function bodHtmlReporte() {
     'body{font-family:Arial,Helvetica,sans-serif;color:#222}h1{font-size:16px;margin:0 0 2px}' +
     '.s{font-size:11px;color:#666;margin-bottom:8px}table{border-collapse:collapse;width:100%;font-size:' + fs + 'px}' +
     'th,td{border:1px solid #bbb;padding:3px 4px;text-align:right}th{background:#a31616;color:#fff;text-align:center;border-color:#7d1111}.l{text-align:left}' +
-    'td.b{background:#e8f5e9;font-weight:700}td.t{background:#fff8e1;font-weight:700}td.g{background:#fde7e7;font-weight:700}.neg{color:#b71c1c;font-weight:700}' +
+    '.dn{display:block;font-size:' + (fs - 1) + 'px;color:#b26a00;font-weight:700}td.b{background:#e8f5e9;font-weight:700}td.t{background:#fff8e1;font-weight:700}td.g{background:#fde7e7;font-weight:700}.neg{color:#b71c1c;font-weight:700}' +
     'tr{page-break-inside:avoid}thead{display:table-header-group}</style></head><body>' +
     docEncabezado('Inventario general de materiales', $('panCat').value || '') +
-    '<div class="s">Bodega general + ' + movs.length + ' móviles activas con material · ' + mats.length + ' materiales · Generado: ' + esc(ahora) + '</div>' +
+    '<div class="s">Bodega general + ' + movs.length + ' móviles activas con material · ' + mats.length + ' materiales' + (det && totDan ? ' · <b>' + fmtN(totDan) + ' dañados</b> en bodega (cuentan en el inventario, no están disponibles)' : '') + ' · Generado: ' + esc(ahora) + '</div>' +
     '<table><thead>' + head + '</thead><tbody>' + rows + '</tbody></table></body></html>';
 }
 
@@ -11329,6 +11333,8 @@ function abrirMov(tipo, idMovil, lineas, borrador, ctx) {
     if (mvAlisto.obs) $('mvObs').value = mvAlisto.obs;
   } else { $('mvGuardar').textContent = '💾 Guardar'; }
   $('mvLineas').innerHTML = '';
+  if ($('mvMotivo')) $('mvMotivo').value = '';
+  mvDanVis();
   (lineas && lineas.length ? lineas : [{}]).forEach(l => mvAgregarLinea(l.clave, l.cantidad, l.danados));
   $('modalMov').classList.add('show');
 }
@@ -11399,11 +11405,11 @@ function mvClave(txt) {
 }
 
 function mvGridCols(d) {
-  const dan = mvTipo === 'DEV_MOVIL' && !mvBorrador;
+  const dan = mvTipo === 'DEV_MOVIL' && !mvBorrador && !($('mvMotivo') && $('mvMotivo').value);
   d.style.gridTemplateColumns = mvBorrador ? '28px 1fr 170px 110px 170px 36px' : (dan ? '28px 1fr 120px 130px 36px' : '28px 1fr 120px 36px');
   const i = d.querySelector('.mvDan'); if (i) i.style.display = dan ? '' : 'none';
 }
-function mvDanVis() { document.querySelectorAll('#mvLineas .mvLinea').forEach(mvGridCols); const t = $('mvNotaAj'); if (t && mvTipo === 'DEV_MOVIL') t.textContent = '— en «De ellos dañados» anota cuántos vienen dañados o defectuosos: entran a la bodega como «para devolución» (no disponibles)'; }
+function mvDanVis() { const cm = $('mvCampoMotivo'); if (cm) cm.style.display = mvTipo === 'DEV_MOVIL' && !mvBorrador ? '' : 'none'; document.querySelectorAll('#mvLineas .mvLinea').forEach(mvGridCols); const t = $('mvNotaAj'); if (t && mvTipo === 'DEV_MOVIL') t.textContent = '— en «De ellos dañados» anota cuántos vienen dañados o defectuosos: entran a la bodega como «para devolución» (no disponibles)'; }
 function mvAgregarLinea(clave, cantidad, danados) {
   if (!$('mvDL')) { const dl = document.createElement('datalist'); dl.id = 'mvDL'; document.body.appendChild(dl); }
   $('mvDL').innerHTML = bodMats(false).map(m => '<option value="' + esc(mvEtiqMat(m)) + '"></option>').join('');
@@ -11734,7 +11740,7 @@ async function guardarMov() {
   btn.disabled = true;
   try {
     const todas = Array.from(document.querySelectorAll('#mvLineas .mvLinea')).map(d => ({
-      texto: d.querySelector('.mvMat').value.trim(), clave: mvClave(d.querySelector('.mvMat').value), cantidad: d.querySelector('.mvCant').value, danados: mvTipo === 'DEV_MOVIL' ? d.querySelector('.mvDan').value : ''
+      texto: d.querySelector('.mvMat').value.trim(), clave: mvClave(d.querySelector('.mvMat').value), cantidad: d.querySelector('.mvCant').value, danados: mvTipo === 'DEV_MOVIL' ? ($('mvMotivo').value ? d.querySelector('.mvCant').value : d.querySelector('.mvDan').value) : ''
     }));
     const sinReconocer = todas.filter(l => l.texto && !l.clave);
     if (sinReconocer.length) { toast('No reconozco el material «' + sinReconocer[0].texto + '». Elígelo de la lista.'); btn.disabled = false; return; }
@@ -11770,7 +11776,7 @@ async function guardarMov() {
     }
     const rg = await api('guardarMovimientoInvWeb', {
       grupo: mvEditGrupo, tipo: tipoReal, fecha: $('mvFecha').value, idMovil: $('mvMovil').value, idMovilDestino: $('mvMovilDestino').value,
-      referencia: $('mvRef').value, obs: $('mvObs').value, lineas: lineas, concepto: MV_CONC[mvTipo] ? $('mvConcepto').value : ''
+      referencia: $('mvRef').value, obs: (mvTipo === 'DEV_MOVIL' && $('mvMotivo').value ? ($('mvMotivo').value === 'EQUIPO' ? 'Equipo dañado' : 'Material dañado') + ($('mvObs').value ? ' · ' : '') : '') + $('mvObs').value, lineas: lineas, concepto: MV_CONC[mvTipo] ? $('mvConcepto').value : ''
     });
     const wasEdit = !!mvEditGrupo;
     const idDestinoSel = $('mvMovilDestino').value, idMovilSel = $('mvMovil').value;
@@ -15006,6 +15012,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 107 · 16-oct 09:46</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 108 · 16-oct 09:59</div>
 </body>
 </html>
