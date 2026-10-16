@@ -1009,7 +1009,6 @@
         <div class="subtabs">
           <button id="stBodRes" class="active" onclick="bodSubtab('res')">🏠 General</button>
           <button id="stBodIng" onclick="bodSubtab('ing')">📦 Bodega principal</button>
-          <button id="stBodDan" onclick="bodSubtab('dan')">↩️ Para devolución</button>
           <button id="stBodAbas" onclick="bodSubtab('abas')">🚐 Abastecimiento de móviles</button>
           <button id="stBodAli" onclick="bodSubtab('ali')">📋 Alistos</button>
           <button id="stBodMoviles" onclick="bodSubtab('moviles')">🚐 Stock de móviles</button>
@@ -1109,17 +1108,19 @@
               <option value="PEND">Pendientes (borrador + alistado)</option><option value="BORRADOR">📝 Borrador</option><option value="ALISTADO">📦 Alistado (listo en físico)</option>
               <option value="APLICADO">✅ Aplicados</option><option value="">Todos</option></select></div>
             <div class="field" style="min-width:170px"><label>Móvil</label><select id="aliMovil" onchange="renderAlistos()"></select></div>
+            <div class="field" style="min-width:170px"><label>Tipo</label><select id="aliTipo" onchange="renderAlistos()"><option value="">Todos</option><option value="ENTREGA">🚚 Entregas a móvil</option><option value="DEVOLUCION">↩️ Devoluciones a proveedor</option></select></div>
             <button class="btn secondary" onclick="cargarAlistos()">↻ Actualizar</button>
           </div>
           <div class="toolbar aliEd">
             <button class="btn primary" onclick="abrirMov('ENTREGA', '', [], true, { modo: 'nuevo' })">➕ Nuevo alisto</button>
+            <button class="btn secondary" onclick="aliDevForm('nuevo')">↩️ Nueva devolución a proveedor</button>
             <button class="btn secondary" onclick="aliGenerarFaltantes()">📝 Generar borradores de todas las móviles con faltantes</button>
             <button class="btn secondary" onclick="aliImprimir()">🖨️ Imprimir hojas de alisto (pendientes)</button>
           </div>
           <div id="aliCards" class="cards segCards"></div>
           <div class="panel">
             <div class="panelHead"><div><h2>Alistos de material</h2>
-              <div style="font-size:12px;color:#777;margin-top:3px">Flujo: <b>📝 Borrador</b> → se prepara el material en bodega → <b>📦 Alistado</b> → cuando llega la móvil por él se pulsa <b>Aplicar entrega</b> y queda registrado en Abastecimiento y en el stock de la móvil.</div></div></div>
+              <div style="font-size:12px;color:#777;margin-top:3px">Devoluciones a proveedor (material dañado): <b>↩️ Devolución</b> → <b>📦 Alistado</b> → <b>✅ Aplicado</b> con el número de boleta (solo ahí sale del inventario; mientras tanto se ve como «200 (16 dañados)» en Bodega general y no se puede entregar). Entregas a móvil — flujo: <b>📝 Borrador</b> → se prepara el material en bodega → <b>📦 Alistado</b> → cuando llega la móvil por él se pulsa <b>Aplicar entrega</b> y queda registrado en Abastecimiento y en el stock de la móvil.</div></div></div>
             <div id="aliTabla" class="tableWrap"></div>
           </div>
         </div>
@@ -1228,21 +1229,6 @@
         <div id="bodPanelHis" style="display:none">
           <div class="toolbar" style="flex-wrap:wrap"><label>Desde <input type="date" id="bhDesde"></label><label>Hasta <input type="date" id="bhHasta"></label><input id="bhQ" placeholder="Buscar usuario, acción o detalle" style="min-width:240px" onkeydown="if(event.key==='Enter')cargarHistBodega()"><button class="btn secondary" onclick="cargarHistBodega()">Buscar</button><button class="btn secondary" onclick="exportarHistBodega()">⬇ Excel</button></div>
           <div class="panel"><div class="panelHead"><h2>🕘 Historial de cambios de bodega</h2><span id="bhTotal"></span></div><div id="bodHisLista" class="hist"></div></div>
-        </div>
-        <!-- Material dañado o defectuoso de la bodega general -->
-        <div id="bodPanelDan" style="display:none">
-          <div class="toolbar">
-            <div class="field" style="min-width:240px"><label>Buscar material</label><input id="danQ" placeholder="Nombre o código" oninput="renderDanados()"></div>
-            <label style="display:flex;align-items:center;gap:6px;font-size:14px;cursor:pointer"><input type="checkbox" id="danSolo" onchange="renderDanados()"> Solo para devolución</label>
-            <button class="btn secondary" onclick="cargarDanados()">↻ Actualizar</button>
-          </div>
-          <div id="danCards" class="cards segCards"></div>
-          <div class="panel">
-            <div class="panelHead"><div><h2>Material para devolución · bodega general</h2>
-              <div style="font-size:12px;color:#777;margin-top:3px">Lo marcado para devolución (dañado o defectuoso) sigue contando en el inventario pero no se puede entregar: <b>Disponible = Existencia − Para devolución</b>. «Quitar de devolución» lo regresa a disponible; «Devolver al proveedor» registra la devolución a proveedor y lo saca del inventario.</div></div></div>
-            <div id="danTabla" class="tableWrap"></div>
-          </div>
-          <div class="panel"><div class="panelHead"><h2>Historial de devoluciones</h2></div><div id="danHist" class="tableWrap"></div></div>
         </div>
 
         <div id="bodPanelCat" style="display:none">
@@ -10667,65 +10653,15 @@ async function devExportar() {
   await xlsxMarca(wb, 'Devoluciones_de_cambio_' + hoyISO() + '.xlsx', 'Devoluciones de cambio');
 }
 
-/* ---------- Material dañado o defectuoso (bodega general) ---------- */
-let danDatos = { danados: {}, historial: [] };
-async function cargarDanados() {
-  $('danTabla').innerHTML = '<div class="loading">Cargando...</div>';
-  try { await cargarBodega(); danDatos = await api('obtenerDanadosInvWeb'); renderDanados(); } catch (e) { $('danTabla').innerHTML = ''; mostrarError(e, 'No se pudo cargar el material para devolución.'); }
-}
-function renderDanados() {
-  if (!bodDatos) return;
-  const q = ($('danQ').value || '').toLowerCase().trim(), solo = $('danSolo').checked, adm = esAdmin();
-  const B = c => bodDatos.bodega[c] || {};
-  let L = (bodDatos.materiales || []).filter(m => (B(m.clave).existencia || 0) !== 0 || (B(m.clave).danado || 0) > 0);
-  const totD = L.reduce((a, m) => a + (B(m.clave).danado || 0), 0), nD = L.filter(m => (B(m.clave).danado || 0) > 0).length;
-  L = L.filter(m => (!q || (m.material + ' ' + (m.codigo || '')).toLowerCase().indexOf(q) >= 0) && (!solo || (B(m.clave).danado || 0) > 0));
-  $('danCards').innerHTML = '<div class="card"><div class="n">' + nD + '</div><div class="t">Materiales para devolución</div></div><div class="card"><div class="n" style="color:#b26a00">' + fmtN(totD) + '</div><div class="t">Unidades para devolución (no disponibles)</div></div>';
-  $('danTabla').innerHTML = L.length ? '<table class="table" style="font-size:13px"><thead><tr><th>Código</th><th class="left">Material</th><th>Und.</th><th>Existencia (inventariado)</th><th>Para devolución</th><th>Disponible</th><th></th></tr></thead><tbody>' +
-    L.map(m => { const b = B(m.clave), d = b.danado || 0, ex = b.existencia || 0, di = b.disponible != null ? b.disponible : ex;
-      return '<tr><td>' + esc(codP(m.codigo)) + '</td><td class="left"><b>' + esc(m.material) + '</b></td><td>' + esc(m.unidad) + '</td><td>' + fmtN(ex) + '</td><td style="' + (d ? 'color:#b26a00;font-weight:700' : '') + '">' + (d ? fmtN(d) : '—') + '</td><td style="font-weight:700;' + (di < 0 ? 'color:#b71c1c' : '') + '">' + fmtN(di) + '</td>' +
-        '<td style="white-space:nowrap;text-align:right"><button class="btn secondary" onclick="danModal(\'DANADO\',\'' + escJs(m.clave) + '\')">↩ Marcar para devolución</button>' + (d ? ' <button class="btn secondary" onclick="danModal(\'REPARADO\',\'' + escJs(m.clave) + '\')">✔ Quitar de devolución</button>' + ' <button class="btn secondary" onclick="danModal(\'BAJA\',\'' + escJs(m.clave) + '\')">📤 Devolver al proveedor</button>' : '') + '</td></tr>'; }).join('') + '</tbody></table>'
-    : '<div class="loading">No hay materiales que coincidan.</div>';
-  const nomT = { DANADO: '↩ Marcado para devolución', REPARADO: '✔ Quitado de devolución', BAJA: '📤 Devuelto al proveedor' };
-  const H = danDatos.historial || [];
-  $('danHist').innerHTML = H.length ? '<table class="table" style="font-size:12.5px"><thead><tr><th>Fecha</th><th class="left">Movimiento</th><th class="left">Material</th><th>Cant.</th><th class="left">Motivo</th><th class="left">Usuario</th><th></th></tr></thead><tbody>' +
-    H.map(h => '<tr><td>' + esc(h.fecha) + '</td><td class="left">' + (nomT[h.tipo] || esc(h.tipo)) + '</td><td class="left">' + esc(h.material) + '</td><td>' + fmtN(h.cantidad) + '</td><td class="left">' + esc(h.motivo) + '</td><td class="left">' + esc(h.usuario) + '</td><td>' + (adm && h.tipo !== 'BAJA' ? '<button class="btnMini" title="Eliminar este registro" onclick="danEliminar(\'' + escJs(h.id) + '\')">✕</button>' : '') + '</td></tr>').join('') + '</tbody></table>'
-    : '<div class="loading">Aún no hay registros.</div>';
-}
-let danCtx = null;
-function danModal(tipo, clave) {
-  const m = bodDatos.materiales.find(x => x.clave === clave), b = bodDatos.bodega[clave] || {}, d = b.danado || 0, ex = b.existencia || 0, di = b.disponible != null ? b.disponible : ex;
-  const max = tipo === 'DANADO' ? Math.max(0, di) : d;
-  danCtx = { tipo, clave, max };
-  const tit = { DANADO: 'Marcar para devolución (dañado / defectuoso)', REPARADO: 'Quitar de devolución (vuelve a estar disponible)', BAJA: 'Devolver al proveedor (sale del inventario)' }[tipo];
-  const ph = { DANADO: 'Ej. puerto Ethernet dañado, no enciende…', REPARADO: 'Ej. se repara en bodega / era falsa alarma…', BAJA: 'Ej. garantía, se envía al proveedor…' }[tipo];
-  devModal('<h3>' + tit + '</h3><div style="font-size:13px;margin-bottom:8px"><b>' + esc(m.material) + '</b><br>Existencia ' + fmtN(ex) + ' · Para devolución ' + fmtN(d) + ' · Disponible ' + fmtN(di) + '</div>' +
-    '<div style="display:grid;gap:8px"><label>Cantidad (máx. ' + fmtN(max) + ')<input id="danCant" type="number" min="0" step="any" max="' + max + '"></label><label>Fecha<input id="danFecha" type="date" value="' + hoyISO() + '"></label>' + (tipo === 'BAJA' ? '<label>N.º de documento de la devolución<input id="danDoc" maxlength="60" placeholder="Guía / nota de devolución"></label>' : '') + '<label>Motivo / descripción del daño o defecto<textarea id="danMot" rows="3" maxlength="200" placeholder="' + ph + '"></textarea></label></div>' +
-    (tipo === 'BAJA' ? '<div style="font-size:12px;color:#9b1c1c;margin-top:6px">Se crea un documento de devolución a proveedor en Bodega principal y baja la existencia.</div>' : '') +
-    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn primary" onclick="danGuardar()">Guardar</button><button class="btn secondary" onclick="devCerrar()">Cancelar</button></div>');
-}
-async function danGuardar() {
-  const c = danCtx; if (!c) return;
-  try {
-    await api('registrarDanadoInvWeb', { tipo: c.tipo, fecha: $('danFecha').value, motivo: $('danMot').value, referencia: c.tipo === 'BAJA' ? $('danDoc').value : '', lineas: [{ clave: c.clave, cantidad: $('danCant').value }] });
-    devCerrar(); toast(c.tipo === 'DANADO' ? 'Marcado para devolución: ya no cuenta como disponible.' : (c.tipo === 'REPARADO' ? 'Quitado de devolución: vuelve a estar disponible.' : 'Devolución al proveedor registrada.'), 4000); await cargarDanados();
-  } catch (e) { mostrarError(e, 'No se pudo guardar.'); }
-}
-async function danEliminar(id) {
-  if (!confirm('¿Eliminar este registro? El material vuelve al estado anterior.')) return;
-  try { await api('eliminarDanadoInvWeb', id); await cargarDanados(); toast('Registro eliminado.'); } catch (e) { mostrarError(e, 'No se pudo eliminar.'); }
-}
-
 function bodSubtab(s) {
   bodSub = s;
-  const m = { res: 'Res', moviles: 'Moviles', dan: 'Dan', ing: 'Ing', abas: 'Abas', ali: 'Ali', cons: 'Cons', inv: 'Inv', dev: 'Dev', his: 'His', cat: 'Cat' };
+  const m = { res: 'Res', moviles: 'Moviles', ing: 'Ing', abas: 'Abas', ali: 'Ali', cons: 'Cons', inv: 'Inv', dev: 'Dev', his: 'His', cat: 'Cat' };
   Object.keys(m).forEach(k => {
     $('bodPanel' + m[k]).style.display = k === s ? 'block' : 'none';
     $('stBod' + m[k]).classList.toggle('active', k === s);
   });
   if (bodSucio && ['res', 'moviles', 'cat', 'cons', 'inv'].indexOf(s) >= 0) cargarBodega();
   if (s === 'ing') cargarIngresos();
-  if (s === 'dan') cargarDanados();
   if (s === 'abas') cargarAbastecimiento();
   if (s === 'ali') cargarAlistos();
   if (s === 'cons') cargarBodCons();
@@ -11017,7 +10953,7 @@ function verDoc(i, ab) {
     (x.concepto ? '<br><b>Tipo de movimiento:</b> ' + esc(x.concepto) : '') + (x.tipo === 'TRASLADO' ? '<br><b>Presta:</b> M' + esc(x.movil) + ' → <b>Recibe:</b> M' + esc(x.movilDestino || '?') : x.movil ? '<br><b>Móvil:</b> M' + esc(x.movil) : '') +
     (x.obs ? '<br><b>Observación:</b> ' + esc(x.obs) : '') + '<br><b>Registró:</b> ' + esc(x.usuario) + ' <span style="color:#888">' + esc(x.creado) + '</span>' + (x.editado ? '<br><b>Última edición:</b> ' + esc(x.editado) : '');
   $('docLineas').innerHTML = '<table class="table" style="font-size:13px"><thead><tr><th>Línea</th><th>Código</th><th class="left">Material</th><th>Und.</th><th>Cantidad</th></tr></thead><tbody>' +
-    x.lineas.map((y, i) => ({ y: y, i: i })).sort((a, b) => (a.y.linea || a.i + 1) - (b.y.linea || b.i + 1)).map(o => { const y = o.y; const m = docFuente.materiales.find(z => z.clave === y.clave) || {}; return '<tr><td><b>' + (y.linea || o.i + 1) + '</b></td><td>' + esc(codP(m.codigo)) + '</td><td class="left"><b>' + esc(y.material) + '</b></td><td>' + esc(m.unidad || '') + '</td><td><b>' + fmtN(y.cantidad) + '</b></td></tr>'; }).join('') +
+    x.lineas.map((y, i) => ({ y: y, i: i })).sort((a, b) => (a.y.linea || a.i + 1) - (b.y.linea || b.i + 1)).map(o => { const y = o.y; const m = docFuente.materiales.find(z => z.clave === y.clave) || {}; return '<tr><td><b>' + (y.linea || o.i + 1) + '</b></td><td>' + esc(codP(m.codigo)) + '</td><td class="left"><b>' + esc(y.material) + '</b></td><td>' + esc(m.unidad || '') + '</td><td><b>' + fmtN(y.cantidad) + '</b>' + (y.danados ? '<div style="font-size:11px;color:#b26a00">⚠ ' + fmtN(y.danados) + ' dañado(s) · para devolución</div>' : '') + '</td></tr>'; }).join('') +
     '</tbody></table>';
   $('docBtnFirmar').style.display = puedeEditar() ? '' : 'none';
   $('docBtnFirmar').textContent = x.firmado ? '✍️ Firmar de nuevo' : '✍️ Firma de recibido';
@@ -11393,7 +11329,7 @@ function abrirMov(tipo, idMovil, lineas, borrador, ctx) {
     if (mvAlisto.obs) $('mvObs').value = mvAlisto.obs;
   } else { $('mvGuardar').textContent = '💾 Guardar'; }
   $('mvLineas').innerHTML = '';
-  (lineas && lineas.length ? lineas : [{}]).forEach(l => mvAgregarLinea(l.clave, l.cantidad));
+  (lineas && lineas.length ? lineas : [{}]).forEach(l => mvAgregarLinea(l.clave, l.cantidad, l.danados));
   $('modalMov').classList.add('show');
 }
 
@@ -11412,6 +11348,7 @@ function mvCambiarTipoMov() {
   mvTipo = t;
   $('mvCampoDestino').style.display = t === 'TRASLADO' ? '' : 'none';
   $('mvNotaAj').textContent = t === 'AJ_MOVIL' ? '— usa números negativos para restar' : '';
+  mvDanVis();
   $('mvEtiquetaRef').textContent = 'N.º de documento / referencia (opcional)';
   mvEtiquetasMovil();
 }
@@ -11461,7 +11398,13 @@ function mvClave(txt) {
   return c.length === 1 ? c[0].clave : '';
 }
 
-function mvAgregarLinea(clave, cantidad) {
+function mvGridCols(d) {
+  const dan = mvTipo === 'DEV_MOVIL' && !mvBorrador;
+  d.style.gridTemplateColumns = mvBorrador ? '28px 1fr 170px 110px 170px 36px' : (dan ? '28px 1fr 120px 130px 36px' : '28px 1fr 120px 36px');
+  const i = d.querySelector('.mvDan'); if (i) i.style.display = dan ? '' : 'none';
+}
+function mvDanVis() { document.querySelectorAll('#mvLineas .mvLinea').forEach(mvGridCols); const t = $('mvNotaAj'); if (t && mvTipo === 'DEV_MOVIL') t.textContent = '— en «De ellos dañados» anota cuántos vienen dañados o defectuosos: entran a la bodega como «para devolución» (no disponibles)'; }
+function mvAgregarLinea(clave, cantidad, danados) {
   if (!$('mvDL')) { const dl = document.createElement('datalist'); dl.id = 'mvDL'; document.body.appendChild(dl); }
   $('mvDL').innerHTML = bodMats(false).map(m => '<option value="' + esc(mvEtiqMat(m)) + '"></option>').join('');
   const d = document.createElement('div');
@@ -11470,9 +11413,12 @@ function mvAgregarLinea(clave, cantidad) {
   d.innerHTML = '<b class="mvNum" style="text-align:center;color:#b71c1c"></b><input class="mvMat" list="mvDL" placeholder="Busca por código o nombre..." autocomplete="off" oninput="mvInfoLinea(this.parentNode)">' +
     (mvBorrador ? '<div class="mvInfo" style="font-size:12px;color:#555"></div>' : '') +
     '<input class="mvCant" type="number" step="any" placeholder="Cantidad" oninput="mvInfoLinea(this.parentNode)">' +
+    '<input class="mvDan" type="number" min="0" step="any" placeholder="De ellos dañados" title="Cuántos de estos vienen dañados o defectuosos: entran a la bodega y se crea una Devolución en Abastecimiento → Alistos (no disponibles hasta aplicarla con boleta)" style="display:none">' +
     (mvBorrador ? '<div class="mvDif" style="font-size:12px"></div>' : '') +
     '<button class="btnMini" type="button" onclick="this.parentNode.remove();mvRenumerar()" title="Quitar">✖</button>';
   $('mvLineas').appendChild(d);
+  mvGridCols(d);
+  if (danados) d.querySelector('.mvDan').value = danados;
   mvRenumerar();
   if (typeof clave === 'string' && clave) { const m = bodDatos.materiales.find(x => x.clave === clave); if (m) d.querySelector('.mvMat').value = mvEtiqMat(m); }
   if (cantidad !== undefined && cantidad !== '') d.querySelector('.mvCant').value = cantidad;
@@ -11516,23 +11462,24 @@ async function cargarAlistos() {
   renderAlistos();
 }
 
-function aliBadge(e) { const b = ALI_EST[e] || [e, '']; return '<span class="segBadge ' + b[1] + '" style="' + (b[1] === 'ok' ? 'background:#dcedc8;color:#2e7d32' : '') + '">' + b[0] + '</span>'; }
+function aliBadge(e, tipo) { const b = (tipo === 'DEVOLUCION' && e === 'BORRADOR') ? ['↩️ Devolución', 't'] : (ALI_EST[e] || [e, '']); return '<span class="segBadge ' + b[1] + '" style="' + (b[1] === 'ok' ? 'background:#dcedc8;color:#2e7d32' : '') + '">' + b[0] + '</span>'; }
 
 function aliFiltrados() {
   if (!aliDatos) return [];
-  const f = $('aliEstado').value, mv = $('aliMovil').value;
-  return aliDatos.alistos.filter(a => (!mv || a.idMovil === mv) && (!f || (f === 'PEND' ? (a.estado === 'BORRADOR' || a.estado === 'ALISTADO') : a.estado === f)));
+  const f = $('aliEstado').value, mv = $('aliMovil').value, tp = $('aliTipo').value;
+  return aliDatos.alistos.filter(a => (!mv || a.idMovil === mv) && (!tp || a.tipo === tp) && (!f || (f === 'PEND' ? (a.estado === 'BORRADOR' || a.estado === 'ALISTADO') : a.estado === f)));
 }
 
 function renderAlistos() {
   if (!aliDatos) return;
   const todos = aliDatos.alistos;
-  const n = e => todos.filter(a => a.estado === e).length;
-  $('aliCards').innerHTML = '<div class="card"><div class="n">' + n('BORRADOR') + '</div><div class="t">📝 Borradores</div></div><div class="card"><div class="n">' + n('ALISTADO') + '</div><div class="t">📦 Alistados (esperando la móvil)</div></div><div class="card"><div class="n">' + n('APLICADO') + '</div><div class="t">✅ Aplicados</div></div>';
+  const n = e => todos.filter(a => a.estado === e && a.tipo !== 'DEVOLUCION').length;
+  const nDev = todos.filter(a => a.tipo === 'DEVOLUCION' && a.estado !== 'APLICADO').length;
+  $('aliCards').innerHTML = '<div class="card"><div class="n">' + nDev + '</div><div class="t">↩️ Devoluciones a proveedor pendientes</div></div><div class="card"><div class="n">' + n('BORRADOR') + '</div><div class="t">📝 Borradores</div></div><div class="card"><div class="n">' + n('ALISTADO') + '</div><div class="t">📦 Alistados (esperando la móvil)</div></div><div class="card"><div class="n">' + n('APLICADO') + '</div><div class="t">✅ Aplicados</div></div>';
   const l = aliFiltrados().sort((a, b) => (a.estado === 'APLICADO') - (b.estado === 'APLICADO') || (Number(a.movil) || 0) - (Number(b.movil) || 0) || a.alisto.localeCompare(b.alisto));
   if (!l.length) { $('aliTabla').innerHTML = '<div class="empty">No hay alistos con ese filtro.</div>'; return; }
   $('aliTabla').innerHTML = '<table class="table" style="min-width:760px"><thead><tr><th>Alisto</th><th>Fecha</th><th>Móvil</th><th>Materiales</th><th>Estado</th><th class="left">Preparó</th><th>Entrega registrada</th></tr></thead><tbody>' +
-    l.map(a => '<tr style="cursor:pointer" title="Ver el detalle" onclick="verAlisto(\'' + escJs(a.alisto) + '\')"><td><b>' + esc(a.alisto) + '</b></td><td>' + esc(fmtFechaSeg(a.fecha)) + '</td><td><b>M' + esc(a.movil) + '</b></td><td>' + a.lineas.length + ' <span style="color:#888">línea' + (a.lineas.length === 1 ? '' : 's') + '</span></td><td>' + aliBadge(a.estado) + '</td>' +
+    l.map(a => '<tr style="cursor:pointer" title="Ver el detalle" onclick="verAlisto(\'' + escJs(a.alisto) + '\')"><td><b>' + esc(a.alisto) + '</b></td><td>' + esc(fmtFechaSeg(a.fecha)) + '</td><td>' + (a.tipo === 'DEVOLUCION' ? '<b>↩️ Proveedor</b>' : '<b>M' + esc(a.movil) + '</b>') + '</td><td>' + a.lineas.length + ' <span style="color:#888">línea' + (a.lineas.length === 1 ? '' : 's') + '</span></td><td>' + aliBadge(a.estado, a.tipo) + '</td>' +
       '<td class="left">' + esc(a.alistado || '—') + '</td><td>' + (a.consecutivoMov ? '<b>' + esc(a.consecutivoMov) + '</b>' : '<span style="color:#bbb">—</span>') + '</td></tr>').join('') + '</tbody></table>';
 }
 
@@ -11543,16 +11490,23 @@ function verAlisto(id) {
   if (!a) return;
   aliActual = a;
   const ed = puedeEditar();
-  $('aliTitulo').textContent = a.alisto + ' · M' + a.movil;
-  $('aliDatos').innerHTML = aliBadge(a.estado) + ' &nbsp; <b>Fecha:</b> ' + esc(fmtFechaSeg(a.fecha)) + (a.obs ? '<br><b>Observación:</b> ' + esc(a.obs) : '') + '<br><b>Creó:</b> ' + esc(a.usuario) + ' <span style="color:#888">' + esc(a.creado) + '</span>' +
-    (a.alistado ? '<br><b>Alistó:</b> ' + esc(a.alistado) : '') + (a.aplicado ? '<br><b>Aplicó:</b> ' + esc(a.aplicado) : '') + (a.consecutivoMov ? '<br><b>Entrega registrada:</b> <b style="color:#b71c1c">' + esc(a.consecutivoMov) + '</b> (en Abastecimiento de móviles)' : '');
+  const dv = a.tipo === 'DEVOLUCION';
+  $('aliTitulo').textContent = a.alisto + (dv ? ' · Devolución a proveedor' : ' · M' + a.movil);
+  $('aliDatos').innerHTML = aliBadge(a.estado, a.tipo) + ' &nbsp; <b>Fecha:</b> ' + esc(fmtFechaSeg(a.fecha)) + (a.obs ? '<br><b>Observación:</b> ' + esc(a.obs) : '') + '<br><b>Creó:</b> ' + esc(a.usuario) + ' <span style="color:#888">' + esc(a.creado) + '</span>' +
+    (a.alistado ? '<br><b>Alistó:</b> ' + esc(a.alistado) : '') + (a.aplicado ? '<br><b>Aplicó:</b> ' + esc(a.aplicado) : '') + (dv ? (a.boletas ? '<br><b>Boleta(s):</b> <b>' + esc(a.boletas) + '</b>' : '') + (a.estado !== 'APLICADO' && a.grupoMov ? '<br><b>Origen:</b> dañados devueltos por una móvil en el documento <b>' + esc(a.consecutivoMov) + '</b>' : '') + (a.estado === 'APLICADO' && a.consecutivoMov ? '<br><b>Salida de inventario:</b> <b style="color:#b71c1c">' + esc(a.consecutivoMov) + '</b> (devolución a proveedor en Bodega principal)' : '') + (a.estado !== 'APLICADO' ? '<br><span style="color:#b26a00">Sigue contando en el inventario pero no está disponible. Sale del stock al aplicarla con la boleta.</span>' : '') : (a.consecutivoMov ? '<br><b>Entrega registrada:</b> <b style="color:#b71c1c">' + esc(a.consecutivoMov) + '</b> (en Abastecimiento de móviles)' : ''));
   $('aliLineas').innerHTML = '<table class="table" style="font-size:13px"><thead><tr><th>Línea</th><th>Código</th><th class="left">Material</th><th>Und.</th><th>Cantidad</th></tr></thead><tbody>' +
     a.lineas.slice().sort((x, y) => x.linea - y.linea).map(y => { const m = aliMatInfo(y.clave); return '<tr><td><b>' + y.linea + '</b></td><td>' + esc(codP(m.codigo)) + '</td><td class="left"><b>' + esc(y.material) + '</b></td><td>' + esc(m.unidad || '') + '</td><td><b>' + fmtN(y.cantidad) + '</b></td></tr>'; }).join('') + '</tbody></table>';
   const b = [];
-  b.push('<button class="btn secondary" onclick="aliImprimir(\'' + escJs(a.alisto) + '\')">🖨️ Hoja de alisto</button>');
-  if (ed && a.estado === 'BORRADOR') b.push('<button class="btn secondary" onclick="aliEditar()">✏️ Editar</button><button class="btn secondary" onclick="aliAccion(\'ALISTAR\')">📦 Marcar alistado</button>');
-  if (ed && a.estado === 'ALISTADO') b.push('<button class="btn secondary" onclick="aliAccion(\'REABRIR\')">↩️ Volver a borrador</button>');
-  if (ed && a.estado !== 'APLICADO') b.push('<button class="btn primary" onclick="aliAplicar()">🚚 Aplicar entrega (llegó la móvil)</button><button class="btn secondary" onclick="aliAccion(\'ANULAR\')">🗑️ Anular</button>');
+  if (dv) {
+    if (ed && a.estado === 'BORRADOR') { if (!a.grupoMov) b.push('<button class="btn secondary" onclick="aliDevForm(\'editar\')">✏️ Editar</button>'); b.push('<button class="btn secondary" onclick="aliAccion(\'ALISTAR\')">📦 Pasar a Alistado</button>'); }
+    if (ed && a.estado === 'ALISTADO') { b.push('<button class="btn secondary" onclick="aliAccion(\'REABRIR\')">↩️ Volver a Devolución</button>'); b.push('<button class="btn primary" onclick="aliDevAplicar()">✅ Aplicar (boletas)</button>'); }
+    if (ed && a.estado !== 'APLICADO') b.push('<button class="btn secondary" onclick="aliAccion(\'ANULAR\')">🗑️ Anular</button>');
+  } else {
+    b.push('<button class="btn secondary" onclick="aliImprimir(\'' + escJs(a.alisto) + '\')">🖨️ Hoja de alisto</button>');
+    if (ed && a.estado === 'BORRADOR') b.push('<button class="btn secondary" onclick="aliEditar()">✏️ Editar</button><button class="btn secondary" onclick="aliAccion(\'ALISTAR\')">📦 Marcar alistado</button>');
+    if (ed && a.estado === 'ALISTADO') b.push('<button class="btn secondary" onclick="aliAccion(\'REABRIR\')">↩️ Volver a borrador</button>');
+    if (ed && a.estado !== 'APLICADO') b.push('<button class="btn primary" onclick="aliAplicar()">🚚 Aplicar entrega (llegó la móvil)</button><button class="btn secondary" onclick="aliAccion(\'ANULAR\')">🗑️ Anular</button>');
+  }
   b.push('<button class="btn secondary" onclick="$(\'modalAli\').classList.remove(\'show\')">Cerrar</button>');
   $('aliAcciones').innerHTML = b.join('');
   $('modalAli').classList.add('show');
@@ -11561,12 +11515,13 @@ function verAlisto(id) {
 async function aliAccion(accion) {
   const a = aliActual;
   if (!a) return;
-  if (accion === 'ANULAR' && !confirm('¿Anular el alisto ' + a.alisto + '? Se elimina y no afecta el stock.')) return;
+  if (accion === 'ANULAR' && !confirm('¿Anular ' + (a.tipo === 'DEVOLUCION' ? 'la devolución ' : 'el alisto ') + a.alisto + '? Se elimina' + (a.tipo === 'DEVOLUCION' ? ' y esos equipos vuelven a estar disponibles.' : ' y no afecta el stock.'))) return;
   try {
     await api('cambiarEstadoAlistoWeb', a.alisto, accion);
     $('modalAli').classList.remove('show');
-    toast(accion === 'ANULAR' ? 'Alisto anulado.' : accion === 'ALISTAR' ? a.alisto + ' marcado como alistado.' : a.alisto + ' volvió a borrador.');
+    toast(accion === 'ANULAR' ? 'Alisto anulado.' : accion === 'ALISTAR' ? a.alisto + ' marcado como alistado.' : a.alisto + (a.tipo === 'DEVOLUCION' ? ' volvió a Devolución.' : ' volvió a borrador.'));
     await cargarAlistos();
+    bodSucio = true;
   } catch (e) { mostrarError(e, 'No se pudo cambiar el alisto.'); }
 }
 
@@ -11577,6 +11532,69 @@ function aliAbrirForm(modo) {
 }
 function aliEditar() { aliAbrirForm('editar'); }
 function aliAplicar() { aliAbrirForm('aplicar'); }
+
+/* ---------- Devoluciones a proveedor (material dañado) dentro de Alistos ---------- */
+let aliDevCtx = null;
+async function aliDevForm(modo) {
+  if (!bodDatos) { try { await cargarBodega(); } catch (e) { return; } }
+  if (!aliDatos) { try { aliDatos = await api('obtenerAlistosWeb'); } catch (e) { mostrarError(e, 'No se pudieron cargar los alistos.'); return; } }
+  const a = modo === 'editar' ? aliActual : null;
+  $('modalAli').classList.remove('show');
+  aliDevCtx = { modo: modo, id: a ? a.alisto : '' };
+  devModal('<h3>' + (a ? 'Editar devolución ' + esc(a.alisto) : '↩️ Nueva devolución a proveedor') + '</h3>' +
+    '<div style="font-size:12.5px;color:#666;margin-bottom:8px">Material dañado o defectuoso que se va a devolver. Sigue contando en el inventario (se verá como «N (M dañados)») pero no se puede entregar, hasta que se aplique con la boleta.</div>' +
+    '<div style="display:grid;grid-template-columns:150px 1fr;gap:8px;margin-bottom:8px"><label>Fecha<input id="adFecha" type="date" value="' + esc(a ? a.fecha : hoyISO()) + '"></label><label>Motivo / observación<input id="adObs" value="' + esc(a ? a.obs : '') + '" placeholder="Ej. puerto Ethernet dañado, no enciende…"></label></div>' +
+    '<div id="adLineas"></div><button class="btn secondary" type="button" onclick="aliDevLinea()">➕ Agregar material</button>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn primary" id="adGuardar" onclick="aliDevGuardar()">Guardar</button><button class="btn secondary" onclick="devCerrar()">Cancelar</button></div>');
+  if (!$('mvDL')) { const dl = document.createElement('datalist'); dl.id = 'mvDL'; document.body.appendChild(dl); }
+  $('mvDL').innerHTML = bodMats(false).map(m => '<option value="' + esc(mvEtiqMat(m)) + '"></option>').join('');
+  if (a) a.lineas.slice().sort((x, y) => x.linea - y.linea).forEach(l => aliDevLinea(l.clave, l.cantidad)); else aliDevLinea();
+}
+function aliDevLinea(clave, cant) {
+  const d = document.createElement('div');
+  d.className = 'adLinea';
+  d.style.cssText = 'display:grid;grid-template-columns:1fr 110px 34px;gap:8px;margin-bottom:6px;align-items:center';
+  d.innerHTML = '<input class="adMat" list="mvDL" placeholder="Busca por código o nombre..." autocomplete="off"><input class="adCant" type="number" min="0" step="any" placeholder="Cantidad"><button class="btnMini" type="button" onclick="this.parentNode.remove()" title="Quitar">✖</button>';
+  $('adLineas').appendChild(d);
+  if (clave) { const m = bodDatos.materiales.find(x => x.clave === clave); if (m) d.querySelector('.adMat').value = mvEtiqMat(m); }
+  if (cant !== undefined && cant !== '') d.querySelector('.adCant').value = cant;
+}
+async function aliDevGuardar() {
+  const c = aliDevCtx; if (!c) return;
+  const todas = Array.from(document.querySelectorAll('#adLineas .adLinea')).map(d => ({ texto: d.querySelector('.adMat').value.trim(), clave: mvClave(d.querySelector('.adMat').value), cantidad: d.querySelector('.adCant').value }));
+  const sin = todas.filter(l => l.texto && !l.clave);
+  if (sin.length) { toast('No reconozco el material «' + sin[0].texto + '». Elígelo de la lista.'); return; }
+  const lineas = todas.filter(l => l.clave && Number(l.cantidad) > 0).map(l => ({ clave: l.clave, cantidad: l.cantidad }));
+  if (!lineas.length) { toast('Agrega al menos un material con cantidad.'); return; }
+  const btn = $('adGuardar'); btn.disabled = true;
+  try {
+    const r = await api('guardarAlistosWeb', [{ tipo: 'DEVOLUCION', alisto: c.modo === 'editar' ? c.id : '', fecha: $('adFecha').value, obs: $('adObs').value, lineas: lineas }]);
+    devCerrar(); bodSucio = true;
+    toast('Devolución ' + r.alistos[0] + ' guardada: esos equipos ya no cuentan como disponibles.');
+    await cargarAlistos();
+  } catch (e) { mostrarError(e, 'No se pudo guardar la devolución.'); btn.disabled = false; }
+}
+function aliDevAplicar() {
+  const a = aliActual; if (!a) return;
+  $('modalAli').classList.remove('show');
+  devModal('<h3>✅ Aplicar devolución ' + esc(a.alisto) + '</h3>' +
+    '<div style="font-size:13px;margin-bottom:8px">' + a.lineas.map(l => esc(l.material) + ' ×<b>' + fmtN(l.cantidad) + '</b>').join('<br>') + '</div>' +
+    '<div style="font-size:12.5px;color:#9b1c1c;margin-bottom:8px">Al aplicar, este material <b>sale del inventario</b> (se crea el documento de devolución a proveedor).</div>' +
+    '<div style="display:grid;grid-template-columns:150px 1fr;gap:8px"><label>Fecha<input id="aaFecha" type="date" value="' + hoyISO() + '"></label><label>Número(s) de boleta<input id="aaBol" placeholder="Ej. 4521, 4522" autocomplete="off"></label></div>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn primary" id="aaGuardar" onclick="aliDevAplicarOk()">Aplicar y restar del stock</button><button class="btn secondary" onclick="devCerrar()">Cancelar</button></div>');
+}
+async function aliDevAplicarOk() {
+  const a = aliActual; if (!a) return;
+  const bol = $('aaBol').value.trim();
+  if (!bol) { toast('Escribe el número (o los números) de boleta.'); return; }
+  const btn = $('aaGuardar'); btn.disabled = true;
+  try {
+    const r = await api('aplicarDevolucionAlistoWeb', a.alisto, $('aaFecha').value, bol);
+    devCerrar(); bodSucio = true;
+    toast(a.alisto + ' aplicada con boleta(s) ' + bol + ': ya se restó del stock (' + r.consecutivo + ').' + (r.negativos && r.negativos.length ? ' ⚠️ La bodega quedó en negativo en: ' + r.negativos.join(', ') + '.' : ''));
+    await cargarAlistos();
+  } catch (e) { mostrarError(e, 'No se pudo aplicar la devolución.'); btn.disabled = false; await cargarAlistos().catch(() => {}); }
+}
 
 function mvLeerLineasForm() {
   const todas = Array.from(document.querySelectorAll('#mvLineas .mvLinea')).map(d => ({ texto: d.querySelector('.mvMat').value.trim(), clave: mvClave(d.querySelector('.mvMat').value), cantidad: d.querySelector('.mvCant').value }));
@@ -11658,7 +11676,7 @@ async function aliGenerarFaltantes() {
 /* Hoja para preparar el material en bodega: una página por alisto, con casilla para marcar cada línea */
 function aliImprimir(id) {
   if (!aliDatos) return;
-  const l = id ? aliDatos.alistos.filter(a => a.alisto === id) : aliDatos.alistos.filter(a => a.estado === 'BORRADOR' || a.estado === 'ALISTADO').sort((a, b) => (Number(a.movil) || 0) - (Number(b.movil) || 0));
+  const l = id ? aliDatos.alistos.filter(a => a.alisto === id) : aliDatos.alistos.filter(a => a.tipo !== 'DEVOLUCION' && (a.estado === 'BORRADOR' || a.estado === 'ALISTADO')).sort((a, b) => (Number(a.movil) || 0) - (Number(b.movil) || 0));
   if (!l.length) { toast('No hay alistos pendientes para imprimir.'); return; }
   const mov = m => (bodDatos && bodDatos.moviles.find(x => x.idMovil === m) || {}).tecnico || '';
   const html = '<!doctype html><html><head><meta charset="utf-8"><title>Hojas de alisto</title><style>' + DOC_CSS + 'body{font-family:Arial,sans-serif;font-size:12px;margin:0}.p{padding:24px;page-break-after:always}h1{font-size:17px;margin:0 0 4px}table{border-collapse:collapse;width:100%;margin-top:10px}th{background:#b71c1c;color:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}th,td{border:1px solid #999;padding:6px 7px;text-align:center}td.l{text-align:left}.f{margin-top:30px;display:flex;gap:40px}.f div{flex:1;border-top:1px solid #111;padding-top:4px}  </style></head><body>' +
@@ -11685,7 +11703,7 @@ function editarDoc() {
   const x = docActual;
   if (!x || !x.lineas) return;
   $('modalDoc').classList.remove('show');
-  const lineas = x.lineas.map((y, i) => ({ y: y, i: i })).sort((a, b) => (a.y.linea || a.i + 1) - (b.y.linea || b.i + 1)).map(o => ({ clave: o.y.clave, cantidad: o.y.cantidad }));
+  const lineas = x.lineas.map((y, i) => ({ y: y, i: i })).sort((a, b) => (a.y.linea || a.i + 1) - (b.y.linea || b.i + 1)).map(o => ({ clave: o.y.clave, cantidad: o.y.cantidad, danados: o.y.danados || 0 }));
   const tipoForm = x.tipo === 'DEV_PROV' ? 'INGRESO' : x.tipo;
   abrirMov(tipoForm, x.idMovil, lineas);
   mvEditGrupo = x.grupo;
@@ -11716,7 +11734,7 @@ async function guardarMov() {
   btn.disabled = true;
   try {
     const todas = Array.from(document.querySelectorAll('#mvLineas .mvLinea')).map(d => ({
-      texto: d.querySelector('.mvMat').value.trim(), clave: mvClave(d.querySelector('.mvMat').value), cantidad: d.querySelector('.mvCant').value
+      texto: d.querySelector('.mvMat').value.trim(), clave: mvClave(d.querySelector('.mvMat').value), cantidad: d.querySelector('.mvCant').value, danados: mvTipo === 'DEV_MOVIL' ? d.querySelector('.mvDan').value : ''
     }));
     const sinReconocer = todas.filter(l => l.texto && !l.clave);
     if (sinReconocer.length) { toast('No reconozco el material «' + sinReconocer[0].texto + '». Elígelo de la lista.'); btn.disabled = false; return; }
@@ -11743,6 +11761,7 @@ async function guardarMov() {
       if (mvTipo !== 'AJ_MOVIL' && lineas.some(l => !(Number(l.cantidad) > 0))) falta.push('cantidades mayores que cero');
       if (falta.length) { toast('Falta: ' + falta.join(', ') + '.'); btn.disabled = false; return; }
     }
+    if (mvTipo === 'DEV_MOVIL' && lineas.some(l => Number(l.danados) > Number(l.cantidad))) { toast('Los dañados no pueden ser más que la cantidad devuelta.'); btn.disabled = false; return; }
     const tipoReal = mvTipo === 'INGRESO' && $('mvConcepto').value === 'Devolución a proveedor' ? 'DEV_PROV' : mvTipo;
     if (mvTipo === 'TRASLADO' && $('mvMovil').value) {
       const st = bodDatos.stockMovil[$('mvMovil').value] || {};
@@ -12255,7 +12274,7 @@ function renderBodPanorama() {
     t.movs.map(m => '<th title="' + esc(m.tecnico) + '">M' + esc(m.movil) + '</th>').join('') +
     (t.hayOtros ? '<th title="' + esc(t.otrosTxt) + '">Otras / inactivas ⓘ</th>' : '') + '<th>🚐 Total móviles</th><th>TOTAL GENERAL</th></tr></thead><tbody>' +
     t.filas.map(f => '<tr style="cursor:pointer" title="Ver el historial de este material" onclick="verKardex(\'' + escJs(f.m.clave) + '\')"><td>' + esc(codP(f.m.codigo)) + '</td><td class="left"><b>' + esc(f.m.material) + '</b></td><td>' + esc(f.m.unidad) + '</td>' +
-      ((alertSet[f.m.clave] ? '<td style="background:#fde8e8;color:#b71c1c;font-weight:700" title="Bodega al 20% o menos">⚠ ' + fmtN(f.bod) + '</td>' : n(f.bod)).replace(/<\/td>$/, (f.dan ? '<div style="font-size:10.5px;color:#b26a00;font-weight:600" title="Para devolución: cuenta en el inventario pero no se puede entregar">⚠ ' + fmtN(f.dan) + ' p/ devol.</div>' : '') + '</td>')) +
+      ((alertSet[f.m.clave] ? '<td style="background:#fde8e8;color:#b71c1c;font-weight:700" title="Disponible al 20% o menos">⚠ ' + fmtN(Math.round((f.bod + f.dan) * 1000) / 1000) + '</td>' : n(Math.round((f.bod + f.dan) * 1000) / 1000)).replace(/<\/td>$/, (f.dan ? ' <span style="font-size:11px;color:#b26a00;font-weight:600" title="Dañados o defectuosos pendientes de devolver al proveedor: cuentan en el inventario pero no se pueden entregar (disponible: ' + fmtN(f.bod) + ')">(' + fmtN(f.dan) + ' dañados)</span>' : '') + '</td>')) +
       t.movs.map(x => n(t.mov(x.idMovil, f.m.clave))).join('') + (t.hayOtros ? n(f.otros) : '') + n(f.mov) +
       '<td style="font-weight:700;font-size:14px;' + (f.tot < 0 ? 'color:#b71c1c' : '') + '">' + (f.tot === 0 ? '—' : fmtN(f.tot)) + '</td></tr>').join('') + '</tbody></table>';
 }
@@ -14987,6 +15006,6 @@ async function cpCompartir() {
 
 </script>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 105 · 16-oct 09:28</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 107 · 16-oct 09:46</div>
 </body>
 </html>

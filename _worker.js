@@ -5921,7 +5921,7 @@ const INV = {
     OBJ: ['ID_Movil', 'Clave', 'Objetivo'],
     CARGAS: ['Fecha_Hora', 'Archivo', 'Filas', 'OT', 'Fechas', 'Sin_Movil', 'Usuario', 'Nuevas', 'Cambiadas', 'Sin_Cambios', 'Cambios'],
     ALE: ['Clave', 'Usuario', 'Fecha_Hora', 'Disponible'],
-    DAN: ['ID', 'Fecha', 'Tipo', 'Clave', 'Material', 'Cantidad', 'Motivo', 'Usuario', 'Creado'],
+    DAN: ['ID', 'Fecha', 'Tipo', 'Clave', 'Material', 'Cantidad', 'Motivo', 'Usuario', 'Creado', 'Origen'],
     DEVL: ['Linea', 'Periodo', 'Archivo', 'Fecha_Cierre', 'N_Orden', 'Contrato', 'ID_Movil', 'Movil', 'Contrata', 'Averia', 'Tipo', 'Servicio',
       'Equipo', 'Equipo_Original', 'Debe', 'Devuelto', 'Justificado', 'Motivo_Justif', 'Justif_Por', 'Justif_Fecha', 'Boletas', 'Fecha_Devolucion', 'Cambio_Motivo', 'Cargado', 'Usuario', 'Recibido_Por'],
     DEVH: ['Fecha_Hora', 'Usuario', 'Linea', 'Accion', 'Detalle'],
@@ -5930,12 +5930,12 @@ const INV = {
     CORTES: ['Corte', 'Fecha', 'Estado', 'Obs', 'Usuario', 'Creado', 'Cerrado_Por', 'Cerrado', 'Tipo', 'Ubicacion'],
     CONTEO: ['Corte', 'Ubicacion', 'Clave', 'Teorico', 'Fisico', 'Justificada', 'Motivo', 'Justif_Por', 'Justif_Fecha'],
     FIR: ['Grupo', 'Consecutivo', 'Nombre', 'Fecha_Hora', 'Usuario', 'Firma'],
-    ALI: ['Alisto', 'Estado', 'Fecha', 'ID_Movil', 'Movil', 'Clave', 'Material', 'Cantidad', 'Linea', 'Obs', 'Usuario', 'Creado', 'Alistado', 'Aplicado', 'Grupo_Mov', 'Consecutivo_Mov']
+    ALI: ['Alisto', 'Estado', 'Fecha', 'ID_Movil', 'Movil', 'Clave', 'Material', 'Cantidad', 'Linea', 'Obs', 'Usuario', 'Creado', 'Alistado', 'Aplicado', 'Grupo_Mov', 'Consecutivo_Mov', 'Tipo', 'Boletas']
   },
 
   TEXTO: {
     MAT: ['Clave', 'Alias', 'Codigo'],
-    DAN: ['ID', 'Fecha', 'Clave', 'Creado'],
+    DAN: ['ID', 'Fecha', 'Clave', 'Creado', 'Origen'],
     MOV: ['Grupo', 'Fecha', 'Clave', 'ID_Movil', 'Movil', 'Referencia', 'Consecutivo'],
     CON: ['Fecha', 'N_Orden', 'ID_Movil', 'Movil', 'Clave', 'Archivo', 'Carga', 'Contrato'],
     OBJ: ['ID_Movil', 'Clave'],
@@ -5948,7 +5948,7 @@ const INV = {
     CORTES: ['Corte', 'Fecha', 'Cerrado'],
     CONTEO: ['Corte', 'Ubicacion', 'Clave'],
     FIR: ['Grupo', 'Consecutivo', 'Nombre', 'Fecha_Hora'],
-    ALI: ['Alisto', 'Fecha', 'ID_Movil', 'Movil', 'Clave', 'Grupo_Mov', 'Consecutivo_Mov']
+    ALI: ['Alisto', 'Fecha', 'ID_Movil', 'Movil', 'Clave', 'Grupo_Mov', 'Consecutivo_Mov', 'Tipo', 'Boletas']
   },
 
   TIPOS: {
@@ -6183,74 +6183,68 @@ function invSaldos_(movs, cons, hasta) {
   return { bodega: bodega, movil: movil };
 }
 
-/* ---------- Material dañado o defectuoso de la bodega general ----------
-   Sigue contando en el inventario (existencia), pero no está disponible para entregar.
-   Disponible = existencia − para devolución. Tipos: DANADO (se marca para devolución), REPARADO (se quita de devolución, vuelve a estar disponible), BAJA (se devuelve al proveedor: genera una devolución a proveedor y sale del inventario). */
+/* ---------- Devoluciones a proveedor (material dañado o defectuoso de la bodega general) ----------
+   Siguen contando en el inventario (existencia) mientras no se apliquen, pero no están disponibles para entregar.
+   Son alistos de tipo DEVOLUCION: BORRADOR («Devolución») → ALISTADO → APLICADO (con número(s) de boleta; ahí sí salen del inventario). */
 function invDanadosMapa_() {
   const m = {};
-  leerObjetos_(invHoja_('DAN')).forEach(r => { const c = txt_(r.Clave); if (!c) return; const q = invNum_(r.Cantidad); m[c] = (m[c] || 0) + (txt_(r.Tipo) === 'DANADO' ? q : -q); });
-  Object.keys(m).forEach(c => { m[c] = Math.max(0, invRedondear_(m[c])); });
+  leerObjetos_(invHoja_('ALI')).forEach(r => {
+    if (txt_(r.Tipo) !== 'DEVOLUCION' || txt_(r.Estado) === 'APLICADO') return;
+    const c = txt_(r.Clave); if (!c) return;
+    m[c] = invRedondear_((m[c] || 0) + invNum_(r.Cantidad));
+  });
   return m;
 }
-function obtenerDanadosInvWeb(token) {
-  requerirSesion_(token, 'consulta');
-  const mapa = invDanadosMapa_();
-  const hist = leerObjetos_(invHoja_('DAN')).map(r => ({ id: txt_(r.ID), fecha: invFecha_(r.Fecha), tipo: txt_(r.Tipo), clave: txt_(r.Clave), material: txt_(r.Material), cantidad: invNum_(r.Cantidad), motivo: txt_(r.Motivo), usuario: txt_(r.Usuario), creado: txt_(r.Creado) }))
-    .sort((a, b) => (a.creado < b.creado ? 1 : -1)).slice(0, 300);
-  return { danados: mapa, historial: hist };
-}
-function registrarDanadoInvWeb(token, d) {
-  d = d || {};
-  const tipo = txt_(d.tipo);
-  if (['DANADO', 'REPARADO', 'BAJA'].indexOf(tipo) < 0) throw new Error('Tipo no válido.');
-  const ses = requerirSesion_(token, 'operador');
-  const fecha = segFecha_(d.fecha) || segHoyISO_();
-  const motivo = txt_(d.motivo).replace(/\s+/g, ' ').slice(0, 200);
-  if (!motivo) throw new Error('Escribe el motivo de la devolución (falla o defecto).');
-  const docRef = txt_(d.referencia).slice(0, 120);
-  if (tipo === 'BAJA' && !docRef) throw new Error('Escribe el número de documento de la devolución al proveedor.');
-  return conBloqueo_(() => {
-    const porClave = {}; invMateriales_().forEach(m => { porClave[m.clave] = m; });
-    const suma = {};
-    (d.lineas || []).forEach(l => { const c = txt_(l.clave), q = invNum_(l.cantidad); if (!c || !(q > 0)) return; if (!porClave[c]) throw new Error('Material no válido: ' + c); suma[c] = invRedondear_((suma[c] || 0) + q); });
-    const claves = Object.keys(suma);
-    if (!claves.length) throw new Error('Indica el material y la cantidad.');
-    const sal = invSaldos_(leerObjetos_(invHoja_('MOV')), []), dan = invDanadosMapa_();
-    claves.forEach(c => {
-      const exist = (sal.bodega[c] || {}).disponible || 0, dc = dan[c] || 0, nom = porClave[c].material;
-      if (tipo === 'DANADO' && suma[c] > exist - dc + 1e-9) throw new Error(nom + ': solo hay ' + invRedondear_(Math.max(0, exist - dc)) + ' disponible(s) para marcar para devolución.');
-      if (tipo !== 'DANADO' && suma[c] > dc + 1e-9) throw new Error(nom + ': solo hay ' + dc + ' marcado(s) para devolución.');
+/* Una sola vez: lo que estaba marcado en la antigua pestaña «Para devolución» pasa a un alisto de devolución */
+function invMigrarDanados_() {
+  const props = PropertiesService.getScriptProperties();
+  if (props.getProperty('DAN_MIGRADO')) return;
+  conBloqueo_(() => {
+    if (props.getProperty('DAN_MIGRADO')) return;
+    const net = {}, nom = {};
+    leerObjetos_(invHoja_('DAN')).forEach(r => {
+      if (txt_(r.Origen)) return;
+      const c = txt_(r.Clave); if (!c) return;
+      nom[c] = txt_(r.Material);
+      net[c] = (net[c] || 0) + (txt_(r.Tipo) === 'DANADO' ? invNum_(r.Cantidad) : -invNum_(r.Cantidad));
     });
-    const ahora = segAhora_(), filas = claves.map(c => ({ ID: 'D' + Date.now() + '_' + c.slice(0, 12), Fecha: fecha, Tipo: tipo, Clave: c, Material: porClave[c].material, Cantidad: suma[c], Motivo: motivo, Usuario: ses.usuario, Creado: ahora }));
-    invAgregar_(invHoja_('DAN'), 'DAN', filas);
-    let consec = '';
-    if (tipo === 'BAJA') {
-      /* la devolución al proveedor saca el material del inventario: documento de devolución a proveedor */
-      invRepartirConsec_(); consec = invSiguienteConsec_(); const grupo = 'M' + Date.now();
-      invAgregar_(invHoja_('MOV'), 'MOV', claves.map(c => ({ Grupo: grupo, Fecha: fecha, Tipo: 'DEV_PROV', Clave: c, Material: porClave[c].material, Cantidad: suma[c], ID_Movil: '', Movil: '', Referencia: docRef, Obs: motivo, Usuario: ses.usuario, Creado: ahora, Concepto: 'Devolución por material dañado', Consecutivo: consec, Linea: 1, Editado: '' })));
+    leerObjetos_(invHoja_('DAN')).forEach(r => {
+      if (!txt_(r.Origen) || txt_(r.Tipo) !== 'DANADO') return;
+      const c = txt_(r.Clave); nom[c] = txt_(r.Material);
+      net[c] = (net[c] || 0) + invNum_(r.Cantidad);
+    });
+    const claves = Object.keys(net).filter(c => net[c] > 1e-9);
+    if (claves.length) {
+      const sh = invHoja_('ALI');
+      const id = invSiguienteAlisto_(leerObjetos_(sh));
+      const ahora = segAhora_();
+      invAgregar_(sh, 'ALI', claves.map((c, i) => ({ Alisto: id, Estado: 'BORRADOR', Fecha: ahora.slice(0, 10), ID_Movil: '', Movil: '', Clave: c, Material: nom[c], Cantidad: invRedondear_(net[c]), Linea: i + 1,
+        Obs: 'Pasado de «Para devolución»', Usuario: 'Sistema', Creado: ahora, Alistado: '', Aplicado: '', Grupo_Mov: '', Consecutivo_Mov: '', Tipo: 'DEVOLUCION', Boletas: '' })));
     }
-    invLog_(ses, tipo === 'DANADO' ? 'Material marcado para devolución' : (tipo === 'REPARADO' ? 'Material quitado de devolución (ya disponible)' : 'Material devuelto al proveedor'), claves.map(c => porClave[c].material + ' ×' + suma[c]).join(', ') + ' · ' + motivo, consec ? 'MOV ' + consec : 'DAN');
-    return { ok: true, lineas: claves.length, consecutivo: consec };
+    props.setProperty('DAN_MIGRADO', '1');
   });
 }
-function eliminarDanadoInvWeb(token, id) {
-  const ses = requerirSesion_(token, 'admin');
-  return conBloqueo_(() => {
-    const sh = invHoja_('DAN'), t = leerTabla_(sh);
-    for (let i = 1; i < t.values.length; i++) {
-      if (txt_(t.values[i][t.idx.ID]) !== txt_(id)) continue;
-      if (txt_(t.values[i][t.idx.Tipo]) === 'BAJA') throw new Error('Esa devolución ya salió del inventario como documento de devolución a proveedor; corrígela desde Bodega principal.');
-      sh.deleteRow(i + 1);
-      invLog_(ses, 'Registro de devolución pendiente eliminado', txt_(t.values[i][t.idx.Material]) + ' ×' + txt_(t.values[i][t.idx.Cantidad]), 'DAN');
-      return { ok: true };
-    }
-    throw new Error('No se encontró el registro.');
+/* Quita la devolución pendiente que nació de un documento de devolución de móvil (al editarlo o eliminarlo) */
+function invChequeDanadosDoc_(grupo) {
+  if (!txt_(grupo)) return;
+  leerObjetos_(invHoja_('ALI')).forEach(r => {
+    if (txt_(r.Tipo) === 'DEVOLUCION' && txt_(r.Grupo_Mov) === txt_(grupo) && txt_(r.Estado) === 'APLICADO')
+      throw new Error('Los dañados de este documento ya se devolvieron al proveedor (alisto ' + txt_(r.Alisto) + ', boletas ' + txt_(r.Boletas) + '); no se puede editar o eliminar.');
   });
+}
+function invQuitarDanadosDoc_(grupo) {
+  if (!txt_(grupo)) return;
+  const sh = invHoja_('ALI'), t = leerTabla_(sh);
+  for (let i = t.values.length - 1; i >= 1; i--) {
+    const r = t.values[i];
+    if (txt_(r[t.idx.Tipo]) === 'DEVOLUCION' && txt_(r[t.idx.Grupo_Mov]) === txt_(grupo) && txt_(r[t.idx.Estado]) !== 'APLICADO') sh.deleteRow(i + 1);
+  }
 }
 
 function obtenerBodegaWeb(token) {
 
   requerirSesion_(token, 'consulta');
+  invMigrarDanados_();
 
   const mats = invMateriales_();
   const movs = leerObjetos_(invHoja_('MOV'));
@@ -6369,8 +6363,9 @@ function guardarAlistosWeb(token, lista) {
     const nuevas = [], quitar = [], ids = [];
 
     lista.forEach(it => {
-      const idMovil = txt_(it.idMovil);
-      const mv = mm.porId[idMovil];
+      const esDev = txt_(it.tipo) === 'DEVOLUCION';
+      const idMovil = esDev ? '' : txt_(it.idMovil);
+      const mv = esDev ? { Movil: '' } : mm.porId[idMovil];
       if (!mv) throw new Error('Elige la móvil del alisto.');
       const fecha = segFecha_(it.fecha) || ahora.slice(0, 10);
       const sumas = {}, orden = [];
@@ -6381,13 +6376,15 @@ function guardarAlistosWeb(token, lista) {
         if (sumas[c] === undefined) { sumas[c] = 0; orden.push(c); }
         sumas[c] += q;
       });
-      if (!orden.length) throw new Error('El alisto de la M' + txt_(mv.Movil) + ' no tiene materiales con cantidad.');
+      if (!orden.length) throw new Error(esDev ? 'La devolución no tiene materiales con cantidad.' : 'El alisto de la M' + txt_(mv.Movil) + ' no tiene materiales con cantidad.');
 
       let id = txt_(it.alisto), creado = ahora, usuario = ses.usuario;
       if (id) {
         const previas = existentes.filter(r => txt_(r.Alisto) === id);
         if (!previas.length) throw new Error('No se encontró el alisto ' + id + '.');
         if (['APLICADO', 'APLICANDO'].indexOf(txt_(previas[0].Estado)) >= 0) throw new Error('El alisto ' + id + ' ya fue aplicado y no se puede editar.');
+        if ((txt_(previas[0].Tipo) === 'DEVOLUCION') !== esDev) throw new Error('No se puede cambiar el tipo del alisto.');
+        if (esDev && txt_(previas[0].Grupo_Mov)) throw new Error('Esta devolución nació de un documento de devolución de móvil; sus cantidades se cambian editando ese documento.');
         creado = txt_(previas[0].Creado); usuario = txt_(previas[0].Usuario);
         quitar.push(id);
       } else {
@@ -6396,7 +6393,7 @@ function guardarAlistosWeb(token, lista) {
       ids.push(id);
       orden.forEach((c, i) => {
         nuevas.push({ Alisto: id, Estado: 'BORRADOR', Fecha: fecha, ID_Movil: idMovil, Movil: txt_(mv.Movil), Clave: c, Material: porClave[c].material,
-          Cantidad: sumas[c], Linea: i + 1, Obs: txt_(it.obs), Usuario: usuario, Creado: creado, Alistado: '', Aplicado: '', Grupo_Mov: '', Consecutivo_Mov: '' });
+          Cantidad: sumas[c], Linea: i + 1, Obs: txt_(it.obs), Usuario: usuario, Creado: creado, Alistado: '', Aplicado: '', Grupo_Mov: '', Consecutivo_Mov: '', Tipo: esDev ? 'DEVOLUCION' : '', Boletas: '' });
       });
     });
 
@@ -6408,6 +6405,7 @@ function guardarAlistosWeb(token, lista) {
 function obtenerAlistosWeb(token) {
 
   requerirSesion_(token, 'consulta');
+  invMigrarDanados_();
   const filas = leerObjetos_(invHoja_('ALI'));
   const g = {}, orden = [];
   filas.forEach(r => {
@@ -6415,7 +6413,7 @@ function obtenerAlistosWeb(token) {
     if (!id) return;
     if (!g[id]) {
       g[id] = { alisto: id, estado: txt_(r.Estado), fecha: invFecha_(r.Fecha), idMovil: txt_(r.ID_Movil), movil: txt_(r.Movil), obs: txt_(r.Obs), usuario: txt_(r.Usuario),
-        creado: txt_(r.Creado), alistado: txt_(r.Alistado), aplicado: txt_(r.Aplicado), grupoMov: txt_(r.Grupo_Mov), consecutivoMov: txt_(r.Consecutivo_Mov), lineas: [] };
+        creado: txt_(r.Creado), alistado: txt_(r.Alistado), aplicado: txt_(r.Aplicado), grupoMov: txt_(r.Grupo_Mov), consecutivoMov: txt_(r.Consecutivo_Mov), tipo: txt_(r.Tipo) === 'DEVOLUCION' ? 'DEVOLUCION' : 'ENTREGA', boletas: txt_(r.Boletas), lineas: [] };
       orden.push(id);
     }
     g[id].lineas.push({ clave: txt_(r.Clave), material: txt_(r.Material), cantidad: invNum_(r.Cantidad), linea: Number(r.Linea) || 0 });
@@ -6470,6 +6468,7 @@ function aplicarAlistoWeb(token, alisto, fecha, lineasFinales) {
     if (!filas.length) throw new Error('No se encontró el alisto.');
     const est = txt_(t.values[filas[0]][t.idx.Estado]);
     if (['APLICADO', 'APLICANDO'].indexOf(est) >= 0) throw new Error('Este alisto ya fue aplicado.');
+    if (txt_(t.values[filas[0]][t.idx.Tipo]) === 'DEVOLUCION') throw new Error('Una devolución se aplica con el número de boleta.');
     filas.forEach(i => sh.getRange(i + 1, t.idx.Estado + 1).setValue('APLICANDO'));
     const r0 = t.values[filas[0]];
     const lin = filas.map(i => ({ clave: txt_(t.values[i][t.idx.Clave]), cantidad: invNum_(t.values[i][t.idx.Cantidad]), linea: Number(t.values[i][t.idx.Linea]) || 0 }));
@@ -6506,6 +6505,60 @@ function aplicarAlistoWeb(token, alisto, fecha, lineasFinales) {
   return r;
 }
 
+/* Aplica una devolución a proveedor: se anotan las boletas y recién ahí salen del inventario (documento DEV_PROV) */
+function aplicarDevolucionAlistoWeb(token, alisto, fecha, boletas) {
+
+  const ses = requerirSesion_(token, 'operador');
+  alisto = txt_(alisto);
+  boletas = txt_(boletas).replace(/\s+/g, ' ').slice(0, 200);
+  if (!boletas) throw new Error('Escribe el número (o los números) de boleta.');
+
+  const previo = conBloqueo_(() => {
+    const sh = invHoja_('ALI');
+    const t = leerTabla_(sh);
+    const filas = [];
+    t.values.forEach((r, i) => { if (i > 0 && txt_(r[t.idx.Alisto]) === alisto) filas.push(i); });
+    if (!filas.length) throw new Error('No se encontró la devolución.');
+    const r0 = t.values[filas[0]];
+    if (txt_(r0[t.idx.Tipo]) !== 'DEVOLUCION') throw new Error('Este alisto no es una devolución.');
+    const est = txt_(r0[t.idx.Estado]);
+    if (['APLICADO', 'APLICANDO'].indexOf(est) >= 0) throw new Error('Esta devolución ya fue aplicada.');
+    if (est !== 'ALISTADO') throw new Error('Primero pásala a «Alistado» (el material ya está empacado para devolver).');
+    filas.forEach(i => sh.getRange(i + 1, t.idx.Estado + 1).setValue('APLICANDO'));
+    return { estado: est, obs: txt_(r0[t.idx.Obs]), creado: txt_(r0[t.idx.Creado]), usuario: txt_(r0[t.idx.Usuario]), alistado: txt_(r0[t.idx.Alistado]), grupoOrigen: txt_(r0[t.idx.Grupo_Mov]),
+      lineas: filas.map(i => ({ clave: txt_(t.values[i][t.idx.Clave]), cantidad: invNum_(t.values[i][t.idx.Cantidad]) })) };
+  });
+
+  let r;
+  try {
+    r = guardarMovimientoInvWeb(token, { tipo: 'DEV_PROV', fecha: fecha || segAhora_().slice(0, 10), referencia: boletas, concepto: 'Devolución por material dañado', obs: ('Alisto ' + alisto + (previo.obs ? ' · ' + previo.obs : '')).slice(0, 300),
+      lineas: previo.lineas.map((l, i) => ({ clave: l.clave, cantidad: l.cantidad, linea: i + 1 })) });
+  } catch (e) {
+    conBloqueo_(() => {
+      const sh = invHoja_('ALI');
+      const t = leerTabla_(sh);
+      t.values.forEach((row, i) => { if (i > 0 && txt_(row[t.idx.Alisto]) === alisto) sh.getRange(i + 1, t.idx.Estado + 1).setValue(previo.estado); });
+    });
+    throw e;
+  }
+
+  conBloqueo_(() => {
+    const sh = invHoja_('ALI');
+    const t = leerTabla_(sh);
+    const ahora = segAhora_();
+    t.values.forEach((row, i) => {
+      if (i === 0 || txt_(row[t.idx.Alisto]) !== alisto) return;
+      sh.getRange(i + 1, t.idx.Estado + 1).setValue('APLICADO');
+      sh.getRange(i + 1, t.idx.Aplicado + 1).setValue(ses.usuario + ' · ' + ahora);
+      sh.getRange(i + 1, t.idx.Boletas + 1).setValue(boletas);
+      sh.getRange(i + 1, t.idx.Grupo_Mov + 1).setValue(previo.grupoOrigen || r.grupo);
+      sh.getRange(i + 1, t.idx.Consecutivo_Mov + 1).setValue(r.consecutivo);
+    });
+  });
+  invLog_(ses, 'Devolución aplicada', 'Alisto ' + alisto + ' · boletas ' + boletas + ' → movimiento N.º ' + (r && r.consecutivo), alisto);
+  return r;
+}
+
 function obtenerMovimientosInvWeb(token, desde, hasta) {
 
   requerirSesion_(token, 'consulta');
@@ -6522,6 +6575,8 @@ function obtenerMovimientosInvWeb(token, desde, hasta) {
     filasMov = leerObjetos_(shMov);
   }
 
+  const danDoc = {};
+  leerObjetos_(invHoja_('ALI')).forEach(r => { if (txt_(r.Tipo) === 'DEVOLUCION' && txt_(r.Grupo_Mov) && txt_(r.Estado) !== 'XX') danDoc[txt_(r.Grupo_Mov) + '|' + txt_(r.Clave)] = invNum_(r.Cantidad); });
   const grupos = {};
   const orden = [];
   filasMov.forEach(r => {
@@ -6543,7 +6598,7 @@ function obtenerMovimientosInvWeb(token, desde, hasta) {
       orden.push(g);
     }
     if (tr === 'TRAS_SALE' && !grupos[g].idMovil) { grupos[g].idMovil = txt_(r.ID_Movil); grupos[g].movil = txt_(r.Movil); }
-    grupos[g].lineas.push({ clave: txt_(r.Clave), material: txt_(r.Material), cantidad: invNum_(r.Cantidad), linea: Number(r.Linea) || 0 });
+    grupos[g].lineas.push({ clave: txt_(r.Clave), material: txt_(r.Material), cantidad: invNum_(r.Cantidad), linea: Number(r.Linea) || 0, danados: danDoc[g + '|' + txt_(r.Clave)] || 0 });
   });
 
   /* Quién firmó de recibido (sin traer la imagen, que pesa) */
@@ -6595,13 +6650,14 @@ function guardarMovimientoInvWeb(token, d) {
       if (String(destino.ID_Movil) === String(m.ID_Movil)) throw new Error('La móvil que entrega y la que recibe son la misma.');
     }
 
-    const suma = {}, linDe = {};
+    const suma = {}, linDe = {}, danDe = {};
     let nLin = 0;
     (d.lineas || []).forEach(l => {
       const c = txt_(l.clave);
       const q = invNum_(l.cantidad);
       if (!c || !q) return;
       nLin++;
+      if (tipo === 'DEV_MOVIL' && invNum_(l.danados) > 0) danDe[c] = invRedondear_((danDe[c] || 0) + invNum_(l.danados));
       if (!linDe[c]) linDe[c] = Number(l.linea) || nLin;
       if (!porClave[c]) throw new Error('Material no válido: ' + c);
       if (!esAjuste && q < 0) throw new Error('Las cantidades deben ser mayores que cero.');
@@ -6609,6 +6665,7 @@ function guardarMovimientoInvWeb(token, d) {
     });
     const claves = Object.keys(suma);
     if (!claves.length) throw new Error('Agrega al menos un material con cantidad.');
+    Object.keys(danDe).forEach(c => { if (danDe[c] > suma[c] + 1e-9) throw new Error(porClave[c].material + ': los dañados (' + danDe[c] + ') no pueden ser más que lo devuelto (' + suma[c] + ').'); });
 
     /* Documentos de la bodega principal (con concepto): todos los datos son obligatorios */
     if (txt_(d.concepto)) {
@@ -6618,6 +6675,7 @@ function guardarMovimientoInvWeb(token, d) {
     /* Edición (solo admin): el documento conserva su grupo, consecutivo, creador y fecha de registro */
     let original = null;
     if (editando) {
+      invChequeDanadosDoc_(editando);
       original = leerObjetos_(invHoja_('MOV')).filter(r => txt_(r.Grupo) === editando);
       if (!original.length) throw new Error('No se encontró el documento que quieres editar.');
     } else {
@@ -6649,8 +6707,16 @@ function guardarMovimientoInvWeb(token, d) {
       shM.getRange(2, 1, tm.values.length - 1, tm.values[0].length).clearContent();
       if (quedan.length) shM.getRange(2, 1, quedan.length, tm.values[0].length).setValues(quedan);
     }
-    if (editando) invQuitarFirma_(editando);
+    if (editando) { invQuitarFirma_(editando); invQuitarDanadosDoc_(editando); }
     invAgregar_(invHoja_('MOV'), 'MOV', filas);
+    /* lo que la móvil devuelve dañado entra a la bodega pero queda «para devolución» (no disponible) */
+    const clavesDan = Object.keys(danDe).filter(c => danDe[c] > 0);
+    if (clavesDan.length) {
+      const shA = invHoja_('ALI');
+      const idA = invSiguienteAlisto_(leerObjetos_(shA));
+      invAgregar_(shA, 'ALI', clavesDan.map((c, i) => ({ Alisto: idA, Estado: 'BORRADOR', Fecha: fecha, ID_Movil: '', Movil: '', Clave: c, Material: porClave[c].material, Cantidad: danDe[c], Linea: i + 1,
+        Obs: ('Devuelto dañado por la móvil ' + (m ? txt_(m.Movil) : '') + ' · doc ' + consec).slice(0, 200), Usuario: usuarioDoc, Creado: segAhora_(), Alistado: '', Aplicado: '', Grupo_Mov: grupo, Consecutivo_Mov: consec, Tipo: 'DEVOLUCION', Boletas: '' })));
+    }
     /* Se permite que la bodega quede en negativo (p. ej. un préstamo entre contratistas sin registrar); solo se avisa */
     const sal = invSaldos_(leerObjetos_(invHoja_('MOV')), []);
     const dan0 = invDanadosMapa_();
@@ -6726,6 +6792,7 @@ function eliminarMovimientoInvWeb(token, grupo) {
 
   return conBloqueo_(() => {
     const sh = invHoja_('MOV');
+    invChequeDanadosDoc_(grupo);
     const t = leerTabla_(sh);
     let n = 0;
     for (let i = t.values.length - 1; i >= 1; i--) {
@@ -6733,6 +6800,7 @@ function eliminarMovimientoInvWeb(token, grupo) {
     }
     if (!n) throw new Error('No se encontró el movimiento.');
     invQuitarFirma_(grupo);
+    invQuitarDanadosDoc_(grupo);
     invLog_(ses, 'Movimiento eliminado', n + ' línea(s) del grupo ' + grupo, grupo);
     return { ok: true, lineas: n };
   });
@@ -12273,7 +12341,7 @@ function prepararSistemaWeb(token) {
 
   }
 
-return {loginWeb: loginWeb, miPerfilWeb: miPerfilWeb, guardarFotoPerfilWeb: guardarFotoPerfilWeb, validarSesionWeb: validarSesionWeb, logoutWeb: logoutWeb, cambiarClaveWeb: cambiarClaveWeb, listarUsuariosWeb: listarUsuariosWeb, crearUsuarioWeb: crearUsuarioWeb, colaboradoresSinUsuarioWeb: colaboradoresSinUsuarioWeb, crearUsuarioColaboradorWeb: crearUsuarioColaboradorWeb, eliminarUsuarioWeb: eliminarUsuarioWeb, actualizarUsuarioWeb: actualizarUsuarioWeb, obtenerDatosWeb: obtenerDatosWeb, obtenerSemanasWeb: obtenerSemanasWeb, obtenerCalendarioWeb: obtenerCalendarioWeb, obtenerRotacionBackupWeb: obtenerRotacionBackupWeb, guardarCalendarioWeb: guardarCalendarioWeb, obtenerHistorialWeb: obtenerHistorialWeb, agregarMovilWeb: agregarMovilWeb, actualizarMovilWeb: actualizarMovilWeb, obtenerHistorialMovilWeb: obtenerHistorialMovilWeb, darDeBajaMovilWeb: darDeBajaMovilWeb, reactivarMovilWeb: reactivarMovilWeb, exportarCalendarioClienteExcelWeb: exportarCalendarioClienteExcelWeb, obtenerResumenWeb: obtenerResumenWeb, obtenerFichasWeb: obtenerFichasWeb, guardarFichasWeb: guardarFichasWeb, obtenerPersonalWeb: obtenerPersonalWeb, buscarPersonaWeb: buscarPersonaWeb, obtenerVehiculosWeb: obtenerVehiculosWeb, deshacerSinTecnicosWeb: deshacerSinTecnicosWeb, guardarSalidaPersonalWeb: guardarSalidaPersonalWeb, obtenerCambiosFichasWeb: obtenerCambiosFichasWeb, exportarFichasExcelWeb: exportarFichasExcelWeb, obtenerSeguimientoWeb: obtenerSeguimientoWeb, guardarJustificacionTiempoWeb: guardarJustificacionTiempoWeb, guardarSeguimientoWeb: guardarSeguimientoWeb, guardarAlmuerzoWeb: guardarAlmuerzoWeb, guardarSalidaWeb: guardarSalidaWeb, corregirCorteWeb: corregirCorteWeb, eliminarCorteWeb: eliminarCorteWeb, obtenerAusenciasWeb: obtenerAusenciasWeb, guardarAusenciaWeb: guardarAusenciaWeb, marcarPenalizacionWeb: marcarPenalizacionWeb, eliminarAusenciaWeb: eliminarAusenciaWeb, importarFinalizadasWeb: importarFinalizadasWeb, guardarSuspendidaWeb: guardarSuspendidaWeb, marcarSuspendidasWeb: marcarSuspendidasWeb, guardarEstadoOtWeb: guardarEstadoOtWeb, eliminarSuspendidaWeb: eliminarSuspendidaWeb, historialBodegaWeb: historialBodegaWeb, obtenerDanadosInvWeb: obtenerDanadosInvWeb, registrarDanadoInvWeb: registrarDanadoInvWeb, eliminarDanadoInvWeb: eliminarDanadoInvWeb, obtenerBodegaWeb: obtenerBodegaWeb, guardarAlistosWeb: guardarAlistosWeb, obtenerAlistosWeb: obtenerAlistosWeb, cambiarEstadoAlistoWeb: cambiarEstadoAlistoWeb, aplicarAlistoWeb: aplicarAlistoWeb, obtenerMovimientosInvWeb: obtenerMovimientosInvWeb, guardarMovimientoInvWeb: guardarMovimientoInvWeb, firmarMovimientoInvWeb: firmarMovimientoInvWeb, obtenerFirmaInvWeb: obtenerFirmaInvWeb, aplicarAdminMovimientoInvWeb: aplicarAdminMovimientoInvWeb, eliminarMovimientoInvWeb: eliminarMovimientoInvWeb, guardarObjetivosWeb: guardarObjetivosWeb, aplicarCostosAdendumWeb: aplicarCostosAdendumWeb, guardarMaterialInvWeb: guardarMaterialInvWeb, importarConsumoWeb: importarConsumoWeb, obtenerConsumoDetalleWeb: obtenerConsumoDetalleWeb, eliminarCargaConsumoWeb: eliminarCargaConsumoWeb, importarDevolucionesWeb: importarDevolucionesWeb, obtenerDevolucionesWeb: obtenerDevolucionesWeb, obtenerHistorialDevolucionWeb: obtenerHistorialDevolucionWeb, registrarDevolucionLineaWeb: registrarDevolucionLineaWeb, recibirLineasDevolucionWeb: recibirLineasDevolucionWeb, registrarBoletaDevolucionWeb: registrarBoletaDevolucionWeb, registrarEntregaMovilWeb: registrarEntregaMovilWeb, justificarDevolucionWeb: justificarDevolucionWeb, cambiarEquipoDevolucionWeb: cambiarEquipoDevolucionWeb, revertirDevolucionWeb: revertirDevolucionWeb, eliminarPeriodoDevolucionesWeb: eliminarPeriodoDevolucionesWeb, aceptarAlertasBodegaWeb: aceptarAlertasBodegaWeb, obtenerNotificacionesWeb: obtenerNotificacionesWeb, obtenerConsumoInvWeb: obtenerConsumoInvWeb, obtenerCortesInvWeb: obtenerCortesInvWeb, crearCorteInvWeb: crearCorteInvWeb, obtenerConteoInvWeb: obtenerConteoInvWeb, guardarConteoInvWeb: guardarConteoInvWeb, justificarDiferenciaInvWeb: justificarDiferenciaInvWeb, cerrarCorteInvWeb: cerrarCorteInvWeb, eliminarCorteInvWeb: eliminarCorteInvWeb, reabrirCorteInvWeb: reabrirCorteInvWeb, guardarMapeoInvWeb: guardarMapeoInvWeb, compararClienteWeb: compararClienteWeb, cargarCatalogoOficialWeb: cargarCatalogoOficialWeb, aplicarObjetivoBaseWeb: aplicarObjetivoBaseWeb, unirMaterialInvWeb: unirMaterialInvWeb, eliminarMaterialesInvWeb: eliminarMaterialesInvWeb, kardexMaterialWeb: kardexMaterialWeb, guardarClienteCotWeb: guardarClienteCotWeb, eliminarClienteCotWeb: eliminarClienteCotWeb, guardarMaterialCotWeb: guardarMaterialCotWeb, eliminarMaterialCotWeb: eliminarMaterialCotWeb, importarMaterialesCotWeb: importarMaterialesCotWeb, obtenerCotizacionesWeb: obtenerCotizacionesWeb, obtenerCotizacionWeb: obtenerCotizacionWeb, guardarCotizacionWeb: guardarCotizacionWeb, cambiarEstadoCotWeb: cambiarEstadoCotWeb, subirFotoCotWeb: subirFotoCotWeb, eliminarFotoCotWeb: eliminarFotoCotWeb, obtenerArchivoCotWeb: obtenerArchivoCotWeb, guardarInformeCotWeb: guardarInformeCotWeb, guardarGastoCotWeb: guardarGastoCotWeb, marcarPagoGastoCotWeb: marcarPagoGastoCotWeb, anularGastoCotWeb: anularGastoCotWeb, eliminarGastoCotWeb: eliminarGastoCotWeb, guardarOCCotWeb: guardarOCCotWeb, facturarCotWeb: facturarCotWeb, registrarPagoFacturaCotWeb: registrarPagoFacturaCotWeb, revertirPagoFacturaCotWeb: revertirPagoFacturaCotWeb, revertirFacturaCotWeb: revertirFacturaCotWeb, archivarCotWeb: archivarCotWeb, desarchivarCotWeb: desarchivarCotWeb, enviarCotWeb: enviarCotWeb, eliminarCotizacionWeb: eliminarCotizacionWeb, configurarConsecutivoCotWeb: configurarConsecutivoCotWeb, miAccesoRhWeb: miAccesoRhWeb, obtenerRhWeb: obtenerRhWeb, guardarColaboradorWeb: guardarColaboradorWeb, importarHistorialPagosRhWeb: importarHistorialPagosRhWeb, eliminarPagosImportadosRhWeb: eliminarPagosImportadosRhWeb, crearSolicitudRhWeb: crearSolicitudRhWeb, cancelarSolicitudRhWeb: cancelarSolicitudRhWeb, resolverSolicitudRhWeb: resolverSolicitudRhWeb, obtenerPagosRhWeb: obtenerPagosRhWeb, planillaSemanaRhWeb: planillaSemanaRhWeb, guardarRubrosPlanillaRhWeb: guardarRubrosPlanillaRhWeb, agregarColaboradorEnvioPmWeb: agregarColaboradorEnvioPmWeb, agregarPersonalInternoPlWeb: agregarPersonalInternoPlWeb, guardarCuentaAhorroPmWeb: guardarCuentaAhorroPmWeb, desgloseFacturaPmWeb: desgloseFacturaPmWeb, guardarDesgloseFacturaPmWeb: guardarDesgloseFacturaPmWeb, planillaColaboradoresPmWeb: planillaColaboradoresPmWeb, registrarPlanillaRhWeb: registrarPlanillaRhWeb, registrarPagoRhWeb: registrarPagoRhWeb, eliminarPagoRhWeb: eliminarPagoRhWeb, obtenerAsistenciaRhWeb: obtenerAsistenciaRhWeb, marcarAsistenciaRhWeb: marcarAsistenciaRhWeb, guardarMiFichaRhWeb: guardarMiFichaRhWeb, guardarTasasRhWeb: guardarTasasRhWeb, obtenerTasasRhWeb: obtenerTasasRhWeb, obtenerReportePagosRhWeb: obtenerReportePagosRhWeb, registrarPagosLoteRhWeb: registrarPagosLoteRhWeb, obtenerEmpresaWeb: obtenerEmpresaWeb, guardarEmpresaPmWeb: guardarEmpresaPmWeb, anularEnvioPmWeb: anularEnvioPmWeb, obtenerPmWeb: obtenerPmWeb, guardarBorradorPagoPmWeb: guardarBorradorPagoPmWeb, obtenerSemanaPmWeb: obtenerSemanaPmWeb, importarSemanaPmWeb: importarSemanaPmWeb, eliminarSemanaPmWeb: eliminarSemanaPmWeb, estadoSemanaPmWeb: estadoSemanaPmWeb, editarOrdenPmWeb: editarOrdenPmWeb, aplicarListaPmWeb: aplicarListaPmWeb, guardarAjustePmWeb: guardarAjustePmWeb, eliminarAjustePmWeb: eliminarAjustePmWeb, guardarPagoPmWeb: guardarPagoPmWeb, guardarExtraPmWeb: guardarExtraPmWeb, aplicarMovilInternaPmWeb: aplicarMovilInternaPmWeb, deshacerMovilInternaPmWeb: deshacerMovilInternaPmWeb, guardarMovilInternaSemanaPmWeb: guardarMovilInternaSemanaPmWeb, quitarMovilInternaSemanaPmWeb: quitarMovilInternaSemanaPmWeb, aplicarMovilInternaSemanaPmWeb: aplicarMovilInternaSemanaPmWeb, deshacerMovilInternaSemanaPmWeb: deshacerMovilInternaSemanaPmWeb, eliminarExtraPmWeb: eliminarExtraPmWeb, copiarExtrasPmWeb: copiarExtrasPmWeb, guardarContratistaPmWeb: guardarContratistaPmWeb, estadoContratistaPmWeb: estadoContratistaPmWeb, importarContratistasPmWeb: importarContratistasPmWeb, completarNumerosOrdenPmWeb: completarNumerosOrdenPmWeb, historialContratistaPmWeb: historialContratistaPmWeb, limpiarDuplicadosPmWeb: limpiarDuplicadosPmWeb, pagosPmWeb: pagosPmWeb, listarPenalizacionesPmWeb: listarPenalizacionesPmWeb, reasignarPenalizacionPmWeb: reasignarPenalizacionPmWeb, obtenerPrestamosPmWeb: obtenerPrestamosPmWeb, guardarPrestamoPmWeb: guardarPrestamoPmWeb, resolverCambioMovilPrestamoPmWeb: resolverCambioMovilPrestamoPmWeb, eliminarPrestamoPmWeb: eliminarPrestamoPmWeb, registrarMovPrestamoPmWeb: registrarMovPrestamoPmWeb, eliminarMovPrestamoPmWeb: eliminarMovPrestamoPmWeb, aplicarCuotasPrestamosPmWeb: aplicarCuotasPrestamosPmWeb, guardarPreciosPmWeb: guardarPreciosPmWeb, serviciosTelecablePmWeb: serviciosTelecablePmWeb, agregarServiciosPmWeb: agregarServiciosPmWeb, guardarBancoPmWeb: guardarBancoPmWeb, generarBancoPmWeb: generarBancoPmWeb, validarReinstalacionPmWeb: validarReinstalacionPmWeb, editarOrdenesPmWeb: editarOrdenesPmWeb, agregarOrdenPmWeb: agregarOrdenPmWeb, eliminarOrdenPmWeb: eliminarOrdenPmWeb, crearApelacionPmWeb: crearApelacionPmWeb, resolverApelacionPmWeb: resolverApelacionPmWeb, vbSinFacturaPmWeb: vbSinFacturaPmWeb, registrarPagoPmWeb: registrarPagoPmWeb, verificarSemanaPmWeb: verificarSemanaPmWeb, sugerirContratistasPmWeb: sugerirContratistasPmWeb, aplicarSugerenciasPmWeb: aplicarSugerenciasPmWeb, obtenerInicioWeb: obtenerInicioWeb, asignarPrecioServicioPmWeb: asignarPrecioServicioPmWeb, loginPaso1_: loginPaso1_, loginPaso2_: loginPaso2_, refrescarWeb: refrescarWeb, prepararSistemaWeb: prepararSistemaWeb};
+return {loginWeb: loginWeb, miPerfilWeb: miPerfilWeb, guardarFotoPerfilWeb: guardarFotoPerfilWeb, validarSesionWeb: validarSesionWeb, logoutWeb: logoutWeb, cambiarClaveWeb: cambiarClaveWeb, listarUsuariosWeb: listarUsuariosWeb, crearUsuarioWeb: crearUsuarioWeb, colaboradoresSinUsuarioWeb: colaboradoresSinUsuarioWeb, crearUsuarioColaboradorWeb: crearUsuarioColaboradorWeb, eliminarUsuarioWeb: eliminarUsuarioWeb, actualizarUsuarioWeb: actualizarUsuarioWeb, obtenerDatosWeb: obtenerDatosWeb, obtenerSemanasWeb: obtenerSemanasWeb, obtenerCalendarioWeb: obtenerCalendarioWeb, obtenerRotacionBackupWeb: obtenerRotacionBackupWeb, guardarCalendarioWeb: guardarCalendarioWeb, obtenerHistorialWeb: obtenerHistorialWeb, agregarMovilWeb: agregarMovilWeb, actualizarMovilWeb: actualizarMovilWeb, obtenerHistorialMovilWeb: obtenerHistorialMovilWeb, darDeBajaMovilWeb: darDeBajaMovilWeb, reactivarMovilWeb: reactivarMovilWeb, exportarCalendarioClienteExcelWeb: exportarCalendarioClienteExcelWeb, obtenerResumenWeb: obtenerResumenWeb, obtenerFichasWeb: obtenerFichasWeb, guardarFichasWeb: guardarFichasWeb, obtenerPersonalWeb: obtenerPersonalWeb, buscarPersonaWeb: buscarPersonaWeb, obtenerVehiculosWeb: obtenerVehiculosWeb, deshacerSinTecnicosWeb: deshacerSinTecnicosWeb, guardarSalidaPersonalWeb: guardarSalidaPersonalWeb, obtenerCambiosFichasWeb: obtenerCambiosFichasWeb, exportarFichasExcelWeb: exportarFichasExcelWeb, obtenerSeguimientoWeb: obtenerSeguimientoWeb, guardarJustificacionTiempoWeb: guardarJustificacionTiempoWeb, guardarSeguimientoWeb: guardarSeguimientoWeb, guardarAlmuerzoWeb: guardarAlmuerzoWeb, guardarSalidaWeb: guardarSalidaWeb, corregirCorteWeb: corregirCorteWeb, eliminarCorteWeb: eliminarCorteWeb, obtenerAusenciasWeb: obtenerAusenciasWeb, guardarAusenciaWeb: guardarAusenciaWeb, marcarPenalizacionWeb: marcarPenalizacionWeb, eliminarAusenciaWeb: eliminarAusenciaWeb, importarFinalizadasWeb: importarFinalizadasWeb, guardarSuspendidaWeb: guardarSuspendidaWeb, marcarSuspendidasWeb: marcarSuspendidasWeb, guardarEstadoOtWeb: guardarEstadoOtWeb, eliminarSuspendidaWeb: eliminarSuspendidaWeb, historialBodegaWeb: historialBodegaWeb, obtenerBodegaWeb: obtenerBodegaWeb, guardarAlistosWeb: guardarAlistosWeb, obtenerAlistosWeb: obtenerAlistosWeb, cambiarEstadoAlistoWeb: cambiarEstadoAlistoWeb, aplicarAlistoWeb: aplicarAlistoWeb, aplicarDevolucionAlistoWeb: aplicarDevolucionAlistoWeb, obtenerMovimientosInvWeb: obtenerMovimientosInvWeb, guardarMovimientoInvWeb: guardarMovimientoInvWeb, firmarMovimientoInvWeb: firmarMovimientoInvWeb, obtenerFirmaInvWeb: obtenerFirmaInvWeb, aplicarAdminMovimientoInvWeb: aplicarAdminMovimientoInvWeb, eliminarMovimientoInvWeb: eliminarMovimientoInvWeb, guardarObjetivosWeb: guardarObjetivosWeb, aplicarCostosAdendumWeb: aplicarCostosAdendumWeb, guardarMaterialInvWeb: guardarMaterialInvWeb, importarConsumoWeb: importarConsumoWeb, obtenerConsumoDetalleWeb: obtenerConsumoDetalleWeb, eliminarCargaConsumoWeb: eliminarCargaConsumoWeb, importarDevolucionesWeb: importarDevolucionesWeb, obtenerDevolucionesWeb: obtenerDevolucionesWeb, obtenerHistorialDevolucionWeb: obtenerHistorialDevolucionWeb, registrarDevolucionLineaWeb: registrarDevolucionLineaWeb, recibirLineasDevolucionWeb: recibirLineasDevolucionWeb, registrarBoletaDevolucionWeb: registrarBoletaDevolucionWeb, registrarEntregaMovilWeb: registrarEntregaMovilWeb, justificarDevolucionWeb: justificarDevolucionWeb, cambiarEquipoDevolucionWeb: cambiarEquipoDevolucionWeb, revertirDevolucionWeb: revertirDevolucionWeb, eliminarPeriodoDevolucionesWeb: eliminarPeriodoDevolucionesWeb, aceptarAlertasBodegaWeb: aceptarAlertasBodegaWeb, obtenerNotificacionesWeb: obtenerNotificacionesWeb, obtenerConsumoInvWeb: obtenerConsumoInvWeb, obtenerCortesInvWeb: obtenerCortesInvWeb, crearCorteInvWeb: crearCorteInvWeb, obtenerConteoInvWeb: obtenerConteoInvWeb, guardarConteoInvWeb: guardarConteoInvWeb, justificarDiferenciaInvWeb: justificarDiferenciaInvWeb, cerrarCorteInvWeb: cerrarCorteInvWeb, eliminarCorteInvWeb: eliminarCorteInvWeb, reabrirCorteInvWeb: reabrirCorteInvWeb, guardarMapeoInvWeb: guardarMapeoInvWeb, compararClienteWeb: compararClienteWeb, cargarCatalogoOficialWeb: cargarCatalogoOficialWeb, aplicarObjetivoBaseWeb: aplicarObjetivoBaseWeb, unirMaterialInvWeb: unirMaterialInvWeb, eliminarMaterialesInvWeb: eliminarMaterialesInvWeb, kardexMaterialWeb: kardexMaterialWeb, guardarClienteCotWeb: guardarClienteCotWeb, eliminarClienteCotWeb: eliminarClienteCotWeb, guardarMaterialCotWeb: guardarMaterialCotWeb, eliminarMaterialCotWeb: eliminarMaterialCotWeb, importarMaterialesCotWeb: importarMaterialesCotWeb, obtenerCotizacionesWeb: obtenerCotizacionesWeb, obtenerCotizacionWeb: obtenerCotizacionWeb, guardarCotizacionWeb: guardarCotizacionWeb, cambiarEstadoCotWeb: cambiarEstadoCotWeb, subirFotoCotWeb: subirFotoCotWeb, eliminarFotoCotWeb: eliminarFotoCotWeb, obtenerArchivoCotWeb: obtenerArchivoCotWeb, guardarInformeCotWeb: guardarInformeCotWeb, guardarGastoCotWeb: guardarGastoCotWeb, marcarPagoGastoCotWeb: marcarPagoGastoCotWeb, anularGastoCotWeb: anularGastoCotWeb, eliminarGastoCotWeb: eliminarGastoCotWeb, guardarOCCotWeb: guardarOCCotWeb, facturarCotWeb: facturarCotWeb, registrarPagoFacturaCotWeb: registrarPagoFacturaCotWeb, revertirPagoFacturaCotWeb: revertirPagoFacturaCotWeb, revertirFacturaCotWeb: revertirFacturaCotWeb, archivarCotWeb: archivarCotWeb, desarchivarCotWeb: desarchivarCotWeb, enviarCotWeb: enviarCotWeb, eliminarCotizacionWeb: eliminarCotizacionWeb, configurarConsecutivoCotWeb: configurarConsecutivoCotWeb, miAccesoRhWeb: miAccesoRhWeb, obtenerRhWeb: obtenerRhWeb, guardarColaboradorWeb: guardarColaboradorWeb, importarHistorialPagosRhWeb: importarHistorialPagosRhWeb, eliminarPagosImportadosRhWeb: eliminarPagosImportadosRhWeb, crearSolicitudRhWeb: crearSolicitudRhWeb, cancelarSolicitudRhWeb: cancelarSolicitudRhWeb, resolverSolicitudRhWeb: resolverSolicitudRhWeb, obtenerPagosRhWeb: obtenerPagosRhWeb, planillaSemanaRhWeb: planillaSemanaRhWeb, guardarRubrosPlanillaRhWeb: guardarRubrosPlanillaRhWeb, agregarColaboradorEnvioPmWeb: agregarColaboradorEnvioPmWeb, agregarPersonalInternoPlWeb: agregarPersonalInternoPlWeb, guardarCuentaAhorroPmWeb: guardarCuentaAhorroPmWeb, desgloseFacturaPmWeb: desgloseFacturaPmWeb, guardarDesgloseFacturaPmWeb: guardarDesgloseFacturaPmWeb, planillaColaboradoresPmWeb: planillaColaboradoresPmWeb, registrarPlanillaRhWeb: registrarPlanillaRhWeb, registrarPagoRhWeb: registrarPagoRhWeb, eliminarPagoRhWeb: eliminarPagoRhWeb, obtenerAsistenciaRhWeb: obtenerAsistenciaRhWeb, marcarAsistenciaRhWeb: marcarAsistenciaRhWeb, guardarMiFichaRhWeb: guardarMiFichaRhWeb, guardarTasasRhWeb: guardarTasasRhWeb, obtenerTasasRhWeb: obtenerTasasRhWeb, obtenerReportePagosRhWeb: obtenerReportePagosRhWeb, registrarPagosLoteRhWeb: registrarPagosLoteRhWeb, obtenerEmpresaWeb: obtenerEmpresaWeb, guardarEmpresaPmWeb: guardarEmpresaPmWeb, anularEnvioPmWeb: anularEnvioPmWeb, obtenerPmWeb: obtenerPmWeb, guardarBorradorPagoPmWeb: guardarBorradorPagoPmWeb, obtenerSemanaPmWeb: obtenerSemanaPmWeb, importarSemanaPmWeb: importarSemanaPmWeb, eliminarSemanaPmWeb: eliminarSemanaPmWeb, estadoSemanaPmWeb: estadoSemanaPmWeb, editarOrdenPmWeb: editarOrdenPmWeb, aplicarListaPmWeb: aplicarListaPmWeb, guardarAjustePmWeb: guardarAjustePmWeb, eliminarAjustePmWeb: eliminarAjustePmWeb, guardarPagoPmWeb: guardarPagoPmWeb, guardarExtraPmWeb: guardarExtraPmWeb, aplicarMovilInternaPmWeb: aplicarMovilInternaPmWeb, deshacerMovilInternaPmWeb: deshacerMovilInternaPmWeb, guardarMovilInternaSemanaPmWeb: guardarMovilInternaSemanaPmWeb, quitarMovilInternaSemanaPmWeb: quitarMovilInternaSemanaPmWeb, aplicarMovilInternaSemanaPmWeb: aplicarMovilInternaSemanaPmWeb, deshacerMovilInternaSemanaPmWeb: deshacerMovilInternaSemanaPmWeb, eliminarExtraPmWeb: eliminarExtraPmWeb, copiarExtrasPmWeb: copiarExtrasPmWeb, guardarContratistaPmWeb: guardarContratistaPmWeb, estadoContratistaPmWeb: estadoContratistaPmWeb, importarContratistasPmWeb: importarContratistasPmWeb, completarNumerosOrdenPmWeb: completarNumerosOrdenPmWeb, historialContratistaPmWeb: historialContratistaPmWeb, limpiarDuplicadosPmWeb: limpiarDuplicadosPmWeb, pagosPmWeb: pagosPmWeb, listarPenalizacionesPmWeb: listarPenalizacionesPmWeb, reasignarPenalizacionPmWeb: reasignarPenalizacionPmWeb, obtenerPrestamosPmWeb: obtenerPrestamosPmWeb, guardarPrestamoPmWeb: guardarPrestamoPmWeb, resolverCambioMovilPrestamoPmWeb: resolverCambioMovilPrestamoPmWeb, eliminarPrestamoPmWeb: eliminarPrestamoPmWeb, registrarMovPrestamoPmWeb: registrarMovPrestamoPmWeb, eliminarMovPrestamoPmWeb: eliminarMovPrestamoPmWeb, aplicarCuotasPrestamosPmWeb: aplicarCuotasPrestamosPmWeb, guardarPreciosPmWeb: guardarPreciosPmWeb, serviciosTelecablePmWeb: serviciosTelecablePmWeb, agregarServiciosPmWeb: agregarServiciosPmWeb, guardarBancoPmWeb: guardarBancoPmWeb, generarBancoPmWeb: generarBancoPmWeb, validarReinstalacionPmWeb: validarReinstalacionPmWeb, editarOrdenesPmWeb: editarOrdenesPmWeb, agregarOrdenPmWeb: agregarOrdenPmWeb, eliminarOrdenPmWeb: eliminarOrdenPmWeb, crearApelacionPmWeb: crearApelacionPmWeb, resolverApelacionPmWeb: resolverApelacionPmWeb, vbSinFacturaPmWeb: vbSinFacturaPmWeb, registrarPagoPmWeb: registrarPagoPmWeb, verificarSemanaPmWeb: verificarSemanaPmWeb, sugerirContratistasPmWeb: sugerirContratistasPmWeb, aplicarSugerenciasPmWeb: aplicarSugerenciasPmWeb, obtenerInicioWeb: obtenerInicioWeb, asignarPrecioServicioPmWeb: asignarPrecioServicioPmWeb, loginPaso1_: loginPaso1_, loginPaso2_: loginPaso2_, refrescarWeb: refrescarWeb, prepararSistemaWeb: prepararSistemaWeb};
 })();
 
 /* =====================================================================
