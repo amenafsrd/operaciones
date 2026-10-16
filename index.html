@@ -12357,11 +12357,12 @@ function renderBodPanorama() {
   const t = panTotales(mats);
   const alertSet = {}; bodAlertasLista().forEach(x => { alertSet[x.m.clave] = true; });
   const n = v => '<td style="' + (v < 0 ? 'color:#b71c1c;font-weight:700' : '') + '">' + (v === 0 ? '<span class="segSinCarga">—</span>' : fmtN(v)) + '</td>';
-  $('bodPanorama').innerHTML = '<table class="table" style="font-size:13px;min-width:' + (420 + t.movs.length * 62 + 80) + 'px"><thead><tr><th>Código</th><th class="left">Material</th><th>Und.</th><th>🏭 Bodega</th>' +
+  const hayDan = t.filas.some(f => f.dan > 0);
+  $('bodPanorama').innerHTML = (hayDan ? '<div style="font-size:12px;color:#666;margin:0 0 6px">Bodega: total <b>(<span style="color:#2e7d32">buenos</span> / <span style="color:#b26a00">dañados</span>)</b> · los dañados cuentan en el inventario pero no se pueden entregar.</div>' : '') + '<table class="table" style="font-size:13px;min-width:' + (420 + t.movs.length * 62 + 80) + 'px"><thead><tr><th>Código</th><th class="left">Material</th><th>Und.</th><th title="Total en bodega (buenos / dañados)">🏭 Bodega</th>' +
     t.movs.map(m => '<th title="' + esc(m.tecnico) + '">M' + esc(m.movil) + '</th>').join('') +
     (t.hayOtros ? '<th title="' + esc(t.otrosTxt) + '">Otras / inactivas ⓘ</th>' : '') + '<th>🚐 Total móviles</th><th>TOTAL GENERAL</th></tr></thead><tbody>' +
     t.filas.map(f => '<tr style="cursor:pointer" title="Ver el historial de este material" onclick="verKardex(\'' + escJs(f.m.clave) + '\')"><td>' + esc(codP(f.m.codigo)) + '</td><td class="left"><b>' + esc(f.m.material) + '</b></td><td>' + esc(f.m.unidad) + '</td>' +
-      ((alertSet[f.m.clave] ? '<td style="background:#fde8e8;color:#b71c1c;font-weight:700" title="Disponible al 20% o menos">⚠ ' + fmtN(Math.round((f.bod + f.dan) * 1000) / 1000) + '</td>' : n(Math.round((f.bod + f.dan) * 1000) / 1000)).replace(/<\/td>$/, (f.dan ? '<div style="font-size:10.5px;font-weight:600;white-space:nowrap" title="Los dañados cuentan en el inventario pero no se pueden entregar"><span style="color:#2e7d32">' + fmtN(f.bod) + ' buenos</span> · <span style="color:#b26a00">' + fmtN(f.dan) + ' dañados</span></div>' : '') + '</td>')) +
+      ((alertSet[f.m.clave] ? '<td style="background:#fde8e8;color:#b71c1c;font-weight:700" title="Disponible al 20% o menos">⚠ ' + fmtN(Math.round((f.bod + f.dan) * 1000) / 1000) + '</td>' : n(Math.round((f.bod + f.dan) * 1000) / 1000)).replace(/<\/td>$/, (f.dan ? ' <span style="font-size:11px;font-weight:700;white-space:nowrap" title="' + fmtN(f.bod) + ' buenos · ' + fmtN(f.dan) + ' dañados (los dañados cuentan en el inventario pero no se pueden entregar)">(<span style="color:#2e7d32">' + fmtN(f.bod) + '</span> / <span style="color:#b26a00">' + fmtN(f.dan) + '</span>)</span>' : '') + '</td>')) +
       t.movs.map(x => n(t.mov(x.idMovil, f.m.clave))).join('') + (t.hayOtros ? n(f.otros) : '') + n(f.mov) +
       '<td style="font-weight:700;font-size:14px;' + (f.tot < 0 ? 'color:#b71c1c' : '') + '">' + (f.tot === 0 ? '—' : fmtN(f.tot)) + '</td></tr>').join('') + '</tbody></table>';
 }
@@ -15207,6 +15208,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 112 · 16-oct 10:45</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 113 · 16-oct 10:57</div>
 </body>
 </html>
