@@ -12498,7 +12498,7 @@ function renderCortes() {
       '<td>' + c.contados + '</td><td>' + (c.diferencias ? '<b class="segNeg">' + c.diferencias + '</b>' : '0') + '</td>' +
       '<td>' + esc(c.usuario) + '</td><td>' + (c.cerrado ? esc(c.cerradoPor) + '<div style="font-size:11px;color:#888">' + esc(c.cerrado) + '</div>' : '—') + '</td>' +
       '<td style="white-space:nowrap"><button class="btnMini" onclick="abrirCorte(\'' + escJs(c.corte) + '\')">' + (c.estado === 'Cerrado' ? '👁️ Ver' : '📝 Contar') + '</button>' +
-        (esAdmin() ? ' <button class="btnMini" title="Eliminar este corte' + (c.estado === 'Cerrado' ? ' y los ajustes que generó' : '') + '" style="color:#b71c1c" onclick="eliminarCorte(\'' + escJs(c.corte) + '\',' + (c.estado === 'Cerrado') + ')">🗑️ Eliminar</button>' : '') + '</td></tr>').join('') + '</tbody></table>';
+        (c.estado !== 'Cerrado' && esAdmin() ? ' <button class="btnMini" title="Eliminar este corte" style="color:#b71c1c" onclick="eliminarCorte(\'' + escJs(c.corte) + '\')">🗑️ Eliminar</button>' : '') + '</td></tr>').join('') + '</tbody></table>';
 }
 
 function invTipoCambio() {
@@ -12949,8 +12949,8 @@ async function cierreConfirmar() {
   } catch (e) { mostrarError(e, 'No se pudo cerrar el corte.'); btn.disabled = false; }
 }
 
-async function eliminarCorte(corte, cerrado) {
-  if (!confirm('¿Eliminar el corte ' + corte + '?\n\nSe borra también lo que se haya contado en él.' + (cerrado ? '\n\n⚠️ Como está cerrado, también se borran los ajustes que generó en el inventario: las cantidades vuelven a depender solo de ingresos, entregas, devoluciones y gastos (pueden quedar saldos en negativo).' : '') + '\n\nEsta acción no se puede deshacer.')) return;
+async function eliminarCorte(corte) {
+  if (!confirm('¿Eliminar el corte ' + corte + '?\n\nSe borra también lo que se haya contado en él. Esta acción no se puede deshacer.')) return;
   try {
     await api('eliminarCorteInvWeb', corte);
     toast('Corte eliminado.');
@@ -15320,6 +15320,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 120 · 18-oct 09:41</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 121 · 18-oct 09:46</div>
 </body>
 </html>

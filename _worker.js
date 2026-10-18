@@ -8247,13 +8247,7 @@ function eliminarCorteInvWeb(token, corte) {
     let fila = -1;
     for (let i = 1; i < tc.values.length; i++) { if (txt_(tc.values[i][tc.idx.Corte]) === corte) { fila = i; break; } }
     if (fila < 0) throw new Error('No se encontró el corte.');
-    /* Si estaba cerrado, se quitan también los ajustes que generó: el inventario vuelve a depender solo de los movimientos */
-    if (txt_(tc.values[fila][tc.idx.Estado]) === 'Cerrado') {
-      const shM = invHoja_('MOV'), tm = leerTabla_(shM);
-      for (let i = tm.values.length - 1; i >= 1; i--) {
-        if (txt_(tm.values[i][tm.idx.Grupo]).indexOf('K-' + corte + '-') === 0) shM.deleteRow(i + 1);
-      }
-    }
+    if (txt_(tc.values[fila][tc.idx.Estado]) === 'Cerrado') throw new Error('Este corte está cerrado y ya generó ajustes. Solo se puede eliminar un corte abierto.');
 
     const sh = invHoja_('CONTEO');
     const resto = leerObjetos_(sh).filter(r => txt_(r.Corte) !== corte).map(invConteoFila_);
