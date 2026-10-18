@@ -10944,6 +10944,23 @@ function panPoblarCats() {
   sel.value = l.indexOf(v) >= 0 ? v : '';
 }
 
+/* Desde el selector de un material: crear una categoría nueva al vuelo */
+async function catSelNueva(sel) {
+  if (sel.value !== '__nueva') return;
+  const nombre = (prompt('Nombre de la nueva categoría:') || '').trim();
+  if (!nombre) { sel.selectedIndex = 0; return; }
+  const l = bodCategorias();
+  const ya = l.find(c => c.toLowerCase() === nombre.toLowerCase());
+  try {
+    if (!ya) await api('guardarCategoriasInvWeb', l.concat([nombre]).map(c => ({ nombre: c, original: c })));
+    const val = ya || nombre;
+    bodDatos.categorias = (ya ? l : l.concat([nombre]));
+    const o = document.createElement('option'); o.text = val; sel.insertBefore(o, sel.querySelector('option[value="__nueva"]')); sel.value = val;
+    document.querySelectorAll('select[id^="cat_k_"]').forEach(x => { if (x !== sel && !Array.from(x.options).some(q => q.text === val)) { const q = document.createElement('option'); q.text = val; x.insertBefore(q, x.querySelector('option[value="__nueva"]')); } });
+    panPoblarCats(); toast('Categoría «' + val + '» lista: guarda el material para asignarla.');
+  } catch (e) { mostrarError(e, 'No se pudo crear la categoría.'); sel.selectedIndex = 0; }
+}
+
 /* Administrar categorías (crear, renombrar, quitar) */
 let catEdit = [];
 function catAbrir() {
@@ -11413,7 +11430,8 @@ function renderAbastecimiento() {
   const mv = $('abMovil').value;
   if (mv) l = l.filter(x => x.idMovil === mv || x.idMovilDestino === mv);
   if (!l.length) { $('abTabla').innerHTML = '<div class="empty">No hay movimientos de móviles en ese rango.</div>'; return; }
-  l = l.slice().sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0) || (String(a.creado) < String(b.creado) ? -1 : String(a.creado) > String(b.creado) ? 1 : 0));
+  const cNum = x => { const m = String(x.consecutivo || '').match(/(\d+)\s*$/); return m ? Number(m[1]) : Infinity; };
+  l = l.slice().sort((a, b) => { const A = cNum(a), B = cNum(b); return A === B ? ((a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0) || (String(a.creado) < String(b.creado) ? -1 : 1)) : (A < B ? -1 : 1); });
   abLista = l;
   $('abTabla').innerHTML = '<table class="table" style="min-width:880px"><thead><tr><th>Consecutivo</th><th>Fecha</th><th class="left">Tipo</th><th>De → A</th><th class="left">Documento</th><th>Materiales</th><th>Recibido</th><th>Registró</th>' +
     (adm ? '<th></th>' : '') + '</tr></thead><tbody>' +
@@ -12543,6 +12561,7 @@ function renderConteo() {
     (!abierto && adm ? '<select id="cobUbic" style="padding:8px 10px;border-radius:8px;border:1px solid #ccc" title="Ubicación del documento de cobro"><option value="">Cobro: todas las ubicaciones</option>' + d.ubicaciones.map(u => '<option value="' + esc(u.id) + '">' + esc(u.nombre) + (u.tecnico ? ' · ' + esc(u.tecnico) : '') + '</option>').join('') + '</select>' +
       '<button class="btn primary" onclick="cobroPdf()">🧾 Documento de cobro (PDF)</button><button class="btn secondary" onclick="cobroExcel()">⬇ Cobro (Excel)</button>' : '') +
     (!abierto && adm ? '<button class="btn secondary" onclick="reabrirCorte()">🔓 Reabrir</button>' : '') +
+    ((abierto && ed) || adm ? '<button class="btn secondary" title="Cambiar la fecha del corte sin perder lo contado" onclick="cambiarFechaCorte()">📅 Cambiar fecha</button>' : '') +
     '</div></div>' +
     '<div class="toolbar" style="padding:0 15px 10px;align-items:center">' +
       '<button class="btn ' + (invVista === 'matriz' ? 'primary' : 'secondary') + '" onclick="invCambiarVista(\'matriz\')">▦ Matriz</button>' +
@@ -12919,6 +12938,19 @@ async function eliminarCorte(corte) {
   } catch (e) {
     mostrarError(e, 'No se pudo eliminar el corte.');
   }
+}
+
+async function cambiarFechaCorte() {
+  const c = invActual.info, abierto = c.estado !== 'Cerrado';
+  const f = (prompt('Nueva fecha del corte ' + c.corte + ' (AAAA-MM-DD).\nActual: ' + c.fecha + '\n\nLo contado se conserva. ' + (abierto ? 'El teórico se recalcula con la fecha nueva.' : 'Como el corte está cerrado, se rehacen sus ajustes con la fecha nueva; las entregas y gastos posteriores a esa fecha se conservan.'), c.fecha) || '').trim();
+  if (!f || f === c.fecha) return;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(f)) { toast('Escribe la fecha como AAAA-MM-DD, por ejemplo 2026-10-15.'); return; }
+  try {
+    const r = await api('cambiarFechaCorteInvWeb', c.corte, f);
+    toast('Fecha del corte cambiada a ' + fmtFechaSeg(f) + '.');
+    if (r.cerrado && r.desviaciones) alert('Fecha cambiada y ajustes rehechos. ' + r.desviaciones + ' conteos no coinciden hoy con el sistema porque hay movimientos posteriores a la fecha del corte (es lo esperado):\n\n' + r.detalleDesv.map(x => '• ' + x.ubicacion + ' · ' + x.material + ': sistema ' + fmtN(x.sistema) + ' / físico ' + fmtN(x.fisico)).join('\n'));
+    await cargarBodega(); await cargarCortes(); abrirCorte(c.corte);
+  } catch (e) { mostrarError(e, 'No se pudo cambiar la fecha.'); await cargarCortes(); abrirCorte(c.corte); }
 }
 
 async function reabrirCorte() {
@@ -13607,7 +13639,7 @@ function renderBodCat() {
 
   $('bodTablaCat').innerHTML = '<table class="table" style="min-width:1000px"><thead><tr><th>Código</th><th class="left">Material</th><th>Categoría</th><th>Unidad</th><th>Stock por móvil</th><th>Mínimo en bodega</th><th title="Stock al 100% (móviles + reserva de bodega). Si lo disponible en bodega llega al 20% de esta cantidad se genera la alerta.">Stock completo bodega (100%)</th><th>Costo unitario (₡)</th><th class="left">Alias (otros nombres: reporte de gastos, inventario)</th><th>Activo</th>' + (adm ? '<th></th>' : '') + '</tr></thead><tbody>' +
     l.map((m, i) => adm
-      ? '<tr><td><input id="cat_c_' + i + '" value="' + esc(m.codigo) + '" style="width:80px"></td><td><input id="cat_n_' + i + '" value="' + esc(m.material) + '" style="width:260px"></td><td><select id="cat_k_' + i + '">' + bodCategorias().map(k => '<option' + (m.categoria === k ? ' selected' : '') + '>' + k + '</option>').join('') + '</select></td><td><input id="cat_u_' + i + '" value="' + esc(m.unidad) + '" style="width:60px"></td>' +
+      ? '<tr><td><input id="cat_c_' + i + '" value="' + esc(m.codigo) + '" style="width:80px"></td><td><input id="cat_n_' + i + '" value="' + esc(m.material) + '" style="width:260px"></td><td><select id="cat_k_' + i + '" onchange="catSelNueva(this)">' + bodCategorias().map(k => '<option' + (m.categoria === k ? ' selected' : '') + '>' + esc(k) + '</option>').join('') + '<option value="__nueva">➕ Nueva categoría…</option></select></td><td><input id="cat_u_' + i + '" value="' + esc(m.unidad) + '" style="width:60px"></td>' +
         '<td><input id="cat_b_' + i + '" type="number" min="0" step="any" value="' + (m.base || '') + '" style="width:80px"></td>' +
         '<td><input id="cat_m_' + i + '" type="number" min="0" step="any" value="' + (m.minimo || '') + '" style="width:80px"></td>' +
         '<td><input id="cat_f_' + i + '" type="number" min="0" step="any" value="' + (m.completo || '') + '" style="width:90px"></td>' +
@@ -13617,7 +13649,7 @@ function renderBodCat() {
         '<td><button class="btnMini" onclick="guardarMaterial(' + i + ')">💾</button>' +
           (!m.codigo && l.some(x => x.codigo) ? ' <button class="btnMini" title="Relacionar con un material oficial" onclick="abrirUnir(' + i + ')">🔗</button>' : '') + '</td></tr>'
       : '<tr><td>' + esc(codP(m.codigo)) + (String(m.codigo || '').indexOf(';') >= 0 ? '<div style="font-size:11px;color:#999" title="Otros códigos con los que el sistema reconoce este material en los archivos importados (se quitan con ✏️ Editar)">también: ' + esc(String(m.codigo).split(';').slice(1).join(', ')) + '</div>' : '') + '</td><td class="left"><b>' + esc(m.material) + '</b></td><td>' + esc(m.categoria) + '</td><td>' + esc(m.unidad) + '</td><td>' + (m.base || '—') + '</td><td>' + (m.minimo || '—') + '</td><td>' + (m.completo || '—') + '</td><td>' + (m.costo ? colones(m.costo) : '—') + '</td><td class="left">' + esc(m.alias) + '</td><td>' + (m.activo ? 'Sí' : 'No') + '</td></tr>').join('') +
-    (adm ? '<tr style="background:#f6f6f6"><td><input id="cat_c_new" placeholder="Código" style="width:80px"></td><td><input id="cat_n_new" placeholder="Nuevo material" style="width:260px"></td><td><select id="cat_k_new">' + bodCategorias().map(k => '<option>' + esc(k) + '</option>').join('') + '</select></td><td><input id="cat_u_new" value="u" style="width:60px"></td>' +
+    (adm ? '<tr style="background:#f6f6f6"><td><input id="cat_c_new" placeholder="Código" style="width:80px"></td><td><input id="cat_n_new" placeholder="Nuevo material" style="width:260px"></td><td><select id="cat_k_new" onchange="catSelNueva(this)">' + bodCategorias().map(k => '<option>' + esc(k) + '</option>').join('') + '<option value="__nueva">➕ Nueva categoría…</option></select></td><td><input id="cat_u_new" value="u" style="width:60px"></td>' +
       '<td><input id="cat_b_new" type="number" min="0" step="any" style="width:80px"></td><td><input id="cat_m_new" type="number" min="0" step="any" style="width:80px"></td><td><input id="cat_f_new" type="number" min="0" step="any" style="width:90px"></td><td><input id="cat_p_new" type="number" min="0" step="any" style="width:90px"></td><td></td><td></td><td><button class="btnMini" onclick="guardarMaterial(-1)">➕ Agregar</button></td></tr>' : '') +
     '</tbody></table>';
 }
@@ -15268,6 +15300,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 115 · 16-oct 14:56</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 117 · 18-oct 09:14</div>
 </body>
 </html>
