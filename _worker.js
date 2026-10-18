@@ -7950,8 +7950,9 @@ function invTeorico_(hasta, movs, cons) {
   return t;
 }
 
+const INV_MARCA_SIN_AJUSTE = '[SIN AJUSTE]';
 function invCorteInfo_(o) {
-  return { corte: txt_(o.Corte), fecha: invFecha_(o.Fecha), estado: txt_(o.Estado) || 'Abierto', obs: txt_(o.Obs),
+  return { corte: txt_(o.Corte), fecha: invFecha_(o.Fecha), estado: txt_(o.Estado) || 'Abierto', obs: txt_(o.Obs), sinAjuste: txt_(o.Obs).indexOf(INV_MARCA_SIN_AJUSTE) === 0,
     usuario: txt_(o.Usuario), creado: txt_(o.Creado), cerradoPor: txt_(o.Cerrado_Por), cerrado: txt_(o.Cerrado),
     tipo: txt_(o.Tipo) === 'Individual' ? 'Individual' : 'General', ubicacion: txt_(o.Ubicacion) };
 }
@@ -8126,7 +8127,7 @@ function justificarDiferenciaInvWeb(token, corte, lista) {
 }
 
 /* Cierra el corte: lo contado pasa a ser el saldo real; las diferencias se ajustan con movimientos */
-function cerrarCorteInvWeb(token, corte) {
+function cerrarCorteInvWeb(token, corte, sinAjustar) {
 
   const ses = requerirSesion_(token, 'admin');
   corte = txt_(corte);
@@ -8137,10 +8138,11 @@ function cerrarCorteInvWeb(token, corte) {
     const tc = leerTabla_(shC);
     let fila = -1, info = null;
     for (let i = 1; i < tc.values.length; i++) {
-      if (txt_(tc.values[i][tc.idx.Corte]) === corte) { fila = i; info = invCorteInfo_({ Corte: tc.values[i][tc.idx.Corte], Fecha: tc.values[i][tc.idx.Fecha], Estado: tc.values[i][tc.idx.Estado] }); break; }
+      if (txt_(tc.values[i][tc.idx.Corte]) === corte) { fila = i; info = invCorteInfo_({ Corte: tc.values[i][tc.idx.Corte], Fecha: tc.values[i][tc.idx.Fecha], Estado: tc.values[i][tc.idx.Estado], Obs: tc.values[i][tc.idx.Obs] }); break; }
     }
     if (!info) throw new Error('No se encontró el corte.');
     if (info.estado === 'Cerrado') throw new Error('Este corte ya está cerrado.');
+    sinAjustar = sinAjustar === true || sinAjustar === 'true' || sinAjustar === 1;
 
     const sh = invHoja_('CONTEO');
     const todos = leerObjetos_(sh);
@@ -8174,7 +8176,9 @@ function cerrarCorteInvWeb(token, corte) {
     });
 
     invReescribir_(sh, 'CONTEO', nuevoConteo);
-    invAgregar_(invHoja_('MOV'), 'MOV', ajustes);
+    /* Sin ajustar: el conteo queda registrado como referencia, pero el inventario del sistema no se toca */
+    if (!sinAjustar && ajustes.length) invAgregar_(invHoja_('MOV'), 'MOV', ajustes);
+    if (sinAjustar) shC.getRange(fila + 1, tc.idx.Obs + 1).setValue((INV_MARCA_SIN_AJUSTE + ' ' + String(tc.values[fila][tc.idx.Obs] || '').replace(INV_MARCA_SIN_AJUSTE, '').trim()).trim());
 
     shC.getRange(fila + 1, tc.idx.Estado + 1).setValue('Cerrado');
     shC.getRange(fila + 1, tc.idx.Cerrado_Por + 1).setValue(ses.usuario);
@@ -8183,14 +8187,14 @@ function cerrarCorteInvWeb(token, corte) {
     /* Verificación: el saldo actual del sistema contra lo contado. Solo puede diferir si hubo movimientos posteriores a la fecha del corte */
     const actual = invTeorico_('');
     const desv = [];
-    nuevoConteo.forEach(o => {
+    if (!sinAjustar) nuevoConteo.forEach(o => {
       if (o.Corte !== corte) return;
       const sis = invRedondear_(((actual[o.Ubicacion] || {})[o.Clave]) || 0);
       if (Math.abs(sis - o.Fisico) > 1e-6) desv.push({ ubicacion: o.Ubicacion, material: mats[o.Clave] || o.Clave, sistema: sis, fisico: o.Fisico });
     });
 
-    invLog_(ses, 'Corte cerrado', corte + ' · contados ' + propios.length + ' · ajustes ' + ajustes.length, corte);
-    return { ok: true, contados: propios.length, ajustes: ajustes.length, faltantes: faltantes, sobrantes: sobrantes, desviaciones: desv.length, detalleDesv: desv.slice(0, 15) };
+    invLog_(ses, sinAjustar ? 'Corte cerrado SIN ajustar el inventario' : 'Corte cerrado', corte + ' · contados ' + propios.length + ' · ajustes ' + (sinAjustar ? 0 : ajustes.length), corte);
+    return { ok: true, sinAjustar: sinAjustar, contados: propios.length, ajustes: sinAjustar ? 0 : ajustes.length, faltantes: faltantes, sobrantes: sobrantes, desviaciones: desv.length, detalleDesv: desv.slice(0, 15) };
   });
 }
 
@@ -8207,7 +8211,13 @@ function eliminarCorteInvWeb(token, corte) {
     let fila = -1;
     for (let i = 1; i < tc.values.length; i++) { if (txt_(tc.values[i][tc.idx.Corte]) === corte) { fila = i; break; } }
     if (fila < 0) throw new Error('No se encontró el corte.');
-    if (txt_(tc.values[fila][tc.idx.Estado]) === 'Cerrado') throw new Error('Este corte está cerrado y ya generó ajustes. Primero reábrelo y luego elimínalo.');
+    /* Si estaba cerrado, se quitan también los ajustes que generó: el inventario vuelve a depender solo de los movimientos */
+    if (txt_(tc.values[fila][tc.idx.Estado]) === 'Cerrado') {
+      const shM = invHoja_('MOV'), tm = leerTabla_(shM);
+      for (let i = tm.values.length - 1; i >= 1; i--) {
+        if (txt_(tm.values[i][tm.idx.Grupo]).indexOf('K-' + corte + '-') === 0) shM.deleteRow(i + 1);
+      }
+    }
 
     const sh = invHoja_('CONTEO');
     const resto = leerObjetos_(sh).filter(r => txt_(r.Corte) !== corte).map(invConteoFila_);
@@ -8249,6 +8259,7 @@ function reabrirCorteInvWeb(token, corte) {
     }
 
     shC.getRange(fila + 1, tc.idx.Estado + 1).setValue('Abierto');
+    if (txt_(tc.values[fila][tc.idx.Obs]).indexOf(INV_MARCA_SIN_AJUSTE) === 0) shC.getRange(fila + 1, tc.idx.Obs + 1).setValue(txt_(tc.values[fila][tc.idx.Obs]).slice(INV_MARCA_SIN_AJUSTE.length).trim());
     shC.getRange(fila + 1, tc.idx.Cerrado_Por + 1).setValue('');
     shC.getRange(fila + 1, tc.idx.Cerrado + 1).setValue('');
     invLog_(ses, 'Corte reabierto', corte, corte);
@@ -8267,7 +8278,7 @@ function cambiarFechaCorteInvWeb(token, corte, fecha) {
 
   const leer = () => {
     const sh = invHoja_('CORTES'), t = leerTabla_(sh);
-    for (let i = 1; i < t.values.length; i++) if (txt_(t.values[i][t.idx.Corte]) === corte) return { sh: sh, t: t, fila: i, estado: txt_(t.values[i][t.idx.Estado]) || 'Abierto', fecha: invFecha_(t.values[i][t.idx.Fecha]) };
+    for (let i = 1; i < t.values.length; i++) if (txt_(t.values[i][t.idx.Corte]) === corte) return { sh: sh, t: t, fila: i, sinAjuste: txt_(t.values[i][t.idx.Obs]).indexOf(INV_MARCA_SIN_AJUSTE) === 0, estado: txt_(t.values[i][t.idx.Estado]) || 'Abierto', fecha: invFecha_(t.values[i][t.idx.Fecha]) };
     throw new Error('No se encontró el corte.');
   };
   const poner = () => conBloqueo_(() => { const c = leer(); c.sh.getRange(c.fila + 1, c.t.idx.Fecha + 1).setValue(fecha); });
@@ -8283,11 +8294,12 @@ function cambiarFechaCorteInvWeb(token, corte, fecha) {
   }
 
   const ses = requerirSesion_(token, 'admin');
+  const eraSin = c0.sinAjuste;
   reabrirCorteInvWeb(token, corte);
   let r;
   try {
     poner();
-    r = cerrarCorteInvWeb(token, corte);
+    r = cerrarCorteInvWeb(token, corte, eraSin);
   } catch (e) {
     throw new Error('La fecha se cambió pero el corte quedó ABIERTO: ' + (e && e.message ? e.message : e) + ' Ciérralo de nuevo.');
   }

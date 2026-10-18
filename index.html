@@ -12498,7 +12498,7 @@ function renderCortes() {
       '<td>' + c.contados + '</td><td>' + (c.diferencias ? '<b class="segNeg">' + c.diferencias + '</b>' : '0') + '</td>' +
       '<td>' + esc(c.usuario) + '</td><td>' + (c.cerrado ? esc(c.cerradoPor) + '<div style="font-size:11px;color:#888">' + esc(c.cerrado) + '</div>' : '—') + '</td>' +
       '<td style="white-space:nowrap"><button class="btnMini" onclick="abrirCorte(\'' + escJs(c.corte) + '\')">' + (c.estado === 'Cerrado' ? '👁️ Ver' : '📝 Contar') + '</button>' +
-        (c.estado !== 'Cerrado' && esAdmin() ? ' <button class="btnMini" title="Eliminar este corte" style="color:#b71c1c" onclick="eliminarCorte(\'' + escJs(c.corte) + '\')">🗑️ Eliminar</button>' : '') + '</td></tr>').join('') + '</tbody></table>';
+        (esAdmin() ? ' <button class="btnMini" title="Eliminar este corte' + (c.estado === 'Cerrado' ? ' y los ajustes que generó' : '') + '" style="color:#b71c1c" onclick="eliminarCorte(\'' + escJs(c.corte) + '\',' + (c.estado === 'Cerrado') + ')">🗑️ Eliminar</button>' : '') + '</td></tr>').join('') + '</tbody></table>';
 }
 
 function invTipoCambio() {
@@ -12552,12 +12552,12 @@ function renderConteo() {
     (abierto ? '<span class="segBadge t">Abierto</span>' : '<span class="segBadge c">🔒 Cerrado</span>') + '</h2>' +
     '<div style="font-size:12px;color:#777;margin-top:3px">' + (abierto
       ? 'Escribe lo contado físicamente. Debajo de cada casilla ves lo que dice el sistema y la diferencia. Lo que dejes vacío no se cuenta ni se ajusta.'
-      : 'Corte cerrado: lo contado es ahora el saldo real y las diferencias quedaron registradas como ajustes en Movimientos.') + '</div></div>' +
+      : (d.info.sinAjuste ? 'Corte guardado SIN ajustar el sistema: lo contado queda como referencia y no se generó ningún ajuste en el inventario.' : 'Corte cerrado: lo contado es ahora el saldo real y las diferencias quedaron registradas como ajustes en Movimientos.')) + '</div></div>' +
     '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
     (abierto && ed ? '<button class="btn secondary" onclick="$(\'invArchivos\').click()">📄 Importar inventario físico (PDF / Excel)</button>' : '') +
     '<button class="btn secondary" onclick="invDescargarHoja()">⬇️ Hoja de conteo (Excel)</button>' +
     (abierto && ed ? '<button class="btn secondary" onclick="invLlenarTeorico()">📋 Llenar vacíos con el sistema</button><button class="btn primary" onclick="guardarConteo()">💾 Guardar conteo</button>' : '') +
-    (abierto && adm ? '<button class="btn success" onclick="cerrarCorte()">✅ Cerrar corte y ajustar diferencias</button>' : '') +
+    (abierto && adm ? '<button class="btn success" onclick="cerrarCorte()">✅ Cerrar corte y ajustar diferencias</button><button class="btn secondary" title="Opción temporal: guarda el conteo como referencia y NO modifica el inventario del sistema" onclick="cerrarCorte(true)">📥 Cerrar sin ajustar el sistema</button>' : '') +
     (!abierto && adm ? '<select id="cobUbic" style="padding:8px 10px;border-radius:8px;border:1px solid #ccc" title="Ubicación del documento de cobro"><option value="">Cobro: todas las ubicaciones</option>' + d.ubicaciones.map(u => '<option value="' + esc(u.id) + '">' + esc(u.nombre) + (u.tecnico ? ' · ' + esc(u.tecnico) : '') + '</option>').join('') + '</select>' +
       '<button class="btn primary" onclick="cobroPdf()">🧾 Documento de cobro (PDF)</button><button class="btn secondary" onclick="cobroExcel()">⬇ Cobro (Excel)</button>' : '') +
     (!abierto && adm ? '<button class="btn secondary" onclick="reabrirCorte()">🔓 Reabrir</button>' : '') +
@@ -12906,11 +12906,20 @@ async function guardarConteo(silencioso) {
   }
 }
 
-async function cerrarCorte() {
+async function cerrarCorte(sinAjustar) {
   if (!(await guardarConteo(true))) return;
   const total = invActual.ubicaciones.length * invActual.materiales.length;
   const contadas = Object.keys(invFis).reduce((n, u) => n + Object.keys(invFis[u]).length, 0);
   const sin = total - contadas;
+  if (sinAjustar) {
+    if (!confirm('¿Cerrar el corte ' + invActual.info.corte + ' SIN ajustar el sistema?\n\nLo contado queda guardado como referencia (con su teórico a ' + fmtFechaSeg(invActual.info.fecha) + '), pero NO se genera ningún ajuste: las cantidades del inventario no cambian.')) return;
+    try {
+      const r = await api('cerrarCorteInvWeb', invActual.info.corte, true);
+      toast('Corte guardado sin ajustar el sistema (' + r.contados + ' conteos).');
+      await cargarBodega(); await cargarCortes(); abrirCorte(invActual.info.corte);
+    } catch (e) { mostrarError(e, 'No se pudo cerrar el corte.'); }
+    return;
+  }
   if (!confirm('¿Cerrar el corte ' + invActual.info.corte + '?\n\nLo contado pasa a ser el saldo real y cada diferencia se registra como un ajuste con fecha ' + fmtFechaSeg(invActual.info.fecha) + '.' +
     (sin > 0 ? '\n\n⚠️ Hay ' + sin + ' casillas SIN contar: esas no se ajustan y siguen con lo que dice el sistema.' : '') +
     '\n\nRecuerda: la fecha del corte debe ser el día en que se hizo el conteo.')) return;
@@ -12929,8 +12938,8 @@ async function cerrarCorte() {
   }
 }
 
-async function eliminarCorte(corte) {
-  if (!confirm('¿Eliminar el corte ' + corte + '?\n\nSe borra también lo que se haya contado en él. Esta acción no se puede deshacer.')) return;
+async function eliminarCorte(corte, cerrado) {
+  if (!confirm('¿Eliminar el corte ' + corte + '?\n\nSe borra también lo que se haya contado en él.' + (cerrado ? '\n\n⚠️ Como está cerrado, también se borran los ajustes que generó en el inventario: las cantidades vuelven a depender solo de ingresos, entregas, devoluciones y gastos (pueden quedar saldos en negativo).' : '') + '\n\nEsta acción no se puede deshacer.')) return;
   try {
     await api('eliminarCorteInvWeb', corte);
     toast('Corte eliminado.');
@@ -15300,6 +15309,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 117 · 18-oct 09:14</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 118 · 18-oct 09:21</div>
 </body>
 </html>
