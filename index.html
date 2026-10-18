@@ -12557,7 +12557,7 @@ function renderConteo() {
     (abierto && ed ? '<button class="btn secondary" onclick="$(\'invArchivos\').click()">📄 Importar inventario físico (PDF / Excel)</button>' : '') +
     '<button class="btn secondary" onclick="invDescargarHoja()">⬇️ Hoja de conteo (Excel)</button>' +
     (abierto && ed ? '<button class="btn secondary" onclick="invLlenarTeorico()">📋 Llenar vacíos con el sistema</button><button class="btn primary" onclick="guardarConteo()">💾 Guardar conteo</button>' : '') +
-    (abierto && adm ? '<button class="btn success" onclick="cerrarCorte()">✅ Cerrar corte y ajustar diferencias</button><button class="btn primary" title="Opción temporal: lo contado pasa a ser el inventario al INICIO de la fecha del corte y se le suman las entregas, devoluciones y gastos de esa fecha en adelante" onclick="cerrarCorte(\'inicial\')">📌 Cerrar como inventario inicial</button><button class="btn secondary" title="Opción temporal: guarda el conteo como referencia y NO modifica el inventario del sistema" onclick="cerrarCorte(true)">📥 Cerrar sin ajustar el sistema</button>' : '') +
+    (abierto && adm ? '<button class="btn success" onclick="cerrarCorte()">✅ Cerrar corte y ajustar diferencias</button>' : '') +
     (!abierto && adm ? '<select id="cobUbic" style="padding:8px 10px;border-radius:8px;border:1px solid #ccc" title="Ubicación del documento de cobro"><option value="">Cobro: todas las ubicaciones</option>' + d.ubicaciones.map(u => '<option value="' + esc(u.id) + '">' + esc(u.nombre) + (u.tecnico ? ' · ' + esc(u.tecnico) : '') + '</option>').join('') + '</select>' +
       '<button class="btn primary" onclick="cobroPdf()">🧾 Documento de cobro (PDF)</button><button class="btn secondary" onclick="cobroExcel()">⬇ Cobro (Excel)</button>' : '') +
     (!abierto && adm ? '<button class="btn secondary" onclick="reabrirCorte()">🔓 Reabrir</button>' : '') +
@@ -12906,45 +12906,47 @@ async function guardarConteo(silencioso) {
   }
 }
 
-async function cerrarCorte(sinAjustar) {
+async function cerrarCorte() {
   if (!(await guardarConteo(true))) return;
+  await cierreVerificar(invActual.info.fecha);
+}
+
+/* Cuadro de verificación: la fecha del conteo se confirma (o se corrige) antes de cerrar */
+async function cierreVerificar(fecha) {
+  let r;
+  try { r = await api('resumenCierreCorteInvWeb', invActual.info.corte, fecha); }
+  catch (e) { mostrarError(e, 'No se pudo preparar la verificación.'); return; }
   const total = invActual.ubicaciones.length * invActual.materiales.length;
   const contadas = Object.keys(invFis).reduce((n, u) => n + Object.keys(invFis[u]).length, 0);
   const sin = total - contadas;
-  if (sinAjustar === 'inicial') {
-    if (!confirm('¿Cerrar el corte ' + invActual.info.corte + ' como INVENTARIO INICIAL?\n\nLo contado pasa a ser lo que había al INICIO del ' + fmtFechaSeg(invActual.info.fecha) + '. A esas cantidades se les suman todos los ingresos, entregas, devoluciones y gastos desde esa fecha (incluida) en adelante.\n\nLo anterior a esa fecha deja de influir en las cantidades de lo contado. Las casillas sin contar no cambian.')) return;
-    try {
-      const r = await api('cerrarCorteInvWeb', invActual.info.corte, 'inicial');
-      toast('Inventario inicial aplicado (' + r.contados + ' conteos).');
-      await cargarBodega(); await cargarCortes(); abrirCorte(invActual.info.corte);
-    } catch (e) { mostrarError(e, 'No se pudo cerrar el corte.'); }
-    return;
-  }
-  if (sinAjustar) {
-    if (!confirm('¿Cerrar el corte ' + invActual.info.corte + ' SIN ajustar el sistema?\n\nLo contado queda guardado como referencia (con su teórico a ' + fmtFechaSeg(invActual.info.fecha) + '), pero NO se genera ningún ajuste: las cantidades del inventario no cambian.')) return;
-    try {
-      const r = await api('cerrarCorteInvWeb', invActual.info.corte, true);
-      toast('Corte guardado sin ajustar el sistema (' + r.contados + ' conteos).');
-      await cargarBodega(); await cargarCortes(); abrirCorte(invActual.info.corte);
-    } catch (e) { mostrarError(e, 'No se pudo cerrar el corte.'); }
-    return;
-  }
-  if (!confirm('¿Cerrar el corte ' + invActual.info.corte + '?\n\nLo contado pasa a ser el saldo real y cada diferencia se registra como un ajuste con fecha ' + fmtFechaSeg(invActual.info.fecha) + '.' +
-    (sin > 0 ? '\n\n⚠️ Hay ' + sin + ' casillas SIN contar: esas no se ajustan y siguen con lo que dice el sistema.' : '') +
-    '\n\nRecuerda: la fecha del corte debe ser el día en que se hizo el conteo.')) return;
+  const posteriores = r.movimientosPosteriores || r.gastosPosteriores;
+  devModal('<h3>🗓️ Verificar la fecha antes de cerrar el corte</h3>' +
+    '<div style="font-size:13px;color:#555;margin-bottom:10px">El ajuste compara lo contado contra lo que el sistema tenía <b>ese día</b>. Si la fecha no es la del conteo real, las diferencias (y el cobro) salen mal.</div>' +
+    '<label style="display:block;margin-bottom:10px"><b>Fecha en que se hizo el conteo físico</b><input id="cvFecha" type="date" value="' + esc(r.fecha) + '" onchange="cierreVerificar(this.value)" style="display:block;margin-top:4px;padding:8px 10px;font-size:15px"></label>' +
+    '<div style="background:#f6f6f6;border-radius:8px;padding:10px 12px;font-size:13px;line-height:1.6">' +
+    '📅 Hoy es <b>' + esc(fmtFechaSeg(r.hoy)) + '</b> · último movimiento registrado: <b>' + esc(r.ultimoMovimiento ? fmtFechaSeg(r.ultimoMovimiento) : '—') + '</b><br>' +
+    (posteriores ? '↪️ Con esta fecha quedan <b>' + r.movimientosPosteriores + '</b> documento(s) de bodega y <b>' + r.gastosPosteriores + '</b> línea(s) de gastos <b>posteriores</b>: se conservan y se suman a lo contado.' : '↪️ No hay movimientos ni gastos posteriores a esta fecha.') + '<br>' +
+    '🧮 Se ajustarán <b>' + r.contados + '</b> conteos: <b style="color:#b71c1c">' + r.faltantes + ' faltantes</b> y <b style="color:#2e7d32">' + r.sobrantes + ' sobrantes</b>.' +
+    (sin > 0 ? '<br>⚠️ Hay <b>' + sin + '</b> casillas sin contar: no se ajustan.' : '') + '</div>' +
+    (r.fecha > r.hoy ? '<div style="margin-top:8px;font-size:13px;color:#b71c1c;font-weight:700">⚠️ La fecha es posterior a hoy. Revísala.</div>' : '') +
+    (r.fecha < r.hoy && posteriores ? '<div style="margin-top:8px;font-size:12.5px;color:#8a5a00">Si el conteo lo hiciste hoy, cambia la fecha a hoy: así las entregas y gastos de los días anteriores quedan dentro del teórico.</div>' : '') +
+    '<label style="display:flex;gap:8px;align-items:flex-start;margin-top:12px;font-size:13.5px"><input type="checkbox" id="cvOk" onchange="$(\'cvCerrar\').disabled=!this.checked" style="margin-top:3px"><span>Confirmo que el conteo físico se hizo el <b>' + esc(fmtFechaSeg(r.fecha)) + '</b> y que las entregas, devoluciones y gastos hasta esa fecha ya están registrados.</span></label>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn success" id="cvCerrar" disabled onclick="cierreConfirmar()">✅ Confirmar fecha y cerrar</button><button class="btn secondary" onclick="devCerrar()">Cancelar</button></div>');
+}
+
+async function cierreConfirmar() {
+  const f = $('cvFecha').value;
+  const btn = $('cvCerrar'); btn.disabled = true;
   try {
+    if (f && f !== invActual.info.fecha) await api('cambiarFechaCorteInvWeb', invActual.info.corte, f);
     const r = await api('cerrarCorteInvWeb', invActual.info.corte);
+    devCerrar();
     toast('Corte cerrado: ' + r.faltantes + ' faltantes y ' + r.sobrantes + ' sobrantes ajustados.');
-    if (r.desviaciones) alert('Corte cerrado, pero ' + r.desviaciones + ' conteos NO coinciden hoy con el sistema, porque hubo movimientos registrados después de la fecha del corte (' + fmtFechaSeg(invActual.info.fecha) + '):\n\n' +
-      r.detalleDesv.map(x => '• ' + x.ubicacion + ' · ' + x.material + ': sistema ' + fmtN(x.sistema) + ' / físico ' + fmtN(x.fisico)).join('\n') +
-      (r.desviaciones > r.detalleDesv.length ? '\n…' : '') + '\n\nPara evitarlo, crea el corte con la fecha real del conteo y ciérralo ese mismo día.');
+    if (r.desviaciones) alert('Corte cerrado. ' + r.desviaciones + ' conteos NO coinciden hoy con el sistema, porque hay movimientos registrados después de la fecha del corte (' + fmtFechaSeg(f) + '). Es lo esperado:\n\n' +
+      r.detalleDesv.map(x => '• ' + x.ubicacion + ' · ' + x.material + ': sistema ' + fmtN(x.sistema) + ' / físico ' + fmtN(x.fisico)).join('\n') + (r.desviaciones > r.detalleDesv.length ? '\n…' : ''));
     else alert('✅ El inventario del sistema quedó igual al físico en los ' + r.contados + ' conteos del corte.');
-    await cargarBodega();
-    await cargarCortes();
-    abrirCorte(invActual.info.corte);
-  } catch (e) {
-    mostrarError(e, 'No se pudo cerrar el corte.');
-  }
+    await cargarBodega(); await cargarCortes(); abrirCorte(invActual.info.corte);
+  } catch (e) { mostrarError(e, 'No se pudo cerrar el corte.'); btn.disabled = false; }
 }
 
 async function eliminarCorte(corte, cerrado) {
@@ -15318,6 +15320,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 119 · 18-oct 09:31</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 120 · 18-oct 09:41</div>
 </body>
 </html>
