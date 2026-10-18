@@ -767,6 +767,7 @@
           <span style="flex:1 1 20px"></span>
           <button id="btnActivarTodas" class="btn secondary" title="Pone «Activa» en todas las casillas vacías de las móviles con técnico (no toca las que ya tienen estado)" onclick="activarTodas()">✅ Activar todas</button>
           <button id="btnDeshacerCal" class="btn secondary" title="Deshace el último cambio (o el último guardado)" onclick="deshacerCalendario()">↩️ Deshacer</button>
+          <button id="btnCerrarCal" class="btn secondary" title="Cierra la semana para que nadie la modifique por error" onclick="cerrarCronograma()">🔒 Cerrar cronograma</button>
           <button id="btnExport" class="btn warning" onclick="exportarCalendarioCliente()">📥 Calendario Cliente (Excel)</button>
         </div>
 
@@ -780,6 +781,7 @@
             <h2>Cronograma semanal</h2>
             <span id="tituloSemana"></span>
           </div>
+          <div id="calBannerCerrado" style="display:none"></div>
           <div id="calendarioContenido" class="tableWrap">
             <div class="loading">Cargando cronograma...</div>
           </div>
@@ -3107,8 +3109,14 @@ function renderizarCalendario() {
   const estadoDe = (ri, di) => { const k = ri + '_' + di; return k in cambios ? cambios[k] : calendario.moviles[ri].estados[di]; };
   let mostradas = 0;
 
-  $('btnActivarTodas').style.display = puedeEditar() ? '' : 'none';
-  $('btnDeshacerCal').style.display = puedeEditar() ? '' : 'none';
+  $('btnActivarTodas').style.display = calEditable() ? '' : 'none';
+  $('btnDeshacerCal').style.display = calEditable() ? '' : 'none';
+  const cer = calendario.cerrado;
+  $('btnCerrarCal').style.display = puedeEditar() && (!cer || esAdmin()) ? '' : 'none';
+  $('btnCerrarCal').textContent = cer ? '🔓 Reabrir cronograma' : '🔒 Cerrar cronograma';
+  $('btnCerrarCal').title = cer ? 'Vuelve a permitir cambios en esta semana (solo administrador)' : 'Cierra la semana para que nadie la modifique por error';
+  $('calBannerCerrado').style.display = cer ? '' : 'none';
+  $('calBannerCerrado').innerHTML = cer ? '<div style="background:#fff3cd;border:1px solid #f0d78a;border-radius:8px;padding:9px 12px;margin:0 0 10px;font-size:13.5px">🔒 <b>Cronograma cerrado</b> por ' + esc(cer.nombre || cer.por) + ' el ' + esc(cer.fecha) + '. No se pueden hacer cambios' + (esAdmin() ? '; usa «Reabrir cronograma» para modificarlo.' : ' hasta que el administrador lo reabra.') + '</div>' : '';
 
   calendario.moviles.forEach((m, ri) => {
 
@@ -3155,7 +3163,7 @@ function selectEstado(valor, ri, di) {
   const clase = valor ? 'state-' + valor.toLowerCase() : 'state-empty';
 
   let html = '<select class="state ' + clase + '"' +
-    (puedeEditar() ? '' : ' disabled') +
+    (calEditable() ? '' : ' disabled') +
     ' onchange="cambioEstado(' + ri + ',' + di + ',this.value)">' +
     '<option value="">--</option>';
 
@@ -3171,7 +3179,25 @@ function snapshotCambios() {
   if (undoPila.length > 60) undoPila.shift();
 }
 
+/* Se puede editar si el usuario tiene permiso y la semana no está cerrada */
+function calEditable() { return puedeEditar() && !(calendario && calendario.cerrado); }
+
+async function cerrarCronograma() {
+  if (!calendario) return;
+  const cer = calendario.cerrado;
+  if (!cer && Object.keys(cambios).length && !confirm('Hay cambios sin guardar en esta semana. Si la cierras ahora se pierden.\n\n¿Cerrar de todos modos?')) return;
+  if (!confirm(cer ? '¿Reabrir el cronograma de la semana ' + calendario.week + '? Se podrán volver a hacer cambios.' : '¿Cerrar el cronograma de la semana ' + calendario.week + '?\n\nNadie podrá modificarlo hasta que el administrador lo reabra.')) return;
+  try {
+    await api('cerrarCronogramaWeb', calendario.year, calendario.week, !cer);
+    cambios = {}; undoPila = []; actualizarAviso();
+    toast(cer ? 'Cronograma reabierto.' : 'Cronograma cerrado.');
+    const data = await api('obtenerCalendarioWeb', calendario.year, calendario.week);
+    calendario = data; renderizarCalendario();
+  } catch (e) { mostrarError(e, 'No se pudo cambiar el estado del cronograma.'); }
+}
+
 function cambioEstado(ri, di, valor) {
+  if (!calEditable()) return;
 
   const key = ri + '_' + di;
   const original = calendario.moviles[ri].estados[di] || '';
@@ -3289,7 +3315,7 @@ function guardarCambiosConComentario(comentario) {
 
 function activarTodas() {
 
-  if (!calendario || !puedeEditar()) return;
+  if (!calendario || !calEditable()) return;
 
   snapshotCambios();
 
@@ -3322,7 +3348,7 @@ function activarTodas() {
 
 function deshacerCalendario() {
 
-  if (!calendario || !puedeEditar()) return;
+  if (!calendario || !calEditable()) return;
 
   /* 1) Cambios todavía sin guardar */
   if (undoPila.length) {
@@ -15336,6 +15362,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 123 · 18-oct 10:03</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 124 · 18-oct 10:13</div>
 </body>
 </html>
