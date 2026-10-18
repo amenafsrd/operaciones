@@ -1259,12 +1259,9 @@
 
         <div id="bodPanelCat" style="display:none">
           <div class="panel">
-            <div class="panelHead"><div><h2>Catálogo de materiales</h2>
-              <div style="font-size:12px;color:#777;margin-top:3px">Los materiales oficiales son los del inventario físico (con código). «Stock por móvil» es lo que debe llevar cada móvil; después se ajusta móvil por móvil en Stock de móviles → 🎯. Alias = otros nombres (p. ej. el que trae el reporte de gastos), separados por «;».</div></div>
-              <div id="catAdmin" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" onclick="abrirCatOficial()">📋 Cargar catálogo oficial</button>
-                <button class="btn secondary" onclick="catAbrir()">🏷️ Categorías</button>
-                <button class="btn secondary" onclick="borrarSinCodigo()">🗑️ Borrar los que no tienen código</button>
-                <button class="btn secondary" onclick="aplicarCostosAdendum()">💲 Cargar costos del adendum + stock completo</button></div></div>
+            <div class="panelHead" style="align-items:flex-start;gap:10px;flex-wrap:wrap"><div style="flex:1;min-width:260px"><h2>Catálogo de materiales <span id="catConteo" style="font-weight:400;color:#888;font-size:14px"></span></h2>
+              <div style="font-size:12px;color:#777;margin-top:3px;line-height:1.45"><b>Stock móvil</b>: lo que debe llevar cada móvil (se ajusta por móvil en Stock de móviles). <b>Alias</b>: otros nombres del material, separados por «;». Cada fila se guarda con 💾.</div></div>
+              <div id="catAdmin" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end"></div></div>
             <div id="bodTablaCat" class="tableWrap"></div>
           </div>
         </div>
@@ -12432,6 +12429,11 @@ function renderBodPanorama() {
   bodRenderAlertas();
   const mats = panMatsVisibles();
   panRenderBox();
+  if (!mats.length) {
+    const cat = $('panCat').value;
+    $('bodPanorama').innerHTML = '<div class="empty">' + (cat && !bodMats(false).some(m => m.categoria === cat) ? 'Ningún material tiene la categoría <b>' + esc(cat) + '</b> todavía. Asígnala en <b>Catálogo</b>: cambia la categoría del material y pulsa <b>Guardar</b> en su fila.' : 'No hay materiales con este filtro. Revisa la categoría o el menú de Materiales.') + '</div>';
+    return;
+  }
   const t = panTotales(mats);
   const alertSet = {}; bodAlertasLista().forEach(x => { alertSet[x.m.clave] = true; });
   const n = v => '<td style="' + (v < 0 ? 'color:#b71c1c;font-weight:700' : '') + '">' + (v === 0 ? '<span class="segSinCarga">—</span>' : fmtN(v)) + '</td>';
@@ -13656,21 +13658,35 @@ function renderBodCat() {
 
   const adm = esAdmin();
   const l = bodDatos.materiales;
+  const hayOficial = l.some(x => x.codigo);
+  const sinCod = l.filter(x => !x.codigo).length;
 
-  $('bodTablaCat').innerHTML = '<table class="table" style="min-width:1000px"><thead><tr><th>Código</th><th class="left">Material</th><th>Categoría</th><th>Unidad</th><th>Stock por móvil</th><th>Mínimo en bodega</th><th title="Stock al 100% (móviles + reserva de bodega). Si lo disponible en bodega llega al 20% de esta cantidad se genera la alerta.">Stock completo bodega (100%)</th><th>Costo unitario (₡)</th><th class="left">Alias (otros nombres: reporte de gastos, inventario)</th><th>Activo</th>' + (adm ? '<th></th>' : '') + '</tr></thead><tbody>' +
+  $('catConteo').textContent = '· ' + l.length;
+  $('catAdmin').innerHTML = (!hayOficial ? '<button class="btn primary" title="Carga el catálogo oficial con sus códigos (solo cuando el catálogo aún no tiene materiales con código)" onclick="abrirCatOficial()">📋 Importar catálogo</button>' : '') +
+    '<button class="btn secondary" title="Crear, renombrar o quitar categorías" onclick="catAbrir()">🏷️ Categorías</button>' +
+    '<button class="btn secondary" title="Cargar costos del adendum y stock completo" onclick="aplicarCostosAdendum()">💲 Costos</button>' +
+    (sinCod && hayOficial ? '<button class="btn secondary" title="Borrar los materiales que no tienen código" onclick="borrarSinCodigo()">🗑️ Sin código (' + sinCod + ')</button>' : '');
+
+  const I = 'style="width:100%;box-sizing:border-box;padding:6px 7px;font-size:13px"';
+  const inp = (id, v, ph) => '<input id="' + id + '" value="' + esc(v) + '"' + (ph ? ' placeholder="' + ph + '"' : '') + ' ' + I + '>';
+  const num = (id, v) => '<input id="' + id + '" type="number" min="0" step="any" value="' + (v || '') + '" style="width:100%;box-sizing:border-box;padding:6px 4px;font-size:13px;text-align:right">';
+  const sel = (id, actual) => '<select id="' + id + '" onchange="catSelNueva(this)" ' + I + '>' + bodCategorias().map(k => '<option' + (actual === k ? ' selected' : '') + '>' + esc(k) + '</option>').join('') + '<option value="__nueva">➕ Nueva categoría…</option></select>';
+  const th = (t, w, tt, left) => '<th' + (left ? ' class="left"' : '') + ' style="width:' + w + 'px;font-size:12px;padding:8px 6px"' + (tt ? ' title="' + esc(tt) + '"' : '') + '>' + t + '</th>';
+
+  const filaNueva = '<tr style="background:#fff8e6"><td>' + inp('cat_c_new', '', 'Código') + '</td><td>' + inp('cat_n_new', '', '➕ Nuevo material') + '</td><td>' + sel('cat_k_new', '') + '</td><td>' + inp('cat_u_new', 'u') + '</td>' +
+    '<td>' + num('cat_b_new', '') + '</td><td>' + num('cat_m_new', '') + '</td><td>' + num('cat_f_new', '') + '</td><td>' + num('cat_p_new', '') + '</td><td></td><td></td><td><button class="btnMini" title="Agregar el material" onclick="guardarMaterial(-1)">➕</button></td></tr>';
+
+  $('bodTablaCat').innerHTML = '<table class="table" style="min-width:1060px;table-layout:fixed"><thead><tr>' +
+    th('Código', 92, '', false) + '<th class="left" style="font-size:12px;padding:8px 6px">Material</th>' + th('Categoría', 120) + th('Unid.', 56) + th('Stock móvil', 86, 'Lo que debe llevar cada móvil') + th('Mín. bodega', 92, 'Mínimo en bodega') +
+    th('Stock 100%', 84, 'Stock completo de bodega al 100% (móviles + reserva). Si lo disponible llega al 20% se genera la alerta.') + th('Costo ₡', 92, 'Costo unitario en colones') + th('Alias', 170, 'Otros nombres del material (reporte de gastos, inventario), separados por «;»', true) + th('Act.', 44) + (adm ? th('', 84) : '') + '</tr></thead><tbody>' +
+    (adm ? filaNueva : '') +
     l.map((m, i) => adm
-      ? '<tr><td><input id="cat_c_' + i + '" value="' + esc(m.codigo) + '" style="width:80px"></td><td><input id="cat_n_' + i + '" value="' + esc(m.material) + '" style="width:260px"></td><td><select id="cat_k_' + i + '" onchange="catSelNueva(this)">' + bodCategorias().map(k => '<option' + (m.categoria === k ? ' selected' : '') + '>' + esc(k) + '</option>').join('') + '<option value="__nueva">➕ Nueva categoría…</option></select></td><td><input id="cat_u_' + i + '" value="' + esc(m.unidad) + '" style="width:60px"></td>' +
-        '<td><input id="cat_b_' + i + '" type="number" min="0" step="any" value="' + (m.base || '') + '" style="width:80px"></td>' +
-        '<td><input id="cat_m_' + i + '" type="number" min="0" step="any" value="' + (m.minimo || '') + '" style="width:80px"></td>' +
-        '<td><input id="cat_f_' + i + '" type="number" min="0" step="any" value="' + (m.completo || '') + '" style="width:90px"></td>' +
-        '<td><input id="cat_p_' + i + '" type="number" min="0" step="any" value="' + (m.costo || '') + '" style="width:90px"></td>' +
-        '<td><input id="cat_a_' + i + '" value="' + esc(m.alias) + '" style="width:180px"></td>' +
-        '<td><input id="cat_v_' + i + '" type="checkbox"' + (m.activo ? ' checked' : '') + '></td>' +
-        '<td><button class="btnMini" onclick="guardarMaterial(' + i + ')">💾</button>' +
-          (!m.codigo && l.some(x => x.codigo) ? ' <button class="btnMini" title="Relacionar con un material oficial" onclick="abrirUnir(' + i + ')">🔗</button>' : '') + '</td></tr>'
-      : '<tr><td>' + esc(codP(m.codigo)) + (String(m.codigo || '').indexOf(';') >= 0 ? '<div style="font-size:11px;color:#999" title="Otros códigos con los que el sistema reconoce este material en los archivos importados (se quitan con ✏️ Editar)">también: ' + esc(String(m.codigo).split(';').slice(1).join(', ')) + '</div>' : '') + '</td><td class="left"><b>' + esc(m.material) + '</b></td><td>' + esc(m.categoria) + '</td><td>' + esc(m.unidad) + '</td><td>' + (m.base || '—') + '</td><td>' + (m.minimo || '—') + '</td><td>' + (m.completo || '—') + '</td><td>' + (m.costo ? colones(m.costo) : '—') + '</td><td class="left">' + esc(m.alias) + '</td><td>' + (m.activo ? 'Sí' : 'No') + '</td></tr>').join('') +
-    (adm ? '<tr style="background:#f6f6f6"><td><input id="cat_c_new" placeholder="Código" style="width:80px"></td><td><input id="cat_n_new" placeholder="Nuevo material" style="width:260px"></td><td><select id="cat_k_new" onchange="catSelNueva(this)">' + bodCategorias().map(k => '<option>' + esc(k) + '</option>').join('') + '<option value="__nueva">➕ Nueva categoría…</option></select></td><td><input id="cat_u_new" value="u" style="width:60px"></td>' +
-      '<td><input id="cat_b_new" type="number" min="0" step="any" style="width:80px"></td><td><input id="cat_m_new" type="number" min="0" step="any" style="width:80px"></td><td><input id="cat_f_new" type="number" min="0" step="any" style="width:90px"></td><td><input id="cat_p_new" type="number" min="0" step="any" style="width:90px"></td><td></td><td></td><td><button class="btnMini" onclick="guardarMaterial(-1)">➕ Agregar</button></td></tr>' : '') +
+      ? '<tr><td>' + inp('cat_c_' + i, m.codigo) + '</td><td>' + inp('cat_n_' + i, m.material) + '</td><td>' + sel('cat_k_' + i, m.categoria) + '</td><td>' + inp('cat_u_' + i, m.unidad) + '</td>' +
+        '<td>' + num('cat_b_' + i, m.base) + '</td><td>' + num('cat_m_' + i, m.minimo) + '</td><td>' + num('cat_f_' + i, m.completo) + '</td><td>' + num('cat_p_' + i, m.costo) + '</td>' +
+        '<td>' + inp('cat_a_' + i, m.alias) + '</td><td><input id="cat_v_' + i + '" type="checkbox"' + (m.activo ? ' checked' : '') + '></td>' +
+        '<td style="white-space:nowrap"><button class="btnMini" title="Guardar los cambios de esta fila" onclick="guardarMaterial(' + i + ')">💾</button>' +
+          (!m.codigo && hayOficial ? ' <button class="btnMini" title="Relacionar con un material oficial" onclick="abrirUnir(' + i + ')">🔗</button>' : '') + '</td></tr>'
+      : '<tr><td>' + esc(codP(m.codigo)) + (String(m.codigo || '').indexOf(';') >= 0 ? '<div style="font-size:11px;color:#999" title="Otros códigos con los que el sistema reconoce este material en los archivos importados">también: ' + esc(String(m.codigo).split(';').slice(1).join(', ')) + '</div>' : '') + '</td><td class="left"><b>' + esc(m.material) + '</b></td><td>' + esc(m.categoria) + '</td><td>' + esc(m.unidad) + '</td><td>' + (m.base || '—') + '</td><td>' + (m.minimo || '—') + '</td><td>' + (m.completo || '—') + '</td><td>' + (m.costo ? colones(m.costo) : '—') + '</td><td class="left">' + esc(m.alias) + '</td><td>' + (m.activo ? 'Sí' : 'No') + '</td></tr>').join('') +
     '</tbody></table>';
 }
 
@@ -15320,6 +15336,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 121 · 18-oct 09:46</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 123 · 18-oct 10:03</div>
 </body>
 </html>
