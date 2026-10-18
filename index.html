@@ -12552,12 +12552,12 @@ function renderConteo() {
     (abierto ? '<span class="segBadge t">Abierto</span>' : '<span class="segBadge c">🔒 Cerrado</span>') + '</h2>' +
     '<div style="font-size:12px;color:#777;margin-top:3px">' + (abierto
       ? 'Escribe lo contado físicamente. Debajo de cada casilla ves lo que dice el sistema y la diferencia. Lo que dejes vacío no se cuenta ni se ajusta.'
-      : (d.info.sinAjuste ? 'Corte guardado SIN ajustar el sistema: lo contado queda como referencia y no se generó ningún ajuste en el inventario.' : 'Corte cerrado: lo contado es ahora el saldo real y las diferencias quedaron registradas como ajustes en Movimientos.')) + '</div></div>' +
+      : (d.info.inicial ? 'Corte cerrado como INVENTARIO INICIAL: lo contado es lo que había al inicio de la fecha y se le suman los movimientos de esa fecha en adelante.' : d.info.sinAjuste ? 'Corte guardado SIN ajustar el sistema: lo contado queda como referencia y no se generó ningún ajuste en el inventario.' : 'Corte cerrado: lo contado es ahora el saldo real y las diferencias quedaron registradas como ajustes en Movimientos.')) + '</div></div>' +
     '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
     (abierto && ed ? '<button class="btn secondary" onclick="$(\'invArchivos\').click()">📄 Importar inventario físico (PDF / Excel)</button>' : '') +
     '<button class="btn secondary" onclick="invDescargarHoja()">⬇️ Hoja de conteo (Excel)</button>' +
     (abierto && ed ? '<button class="btn secondary" onclick="invLlenarTeorico()">📋 Llenar vacíos con el sistema</button><button class="btn primary" onclick="guardarConteo()">💾 Guardar conteo</button>' : '') +
-    (abierto && adm ? '<button class="btn success" onclick="cerrarCorte()">✅ Cerrar corte y ajustar diferencias</button><button class="btn secondary" title="Opción temporal: guarda el conteo como referencia y NO modifica el inventario del sistema" onclick="cerrarCorte(true)">📥 Cerrar sin ajustar el sistema</button>' : '') +
+    (abierto && adm ? '<button class="btn success" onclick="cerrarCorte()">✅ Cerrar corte y ajustar diferencias</button><button class="btn primary" title="Opción temporal: lo contado pasa a ser el inventario al INICIO de la fecha del corte y se le suman las entregas, devoluciones y gastos de esa fecha en adelante" onclick="cerrarCorte(\'inicial\')">📌 Cerrar como inventario inicial</button><button class="btn secondary" title="Opción temporal: guarda el conteo como referencia y NO modifica el inventario del sistema" onclick="cerrarCorte(true)">📥 Cerrar sin ajustar el sistema</button>' : '') +
     (!abierto && adm ? '<select id="cobUbic" style="padding:8px 10px;border-radius:8px;border:1px solid #ccc" title="Ubicación del documento de cobro"><option value="">Cobro: todas las ubicaciones</option>' + d.ubicaciones.map(u => '<option value="' + esc(u.id) + '">' + esc(u.nombre) + (u.tecnico ? ' · ' + esc(u.tecnico) : '') + '</option>').join('') + '</select>' +
       '<button class="btn primary" onclick="cobroPdf()">🧾 Documento de cobro (PDF)</button><button class="btn secondary" onclick="cobroExcel()">⬇ Cobro (Excel)</button>' : '') +
     (!abierto && adm ? '<button class="btn secondary" onclick="reabrirCorte()">🔓 Reabrir</button>' : '') +
@@ -12911,6 +12911,15 @@ async function cerrarCorte(sinAjustar) {
   const total = invActual.ubicaciones.length * invActual.materiales.length;
   const contadas = Object.keys(invFis).reduce((n, u) => n + Object.keys(invFis[u]).length, 0);
   const sin = total - contadas;
+  if (sinAjustar === 'inicial') {
+    if (!confirm('¿Cerrar el corte ' + invActual.info.corte + ' como INVENTARIO INICIAL?\n\nLo contado pasa a ser lo que había al INICIO del ' + fmtFechaSeg(invActual.info.fecha) + '. A esas cantidades se les suman todos los ingresos, entregas, devoluciones y gastos desde esa fecha (incluida) en adelante.\n\nLo anterior a esa fecha deja de influir en las cantidades de lo contado. Las casillas sin contar no cambian.')) return;
+    try {
+      const r = await api('cerrarCorteInvWeb', invActual.info.corte, 'inicial');
+      toast('Inventario inicial aplicado (' + r.contados + ' conteos).');
+      await cargarBodega(); await cargarCortes(); abrirCorte(invActual.info.corte);
+    } catch (e) { mostrarError(e, 'No se pudo cerrar el corte.'); }
+    return;
+  }
   if (sinAjustar) {
     if (!confirm('¿Cerrar el corte ' + invActual.info.corte + ' SIN ajustar el sistema?\n\nLo contado queda guardado como referencia (con su teórico a ' + fmtFechaSeg(invActual.info.fecha) + '), pero NO se genera ningún ajuste: las cantidades del inventario no cambian.')) return;
     try {
@@ -15309,6 +15318,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 118 · 18-oct 09:21</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 119 · 18-oct 09:31</div>
 </body>
 </html>

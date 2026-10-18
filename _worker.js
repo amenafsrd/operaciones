@@ -7950,9 +7950,12 @@ function invTeorico_(hasta, movs, cons) {
   return t;
 }
 
-const INV_MARCA_SIN_AJUSTE = '[SIN AJUSTE]';
+const INV_MARCA_SIN_AJUSTE = '[SIN AJUSTE]', INV_MARCA_INICIAL = '[INICIAL]';
+/* Modo de un corte guardado: 'sin' (solo referencia), 'inicial' (lo contado es el inventario al INICIO del día de la fecha) o '' (corte normal) */
+function invModoCorte_(obs) { obs = txt_(obs); return obs.indexOf(INV_MARCA_SIN_AJUSTE) === 0 ? 'sin' : obs.indexOf(INV_MARCA_INICIAL) === 0 ? 'inicial' : ''; }
+function invObsLimpia_(obs) { return txt_(obs).replace(/^\[(SIN AJUSTE|INICIAL)\]\s*/, '').trim(); }
 function invCorteInfo_(o) {
-  return { corte: txt_(o.Corte), fecha: invFecha_(o.Fecha), estado: txt_(o.Estado) || 'Abierto', obs: txt_(o.Obs), sinAjuste: txt_(o.Obs).indexOf(INV_MARCA_SIN_AJUSTE) === 0,
+  return { corte: txt_(o.Corte), fecha: invFecha_(o.Fecha), estado: txt_(o.Estado) || 'Abierto', obs: txt_(o.Obs), sinAjuste: invModoCorte_(o.Obs) === 'sin', inicial: invModoCorte_(o.Obs) === 'inicial',
     usuario: txt_(o.Usuario), creado: txt_(o.Creado), cerradoPor: txt_(o.Cerrado_Por), cerrado: txt_(o.Cerrado),
     tipo: txt_(o.Tipo) === 'Individual' ? 'Individual' : 'General', ubicacion: txt_(o.Ubicacion) };
 }
@@ -8142,14 +8145,17 @@ function cerrarCorteInvWeb(token, corte, sinAjustar) {
     }
     if (!info) throw new Error('No se encontró el corte.');
     if (info.estado === 'Cerrado') throw new Error('Este corte ya está cerrado.');
-    sinAjustar = sinAjustar === true || sinAjustar === 'true' || sinAjustar === 1;
+    const modo = (sinAjustar === true || sinAjustar === 'true' || sinAjustar === 1 || sinAjustar === 'sin') ? 'sin' : (sinAjustar === 'inicial' ? 'inicial' : '');
+    sinAjustar = modo === 'sin';
+    /* Inventario inicial: lo contado es lo que había al comenzar la fecha; sus ajustes quedan el día anterior y todo lo de esa fecha en adelante se suma */
+    const fechaAj = modo === 'inicial' ? invDiaAnterior_(info.fecha) : info.fecha;
 
     const sh = invHoja_('CONTEO');
     const todos = leerObjetos_(sh);
     const propios = todos.filter(r => txt_(r.Corte) === corte);
     if (!propios.length) throw new Error('No hay nada contado en este corte.');
 
-    const teorico = invTeorico_(info.fecha);
+    const teorico = invTeorico_(fechaAj);
     const mats = {};
     invMateriales_().forEach(m => { mats[m.clave] = m.material; });
     const mm = segMapaMoviles_();
@@ -8166,7 +8172,7 @@ function cerrarCorteInvWeb(token, corte, sinAjustar) {
         if (dif < 0) faltantes++; else sobrantes++;
         const m = o.Ubicacion === 'BODEGA' ? null : mm.porId[o.Ubicacion];
         ajustes.push({
-          Grupo: 'K-' + corte + '-' + o.Ubicacion, Fecha: info.fecha, Tipo: o.Ubicacion === 'BODEGA' ? 'AJ_BODEGA' : 'AJ_MOVIL',
+          Grupo: 'K-' + corte + '-' + o.Ubicacion, Fecha: fechaAj, Tipo: o.Ubicacion === 'BODEGA' ? 'AJ_BODEGA' : 'AJ_MOVIL',
           Clave: o.Clave, Material: mats[o.Clave] || o.Clave, Cantidad: dif,
           ID_Movil: m ? String(m.ID_Movil) : '', Movil: m ? txt_(m.Movil) : '',
           Referencia: 'Corte de inventario ' + corte, Obs: 'Ajuste por conteo físico', Usuario: ses.usuario, Creado: ahora
@@ -8178,7 +8184,7 @@ function cerrarCorteInvWeb(token, corte, sinAjustar) {
     invReescribir_(sh, 'CONTEO', nuevoConteo);
     /* Sin ajustar: el conteo queda registrado como referencia, pero el inventario del sistema no se toca */
     if (!sinAjustar && ajustes.length) invAgregar_(invHoja_('MOV'), 'MOV', ajustes);
-    if (sinAjustar) shC.getRange(fila + 1, tc.idx.Obs + 1).setValue((INV_MARCA_SIN_AJUSTE + ' ' + String(tc.values[fila][tc.idx.Obs] || '').replace(INV_MARCA_SIN_AJUSTE, '').trim()).trim());
+    if (modo) shC.getRange(fila + 1, tc.idx.Obs + 1).setValue(((modo === 'sin' ? INV_MARCA_SIN_AJUSTE : INV_MARCA_INICIAL) + ' ' + invObsLimpia_(tc.values[fila][tc.idx.Obs])).trim());
 
     shC.getRange(fila + 1, tc.idx.Estado + 1).setValue('Cerrado');
     shC.getRange(fila + 1, tc.idx.Cerrado_Por + 1).setValue(ses.usuario);
@@ -8193,8 +8199,8 @@ function cerrarCorteInvWeb(token, corte, sinAjustar) {
       if (Math.abs(sis - o.Fisico) > 1e-6) desv.push({ ubicacion: o.Ubicacion, material: mats[o.Clave] || o.Clave, sistema: sis, fisico: o.Fisico });
     });
 
-    invLog_(ses, sinAjustar ? 'Corte cerrado SIN ajustar el inventario' : 'Corte cerrado', corte + ' · contados ' + propios.length + ' · ajustes ' + (sinAjustar ? 0 : ajustes.length), corte);
-    return { ok: true, sinAjustar: sinAjustar, contados: propios.length, ajustes: sinAjustar ? 0 : ajustes.length, faltantes: faltantes, sobrantes: sobrantes, desviaciones: desv.length, detalleDesv: desv.slice(0, 15) };
+    invLog_(ses, sinAjustar ? 'Corte cerrado SIN ajustar el inventario' : modo === 'inicial' ? 'Corte cerrado como INVENTARIO INICIAL' : 'Corte cerrado', corte + ' · contados ' + propios.length + ' · ajustes ' + (sinAjustar ? 0 : ajustes.length), corte);
+    return { ok: true, modo: modo, sinAjustar: sinAjustar, contados: propios.length, ajustes: sinAjustar ? 0 : ajustes.length, faltantes: faltantes, sobrantes: sobrantes, desviaciones: desv.length, detalleDesv: desv.slice(0, 15) };
   });
 }
 
@@ -8259,7 +8265,7 @@ function reabrirCorteInvWeb(token, corte) {
     }
 
     shC.getRange(fila + 1, tc.idx.Estado + 1).setValue('Abierto');
-    if (txt_(tc.values[fila][tc.idx.Obs]).indexOf(INV_MARCA_SIN_AJUSTE) === 0) shC.getRange(fila + 1, tc.idx.Obs + 1).setValue(txt_(tc.values[fila][tc.idx.Obs]).slice(INV_MARCA_SIN_AJUSTE.length).trim());
+    if (invModoCorte_(tc.values[fila][tc.idx.Obs])) shC.getRange(fila + 1, tc.idx.Obs + 1).setValue(invObsLimpia_(tc.values[fila][tc.idx.Obs]));
     shC.getRange(fila + 1, tc.idx.Cerrado_Por + 1).setValue('');
     shC.getRange(fila + 1, tc.idx.Cerrado + 1).setValue('');
     invLog_(ses, 'Corte reabierto', corte, corte);
@@ -8278,7 +8284,7 @@ function cambiarFechaCorteInvWeb(token, corte, fecha) {
 
   const leer = () => {
     const sh = invHoja_('CORTES'), t = leerTabla_(sh);
-    for (let i = 1; i < t.values.length; i++) if (txt_(t.values[i][t.idx.Corte]) === corte) return { sh: sh, t: t, fila: i, sinAjuste: txt_(t.values[i][t.idx.Obs]).indexOf(INV_MARCA_SIN_AJUSTE) === 0, estado: txt_(t.values[i][t.idx.Estado]) || 'Abierto', fecha: invFecha_(t.values[i][t.idx.Fecha]) };
+    for (let i = 1; i < t.values.length; i++) if (txt_(t.values[i][t.idx.Corte]) === corte) return { sh: sh, t: t, fila: i, modo: invModoCorte_(t.values[i][t.idx.Obs]), estado: txt_(t.values[i][t.idx.Estado]) || 'Abierto', fecha: invFecha_(t.values[i][t.idx.Fecha]) };
     throw new Error('No se encontró el corte.');
   };
   const poner = () => conBloqueo_(() => { const c = leer(); c.sh.getRange(c.fila + 1, c.t.idx.Fecha + 1).setValue(fecha); });
@@ -8294,7 +8300,7 @@ function cambiarFechaCorteInvWeb(token, corte, fecha) {
   }
 
   const ses = requerirSesion_(token, 'admin');
-  const eraSin = c0.sinAjuste;
+  const eraSin = c0.modo;
   reabrirCorteInvWeb(token, corte);
   let r;
   try {
