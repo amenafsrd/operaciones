@@ -638,7 +638,14 @@
     #rhModal .field { margin-bottom: 8px; }
       #uModulos label { display:flex; align-items:center; gap:8px; }
     #uModulos input { width:auto; margin:0; }
-  </style>
+  
+.devTbl{font-size:12px}
+.devTbl th,.devTbl td{padding:5px 7px}
+.devTbl td b{font-size:12px}
+.devTbl td div{font-size:10.5px!important;line-height:1.25}
+.devTbl .btnMini{padding:2px 6px;font-size:12px}
+.devTbl .segBadge{font-size:11px;padding:2px 8px}
+</style>
 </head>
 
 <body>
@@ -1232,11 +1239,11 @@
         <!-- Cambios de equipo -->
         <div id="bodPanelDev" style="display:none">
           <div class="panel">
-            <div class="panelHead"><div><h2>Cambios de equipo</h2>
-              <div style="font-size:12px;color:#777;margin-top:3px">Control de los equipos que las móviles deben devolver tras un cambio. Se carga el Excel semanal; <b>no mueve stock ni gastos</b>. Marca lo devuelto, justifica lo que no debe devolverse o cambia el tipo de equipo si correspondía a otro.</div></div>
-              <div style="display:flex;gap:8px;flex-wrap:wrap">
-                <button class="btn primary" id="devBtnImp" onclick="$('devArchivo').click()">📥 Cargar Excel semanal</button>
-                <button class="btn" onclick="devExportar()">📊 Exportar Excel</button>
+            <div class="panelHead" style="align-items:flex-start;gap:16px"><div style="flex:1;min-width:240px"><h2>Cambios de equipo</h2>
+              <div style="font-size:12px;color:#777;margin-top:3px;max-width:760px">Control de los equipos que las móviles deben devolver tras un cambio. Se carga el Excel semanal; <b>no mueve stock ni gastos</b>. Marca lo devuelto, justifica lo que no debe devolverse o cambia el tipo de equipo si correspondía a otro.</div></div>
+              <div style="display:flex;gap:8px;flex-wrap:nowrap;flex:none">
+                <button class="btn primary" id="devBtnImp" style="white-space:nowrap" onclick="$('devArchivo').click()">📥 Cargar Excel</button>
+                <button class="btn" style="white-space:nowrap" onclick="devExportarModal()">📊 Exportar</button>
               </div>
             </div>
             <input type="file" id="devArchivo" accept=".xlsx,.xls" style="display:none" onchange="devImportar(this)">
@@ -10397,11 +10404,11 @@ async function cargarBodega() {
 let devDatos = { lineas: [], entregas: [] }, devVisibles = [], devMovilesLista = [], devAbiertas = {};
 
 function devEstado(o) {
-  if (o.pendiente <= 0) return (o.justificado > 0 && o.devuelto <= 0) ? 'Justificado' : 'Devuelto';
+  if (o.pendiente <= 0) return o.justificado > 0 ? (o.devuelto > 0 ? 'Devuelto y justificado' : 'Justificado') : 'Devuelto';
   return (o.devuelto > 0 || o.justificado > 0) ? 'Parcial' : 'Pendiente';
 }
 function devColor(e) {
-  return e === 'Devuelto' ? '#e8f7ec;color:#1b7a3a' : e === 'Justificado' ? '#eaf0ff;color:#2a4fb3' : e === 'Parcial' ? '#fff4d6;color:#8a6200' : '#fdeaea;color:#b3261e';
+  return e === 'Devuelto' ? '#e8f7ec;color:#1b7a3a' : (e === 'Justificado' || e === 'Devuelto y justificado') ? '#eaf0ff;color:#2a4fb3' : e === 'Parcial' ? '#fff4d6;color:#8a6200' : '#fdeaea;color:#b3261e';
 }
 function devModal(html) { $('devModal').innerHTML = html; $('devModalBg').classList.add('show'); }
 function devCerrar() { $('devModalBg').classList.remove('show'); }
@@ -10438,7 +10445,7 @@ function devFiltradas() {
     if (d1 && (o.fecha || '') < d1) return false;
     if (d2 && (o.fecha || '') > d2) return false;
     const e = devEstado(o);
-    if (es === 'pend' ? o.pendiente <= 0 : (es && e !== es)) return false;
+    if (es === 'pend' ? o.pendiente <= 0 : (es && e !== es && !(es === 'Justificado' && (+o.justificado || 0) > 0) && !(es === 'Devuelto' && e === 'Devuelto y justificado'))) return false;
     return true;
   });
 }
@@ -10492,14 +10499,14 @@ function devRender() {
       (esAdmin() && k !== '(sin periodo)' && !filtrando ? '<button class="btnMini" style="' + (puedeEditar() && pen > 0 ? '' : 'margin-left:auto') + '" title="Eliminar semana" onclick="event.stopPropagation();devEliminarSemana(\'' + escJs(k) + '\')">🗑</button>' : '') +
       '</div>';
     if (abierta) {
-      h += '<div class="tableWrap"><table class="table" style="min-width:900px"><thead><tr><th>Fecha</th><th>Móvil</th><th>OT</th><th>Contrato</th><th>Avería</th><th>Equipo</th><th style="text-align:right">Debe</th><th style="text-align:right">Dev.</th><th style="text-align:right">Just.</th><th style="text-align:right">Pend.</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>';
+      h += '<div class="tableWrap"><table class="table devTbl" style="min-width:820px"><thead><tr><th>Fecha</th><th>Móvil</th><th>OT</th><th>Contrato</th><th>Avería</th><th>Equipo</th><th style="text-align:right">Debe</th><th style="text-align:right">Dev.</th><th style="text-align:right">Just.</th><th style="text-align:right">Pend.</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>';
       A.forEach(o => {
         const i = devVisibles.length; devVisibles.push(o);
         const e = devEstado(o);
-        h += '<tr><td>' + esc(fmtFechaSeg(o.fecha)) + '</td><td>' + esc(o.movil) + '</td><td>' + esc(o.orden) + '</td><td>' + esc(o.contrato) + '</td><td style="font-size:12px">' + esc(o.averia) + '</td>' +
+        h += '<tr><td>' + esc(fmtFechaSeg(o.fecha)) + '</td><td>' + esc(o.movil) + '</td><td>' + esc(o.orden) + '</td><td>' + esc(o.contrato) + '</td><td style="font-size:11px;line-height:1.2">' + esc(o.averia) + '</td>' +
           '<td><b>' + esc(o.equipo) + '</b>' + (o.equipoOriginal ? '<div style="font-size:11px;color:#8a6200" title="' + esc(o.cambioMotivo) + '">cambiado desde ' + esc(o.equipoOriginal) + '</div>' : '') + (o.recibidoPor ? '<div style="font-size:11px;color:#1b7a3a">Recibió: ' + esc(o.recibidoPor) + (o.fechaDev ? ' · ' + esc(fmtFechaSeg(o.fechaDev)) : '') + '</div>' : '') + (o.motivo ? '<div style="font-size:11px;color:#2a4fb3">Just.: ' + esc(o.motivo) + '</div>' : '') + '</td>' +
           '<td style="text-align:right">' + fmtN(o.debe) + '</td><td style="text-align:right">' + fmtN(o.devuelto) + '</td><td style="text-align:right">' + fmtN(o.justificado) + '</td><td style="text-align:right;font-weight:700">' + fmtN(o.pendiente) + '</td>' +
-          '<td><span class="segBadge" style="background:' + devColor(e) + '">' + e + '</span></td><td style="white-space:nowrap">';
+          '<td><span class="segBadge" style="background:' + devColor(e) + ';white-space:nowrap">' + e + '</span></td><td style="white-space:nowrap">';
         if (puedeEditar() && o.pendiente > 0) h += '<button class="btnMini" title="Marcar devuelto" onclick="devAccion(\'dev\',' + i + ')">✔</button> <button class="btnMini" title="Cambiar equipo" onclick="devAccion(\'cambio\',' + i + ')">🔄</button> ';
         if (esAdmin() && o.pendiente > 0) h += '<button class="btnMini" title="Justificar (no debe devolver)" onclick="devAccion(\'just\',' + i + ')">✍️</button> ';
         if (esAdmin() && (o.devuelto > 0 || o.justificado > 0 || o.equipoOriginal)) h += '<button class="btnMini" title="Revertir" onclick="devAccion(\'rev\',' + i + ')">↩</button> ';
@@ -10787,23 +10794,72 @@ function devGuardarEntrega() {
   devLlamar('registrarEntregaMovilWeb', [window._devM.id, $('dvFecha').value, $('dvBol').value, c], 'Entrega registrada (' + t + ' equipos).');
 }
 
-async function devExportar() {
-  await cargarLib('xlsx', SEG_URL_XLSX);
-  /* Todo lo que cumple los filtros, esté la semana abierta o cerrada en pantalla */
-  const L = devFiltradas().slice().sort((a, b) => String(b.periodo || '').localeCompare(String(a.periodo || '')) || String(a.fecha || '').localeCompare(String(b.fecha || '')) || String(a.movil).localeCompare(String(b.movil), 'es', { numeric: true }));
-  if (!L.length) { toast('No hay líneas para exportar con estos filtros.'); return; }
+function devLibro(L) {
+  const wb = XLSX.utils.book_new();
   const rows = [['Periodo', 'Fecha', 'Móvil', 'OT', 'Contrato', 'Avería', 'Equipo', 'Equipo original', 'Debe', 'Devuelto', 'Justificado', 'Pendiente', 'Estado', 'Boletas', 'Motivo justificación']]
     .concat(L.map(o => [o.periodo, o.fecha, o.movil, o.orden, o.contrato, o.averia, o.equipo, o.equipoOriginal, o.debe, o.devuelto, o.justificado, o.pendiente, devEstado(o), o.boletas, o.motivo]));
-  const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Cambios de equipo');
-  const pm = {};
+  const pm = {}, pe = {};
   L.forEach(o => {
     const r = pm[o.movil] || (pm[o.movil] = { movil: o.movil, debe: 0, dev: 0, jus: 0, pen: 0 });
     r.debe += +o.debe || 0; r.dev += +o.devuelto || 0; r.jus += +o.justificado || 0; r.pen += +o.pendiente || 0;
+    const q = pe[o.equipo] || (pe[o.equipo] = { eq: o.equipo, debe: 0, dev: 0, jus: 0, pen: 0 });
+    q.debe += +o.debe || 0; q.dev += +o.devuelto || 0; q.jus += +o.justificado || 0; q.pen += +o.pendiente || 0;
   });
   const res = [['Móvil', 'Debe', 'Devuelto', 'Justificado', 'Pendiente']].concat(Object.keys(pm).sort((a, b) => a.localeCompare(b, 'es', { numeric: true })).map(k => [pm[k].movil, pm[k].debe, pm[k].dev, pm[k].jus, pm[k].pen]));
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(res), 'Resumen por móvil');
-  await xlsxMarca(wb, 'Cambios_de_equipo_' + hoyISO() + '.xlsx', 'Cambios de equipo');
+  const rq = [['Equipo', 'Debe', 'Devuelto', 'Justificado', 'Pendiente']].concat(Object.keys(pe).sort((a, b) => a.localeCompare(b, 'es')).map(k => [pe[k].eq, pe[k].debe, pe[k].dev, pe[k].jus, pe[k].pen]));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rq), 'Resumen por equipo');
+  return wb;
+}
+function devLineasExport() {
+  return devFiltradas().slice().sort((a, b) => String(b.periodo || '').localeCompare(String(a.periodo || '')) || String(a.fecha || '').localeCompare(String(b.fecha || '')) || String(a.movil).localeCompare(String(b.movil), 'es', { numeric: true }));
+}
+function devExportarModal() {
+  const L = devLineasExport();
+  if (!L.length) { toast('No hay líneas para exportar con estos filtros.'); return; }
+  const mv = {};
+  L.forEach(o => { mv[o.movil] = (mv[o.movil] || 0) + 1; });
+  const ms = Object.keys(mv).sort((a, b) => a.localeCompare(b, 'es', { numeric: true }));
+  const filtrando = L.length !== devDatos.lineas.length;
+  const op = (v, t, d, ck) => '<label style="display:flex;gap:9px;align-items:flex-start;padding:9px 10px;border:1px solid #e3e6ea;border-radius:8px;margin-bottom:8px;cursor:pointer"><input type="radio" name="dxModo" value="' + v + '"' + (ck ? ' checked' : '') + ' style="margin-top:3px" onchange="$(\'dxMovilSel\').disabled=(this.value!==\'una\')"><span><b>' + t + '</b><br><span style="font-size:12px;color:#667">' + d + '</span></span></label>';
+  devModal('<h3>📊 Exportar cambios de equipo</h3>' +
+    '<div style="font-size:12px;color:#556;margin-bottom:10px">' + L.length + ' líneas de ' + ms.length + ' móviles' + (filtrando ? ' <b>(según los filtros aplicados)</b>' : '') + '.</div>' +
+    op('todo', 'Un solo Excel', 'Todas las móviles juntas, con resumen por móvil y por equipo.', true) +
+    op('zip', 'ZIP con un Excel por móvil', 'Un archivo separado para cada móvil (' + ms.length + ' archivos) dentro de un ZIP.') +
+    op('una', 'Una móvil específica', 'Un Excel solo con el detalle de la móvil que escojas.') +
+    '<select id="dxMovilSel" disabled style="width:100%;margin:-2px 0 6px">' + ms.map(m => '<option value="' + esc(m) + '">Móvil ' + esc(m) + ' (' + mv[m] + (mv[m] === 1 ? ' línea' : ' líneas') + ')</option>').join('') + '</select>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn secondary" onclick="devCerrar()">Cancelar</button><button class="btn primary" id="dxBtn" onclick="devExportarOk()">Exportar</button></div>');
+}
+async function devExportarOk() {
+  const modo = (document.querySelector('input[name=dxModo]:checked') || {}).value || 'todo';
+  const L = devLineasExport();
+  if (!L.length) { toast('No hay líneas para exportar con estos filtros.'); return; }
+  const btn = $('dxBtn'); btn.disabled = true;
+  const limpio = t => String(t).replace(/[^\w\-]+/g, '_');
+  try {
+    await cargarLib('xlsx', SEG_URL_XLSX);
+    const hoy = hoyISO();
+    if (modo === 'todo') {
+      await xlsxMarca(devLibro(L), 'Cambios_de_equipo_' + hoy + '.xlsx', 'Cambios de equipo');
+    } else if (modo === 'una') {
+      const m = $('dxMovilSel').value;
+      await xlsxMarca(devLibro(L.filter(o => String(o.movil) === m)), 'Cambios_de_equipo_Movil_' + limpio(m) + '_' + hoy + '.xlsx', 'Cambios de equipo · Móvil ' + m);
+    } else {
+      await cargarLib('jszip', URL_JSZIP);
+      const Z = new JSZip(), mv = {};
+      L.forEach(o => { (mv[o.movil] || (mv[o.movil] = [])).push(o); });
+      const ms = Object.keys(mv).sort((a, b) => a.localeCompare(b, 'es', { numeric: true })); let n = 0;
+      for (const m of ms) {
+        btn.textContent = 'Generando ' + (++n) + ' de ' + ms.length + '…';
+        Z.file('Cambios_de_equipo_Movil_' + limpio(m) + '.xlsx', await xlsxMarcaBuf(devLibro(mv[m]), 'Cambios de equipo · Móvil ' + m));
+      }
+      btn.textContent = 'Comprimiendo…';
+      pmBajar(await Z.generateAsync({ type: 'blob', compression: 'DEFLATE' }), 'Cambios_de_equipo_por_movil_' + hoy + '.zip');
+    }
+    devCerrar();
+    toast(modo === 'zip' ? 'ZIP exportado.' : 'Excel exportado.');
+  } catch (e) { btn.disabled = false; btn.textContent = 'Exportar'; mostrarError(e, 'No se pudo exportar.'); }
 }
 
 /* ---------- Equipos / material dañado (bodega general) ---------- */
@@ -15461,6 +15517,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 127 · 19-oct 13:37</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 128 · 19-oct 14:14</div>
 </body>
 </html>
