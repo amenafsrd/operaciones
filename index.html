@@ -1017,7 +1017,7 @@
           <button id="stBodDan" onclick="bodSubtab('dan')">🛠️ Equipos dañados</button>
           <button id="stBodCons" onclick="bodSubtab('cons')">📥 Consumo (OT)</button>
           <button id="stBodInv" onclick="bodSubtab('inv')">🧮 Cortes de inventario</button>
-          <button id="stBodDev" onclick="bodSubtab('dev')">🔁 Devoluciones de cambio</button>
+          <button id="stBodDev" onclick="bodSubtab('dev')">🔁 Cambios de equipo</button>
           <button id="stBodCat" onclick="bodSubtab('cat')">⚙️ Materiales</button>
         </div>
         <div id="bodAlertaBox"></div>
@@ -1229,10 +1229,10 @@
           <div id="invDetalle"></div>
         </div>
 
-        <!-- Devoluciones de cambio -->
+        <!-- Cambios de equipo -->
         <div id="bodPanelDev" style="display:none">
           <div class="panel">
-            <div class="panelHead"><div><h2>Devoluciones de cambio</h2>
+            <div class="panelHead"><div><h2>Cambios de equipo</h2>
               <div style="font-size:12px;color:#777;margin-top:3px">Control de los equipos que las móviles deben devolver tras un cambio. Se carga el Excel semanal; <b>no mueve stock ni gastos</b>. Marca lo devuelto, justifica lo que no debe devolverse o cambia el tipo de equipo si correspondía a otro.</div></div>
               <div style="display:flex;gap:8px;flex-wrap:wrap">
                 <button class="btn primary" id="devBtnImp" onclick="$('devArchivo').click()">📥 Cargar Excel semanal</button>
@@ -10393,7 +10393,7 @@ async function cargarBodega() {
 }
 
 
-/* ---------- Devoluciones de cambio ---------- */
+/* ---------- Cambios de equipo ---------- */
 let devDatos = { lineas: [], entregas: [] }, devVisibles = [], devMovilesLista = [], devAbiertas = {};
 
 function devEstado(o) {
@@ -10526,51 +10526,136 @@ function devISO(v) {
   return m ? m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0') : '';
 }
 
-async function devLeerExcel(file) {
+/* ---------- Importar el Excel: se eligen y verifican las columnas antes de cargar ---------- */
+let devImp = null;
+
+const DEV_CAMPOS = [
+  { k: 'movil', t: 'Móvil', req: true, re: /^nombre[_ ]?movil$|^m[oó]vil$/i },
+  { k: 'orden', t: 'N.º de OT (código)', req: true, re: /^c[oó]digo$|^(n[.º° ]*)?(de )?(ot|orden)$/i },
+  { k: 'fecha', t: 'Fecha', re: /^fecha/i },
+  { k: 'contrata', t: 'Contrata', re: /^contrata$/i },
+  { k: 'averia', t: 'Avería', re: /^aver/i },
+  { k: 'tipo', t: 'Tipo', re: /^tipo$/i },
+  { k: 'servicio', t: 'Servicio', re: /^servicio/i },
+  { k: 'contrato', t: 'Contrato', re: /^contrato$/i }
+];
+
+function devLetra(n) { let r = ''; n++; while (n > 0) { const m = (n - 1) % 26; r = String.fromCharCode(65 + m) + r; n = Math.floor((n - 1) / 26); } return r; }
+
+async function devAnalizarExcel(file) {
   await cargarLib('xlsx', SEG_URL_XLSX);
   const wb = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true });
-  for (const n of wb.SheetNames) {
+  const hojas = wb.SheetNames.map(n => {
     const m = XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: true, defval: '' });
-    const hi = m.findIndex(f => f.some(c => /^nombre[_ ]?movil$/i.test(String(c).trim())));
-    if (hi < 0) continue;
-    const H = m[hi].map(c => String(c).trim());
-    const ix = re => H.findIndex(c => re.test(c));
-    const cM = ix(/^nombre[_ ]?movil$/i), cCo = ix(/^contrata$/i), cAv = ix(/^aver/i), cTi = ix(/^tipo$/i), cFe = ix(/^fecha/i), cSe = ix(/^servicio/i), cCt = ix(/^contrato$/i), cOt = ix(/^c[oó]digo$/i), cTo = ix(/^total$/i);
-    if (cOt < 0) throw new Error('No encontré la columna CODIGO (número de OT) en la hoja «' + n + '».');
-    const fin = cTo > cOt ? cTo : H.length;
-    const cols = [];
-    for (let c = cOt + 1; c < fin; c++) if (H[c]) cols.push(c);
-    const filas = [];
-    m.slice(hi + 1).forEach(f => {
-      const movil = String(f[cM] || '').trim(), orden = String(f[cOt] || '').trim();
-      if (!movil || !orden) return;
-      const equipos = {};
-      cols.forEach(c => { const q = Number(f[c]); if (q > 0) equipos[H[c]] = q; });
-      if (!Object.keys(equipos).length) return;
-      filas.push({ movil: movil, contrata: cCo >= 0 ? String(f[cCo]).trim() : '', averia: cAv >= 0 ? String(f[cAv]).trim() : '', tipo: cTi >= 0 ? String(f[cTi]).trim() : '',
-        fecha: devISO(f[cFe]), servicio: cSe >= 0 ? String(f[cSe]).trim() : '', contrato: cCt >= 0 ? String(f[cCt]).trim() : '', orden: orden, equipos: equipos });
-    });
-    return filas;
+    let hi = m.findIndex(f => f.some(c => /^nombre[_ ]?movil$/i.test(String(c).trim())));
+    const auto = hi >= 0;
+    if (hi < 0) hi = Math.max(0, m.slice(0, 15).reduce((b, f, k, a) => f.filter(c => String(c).trim()).length > a[b].filter(c => String(c).trim()).length ? k : b, 0));
+    return { nombre: n, m: m, hi: hi, auto: auto };
+  }).filter(h => h.m.length);
+  if (!hojas.length) throw new Error('El archivo no tiene hojas con datos.');
+  /* Se propone primero la hoja que trae NOMBRE_MOVIL (la «BD») */
+  hojas.sort((a, b) => (b.auto ? 1 : 0) - (a.auto ? 1 : 0));
+  return hojas;
+}
+
+/* Propone las columnas según los encabezados de la fila elegida */
+function devAutoMapa(H) {
+  const mapa = {};
+  DEV_CAMPOS.forEach(c => { const x = H.findIndex(h => c.re.test(h)); mapa[c.k] = x; });
+  const cTo = H.findIndex(h => /^total$/i.test(h));
+  const ini = mapa.orden >= 0 ? mapa.orden + 1 : 0, fin = cTo > ini ? cTo : H.length;
+  const usados = new Set(Object.keys(mapa).map(k => mapa[k]));
+  const eq = [];
+  for (let c = ini; c < fin; c++) if (H[c] && !usados.has(c)) eq.push(c);
+  return { mapa: mapa, eq: eq };
+}
+
+function devConstruirFilas(h, mapa, eq, limite) {
+  const H = h.m[h.hi].map(c => String(c).trim());
+  const g = (f, k) => mapa[k] >= 0 ? String(f[mapa[k]] === undefined ? '' : f[mapa[k]]).trim() : '';
+  const filas = [];
+  for (const f of h.m.slice(h.hi + 1)) {
+    const movil = g(f, 'movil'), orden = g(f, 'orden');
+    if (!movil || !orden) continue;
+    const equipos = {};
+    eq.forEach(c => { const q = Number(f[c]); if (q > 0) equipos[H[c] || ('Columna ' + devLetra(c))] = q; });
+    if (!Object.keys(equipos).length) continue;
+    filas.push({ movil: movil, contrata: g(f, 'contrata'), averia: g(f, 'averia'), tipo: g(f, 'tipo'), fecha: mapa.fecha >= 0 ? devISO(f[mapa.fecha]) : '', servicio: g(f, 'servicio'), contrato: g(f, 'contrato'), orden: orden, equipos: equipos });
+    if (limite && filas.length >= limite) break;
   }
-  throw new Error('No encontré una hoja con la columna NOMBRE_MOVIL (hoja «BD»).');
+  return filas;
 }
 
 async function devImportar(inp) {
   const f = inp.files[0]; inp.value = '';
   if (!f) return;
-  let filas;
-  try { filas = await devLeerExcel(f); } catch (e) { mostrarError(e, 'No se pudo leer el Excel.'); return; }
-  if (!filas.length) { toast('El archivo no trae equipos a devolver.'); return; }
+  let hojas;
+  try { hojas = await devAnalizarExcel(f); } catch (e) { mostrarError(e, 'No se pudo leer el Excel.'); return; }
   const mm = f.name.match(/(\d{4}-\d{2}-\d{2})_al_(\d{4}-\d{2}-\d{2})/);
-  const periodo = mm ? mm[1] + ' al ' + mm[2] : '';
+  devImp = { f: f, hojas: hojas, hoja: 0, periodo: mm ? mm[1] + ' al ' + mm[2] : '' };
+  devImpHoja(0, true);
+}
+
+/* Cambia de hoja o de fila de encabezados y vuelve a proponer las columnas */
+function devImpHoja(i, nuevaHoja) {
+  const D = devImp; D.hoja = i;
+  const h = D.hojas[i];
+  if (nuevaHoja !== 'fila') {/* hoja nueva: se usa su fila de encabezados propuesta */}
+  const H = h.m[h.hi].map(c => String(c).trim());
+  const a = devAutoMapa(H);
+  D.mapa = a.mapa; D.eq = a.eq;
+  devImpPintar();
+}
+function devImpFila(v) {
+  const h = devImp.hojas[devImp.hoja];
+  const n = Math.max(1, Math.min(h.m.length, Number(v) || 1)) - 1;
+  h.hi = n;
+  devImpHoja(devImp.hoja, 'fila');
+}
+function devImpCampo(k, v) { devImp.mapa[k] = Number(v); devImpPintar(true); }
+function devImpEq(c, on) { const D = devImp; D.eq = D.eq.filter(x => x !== c); if (on) D.eq.push(c); D.eq.sort((a, b) => a - b); devImpPintar(true); }
+
+function devImpPintar(soloVista) {
+  const D = devImp, h = D.hojas[D.hoja];
+  const H = h.m[h.hi].map(c => String(c).trim());
+  const opt = (sel, vacio) => (vacio ? '<option value="-1">— no usar —</option>' : '<option value="-1">— elegir —</option>') + H.map((t, c) => t ? '<option value="' + c + '"' + (sel === c ? ' selected' : '') + '>' + devLetra(c) + ' · ' + esc(t) + '</option>' : '').join('');
+  const filas = devConstruirFilas(h, D.mapa, D.eq, 0);
+  const prev = filas.slice(0, 5);
   const und = filas.reduce((a, r) => a + Object.keys(r.equipos).reduce((b, k) => b + r.equipos[k], 0), 0);
-  if (!confirm('Cargar «' + f.name + '»?\n\n' + filas.length + ' órdenes · ' + und + ' equipos a devolver.\nNo afecta stock ni gastos. Las líneas ya cargadas no se duplican.')) return;
+  const faltan = DEV_CAMPOS.filter(c => c.req && D.mapa[c.k] < 0).map(c => c.t);
+  const hojaSel = D.hojas.length > 1 ? '<label style="font-size:12px;color:#666">Hoja <select onchange="devImpHoja(+this.value)" style="padding:6px">' + D.hojas.map((x, i) => '<option value="' + i + '"' + (i === D.hoja ? ' selected' : '') + '>' + esc(x.nombre) + (x.auto ? ' ✔' : '') + '</option>').join('') + '</select></label>' : '<span style="font-size:12px;color:#666">Hoja <b>' + esc(h.nombre) + '</b></span>';
+  const body = '<div style="font-size:12.5px;color:#666;margin-bottom:8px">Archivo: <b>' + esc(D.f.name) + '</b>. Verifica qué columna del Excel corresponde a cada dato antes de cargar. Esto no mueve stock ni gastos.</div>' +
+    '<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:8px">' + hojaSel +
+    '<label style="font-size:12px;color:#666">Fila de encabezados <input type="number" min="1" value="' + (h.hi + 1) + '" onchange="devImpFila(this.value)" style="width:64px;padding:6px"></label>' +
+    '<label style="font-size:12px;color:#666">Período <input id="devImpPeriodo" value="' + esc(D.periodo) + '" placeholder="2026-10-05 al 2026-10-11" oninput="devImp.periodo=this.value" style="width:190px;padding:6px"></label></div>' +
+    '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px;margin-bottom:10px">' +
+    DEV_CAMPOS.map(c => '<label style="font-size:12px;color:#555"><b>' + c.t + (c.req ? ' *' : '') + '</b><select onchange="devImpCampo(\'' + c.k + '\',this.value)" style="display:block;width:100%;padding:6px;margin-top:2px;' + (c.req && D.mapa[c.k] < 0 ? 'border:2px solid #b71c1c' : '') + '">' + opt(D.mapa[c.k], !c.req) + '</select></label>').join('') + '</div>' +
+    '<div style="font-size:12.5px;margin-bottom:4px"><b>Columnas de equipos a devolver</b> <span style="color:#777">(las que traen la cantidad por equipo)</span></div>' +
+    '<div style="display:flex;gap:6px 14px;flex-wrap:wrap;max-height:110px;overflow:auto;border:1px solid #e3e3e3;border-radius:8px;padding:8px;margin-bottom:10px">' +
+    (H.map((t, c) => t ? '<label style="font-size:12.5px;white-space:nowrap"><input type="checkbox"' + (D.eq.indexOf(c) >= 0 ? ' checked' : '') + ' onchange="devImpEq(' + c + ',this.checked)"> ' + devLetra(c) + ' · ' + esc(t) + '</label>' : '').join('')) + '</div>' +
+    '<div style="font-size:12.5px;margin-bottom:4px"><b>Vista previa</b> · ' + filas.length + ' órdenes · ' + und + ' equipos' + (faltan.length ? ' · <span style="color:#b71c1c">falta elegir: ' + faltan.join(', ') + '</span>' : '') + '</div>' +
+    (prev.length ? '<div style="overflow:auto"><table class="table" style="font-size:12px;min-width:560px"><thead><tr><th>Móvil</th><th>OT</th><th>Fecha</th><th>Contrato</th><th class="left">Equipos</th></tr></thead><tbody>' + prev.map(r => '<tr><td>' + esc(r.movil) + '</td><td>' + esc(r.orden) + '</td><td>' + esc(r.fecha || '—') + '</td><td>' + esc(r.contrato || '—') + '</td><td class="left">' + Object.keys(r.equipos).map(k => esc(k) + ' × ' + r.equipos[k]).join(', ') + '</td></tr>').join('') + '</tbody></table></div>' : '<div class="empty" style="padding:10px">Con estas columnas no sale ninguna orden. Revisa la fila de encabezados y las columnas elegidas.</div>') +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn primary" id="devImpOk" ' + (faltan.length || !filas.length ? 'disabled' : '') + ' onclick="devImpConfirmar()">📥 Cargar ' + filas.length + ' órdenes</button><button class="btn secondary" onclick="devCerrar();devImp=null">Cancelar</button></div>';
+  if (soloVista && $('devModal').dataset.imp) {
+    const per = $('devImpPeriodo') ? $('devImpPeriodo').value : D.periodo; D.periodo = per;
+  }
+  devModal('<h3>📥 Cargar Excel de cambios de equipo</h3>' + body);
+  $('devModal').dataset.imp = '1';
+}
+
+async function devImpConfirmar() {
+  const D = devImp; if (!D) return;
+  const h = D.hojas[D.hoja];
+  const filas = devConstruirFilas(h, D.mapa, D.eq, 0);
+  if (!filas.length) { toast('No hay órdenes para cargar con estas columnas.'); return; }
+  const btn = $('devImpOk'); btn.disabled = true;
   try {
-    const r = await api('importarDevolucionesWeb', filas, f.name, periodo);
+    const r = await api('importarDevolucionesWeb', filas, D.f.name, (D.periodo || '').trim());
+    devCerrar(); devImp = null;
     toast('Cargado: ' + r.nuevas + ' líneas nuevas, ' + r.repetidas + ' ya existían.' + (r.sinMovil ? ' ' + r.sinMovil + ' sin móvil identificada.' : ''));
     if (r.periodo) devAbiertas[r.periodo] = 1;
     await cargarDevoluciones();
-  } catch (e) { mostrarError(e, 'No se pudo importar.'); }
+  } catch (e) { mostrarError(e, 'No se pudo importar.'); btn.disabled = false; }
 }
 
 function devEliminarSemana(p) {
@@ -10704,7 +10789,7 @@ async function devExportar() {
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Devoluciones');
   const res = [['Móvil', 'Debe', 'Devuelto', 'Justificado', 'Pendiente']].concat(devMovilesLista.map(r => [r.movil, r.debe, r.dev, r.jus, r.pen]));
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(res), 'Resumen por móvil');
-  await xlsxMarca(wb, 'Devoluciones_de_cambio_' + hoyISO() + '.xlsx', 'Devoluciones de cambio');
+  await xlsxMarca(wb, 'Cambios_de_equipo_' + hoyISO() + '.xlsx', 'Cambios de equipo');
 }
 
 /* ---------- Equipos / material dañado (bodega general) ---------- */
@@ -15362,6 +15447,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 124 · 18-oct 10:13</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 125 · 19-oct 07:27</div>
 </body>
 </html>
