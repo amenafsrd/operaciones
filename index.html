@@ -10782,12 +10782,19 @@ function devGuardarEntrega() {
 
 async function devExportar() {
   await cargarLib('xlsx', SEG_URL_XLSX);
-  const L = devVisibles;
+  /* Todo lo que cumple los filtros, esté la semana abierta o cerrada en pantalla */
+  const L = devFiltradas().slice().sort((a, b) => String(b.periodo || '').localeCompare(String(a.periodo || '')) || String(a.fecha || '').localeCompare(String(b.fecha || '')) || String(a.movil).localeCompare(String(b.movil), 'es', { numeric: true }));
+  if (!L.length) { toast('No hay líneas para exportar con estos filtros.'); return; }
   const rows = [['Periodo', 'Fecha', 'Móvil', 'OT', 'Contrato', 'Avería', 'Equipo', 'Equipo original', 'Debe', 'Devuelto', 'Justificado', 'Pendiente', 'Estado', 'Boletas', 'Motivo justificación']]
     .concat(L.map(o => [o.periodo, o.fecha, o.movil, o.orden, o.contrato, o.averia, o.equipo, o.equipoOriginal, o.debe, o.devuelto, o.justificado, o.pendiente, devEstado(o), o.boletas, o.motivo]));
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Devoluciones');
-  const res = [['Móvil', 'Debe', 'Devuelto', 'Justificado', 'Pendiente']].concat(devMovilesLista.map(r => [r.movil, r.debe, r.dev, r.jus, r.pen]));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Cambios de equipo');
+  const pm = {};
+  L.forEach(o => {
+    const r = pm[o.movil] || (pm[o.movil] = { movil: o.movil, debe: 0, dev: 0, jus: 0, pen: 0 });
+    r.debe += +o.debe || 0; r.dev += +o.devuelto || 0; r.jus += +o.justificado || 0; r.pen += +o.pendiente || 0;
+  });
+  const res = [['Móvil', 'Debe', 'Devuelto', 'Justificado', 'Pendiente']].concat(Object.keys(pm).sort((a, b) => a.localeCompare(b, 'es', { numeric: true })).map(k => [pm[k].movil, pm[k].debe, pm[k].dev, pm[k].jus, pm[k].pen]));
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(res), 'Resumen por móvil');
   await xlsxMarca(wb, 'Cambios_de_equipo_' + hoyISO() + '.xlsx', 'Cambios de equipo');
 }
@@ -15447,6 +15454,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 125 · 19-oct 07:27</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 126 · 19-oct 11:10</div>
 </body>
 </html>
