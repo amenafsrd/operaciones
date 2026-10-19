@@ -10694,10 +10694,17 @@ async function devAccion(tipo, i) {
       '<div class="field"><label>Cantidad a justificar</label><input id="dvCant" type="number" min="1" max="' + o.pendiente + '" value="' + o.pendiente + '"></div>' +
       '<div class="field"><label>Motivo</label><textarea id="dvMot" rows="3" placeholder="Ej. el cliente conservó el equipo, equipo dañado por el cliente…"></textarea></div>' + devPie('devGuardarJust()', 'Justificar'));
   } else if (tipo === 'cambio') {
-    const eq = Array.from(new Set(devDatos.lineas.map(x => x.equipo))).filter(x => x !== o.equipo).sort();
+    /* Opciones: lo que trae el Excel + los equipos del catálogo (por su alias o nombre) + EERO, aunque todavía no haya llegado en ningún archivo */
+    const set = new Set(devDatos.lineas.map(x => x.equipo));
+    ((typeof bodDatos !== 'undefined' && bodDatos && bodDatos.materiales) || []).filter(m => m.categoria === 'Equipos' && m.activo !== false).forEach(m => {
+      const nombres = String(m.alias || '').split(';').map(t => t.trim()).filter(Boolean);
+      (nombres.length ? nombres : [m.material]).forEach(t => set.add(t.slice(0, 40)));
+    });
+    if (!Array.from(set).some(t => /eero/i.test(t))) set.add('EERO');
+    const eq = Array.from(set).filter(x => x && x !== o.equipo).sort((x, y) => x.localeCompare(y, 'es'));
     devModal('<h3>🔄 Cambiar tipo de equipo</h3>' + devCab(o) +
       '<div style="font-size:12px;color:#777;margin-bottom:8px">Si el equipo a devolver correspondía a otro, mueve la cantidad pendiente a ese equipo.</div>' +
-      '<div class="grid2"><div class="field"><label>Debe devolver realmente</label><input id="dvEq" list="dvEqList" placeholder="Equipo correcto"><datalist id="dvEqList">' + eq.map(x => '<option value="' + esc(x) + '">').join('') + '</datalist></div>' +
+      '<div class="grid2"><div class="field"><label>Debe devolver realmente</label><input id="dvEq" list="dvEqList" placeholder="Elige o escribe el equipo (p. ej. EERO)" autocomplete="off"><datalist id="dvEqList">' + eq.map(x => '<option value="' + esc(x) + '">').join('') + '</datalist></div>' +
       '<div class="field"><label>Cantidad a mover</label><input id="dvCant" type="number" min="1" max="' + o.pendiente + '" value="' + o.pendiente + '"></div></div>' +
       '<div class="field"><label>Motivo</label><textarea id="dvMot" rows="2"></textarea></div>' + devPie('devGuardarCambio()', 'Cambiar'));
   } else if (tipo === 'rev') {
@@ -15454,6 +15461,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 126 · 19-oct 11:10</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 127 · 19-oct 13:37</div>
 </body>
 </html>
