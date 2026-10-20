@@ -654,6 +654,11 @@
 .calSemIt{display:flex;justify-content:space-between;gap:8px;padding:7px 10px 7px 22px;border-radius:7px;cursor:pointer;font-size:13px}
 .calSemIt:hover{background:#f3f5f8}.calSemIt.sel{background:#a31616;color:#fff;font-weight:600}
 .calSemIt.hoy:not(.sel){color:#a31616;font-weight:600}
+
+.calBarra{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 16px}
+.calOpc{display:flex;flex-direction:column;gap:6px;padding-bottom:4px}
+.calBtns{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;margin-left:auto}
+.calBtns .btn{white-space:nowrap}
 </style>
 </head>
 
@@ -761,32 +766,36 @@
 
       <!-- CALENDARIO -->
       <section id="vistaCalendario">
-        <div class="toolbar">
-          <div class="field">
+        <div class="toolbar calBarra">
+          <div class="field" style="min-width:0;width:92px;flex:none">
             <label>Año</label>
             <select id="selAno" onchange="cargarSemanas()"></select>
           </div>
-          <div class="field" style="min-width:260px;position:relative">
+          <div class="field" style="min-width:290px;position:relative;flex:none">
             <label>Semana</label>
             <select id="selSemana" onchange="cargarCalendario()" style="display:none"></select>
             <button type="button" id="calSemBtn" class="calSemBtn" onclick="calSemToggle(event)"><span id="calSemTxt">Semana…</span><span>▾</span></button>
             <div id="calSemPanel" class="calSemPanel" style="display:none"></div>
           </div>
-          <label class="chkInline" style="padding-bottom:10px">
+          <div class="calOpc">
+          <label class="chkInline">
             <input type="checkbox" id="calVacantes" checked onchange="renderizarCalendario()"> Mostrar móviles sin técnico
           </label>
+          <label class="chkInline"><input type="checkbox" id="calFCambios" onchange="renderizarCalendario()"> Solo con cambios sin guardar</label>
+          </div>
           <div style="display:none">
           <div class="field" style="min-width:200px"><label>Buscar</label><input id="calBuscar" oninput="renderizarCalendario()" placeholder="Móvil, técnico, zona o contrata"></div>
           <div class="field" style="min-width:140px"><label>Contrata</label><select id="calFContrata" onchange="renderizarCalendario()"><option value="">Todas</option></select></div>
           <div class="field" style="min-width:150px"><label>Zona de trabajo</label><select id="calFZona" onchange="renderizarCalendario()"><option value="">Todas</option></select></div>
           <div class="field" style="min-width:130px"><label>Estado en la semana</label><select id="calFEstado" onchange="renderizarCalendario()"><option value="">Todos</option><option value="__vacio">Con días sin definir</option></select></div>
           </div>
-          <label class="chkInline" style="padding-bottom:10px"><input type="checkbox" id="calFCambios" onchange="renderizarCalendario()"> Solo con cambios sin guardar</label>
           <span style="flex:1 1 20px"></span>
+          <div class="calBtns">
           <button id="btnActivarTodas" class="btn secondary" title="Pone «Activa» en todas las casillas vacías de las móviles con técnico (no toca las que ya tienen estado)" onclick="activarTodas()">✅ Activar todas</button>
           <button id="btnDeshacerCal" class="btn secondary" title="Deshace el último cambio (o el último guardado)" onclick="deshacerCalendario()">↩️ Deshacer</button>
           <button id="btnCerrarCal" class="btn secondary" title="Bloquea la edición de esta semana para evitar cambios por error de manipulación" onclick="cerrarCronograma()">🔒 Bloquear edición</button>
-          <button id="btnExport" class="btn warning" onclick="exportarCalendarioCliente()">📥 Calendario Cliente (Excel)</button>
+          <button id="btnExport" class="btn warning" onclick="exportarCalendarioCliente()" style="display:none">📥 Calendario Cliente (Excel)</button>
+          </div>
         </div>
 
         <div class="subtabs" id="calSubtabs">
@@ -3031,13 +3040,13 @@ function calSemFechas(x) {
 function calSemMesDe(x) { const f = calSemFechas(x).jue; return f.getFullYear() + '-' + f.getMonth(); }
 function calSemTexto() {
   const w = Number($('selSemana').value), x = calSemLista.filter(y => y.semana === w)[0];
-  $('calSemTxt').textContent = x ? 'Semana ' + x.semana + ' · ' + calSemFechas(x).txt + (x.bloqueada ? ' 🔒' : '') : 'Semana…';
+  $('calSemTxt').textContent = x ? CAL_MESES[calSemFechas(x).jue.getMonth()] + ' · Semana ' + x.semana + ' · ' + calSemFechas(x).txt + (x.bloqueada ? ' 🔒' : '') : 'Semana…';
 }
 function calSemPintar() {
   const w = Number($('selSemana').value), act = calSemLista.filter(y => y.semana === w)[0];
   const grupos = {}, orden = [];
   calSemLista.forEach(x => { const k = calSemMesDe(x); if (!grupos[k]) { grupos[k] = []; orden.push(k); } grupos[k].push(x); });
-  if (calMesAbierto === null || !grupos[calMesAbierto]) calMesAbierto = act ? calSemMesDe(act) : orden[0];
+  if (calMesAbierto === null) calMesAbierto = act ? calSemMesDe(act) : orden[0];
   const hoy = datosWeb && Number(datosWeb.semanaActual), anoHoy = datosWeb && Number(datosWeb.añoActual), ano = Number($('selAno').value);
   $('calSemPanel').innerHTML = orden.map(k => {
     const g = grupos[k], ab = k === calMesAbierto, mi = Number(k.split('-')[1]), bl = g.filter(x => x.bloqueada).length;
@@ -3157,7 +3166,7 @@ function renderizarCalendario() {
     calendario.diasBonitos[0] + ' al ' + calendario.diasBonitos[6];
 
   let html = '<table class="table" style="min-width:850px"><thead><tr>' +
-    '<th>Contrata</th><th>Zona de trabajo</th><th style="text-align:right">Móvil</th>';
+    '<th>Contrata</th><th>Zona de trabajo</th><th style="text-align:left">Móvil</th>';
 
   calendario.diasBonitos.forEach((d, i) => {
     html += '<th>' + DIAS[i] + '<br><small>' + d + '</small></th>';
@@ -3176,6 +3185,7 @@ function renderizarCalendario() {
   let mostradas = 0;
 
   $('btnActivarTodas').style.display = calEditable() ? '' : 'none';
+  $('btnExport').style.display = calendario.cerrado ? '' : 'none';
   $('btnDeshacerCal').style.display = calEditable() ? '' : 'none';
   const cer = calendario.cerrado;
   $('btnCerrarCal').style.display = puedeEditar() ? '' : 'none';
@@ -3202,7 +3212,7 @@ function renderizarCalendario() {
     html += '<tr>' +
       '<td>' + esc(m.Contrata) + '</td>' +
       '<td class="left">' + esc(m.Domicilio) + '</td>' +
-      '<td style="text-align:right"><b>' + esc(m.Movil) + '</b><br><small>' +
+      '<td style="text-align:left"><b>' + esc(m.Movil) + '</b><br><small>' +
         (sinTecnico ? '<span style="color:#b71c1c">(sin técnico)</span>' : esc(m.Tecnico_Actual)) + '</small>' +
         (!sinTecnico && backupSemanaAnterior(m.Tecnico_Actual)
           ? '<br><span class="chip amar" title="Estuvo de Backup la semana anterior">🔁 Backup sem. ant.</span>' : '') + '</td>';
@@ -15576,6 +15586,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 129 · 20-oct 09:41</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 131 · 20-oct 09:46</div>
 </body>
 </html>
