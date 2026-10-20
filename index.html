@@ -11718,8 +11718,9 @@ function renderAbastecimiento() {
   const mv = $('abMovil').value;
   if (mv) l = l.filter(x => x.idMovil === mv || x.idMovilDestino === mv);
   if (!l.length) { $('abTabla').innerHTML = '<div class="empty">No hay movimientos de móviles en ese rango.</div>'; return; }
-  const cNum = x => { const m = String(x.consecutivo || '').match(/(\d+)\s*$/); return m ? Number(m[1]) : Infinity; };
-  l = l.slice().sort((a, b) => { const A = cNum(a), B = cNum(b); return A === B ? ((a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0) || (String(a.creado) < String(b.creado) ? -1 : 1)) : (A < B ? -1 : 1); });
+  /* Consecutivo mayor arriba (los documentos sin consecutivo van al final, los más recientes primero) */
+  const cNum = x => { const m = String(x.consecutivo || '').match(/(\d+)\s*$/); return m ? Number(m[1]) : -1; };
+  l = l.slice().sort((a, b) => { const A = cNum(a), B = cNum(b); return A === B ? ((a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0) || (String(a.creado) < String(b.creado) ? 1 : -1)) : (A < B ? 1 : -1); });
   abLista = l;
   $('abTabla').innerHTML = '<table class="table" style="min-width:880px"><thead><tr><th>Consecutivo</th><th>Fecha</th><th class="left">Tipo</th><th>De → A</th><th class="left">Documento</th><th>Materiales</th><th>Recibido</th><th>Registró</th>' +
     (adm ? '<th></th>' : '') + '</tr></thead><tbody>' +
@@ -14045,7 +14046,7 @@ async function guardarMaterial(i) {
 
 /* ---------- Página pública de firma (enlace por WhatsApp, sin iniciar sesión) ---------- */
 const FP_ENLACE = (new URLSearchParams(location.search).get('firma') || '').trim();
-let fpDoc = null, fpDib = false, fpTr = 0;
+let fpDoc = null, fpDib = false, fpTr = 0, fpReciente = false;
 async function fpIniciar() {
   $('firmaPub').style.display = 'block';
   document.body.style.overflow = 'hidden';
@@ -14056,6 +14057,7 @@ function fpPintar() {
   const x = fpDoc, L = empresaLineas();
   const de = x.tipo === 'TRASLADO' ? 'Presta: <b>M' + esc(x.movil) + '</b> → Recibe: <b>M' + esc(x.movilDestino || '?') + '</b>' : x.tipo === 'ENTREGA' ? 'Bodega → <b>M' + esc(x.movil) + '</b>' : x.tipo === 'DEV_MOVIL' ? '<b>M' + esc(x.movil) + '</b> → Bodega' : (x.movil ? '<b>M' + esc(x.movil) + '</b>' : '');
   let h = '<div style="display:flex;align-items:center;gap:12px;border-bottom:3px solid #a31616;padding-bottom:10px;margin-bottom:10px"><img src="' + CT_LOGO + '" style="height:46px" alt=""><div style="font-size:12px;line-height:1.4"><b style="font-size:14px">' + esc(L[0]) + '</b>' + (L[1] ? '<br>' + esc(L[1]) : '') + '</div></div>' +
+    (x.firmado ? '<div style="margin:0 0 12px;padding:14px;background:#e8f5e9;border:2px solid #66bb6a;border-radius:10px;text-align:center"><div style="font-size:34px;line-height:1">✅</div><div style="font-size:17px;font-weight:700;color:#1b5e20;margin:4px 0">' + (fpReciente ? '¡Listo! Tu recibido quedó registrado' : 'Este documento ya fue firmado') + '</div><div style="font-size:13px;color:#2e4a2f">' + (x.firmado.admin ? 'Aplicado por administrador (' + esc(x.firmado.nombre) + ')' : 'Firmado por <b>' + esc(x.firmado.nombre) + '</b>') + ' · ' + esc(x.firmado.hora) + '<br>Ya no se puede firmar de nuevo.</div><button class="btn primary" style="width:100%;margin-top:10px;font-size:16px;padding:12px" onclick="fpPdf()">⬇️ Descargar documento firmado (PDF)</button></div>' : '') +
     '<h2 style="margin:4px 0;color:#a31616;font-size:18px">' + esc(x.tipoTxt) + ' · ' + esc(x.consecutivo) + '</h2>' +
     '<div style="font-size:14px;line-height:1.6;margin-bottom:10px"><b>Fecha:</b> ' + esc(fmtFechaSeg(x.fecha)) + (de ? '<br>' + de : '') + (x.referencia ? '<br><b>Referencia:</b> ' + esc(x.referencia) : '') + (x.obs ? '<br><b>Observación:</b> ' + esc(x.obs) : '') + '</div>' +
     '<table style="width:100%;border-collapse:collapse;font-size:14px"><thead><tr style="background:#a31616;color:#fff"><th style="padding:6px 4px;width:28px">#</th><th style="padding:6px 4px;text-align:left">Material</th><th style="padding:6px 4px">Und.</th><th style="padding:6px 4px;text-align:right">Cant.</th></tr></thead><tbody>' +
@@ -14069,7 +14071,8 @@ function fpPintar() {
       '<canvas id="fpCanvas" width="400" height="190" style="width:100%;border:2px solid #999;border-radius:8px;background:#fff;touch-action:none"></canvas>' +
       '<div style="display:flex;gap:8px;margin-top:8px"><button class="btn secondary" onclick="fpBorrar()">🧹 Borrar</button><button id="fpGuardar" class="btn primary" style="flex:1;font-size:15px" onclick="fpGuardar()">✅ Confirmo que recibí esto y firmo</button></div></div>';
   }
-  h += '<div style="margin-top:14px"><button class="btn secondary" style="width:100%" onclick="fpPdf()">⬇️ Descargar documento (PDF)</button></div><div style="margin-top:10px;font-size:11px;color:#888;text-align:center">Enlace válido hasta ' + esc(String(x.vence).slice(0, 16)) + '</div>';
+  if (!x.firmado) h += '<div style="margin-top:14px"><button class="btn secondary" style="width:100%" onclick="fpPdf()">⬇️ Descargar documento (PDF)</button></div>';
+  h += '<div style="margin-top:10px;font-size:11px;color:#888;text-align:center">Enlace válido hasta ' + esc(String(x.vence).slice(0, 16)) + '</div>';
   $('fpCuerpo').innerHTML = h;
   const c = $('fpCanvas');
   if (c) {
@@ -14096,9 +14099,15 @@ async function fpGuardar() {
   try {
     await llamarServidor('guardarFirmaPublicaWeb', [FP_ENLACE, nombre, $('fpCanvas').toDataURL('image/png')], true);
     fpDoc = await llamarServidor('obtenerFirmaPublicaWeb', [FP_ENLACE], true);
+    fpReciente = true;
     fpPintar();
     window.scrollTo(0, 0); $('firmaPub').scrollTop = 0;
-  } catch (e) { alert(e.message || 'No se pudo guardar la firma.'); b.disabled = false; }
+  } catch (e) {
+    alert(e.message || 'No se pudo guardar la firma.');
+    /* si ya estaba firmado (por ejemplo, tocó dos veces), muestra el documento firmado en vez de dejar el formulario */
+    if (/ya fue firmado/i.test(String(e.message || ''))) { try { fpDoc = await llamarServidor('obtenerFirmaPublicaWeb', [FP_ENLACE], true); fpPintar(); window.scrollTo(0, 0); $('firmaPub').scrollTop = 0; return; } catch (e2) { } }
+    b.disabled = false;
+  }
 }
 async function fpPdf() {
   const x = fpDoc;
@@ -14132,7 +14141,7 @@ async function fpPdf() {
       d.setFont('helvetica', 'bold'); d.setFontSize(10); d.text((x.firmado.admin ? 'Aplicado por administrador: ' : 'Recibido por: ') + x.firmado.nombre, M, y); d.setFont('helvetica', 'normal'); d.setFontSize(9); d.setTextColor(90); d.text(String(x.firmado.hora), M, y + 5);
       if (x.firmado.imagen) { try { d.addImage(x.firmado.imagen, 'PNG', M, y + 8, 60, 60 * 190 / 400); } catch (e) { } }
     } else { d.setFontSize(10); d.text('Sin firma de recibido.', M, y); }
-    d.save('Documento_' + String(x.consecutivo).replace(/[^\w-]/g, '') + '.pdf');
+    d.save('Documento_' + String(x.consecutivo).replace(/[^\w-]/g, '') + (x.firmado ? '_firmado' : '') + '.pdf');
   } catch (e) { fpImprimir(); }
 }
 /* Respaldo si no carga la librería de PDF: abre la impresión del navegador («Guardar como PDF») */
@@ -15647,6 +15656,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 134 · 20-oct 11:32</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 136 · 20-oct 11:40</div>
 </body>
 </html>
