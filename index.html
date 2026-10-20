@@ -5892,6 +5892,8 @@ function calSub(x) {
   $('calPanelRot').style.display = sem ? 'none' : 'block';
   $('stCalSem').classList.toggle('active', sem);
   $('stCalRot').classList.toggle('active', !sem);
+  /* Bloquear/desbloquear, Activar todas, Deshacer y Calendario Cliente solo aplican al cronograma; el seguimiento de backup es informativo */
+  document.querySelectorAll('#vistaCalendario .calBtns, #vistaCalendario .calOpc').forEach(e => { e.style.display = sem ? '' : 'none'; });
   sideRefrescar();
 }
 function sideToggle(forzar) {
@@ -15656,6 +15658,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 136 · 20-oct 11:40</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 137 · 20-oct 12:34</div>
 </body>
 </html>
