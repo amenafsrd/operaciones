@@ -7024,8 +7024,8 @@ function pmRenderSemanas() {
   pmSemId = ''; pmS = null; $('pmPSem').classList.remove('pmFlex');
   let h = '<div class="toolbar"><button class="btn primary" onclick="pmImportarModal()">⬆ Importar semana de Telecable</button></div><div class="panel"><div class="panelHead"><h2>Semanas de pago</h2></div><div class="tableWrap">';
   if (!pmD.semanas.length) h += '<div class="loading">Aún no hay semanas. Importa el Excel «Pago servicios» que envía Telecable.</div>';
-  else h += '<table class="pmT"><thead><tr><th>Semana</th><th>Estado</th><th>Pago estimado</th><th>Pagos hechos</th><th style="text-align:right">Depósito pendiente</th><th style="text-align:right">Órdenes</th><th style="text-align:right">Contratos</th><th>Precios</th><th style="text-align:right">Costo móviles (detalle)</th><th style="text-align:right">UF Telecable</th><th style="text-align:right">Margen</th><th></th></tr></thead><tbody>' +
-    pmD.semanas.map(s => '<tr style="cursor:pointer" onclick="pmAbrir(\'' + s.id + '\')"><td><b>' + esc(pmFh(s.desde)) + ' al ' + esc(pmFh(s.hasta)) + '</b></td><td>' + (s.estado === 'Cerrada' ? '<span class="chip verde">Cerrada</span>' : '<span class="chip amar">Abierta</span>') + '</td><td>' + esc(pmFh(s.fechaPagoEst)) + '</td><td>' + (s.pagosHechos || 0) + ' / ' + (s.pagosTotal || 0) + '</td><td style="text-align:right;white-space:nowrap">' + pmM(s.depositoPendiente || 0) + '</td><td style="text-align:right">' + s.ordenes + '</td><td style="text-align:right">' + (s.contratos || 0) + '</td><td>' + (s.sinPrecio ? '<span class="chip rojo" title="Líneas sin precio de pago">⚠ ' + s.sinPrecio + ' sin precio</span>' : '<span class="chip verde">Todas con precio</span>') + '</td><td style="text-align:right">' + pmM(s.costo) + '</td><td style="text-align:right">' + pmM(s.uf) + '</td><td style="text-align:right"><b>' + pmM(s.uf - s.costo) + '</b></td><td style="text-align:right;white-space:nowrap" onclick="event.stopPropagation()"><button class="btn secondary" onclick="pmAbrir(\'' + s.id + '\')">Abrir</button> <button class="btn secondary" title="Eliminar este archivo de pago" onclick="pmEliminarSemanaId(\'' + s.id + '\')">🗑</button></td></tr>').join('') + '</tbody></table>';
+  else h += '<table class="pmT"><thead><tr><th>Semana</th><th>Estado</th><th>Pago estimado</th><th>Pagos</th><th style="text-align:right">Depósito pendiente</th><th style="text-align:right">Órdenes</th><th style="text-align:right">Margen</th><th></th></tr></thead><tbody>' +
+    pmD.semanas.map(s => '<tr style="cursor:pointer" onclick="pmAbrir(\'' + s.id + '\')"><td><b>' + esc(pmFh(s.desde)) + ' al ' + esc(pmFh(s.hasta)) + '</b>' + (s.sinPrecio ? ' <span class="chip rojo" title="Líneas sin precio de pago">⚠ ' + s.sinPrecio + ' sin precio</span>' : '') + '</td><td>' + (s.estado === 'Cerrada' ? '<span class="chip verde">Cerrada</span>' : '<span class="chip amar">Abierta</span>') + '</td><td>' + esc(pmFh(s.fechaPagoEst)) + '</td><td>' + (s.pagosHechos || 0) + ' / ' + (s.pagosTotal || 0) + '</td><td style="text-align:right;white-space:nowrap">' + pmM(s.depositoPendiente || 0) + '</td><td style="text-align:right">' + s.ordenes + '</td><td style="text-align:right"><b>' + pmM(s.uf - s.costo) + '</b></td><td style="text-align:right;white-space:nowrap" onclick="event.stopPropagation()"><button class="btn secondary" title="Eliminar este archivo de pago" onclick="pmEliminarSemanaId(\'' + s.id + '\')">🗑</button></td></tr>').join('') + '</tbody></table>';
   $('pmPSem').innerHTML = h + '</div></div>';
 }
 async function pmAbrir(id) {
@@ -7048,9 +7048,9 @@ function pmRenderSemana() {
   const margen = T.uf - T.detalle;
   const tb = (v, t) => '<button class="' + (pmVista === v ? 'active' : '') + '" onclick="pmSub(\'' + v + '\')">' + t + '</button>';
   let h = '<div class="toolbar"><button class="btn secondary" onclick="pmRenderSemanas()">← Semanas</button><b style="font-size:15px">Semana ' + esc(pmFh(S.semana.desde)) + ' al ' + esc(pmFh(S.semana.hasta)) + '</b>' + (cerr ? '<span class="chip verde">Cerrada</span>' : '<span class="chip amar">Abierta</span>') +
-    '<span class="chip azul" title="Semana + días de plazo habitual">Pago estimado: ' + esc(pmFh(S.semana.fechaPagoEst)) + '</span><span style="flex:1"></span>' + (cerr || !(S.prestamosActivos || []).length ? '' : '<button class="btn secondary" title="Rebaja la cuota semanal de cada préstamo activo" onclick="pmAplicarCuotas()">🏦 Aplicar cuotas de préstamos</button>') + '<button class="btn secondary" onclick="pmPagoModal()">💵 Registrar pago</button><button class="btn secondary" onclick="pmCerrarSemana(' + (cerr ? 'false' : 'true') + ')">' + (cerr ? 'Reabrir' : 'Cerrar semana') + '</button><button class="btn secondary" onclick="pmEliminarSemana()">🗑 Eliminar</button></div>';
+    '<span class="chip azul" title="Semana + días de plazo habitual">Pago estimado: ' + esc(pmFh(S.semana.fechaPagoEst)) + '</span><span style="flex:1"></span>' + '<button class="btn secondary" onclick="pmPagoModal()">💵 Registrar pago</button><button class="btn secondary" onclick="pmCerrarSemana(' + (cerr ? 'false' : 'true') + ')">' + (cerr ? 'Reabrir' : 'Cerrar semana') + '</button><button class="btn secondary" title="Eliminar esta semana" onclick="pmEliminarSemana()">🗑</button></div>';
   h += '<div class="panel"><div style="display:flex;gap:6px 18px;flex-wrap:wrap;padding:5px 14px;font-size:12px;color:#667">' +
-    [['Órdenes', T.nOrdenes], ['Costo detalle', pmM(T.detalle)], ['UF Telecable', pmM(T.uf)], ['Margen (UF − costo)', pmM(margen)], ['Total facturado', pmM(T.totalFacturado)], ['Total a depositar', pmM(T.deposito)]]
+    [['Órdenes', T.nOrdenes], ['UF Telecable', pmM(T.uf)], ['Costo', pmM(T.detalle)], ['Margen', pmM(margen)], ['A depositar', pmM(T.deposito)]]
       .map(x => '<span>' + x[0] + ' <b style="font-size:13px;color:#1d2433">' + x[1] + '</b></span>').join('') + '</div></div>';
   if (S.diferencias || S.sinLista) h += '<div class="panel" style="padding:10px 14px;font-size:13px;background:#fff8e1">' + (S.diferencias ? '⚠ <b>' + S.diferencias + '</b> orden(es) con costo distinto a la lista de precios. ' + (cerr ? '' : '<button class="btn secondary" onclick="pmAplicarLista()">Aplicar precio de lista</button> ') : '') + (S.sinLista ? '⚠ <b>' + S.sinLista + '</b> orden(es) sin precio de pago (el servicio no está en la lista). ' + (cerr ? '' : '<button class="btn primary" onclick="pmSinPrecioModal()">Asignar precio</button>') : '') + '</div>';
   h += '<div class="subtabs">' + tb('mov', 'Resumen por móvil') + tb('ord', 'Órdenes') + tb('res', 'Pago por contratista') + tb('int', 'Móviles internas' + ((pmS.internasLista || []).length ? ' (' + pmS.internasLista.length + ')' : '')) + tb('pla', 'Planilla') + tb('ape', 'Apelaciones' + (S.apelaciones.some(a => a.estado === 'Pendiente') ? ' •' : '')) + tb('aju', 'Ajustes') + tb('ext', 'Adicionales') + tb('ver', 'Verificación') + '</div>';
@@ -8166,7 +8166,7 @@ function pmPrestamoModal(id) {
     '<div style="display:grid;gap:12px;grid-template-columns:1fr 1fr"><label style="' + L + '">Fecha en que se prestó<input type="date" id="prFec" value="' + esc(p.fecha) + '" oninput="pmPrProy()"></label><label style="' + L + '">Monto prestado (₡)<input type="number" id="prMon" step="0.01" min="0" value="' + esc(p.monto) + '" oninput="pmPrEq()"></label>' +
     '<label style="' + L + '">Interés semanal (%) sobre el saldo<input type="number" id="prTasa" step="0.01" min="0" value="' + esc(p.tasa) + '" oninput="pmPrEq()"><span id="prEq" style="font-size:11px;font-weight:400;color:#667">≈ ' + (Math.round(p.tasa * 52 / 12 * 10) / 10) + ' % mensual · ' + (Math.round(p.tasa * 52 * 10) / 10) + ' % anual (simple)</span></label>' +
     '<label style="' + L + '">Rebajo de la cuota<select id="prFrec" onchange="pmPrFrecCambio()"><option value="Semana"' + (frec === 'Semana' ? ' selected' : '') + '>Por semana</option><option value="Mes"' + (frec === 'Mes' ? ' selected' : '') + '>Por mes</option></select></label>' +
-    '<label style="' + L + '"><span id="prCuoL">Cuota ' + (frec === 'Mes' ? 'mensual' : 'semanal') + ' pactada (₡)</span><input type="number" id="prCuo" step="0.01" min="0" value="' + esc(frec === 'Mes' ? (p.cuotaMensual || '') : (p.cuota || '')) + '" placeholder="Monto de cada cuota" oninput="pmPrProy()"><span id="prCuoAy" style="font-size:11px;font-weight:400;color:#667">' + (frec === 'Mes' ? 'Se rebaja una vez al mes con «Aplicar cuotas».' : 'Se rebaja cada semana con «Aplicar cuotas».') + '</span></label>' +
+    '<label style="' + L + '"><span id="prCuoL">Cuota ' + (frec === 'Mes' ? 'mensual' : 'semanal') + ' pactada (₡)</span><input type="number" id="prCuo" step="0.01" min="0" value="' + esc(frec === 'Mes' ? (p.cuotaMensual || '') : (p.cuota || '')) + '" placeholder="Monto de cada cuota" oninput="pmPrProy()"><span id="prCuoAy" style="font-size:11px;font-weight:400;color:#667">' + (frec === 'Mes' ? 'Se carga a mano en Rebajos (una vez al mes).' : 'Se carga a mano en Rebajos cada semana.') + '</span></label>' +
     '<div id="prProy" style="grid-column:1/3;font-size:12.5px;background:#fbf6f6;border:1px solid #ecd5d5;border-radius:8px;padding:8px 10px"></div>' +
     '<label style="' + L + ';grid-column:1/3">Concepto<input id="prCon2" maxlength="160" value="' + esc(p.concepto) + '" placeholder="ej. Adelanto para herramientas"></label>' + (id ? '<label style="' + L + '">Estado<select id="prEst"><option' + (p.estado === 'Activo' ? ' selected' : '') + '>Activo</option><option' + (p.estado === 'Cancelado' ? ' selected' : '') + '>Cancelado</option></select></label>' : '') + '</div></div>' +
     '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;padding-top:12px;border-top:1px solid #e6e9ef">' + (id ? '<button class="btn secondary" onclick="pmPrestamoBorrar(\'' + id + '\')">🗑 Eliminar</button>' : '') + '<span style="flex:1"></span><button class="btn secondary" onclick="pmCerrar()">Cancelar</button><button class="btn primary" onclick="pmPrestamoGuardar(\'' + (id || '') + '\')">Guardar</button></div>', 600);
@@ -8202,7 +8202,7 @@ function pmPrProyHtml(S, freq, cuota, titulo) {
 }
 function pmPrFrecCambio() {
   const fr = $('prFrec').value; $('prCuoL').textContent = 'Cuota ' + (fr === 'Mes' ? 'mensual' : 'semanal') + ' pactada (₡)';
-  $('prCuoAy').textContent = fr === 'Mes' ? 'Se rebaja una vez al mes con «Aplicar cuotas».' : 'Se rebaja cada semana con «Aplicar cuotas».'; pmPrProy();
+  $('prCuoAy').textContent = fr === 'Mes' ? 'Se carga a mano en Rebajos (una vez al mes).' : 'Se carga a mano en Rebajos cada semana.'; pmPrProy();
 }
 function pmPrProy() {
   const el = $('prProy'); if (!el) return; const fr = $('prFrec').value, cu = +$('prCuo').value || 0;
@@ -8259,12 +8259,6 @@ function pmPrestamoImprimir(id) {
   f.onload = () => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (x) { toast('No se pudo abrir la impresión.'); } setTimeout(() => f.remove(), 60000); };
   f.srcdoc = html;
 }
-async function pmAplicarCuotas() {
-  try { const r = await api('aplicarCuotasPrestamosPmWeb', pmSemId); await pmRecargar(); toast(r.aplicadas ? r.aplicadas + ' cuota(s) de préstamo aplicadas en Rebajos.' : 'No hay cuotas por aplicar (sin préstamos activos con cuota o ya aplicadas).', 5000); }
-  catch (e) { mostrarError(e, 'No se pudieron aplicar las cuotas.'); }
-}
-
-
 /* ---------- Reporte individual por contratista: PDF, Excel y correo ---------- */
 function pmEcDatos(idCon) {
   const S = pmS, f = S.resumen.filas.find(r => r.idCon === idCon); if (!f || f.sinContratista) return null;
@@ -15690,6 +15684,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 138 · 20-oct 15:15</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 139 · 20-oct 15:31</div>
 </body>
 </html>
