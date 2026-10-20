@@ -5989,6 +5989,10 @@ const INV = {
     ALI: ['Alisto', 'Fecha', 'ID_Movil', 'Movil', 'Clave', 'Grupo_Mov', 'Consecutivo_Mov', 'Tipo', 'Boletas']
   },
 
+  /* Cable sobrante de destajo: material de corte que la móvil devuelve. Cuenta en el inventario pero no está disponible; se devuelve al proveedor */
+  CAT_DESTAJO: 'Sobrante de destajo',
+  CONC_DEST_MOVIL: 'Destajo: cable sobrante de móvil a bodega',
+  CONC_DEST_PROV: 'Devolución de destajo a proveedor',
   CAT_DANO: ['No enciende', 'Falla de fábrica', 'Golpe / daño físico', 'Puerto o conector dañado', 'Humedad', 'Falla de software / firmware', 'Faltante de accesorios', 'Sin especificar', 'Otro'],
 
   TIPOS: {
@@ -6251,9 +6255,10 @@ function invSaldos_(movs, cons, hasta) {
    Siguen contando en el inventario (existencia) pero no están disponibles para entregar. Disponible = existencia − dañados.
    Libro DAN: DANADO (entra como dañado: de una móvil que devuelve, o registro manual de bodega), REPARADO (se quita, vuelve a estar disponible),
    BAJA (se devolvió al proveedor: se genera sola al hacer el documento «Devolución a proveedor» en Bodega principal). */
-function invDanadosMapa_() {
+function invDanadosMapa_(modo) {
   const m = {};
-  leerObjetos_(invHoja_('DAN')).forEach(r => { const c = txt_(r.Clave); if (!c) return; const q = invNum_(r.Cantidad); m[c] = (m[c] || 0) + (txt_(r.Tipo) === 'DANADO' ? q : -q); });
+  /* modo 'dest' = solo el sobrante de destajo; 'dan' = solo los dañados (sin destajo); sin modo = todo lo no disponible */
+  leerObjetos_(invHoja_('DAN')).forEach(r => { const c = txt_(r.Clave); if (!c) return; const dest = txt_(r.Categoria) === INV.CAT_DESTAJO; if (modo === 'dest' && !dest) return; if (modo === 'dan' && dest) return; const q = invNum_(r.Cantidad); m[c] = (m[c] || 0) + (txt_(r.Tipo) === 'DANADO' ? q : -q); });
   Object.keys(m).forEach(c => { m[c] = Math.max(0, invRedondear_(m[c])); });
   return m;
 }
@@ -6312,7 +6317,7 @@ function obtenerDanadosInvWeb(token) {
   const hist = leerObjetos_(invHoja_('DAN')).filter(r => txt_(r.Clave)).map(r => ({ id: txt_(r.ID), fecha: invFecha_(r.Fecha), tipo: txt_(r.Tipo), clave: txt_(r.Clave), material: txt_(r.Material), cantidad: invNum_(r.Cantidad),
     motivo: txt_(r.Motivo), usuario: txt_(r.Usuario), creado: txt_(r.Creado), categoria: txt_(r.Categoria), fuente: txt_(r.Fuente), idMovil: txt_(r.ID_Movil), movil: txt_(r.Movil), documento: txt_(r.Documento), origen: txt_(r.Origen) }))
     .sort((a, b) => (a.creado < b.creado ? 1 : -1)).slice(0, 1500);
-  return { danados: mapa, historial: hist, categorias: INV.CAT_DANO };
+  return { danados: mapa, historial: hist, categorias: INV.CAT_DANO, catDestajo: INV.CAT_DESTAJO };
 }
 /* Registro manual de la bodega: DANADO (equipo que ya estaba en bodega y está dañado) o REPARADO (se quita, vuelve a estar disponible) */
 function registrarDanadoInvWeb(token, d) {
@@ -6330,11 +6335,11 @@ function registrarDanadoInvWeb(token, d) {
     (d.lineas || []).forEach(l => { const c = txt_(l.clave), q = invNum_(l.cantidad); if (!c || !(q > 0)) return; if (!porClave[c]) throw new Error('Material no válido: ' + c); suma[c] = invRedondear_((suma[c] || 0) + q); });
     const claves = Object.keys(suma);
     if (!claves.length) throw new Error('Indica el material y la cantidad.');
-    const sal = invSaldos_(leerObjetos_(invHoja_('MOV')), []), dan = invDanadosMapa_();
+    const sal = invSaldos_(leerObjetos_(invHoja_('MOV')), []), dan = invDanadosMapa_(), danSolo = invDanadosMapa_('dan');
     claves.forEach(c => {
       const exist = (sal.bodega[c] || {}).disponible || 0, dc = dan[c] || 0, nom = porClave[c].material;
       if (tipo === 'DANADO' && suma[c] > exist - dc + 1e-9) throw new Error(nom + ': solo hay ' + invRedondear_(Math.max(0, exist - dc)) + ' disponible(s) en bodega para marcar como dañado(s).');
-      if (tipo === 'REPARADO' && suma[c] > dc + 1e-9) throw new Error(nom + ': solo hay ' + dc + ' dañado(s) registrado(s).');
+      if (tipo === 'REPARADO' && suma[c] > (danSolo[c] || 0) + 1e-9) throw new Error(nom + ': solo hay ' + (danSolo[c] || 0) + ' dañado(s) registrado(s) (el sobrante de destajo se devuelve al proveedor).');
     });
     const ahora = segAhora_();
     const filas = claves.map(c => ({ ID: 'D' + Date.now() + '_' + c.slice(0, 12), Fecha: fecha, Tipo: tipo, Clave: c, Material: porClave[c].material, Cantidad: suma[c], Motivo: motivo, Usuario: ses.usuario, Creado: ahora,
@@ -6350,7 +6355,7 @@ function editarDanadoInvWeb(token, id, cantidad, categoria, motivo) {
   const q = invRedondear_(invNum_(cantidad));
   if (!(q > 0)) throw new Error('La cantidad debe ser mayor que cero.');
   categoria = txt_(categoria);
-  if (INV.CAT_DANO.indexOf(categoria) < 0) throw new Error('Elige la categoría del daño.');
+  if (INV.CAT_DANO.indexOf(categoria) < 0 && categoria !== INV.CAT_DESTAJO) throw new Error('Elige la categoría del daño.');
   return conBloqueo_(() => {
     const sh = invHoja_('DAN'), t = leerTabla_(sh);
     for (let i = 1; i < t.values.length; i++) {
@@ -6358,11 +6363,13 @@ function editarDanadoInvWeb(token, id, cantidad, categoria, motivo) {
       if (txt_(r[t.idx.ID]) !== txt_(id)) continue;
       if (txt_(r[t.idx.Tipo]) !== 'DANADO') throw new Error('Solo se pueden corregir los registros de equipos dañados.');
       const c = txt_(r[t.idx.Clave]), antes = invNum_(r[t.idx.Cantidad]), dif = invRedondear_(q - antes);
-      const pend = invDanadosMapa_()[c] || 0;
+      const esDestRow = txt_(r[t.idx.Categoria]) === INV.CAT_DESTAJO;
+      if (esDestRow !== (categoria === INV.CAT_DESTAJO)) throw new Error('No se puede cambiar un registro entre «dañado» y «sobrante de destajo».');
+      const pend = invDanadosMapa_(esDestRow ? 'dest' : 'dan')[c] || 0;
       if (dif < 0 && pend + dif < -1e-9) throw new Error('No se puede bajar a ' + q + ': ya se devolvieron al proveedor ' + invRedondear_(-(pend + dif)) + ' de estos equipos.');
       if (dif > 0) {
         const sal = invSaldos_(leerObjetos_(invHoja_('MOV')), []);
-        const libres = ((sal.bodega[c] || {}).disponible || 0) - pend;
+        const libres = ((sal.bodega[c] || {}).disponible || 0) - (invDanadosMapa_()[c] || 0);
         if (dif > libres + 1e-9) throw new Error('Solo hay ' + invRedondear_(Math.max(0, libres)) + ' disponible(s) más en bodega para marcar como dañado(s).');
       }
       sh.getRange(i + 1, t.idx.Cantidad + 1).setValue(q);
@@ -6399,9 +6406,9 @@ function obtenerBodegaWeb(token) {
   const cons = invConsumoTot_();
   const objs = leerObjetos_(invHoja_('OBJ'));
   const s = invSaldos_(movs, cons);
-  const danM = invDanadosMapa_();
+  const danM = invDanadosMapa_(), destM = invDanadosMapa_('dest');
   Object.keys(danM).forEach(c => { if (!s.bodega[c]) s.bodega[c] = { ingresos: 0, entregas: 0, devProv: 0, devMovil: 0, ajuste: 0, disponible: 0 }; });
-  Object.keys(s.bodega).forEach(c => { const b = s.bodega[c]; b.existencia = b.disponible; b.danado = danM[c] || 0; b.disponible = invRedondear_(b.existencia - b.danado); });
+  Object.keys(s.bodega).forEach(c => { const b = s.bodega[c]; b.existencia = b.disponible; b.danado = danM[c] || 0; b.destajo = destM[c] || 0; b.disponible = invRedondear_(b.existencia - b.danado); });
 
   const objetivos = {};
   objs.forEach(o => {
@@ -6788,12 +6795,16 @@ function guardarMovimientoInvWeb(token, d) {
 
     const suma = {}, linDe = {}, danDe = {};
     let nLin = 0;
+    /* Destajo: lo que la móvil devuelve como cable sobrante entra a bodega entero como «no disponible» */
+    const esDestMovil = tipo === 'DEV_MOVIL' && txt_(d.concepto) === INV.CONC_DEST_MOVIL;
+    const esDevDest = tipo === 'DEV_PROV' && txt_(d.concepto) === INV.CONC_DEST_PROV;
     (d.lineas || []).forEach(l => {
       const c = txt_(l.clave);
       const q = invNum_(l.cantidad);
       if (!c || !q) return;
       nLin++;
-      if (tipo === 'DEV_MOVIL' && invNum_(l.danados) > 0) danDe[c] = invRedondear_((danDe[c] || 0) + invNum_(l.danados));
+      if (esDestMovil) danDe[c] = invRedondear_((danDe[c] || 0) + q);
+      else if (tipo === 'DEV_MOVIL' && invNum_(l.danados) > 0) danDe[c] = invRedondear_((danDe[c] || 0) + invNum_(l.danados));
       if (!linDe[c]) linDe[c] = Number(l.linea) || nLin;
       if (!porClave[c]) throw new Error('Material no válido: ' + c);
       if (!esAjuste && q < 0) throw new Error('Las cantidades deben ser mayores que cero.');
@@ -6801,18 +6812,26 @@ function guardarMovimientoInvWeb(token, d) {
     });
     const claves = Object.keys(suma);
     if (!claves.length) throw new Error('Agrega al menos un material con cantidad.');
+    if (esDestMovil || esDevDest) claves.forEach(c => { if (porClave[c].categoria !== 'De corte') throw new Error(porClave[c].material + ': la devolución de destajo solo aplica a material de corte (cable, fibra).'); });
     Object.keys(danDe).forEach(c => { if (danDe[c] > suma[c] + 1e-9) throw new Error(porClave[c].material + ': los dañados (' + danDe[c] + ') no pueden ser más que lo devuelto (' + suma[c] + ').'); });
 
     /* Devolución de equipos dañados al proveedor: solo se puede devolver lo que está registrado como dañado y pendiente */
     const esDevDan = tipo === 'DEV_PROV' && txt_(d.concepto) === 'Devolución de equipos dañados';
     if (esDevDan) {
-      const pend = invDanadosMapa_(), propios = {};
+      const pend = invDanadosMapa_('dan'), propios = {};
       if (editando) leerObjetos_(invHoja_('DAN')).forEach(r => { if (txt_(r.Origen) === editando && txt_(r.Tipo) === 'BAJA') propios[txt_(r.Clave)] = (propios[txt_(r.Clave)] || 0) + invNum_(r.Cantidad); });
       claves.forEach(c => { const max = invRedondear_((pend[c] || 0) + (propios[c] || 0)); if (suma[c] > max + 1e-9) throw new Error(porClave[c].material + ': solo hay ' + max + ' dañado(s) pendiente(s) de devolver.'); });
     }
 
+    /* Devolución de destajo al proveedor: solo se puede devolver el sobrante de destajo que está pendiente */
+    if (esDevDest) {
+      const pendD = invDanadosMapa_('dest'), propiosD = {};
+      if (editando) leerObjetos_(invHoja_('DAN')).forEach(r => { if (txt_(r.Origen) === editando && txt_(r.Tipo) === 'BAJA') propiosD[txt_(r.Clave)] = (propiosD[txt_(r.Clave)] || 0) + invNum_(r.Cantidad); });
+      claves.forEach(c => { const max = invRedondear_((pendD[c] || 0) + (propiosD[c] || 0)); if (suma[c] > max + 1e-9) throw new Error(porClave[c].material + ': solo hay ' + max + ' de sobrante de destajo pendiente de devolver.'); });
+    }
+
     /* Documentos de la bodega principal (con concepto): todos los datos son obligatorios */
-    if (txt_(d.concepto)) {
+    if (txt_(d.concepto) && tipo !== 'DEV_MOVIL') {
       if (!txt_(d.referencia)) throw new Error('Falta el número de documento.');
     }
 
@@ -6855,15 +6874,15 @@ function guardarMovimientoInvWeb(token, d) {
     /* lo que la móvil devuelve dañado entra a la bodega pero queda «para devolución» (no disponible) */
     const clavesDan = Object.keys(danDe).filter(c => danDe[c] > 0);
     if (clavesDan.length) {
-      const catD = INV.CAT_DANO.indexOf(txt_(d.categoriaDano)) >= 0 ? txt_(d.categoriaDano) : 'Sin especificar';
+      const catD = esDestMovil ? INV.CAT_DESTAJO : INV.CAT_DANO.indexOf(txt_(d.categoriaDano)) >= 0 ? txt_(d.categoriaDano) : 'Sin especificar';
       invAgregar_(invHoja_('DAN'), 'DAN', clavesDan.map(c => ({ ID: 'DM' + grupo + '_' + c.slice(0, 12), Fecha: fecha, Tipo: 'DANADO', Clave: c, Material: porClave[c].material, Cantidad: danDe[c],
-        Motivo: ('Devuelto dañado por la móvil ' + (m ? txt_(m.Movil) : '') + (txt_(d.obs) ? ' · ' + txt_(d.obs) : '')).slice(0, 200), Usuario: usuarioDoc, Creado: segAhora_(), Origen: grupo,
+        Motivo: ((esDestMovil ? 'Cable sobrante de destajo devuelto por la móvil ' : 'Devuelto dañado por la móvil ') + (m ? txt_(m.Movil) : '') + (txt_(d.obs) ? ' · ' + txt_(d.obs) : '')).slice(0, 200), Usuario: usuarioDoc, Creado: segAhora_(), Origen: grupo,
         Categoria: catD, Fuente: 'MOVIL', ID_Movil: m ? String(m.ID_Movil) : '', Movil: m ? txt_(m.Movil) : '', Documento: consec })));
     }
     /* Devolución a proveedor: lo que estaba dañado en bodega sale de la lista de pendientes (queda como «devuelto al proveedor») */
-    if (esDevDan) {
+    if (esDevDan || esDevDest) {
       const bajas = claves.map(c => ({ ID: 'BP' + grupo + '_' + c.slice(0, 12), Fecha: fecha, Tipo: 'BAJA', Clave: c, Material: porClave[c].material, Cantidad: suma[c],
-        Motivo: ('Devuelto al proveedor' + (txt_(d.referencia) ? ' · ref. ' + txt_(d.referencia) : '')).slice(0, 200), Usuario: usuarioDoc, Creado: segAhora_(), Origen: grupo, Categoria: '', Fuente: '', ID_Movil: '', Movil: '', Documento: consec }));
+        Motivo: ((esDevDest ? 'Sobrante de destajo devuelto al proveedor' : 'Devuelto al proveedor') + (txt_(d.referencia) ? ' · ref. ' + txt_(d.referencia) : '')).slice(0, 200), Usuario: usuarioDoc, Creado: segAhora_(), Origen: grupo, Categoria: esDevDest ? INV.CAT_DESTAJO : '', Fuente: '', ID_Movil: '', Movil: '', Documento: consec }));
       invAgregar_(invHoja_('DAN'), 'DAN', bajas);
     }
     /* Se permite que la bodega quede en negativo (p. ej. un préstamo entre contratistas sin registrar); solo se avisa */

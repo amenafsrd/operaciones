@@ -1098,6 +1098,7 @@
             <button class="btn secondary" onclick="cargarIngresos()">↻ Actualizar</button>
             <button class="btn secondary" onclick="ingVerTodo()">📅 Ver todo el historial</button>
             <button class="btn primary" onclick="ingDevolverDanados()">↩️ Devolver equipos dañados</button>
+            <button class="btn primary" onclick="ingDevolverDestajo()">✂️ Devolver destajo al proveedor</button>
           </div>
           <div class="toolbar ingEd">
             <button class="btn primary" onclick="abrirMov('INGRESO')">➕ Registrar documento</button>
@@ -1128,6 +1129,7 @@
           </div>
           <div class="toolbar abEd">
             <button class="btn primary" onclick="abrirMov('ENTREGA')">➕ Registrar movimiento</button>
+            <button class="btn primary" onclick="abDestajoMovil()">✂️ Devolución de destajo (cable sobrante)</button>
           </div>
           <div class="panel">
             <div class="panelHead"><div><h2>Movimientos de móviles</h2>
@@ -1151,6 +1153,7 @@
             <div class="field"><label>Hasta</label><input type="date" id="danHasta" onchange="renderDanados()"></div>
             <button class="btn primary" onclick="danForm()">➕ Registrar dañados de bodega</button>
             <button class="btn primary" onclick="ingDevolverDanados()">↩️ Devolver equipos dañados</button>
+            <button class="btn primary" onclick="ingDevolverDestajo()">✂️ Devolver destajo al proveedor</button>
             <button class="btn secondary" onclick="danExcel()">📥 Excel</button>
             <button class="btn secondary" onclick="cargarDanados()">↻</button>
           </div>
@@ -1701,7 +1704,7 @@
           <option value="DEV_MOVIL">Devolución de móvil a bodega</option>
           <option value="AJ_MOVIL">Ajuste de móvil (saldo inicial, conteo)</option></select><div id="mvSentidoMov" style="font-size:12px;margin-top:3px"></div></div>
         <div class="field" id="mvCampoMovil"><label id="mvEtiquetaMovil">Móvil</label><select id="mvMovil" onchange="mvRefrescarInfo()"></select></div>
-        <div class="field" id="mvCampoMotivo" style="grid-column:1/-1;display:none"><label>Motivo de la devolución</label><select id="mvMotivo" onchange="mvDanVis()"><option value="">Devolución normal (sobrante, cambio de stock…)</option><option value="EQUIPO">Equipo dañado</option><option value="MATERIAL">Material dañado</option></select><div style="font-size:12px;color:#777;margin-top:3px">Si el motivo es equipo o material dañado, todo lo devuelto entra a la bodega pero queda marcado como dañado (cuenta en el inventario, no se puede entregar). Para una devolución mixta deja «normal» y anota los dañados en cada línea.</div></div>
+        <div class="field" id="mvCampoMotivo" style="grid-column:1/-1;display:none"><label>Motivo de la devolución</label><select id="mvMotivo" onchange="mvDanVis()"><option value="">Devolución normal (sobrante, cambio de stock…)</option><option value="EQUIPO">Equipo dañado</option><option value="MATERIAL">Material dañado</option><option value="DESTAJO">Cable sobrante de destajo (material de corte)</option></select><div style="font-size:12px;color:#777;margin-top:3px">Si el motivo es equipo o material dañado, todo lo devuelto entra a la bodega pero queda marcado como dañado (cuenta en el inventario, no se puede entregar). Para una devolución mixta deja «normal» y anota los dañados en cada línea. Con «cable sobrante de destajo» todo lo devuelto (solo material de corte) entra a la bodega como no disponible, hasta devolverlo al proveedor.</div></div>
         <div class="field" id="mvCampoCatDan" style="grid-column:1/-1;display:none"><label>Categoría del daño (para lo que venga dañado)</label><select id="mvCatDan"></select></div>
         <div class="field" id="mvCampoDestino" style="display:none"><label>Móvil que recibe</label><select id="mvMovilDestino"></select></div>
         <div class="field" id="mvCampoConcepto" style="grid-column:1/-1;display:none"><label>Tipo de movimiento *</label><select id="mvConcepto" onchange="mvActualizarSentido()"></select><div id="mvSentido" style="font-size:12px;margin-top:3px"></div></div>
@@ -10938,7 +10941,7 @@ async function cargarDanados() {
   $('danTabla').innerHTML = '<div class="loading">Cargando...</div>';
   try {
     await cargarBodega(); danDatos = await api('obtenerDanadosInvWeb');
-    const cs = $('danCat'), v = cs.value; cs.innerHTML = '<option value="">Todas</option>' + (danDatos.categorias || DAN_CATS).map(c => '<option>' + esc(c) + '</option>').join(''); cs.value = v;
+    const cs = $('danCat'), v = cs.value; cs.innerHTML = '<option value="">Todas</option>' + (danDatos.categorias || DAN_CATS).concat([danDatos.catDestajo || 'Sobrante de destajo']).map(c => '<option>' + esc(c) + '</option>').join(''); cs.value = v;
     renderDanados();
   } catch (e) { $('danTabla').innerHTML = ''; mostrarError(e, 'No se pudieron cargar los equipos dañados.'); }
 }
@@ -10960,20 +10963,21 @@ function renderDanados() {
   if (!bodDatos) return;
   const adm = esAdmin(), B = c => bodDatos.bodega[c] || {};
   const pendMats = (bodDatos.materiales || []).filter(m => (B(m.clave).danado || 0) > 0);
-  const totP = pendMats.reduce((a, m) => a + (B(m.clave).danado || 0), 0);
+  const totP = pendMats.reduce((a, m) => a + (B(m.clave).danado || 0) - (B(m.clave).destajo || 0), 0), totD = pendMats.reduce((a, m) => a + (B(m.clave).destajo || 0), 0);
   const H = danDatos.historial || [];
   const sum = f => H.filter(f).reduce((a, h) => a + h.cantidad, 0);
   $('danCards').innerHTML = '<div class="card"><div class="n" style="color:#b26a00">' + fmtN(totP) + '</div><div class="t">Dañados pendientes de devolver (no disponibles)</div></div>' +
-    '<div class="card"><div class="n">' + pendMats.length + '</div><div class="t">Materiales con dañados</div></div>' +
+    '<div class="card"><div class="n" style="color:#8a4b00">' + fmtN(totD) + '</div><div class="t">Sobrante de destajo pendiente de devolver (no disponible)</div></div>' +
+    '<div class="card"><div class="n">' + pendMats.length + '</div><div class="t">Materiales no disponibles</div></div>' +
     '<div class="card"><div class="n">' + fmtN(sum(h => h.tipo === 'DANADO' && h.fuente === 'MOVIL')) + '</div><div class="t">Recibidos de móviles (histórico)</div></div>' +
     '<div class="card"><div class="n">' + fmtN(sum(h => h.tipo === 'DANADO' && h.fuente === 'BODEGA')) + '</div><div class="t">Detectados en bodega (histórico)</div></div>' +
     '<div class="card"><div class="n" style="color:#2e7d32">' + fmtN(sum(h => h.tipo === 'BAJA')) + '</div><div class="t">Devueltos al proveedor (histórico)</div></div>';
   const L = danFilas();
   let pend = '';
-  if (pendMats.length) pend = '<div style="font-weight:700;margin:4px 0">Pendientes por material</div><table class="table" style="font-size:13px;margin-bottom:14px"><thead><tr><th>Código</th><th class="left">Material</th><th>Existencia (inventariado)</th><th>Dañados</th><th>Disponible</th></tr></thead><tbody>' +
-    pendMats.map(m => { const b = B(m.clave); return '<tr><td>' + esc(codP(m.codigo)) + '</td><td class="left"><b>' + esc(m.material) + '</b></td><td>' + fmtN(b.existencia || 0) + '</td><td style="color:#b26a00;font-weight:700">' + fmtN(b.danado) + '</td><td style="font-weight:700">' + fmtN(b.disponible || 0) + '</td>' + '</tr>'; }).join('') + '</tbody></table>';
+  if (pendMats.length) pend = '<div style="font-weight:700;margin:4px 0">Pendientes por material</div><table class="table" style="font-size:13px;margin-bottom:14px"><thead><tr><th>Código</th><th class="left">Material</th><th>Existencia (inventariado)</th><th>Dañados</th><th>Sobrante destajo</th><th>Disponible</th></tr></thead><tbody>' +
+    pendMats.map(m => { const b = B(m.clave); return '<tr><td>' + esc(codP(m.codigo)) + '</td><td class="left"><b>' + esc(m.material) + '</b></td><td>' + fmtN(b.existencia || 0) + '</td><td style="color:#b26a00;font-weight:700">' + fmtN(b.danado - (b.destajo || 0)) + '</td><td style="color:#8a4b00;font-weight:700">' + fmtN(b.destajo || 0) + '</td><td style="font-weight:700">' + fmtN(b.disponible || 0) + '</td>' + '</tr>'; }).join('') + '</tbody></table>';
   $('danTabla').innerHTML = pend + '<div style="font-weight:700;margin:4px 0">Registro (' + L.length + ')</div>' + (L.length ? '<table class="table" style="font-size:12.5px;min-width:900px"><thead><tr><th>Fecha</th><th class="left">Material</th><th>Cant.</th><th class="left">Movimiento</th><th class="left">Origen / quién</th><th class="left">Categoría</th><th class="left">Detalle</th><th class="left">Documento</th><th class="left">Registró</th><th></th></tr></thead><tbody>' +
-    L.map(h => '<tr><td>' + esc(fmtFechaSeg ? fmtFechaSeg(h.fecha) : h.fecha) + '</td><td class="left"><b>' + esc(h.material) + '</b></td><td><b>' + fmtN(h.cantidad) + '</b></td><td class="left">' + (DAN_TIPO[h.tipo] || esc(h.tipo)) + '</td>' +
+    L.map(h => '<tr><td>' + esc(fmtFechaSeg ? fmtFechaSeg(h.fecha) : h.fecha) + '</td><td class="left"><b>' + esc(h.material) + '</b></td><td><b>' + fmtN(h.cantidad) + '</b></td><td class="left">' + (h.tipo === 'DANADO' && h.categoria === (danDatos.catDestajo || 'Sobrante de destajo') ? '✂️ Sobrante de destajo' : (DAN_TIPO[h.tipo] || esc(h.tipo))) + '</td>' +
       '<td class="left">' + (h.tipo !== 'DANADO' ? '—' : h.fuente === 'MOVIL' ? '🚐 Móvil <b>M' + esc(h.movil) + '</b>' : '🏭 Bodega') + '</td><td class="left">' + esc(h.categoria || '—') + '</td><td class="left">' + esc(h.motivo) + '</td><td class="left">' + (h.documento ? '<b>' + esc(h.documento) + '</b>' : '—') + '</td><td class="left">' + esc(h.usuario) + '</td>' +
       '<td style="white-space:nowrap">' + (puedeEditar() && h.tipo === 'DANADO' ? '<button class="btnMini" title="Corregir cantidad, categoría o detalle" onclick="danEditar(\'' + escJs(h.id) + '\')">✏️</button> ' : '') + (adm && !h.origen ? '<button class="btnMini" title="Eliminar este registro" onclick="danEliminar(\'' + escJs(h.id) + '\')">✕</button>' : '') + '</td></tr>').join('') + '</tbody></table>' : '<div class="loading">No hay registros con ese filtro.</div>');
 }
@@ -11010,7 +11014,7 @@ async function danGuardar() {
 function danEditar(id) {
   const h = (danDatos.historial || []).find(x => x.id === id); if (!h) return;
   devModal('<h3>✏️ Corregir registro de dañados</h3><div style="font-size:13px;margin-bottom:8px"><b>' + esc(h.material) + '</b> · ' + esc(fmtFechaSeg(h.fecha)) + (h.fuente === 'MOVIL' ? ' · móvil M' + esc(h.movil) + ' (' + esc(h.documento) + ')' : '') + '</div>' +
-    '<div style="display:grid;grid-template-columns:130px 1fr;gap:8px;margin-bottom:8px"><label>Cantidad<input id="deCant" type="number" min="0" step="any" value="' + h.cantidad + '"></label><label>Categoría del daño<select id="deCat">' + (danDatos.categorias || DAN_CATS).map(c => '<option' + (c === h.categoria ? ' selected' : '') + '>' + esc(c) + '</option>').join('') + '</select></label></div>' +
+    '<div style="display:grid;grid-template-columns:130px 1fr;gap:8px;margin-bottom:8px"><label>Cantidad<input id="deCant" type="number" min="0" step="any" value="' + h.cantidad + '"></label><label>Categoría del daño<select id="deCat">' + (h.categoria === (danDatos.catDestajo || 'Sobrante de destajo') ? [h.categoria] : (danDatos.categorias || DAN_CATS)).map(c => '<option' + (c === h.categoria ? ' selected' : '') + '>' + esc(c) + '</option>').join('') + '</select></label></div>' +
     '<label style="display:block">Detalle<input id="deMot" maxlength="200" value="' + esc(h.motivo) + '" autocomplete="off"></label>' +
     (h.origen ? '<div style="font-size:12px;color:#9b6a00;margin-top:6px">Este registro nació de una devolución de móvil. Si luego editas ese documento, se vuelve a calcular con lo que digas allá.</div>' : '') +
     '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn primary" onclick="danEditarOk(\'' + escJs(id) + '\')">Guardar</button><button class="btn secondary" onclick="devCerrar()">Cancelar</button></div>');
@@ -11037,13 +11041,32 @@ async function danExcel() {
 /* Devolver al proveedor los equipos dañados: abre el documento con todos los pendientes ya cargados para escoger cuáles se devuelven */
 async function ingDevolverDanados() {
   try { await cargarBodega(); } catch (e) { return; }
-  const lineas = (bodDatos.materiales || []).filter(m => ((bodDatos.bodega[m.clave] || {}).danado || 0) > 0).map(m => ({ clave: m.clave, cantidad: bodDatos.bodega[m.clave].danado }));
+  const pdn = m => Math.round(((bodDatos.bodega[m.clave] || {}).danado - ((bodDatos.bodega[m.clave] || {}).destajo || 0)) * 1000) / 1000;
+  const lineas = (bodDatos.materiales || []).filter(m => (bodDatos.bodega[m.clave] || {}).danado && pdn(m) > 0).map(m => ({ clave: m.clave, cantidad: pdn(m) }));
   if (!lineas.length) { toast('No hay equipos dañados pendientes de devolver.'); return; }
   abrirMov('INGRESO', '', lineas);
   $('mvConcepto').value = 'Devolución de equipos dañados';
   $('mvTitulo').textContent = '↩️ Devolver equipos dañados al proveedor';
   $('mvEtiquetaRef').textContent = 'N.º de boleta / guía de devolución (obligatorio)';
   mvActualizarSentido();
+}
+
+/* Devolución de destajo: de bodega al proveedor (con todo el sobrante pendiente cargado) y de la móvil a bodega */
+async function ingDevolverDestajo() {
+  try { await cargarBodega(); } catch (e) { return; }
+  const lineas = (bodDatos.materiales || []).filter(m => ((bodDatos.bodega[m.clave] || {}).destajo || 0) > 0).map(m => ({ clave: m.clave, cantidad: bodDatos.bodega[m.clave].destajo }));
+  if (!lineas.length) { toast('No hay cable sobrante de destajo pendiente de devolver al proveedor.'); return; }
+  abrirMov('INGRESO', '', lineas);
+  $('mvConcepto').value = CONC_DEST_PROV;
+  $('mvTitulo').textContent = '✂️ Devolver sobrante de destajo al proveedor';
+  $('mvEtiquetaRef').textContent = 'N.º de boleta / guía de devolución (obligatorio)';
+  mvActualizarSentido();
+}
+function abDestajoMovil() {
+  abrirMov('DEV_MOVIL');
+  $('mvMotivo').value = 'DESTAJO';
+  mvDanVis();
+  $('mvTitulo').textContent = '✂️ Devolución de destajo: cable sobrante de móvil a bodega';
 }
 
 /* ---------- Historial de modificaciones (quién hizo cambios), con el estilo de Cronogramas ---------- */
@@ -11331,6 +11354,9 @@ async function aplicarAdminDoc() {
   if (!confirm('¿Dar este documento por aplicado como administrador, sin firma del móvil? Quedará registrado tu usuario y la hora.')) return;
   try { await api('aplicarAdminMovimientoInvWeb', x.grupo); toast('Documento aplicado por administrador.'); $('modalDoc').classList.remove('show'); if (docFuente === abDatos) await cargarAbastecimiento(); else await cargarIngresos(); } catch (e) { mostrarError(e, 'No se pudo aplicar el documento.'); }
 }
+/* Los documentos de la bodega principal (ingresos, ajustes y devoluciones a proveedor) no llevan firma: los aplica el usuario administrador que los registra */
+function esDocBodega(x) { return !!(x && ING_DIR[x.tipo]); }
+function aplicaCelda(x) { return '<span title="' + esc(x.creado || '') + '">🛡️ ' + esc(x.usuario || '') + '</span>'; }
 function firmaCelda(x) { return x.firmado ? '<span title="' + esc(firmaEtq(x.firmado)) + ' · ' + esc(x.firmado.hora) + '">✅ ' + esc(x.firmado.admin ? 'Admin · ' + x.firmado.nombre : x.firmado.nombre) + '</span>' : '<span style="color:#bbb">pendiente</span>'; }
 
 function bodMovDeA(x) {
@@ -11398,12 +11424,12 @@ function renderIngresos() {
   }
 
   ingLista = l;
-  $('ingTabla').innerHTML = '<table class="table" style="min-width:880px"><thead><tr><th>Consecutivo</th><th>Fecha</th><th class="left">Tipo / concepto</th><th class="left">Documento</th><th>Materiales</th><th>Recibido</th><th>Registró</th>' + (adm ? '<th></th>' : '') + '</tr></thead><tbody>' +
+  $('ingTabla').innerHTML = '<table class="table" style="min-width:880px"><thead><tr><th>Consecutivo</th><th>Fecha</th><th class="left">Tipo / concepto</th><th class="left">Documento</th><th>Materiales</th><th>Aplicado por</th>' + (adm ? '<th></th>' : '') + '</tr></thead><tbody>' +
     l.map((x, i) => '<tr style="cursor:pointer" title="Ver el detalle" onclick="verDoc(' + i + ')"><td><b>' + esc(x.consecutivo || '—') + '</b></td><td>' + esc(fmtFechaSeg(x.fecha)) + '</td>' +
       '<td class="left"><b>' + esc(ingDatos.tipos[x.tipo] || x.tipo) + '</b> ' + aDe(x) + (x.concepto ? '<div style="font-size:12px;color:#555">' + esc(x.concepto) + '</div>' : '') + '</td>' +
       '<td class="left"><b style="color:#b71c1c;text-decoration:underline">' + esc(x.referencia || 'sin número') + '</b></td>' +
       '<td>' + x.lineas.length + ' <span style="color:#888">línea' + (x.lineas.length === 1 ? '' : 's') + '</span></td>' +
-      '<td>' + firmaCelda(x) + '</td><td>' + esc(x.usuario) + '</td>' + (adm ? '<td><button class="btnMini" onclick="event.stopPropagation();eliminarMov(\'' + escJs(x.grupo) + '\')">🗑️</button></td>' : '') + '</tr>').join('') + '</tbody></table>';
+      '<td>' + (esDocBodega(x) ? aplicaCelda(x) : firmaCelda(x) + ' <span style="color:#888">· ' + esc(x.usuario) + '</span>') + '</td>' + (adm ? '<td><button class="btnMini" onclick="event.stopPropagation();eliminarMov(\'' + escJs(x.grupo) + '\')">🗑️</button></td>' : '') + '</tr>').join('') + '</tbody></table>';
 }
 
 let ingLista = [];
@@ -11422,11 +11448,14 @@ function verDoc(i, ab) {
     (x.concepto ? '<br><b>Tipo de movimiento:</b> ' + esc(x.concepto) : '') + (x.tipo === 'TRASLADO' ? '<br><b>Presta:</b> M' + esc(x.movil) + ' → <b>Recibe:</b> M' + esc(x.movilDestino || '?') : x.movil ? '<br><b>Móvil:</b> M' + esc(x.movil) : '') +
     (x.obs ? '<br><b>Observación:</b> ' + esc(x.obs) : '') + '<br><b>Registró:</b> ' + esc(x.usuario) + ' <span style="color:#888">' + esc(x.creado) + '</span>' + (x.editado ? '<br><b>Última edición:</b> ' + esc(x.editado) : '');
   $('docLineas').innerHTML = '<table class="table" style="font-size:13px"><thead><tr><th>Línea</th><th>Código</th><th class="left">Material</th><th>Und.</th><th>Cantidad</th></tr></thead><tbody>' +
-    x.lineas.map((y, i) => ({ y: y, i: i })).sort((a, b) => (a.y.linea || a.i + 1) - (b.y.linea || b.i + 1)).map(o => { const y = o.y; const m = docFuente.materiales.find(z => z.clave === y.clave) || {}; return '<tr><td><b>' + (y.linea || o.i + 1) + '</b></td><td>' + esc(codP(m.codigo)) + '</td><td class="left"><b>' + esc(y.material) + '</b></td><td>' + esc(m.unidad || '') + '</td><td><b>' + fmtN(y.cantidad) + '</b>' + (y.danados ? '<div style="font-size:11px;color:#b26a00">⚠ ' + fmtN(y.danados) + ' dañado(s) · para devolución</div>' : '') + '</td></tr>'; }).join('') +
+    x.lineas.map((y, i) => ({ y: y, i: i })).sort((a, b) => (a.y.linea || a.i + 1) - (b.y.linea || b.i + 1)).map(o => { const y = o.y; const m = docFuente.materiales.find(z => z.clave === y.clave) || {}; return '<tr><td><b>' + (y.linea || o.i + 1) + '</b></td><td>' + esc(codP(m.codigo)) + '</td><td class="left"><b>' + esc(y.material) + '</b></td><td>' + esc(m.unidad || '') + '</td><td><b>' + fmtN(y.cantidad) + '</b>' + (y.danados ? '<div style="font-size:11px;color:#b26a00">' + (x.concepto === CONC_DEST_MOVIL ? '✂ sobrante de destajo · no disponible, para devolver al proveedor' : '⚠ ' + fmtN(y.danados) + ' dañado(s) · para devolución') + '</div>' : '') + '</td></tr>'; }).join('') +
     '</tbody></table>';
-  $('docBtnFirmar').style.display = puedeEditar() ? '' : 'none';
+  const bodega = esDocBodega(x);
+  $('docBtnFirmar').style.display = puedeEditar() && !bodega ? '' : 'none';
   $('docBtnFirmar').textContent = x.firmado ? '✍️ Firmar de nuevo' : '✍️ Firma de recibido';
-  $('docBtnAdmin').style.display = esAdmin() ? '' : 'none';
+  $('docBtnAdmin').style.display = esAdmin() && !bodega ? '' : 'none';
+  $('docFirma').style.display = '';
+  if (bodega) { $('docFirma').innerHTML = '🛡️ <b>Aplicado por ' + esc(x.usuario || '') + '</b> <span style="color:#888">' + esc(x.creado || '') + '</span><div style="color:#888;margin-top:2px">Los documentos de la bodega principal no llevan firma.</div>'; $('modalDoc').classList.add('show'); return; }
   $('docFirma').innerHTML = x.firmado ? '✅ <b>' + esc(firmaEtq(x.firmado)) + '</b> <span style="color:#888">' + esc(x.firmado.hora) + '</span><div id="docFirmaImg" style="margin-top:6px;color:#888">Cargando firma...</div>' :
     '<span style="color:#888">Sin firma de recibido.</span>';
   if (x.firmado) api('obtenerFirmaInvWeb', x.grupo).then(f => { const e = $('docFirmaImg'); if (e && docActual === x) e.innerHTML = f && f.imagen ? '<img src="' + f.imagen + '" style="max-width:260px;border:1px solid #ccc;border-radius:6px;background:#fff">' : ''; }).catch(() => {});
@@ -11530,12 +11559,13 @@ async function compartirDoc(x) {
   $('modalComp').classList.add('show');
   try {
     let f = null;
-    if (x.firmado) f = await api('obtenerFirmaInvWeb', x.grupo);
+    const bod = esDocBodega(x);
+    if (x.firmado && !bod) f = await api('obtenerFirmaInvWeb', x.grupo);
     await cargarLib('jspdf', URL_JSPDF);
     const doc = docArmarPdf(x, f);
-    const nombre = (x.consecutivo || 'documento') + (x.firmado ? '_firmado' : '') + '.pdf';
+    const nombre = (x.consecutivo || 'documento') + (x.firmado && !bod ? '_firmado' : '') + '.pdf';
     compFile = new File([doc.output('blob')], nombre, { type: 'application/pdf' });
-    $('compEstado').innerHTML = x.firmado ? '✅ <b>PDF firmado listo</b> · ' + esc(firmaEtq(x.firmado)) : '⚠️ Este documento <b>aún no está firmado</b>. El PDF saldrá con el espacio de firma en blanco.';
+    $('compEstado').innerHTML = bod ? '✅ <b>PDF listo</b> · Aplicado por ' + esc(x.usuario || '') : x.firmado ? '✅ <b>PDF firmado listo</b> · ' + esc(firmaEtq(x.firmado)) : '⚠️ Este documento <b>aún no está firmado</b>. El PDF saldrá con el espacio de firma en blanco.';
     $('compBtnCompartir').disabled = false; $('compBtnDescargar').disabled = false;
   } catch (e) {
     $('compEstado').innerHTML = '<span style="color:#b71c1c">No se pudo generar el PDF.</span>';
@@ -11594,6 +11624,13 @@ function docArmarPdf(x, f) {
     d.setFont('helvetica', 'bold'); d.text(fmtN(o.l.cantidad), cx + cols[4].w / 2, y, { align: 'center' }); d.setFont('helvetica', 'normal');
     y += h;
   });
+  if (esDocBodega(x)) {
+    if (y > 262) { d.addPage(); y = 20; }
+    y += 14; d.setDrawColor(0); d.setFontSize(10);
+    d.setFont('helvetica', 'bold'); d.text('Aplicado por: ' + (x.usuario || ''), M, y);
+    d.setFont('helvetica', 'normal'); d.text(String(x.creado || ''), M, y + 5);
+    return d;
+  }
   if (y > 215) { d.addPage(); y = 20; }
   y = Math.max(y + 18, 225);
   d.setDrawColor(0);
@@ -11634,7 +11671,7 @@ async function docImprimir() {
   const x = docActual;
   if (!x) return;
   let f = null;
-  if (x.firmado) { try { f = await api('obtenerFirmaInvWeb', x.grupo); } catch (e) { f = null; } }
+  if (x.firmado && !esDocBodega(x)) { try { f = await api('obtenerFirmaInvWeb', x.grupo); } catch (e) { f = null; } }
   const tipo = (docFuente.tipos || {})[x.tipo] || x.tipo;
   const lin = x.lineas.map((y, i) => ({ y: y, i: i })).sort((a, b) => (a.y.linea || a.i + 1) - (b.y.linea || b.i + 1)).map(o => {
     const m = docFuente.materiales.find(z => z.clave === o.y.clave) || {};
@@ -11645,7 +11682,7 @@ async function docImprimir() {
     docEncabezado(tipo, x.consecutivo || '') + '<div class="d"><b>Consecutivo:</b> ' + esc(x.consecutivo || '—') + ' &nbsp; <b>Fecha:</b> ' + esc(fmtFechaSeg(x.fecha)) + (de ? ' &nbsp; <b>' + de + '</b>' : '') +
     '<br><b>Documento / referencia:</b> ' + esc(x.referencia || 's/n') + (x.concepto ? ' &nbsp; <b>Tipo:</b> ' + esc(x.concepto) : '') + (x.obs ? '<br><b>Observación:</b> ' + esc(x.obs) : '') + '<br><b>Registró:</b> ' + esc(x.usuario) + '</div>' +
     '<table><thead><tr><th>Línea</th><th>Código</th><th>Material</th><th>Und.</th><th>Cantidad</th></tr></thead><tbody>' + lin + '</tbody></table>' +
-    '<div class="f"><div>' + (f && f.imagen ? '<img src="' + f.imagen + '" style="max-height:80px"><br>' : '') + '<b>' + (f && f.admin ? 'Aplicado por administrador: ' : 'Recibido por: ') + esc(f ? f.nombre : '') + '</b>' + (f ? '<br>' + esc(f.hora) : '<br>Nombre y firma') + '</div><div><b>Entregado por</b><br>' + esc(x.usuario) + '</div></div></body></html>';
+    (esDocBodega(x) ? '<div style="margin-top:30px"><b>Aplicado por:</b> ' + esc(x.usuario || '') + '<br>' + esc(x.creado || '') + '</div></body></html>' : '<div class="f"><div>' + (f && f.imagen ? '<img src="' + f.imagen + '" style="max-height:80px"><br>' : '') + '<b>' + (f && f.admin ? 'Aplicado por administrador: ' : 'Recibido por: ') + esc(f ? f.nombre : '') + '</b>' + (f ? '<br>' + esc(f.hora) : '<br>Nombre y firma') + '</div><div><b>Entregado por</b><br>' + esc(x.usuario) + '</div></div></body></html>');
   const fr = document.createElement('iframe');
   fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
   document.body.appendChild(fr);
@@ -11683,7 +11720,7 @@ function renderAbastecimiento() {
   $('abTabla').innerHTML = '<table class="table" style="min-width:880px"><thead><tr><th>Consecutivo</th><th>Fecha</th><th class="left">Tipo</th><th>De → A</th><th class="left">Documento</th><th>Materiales</th><th>Recibido</th><th>Registró</th>' +
     (adm ? '<th></th>' : '') + '</tr></thead><tbody>' +
     l.map((x, i) => '<tr style="cursor:pointer" title="Ver el detalle" onclick="verDoc(' + i + ',true)"><td><b>' + esc(x.consecutivo || '—') + '</b></td><td>' + esc(fmtFechaSeg(x.fecha)) + '</td>' +
-      '<td class="left"><b>' + esc(abDatos.tipos[x.tipo] || x.tipo) + '</b></td><td>' + bodMovDeA(x) + '</td>' +
+      '<td class="left"><b>' + esc(abDatos.tipos[x.tipo] || x.tipo) + '</b>' + (x.concepto ? '<div style="font-size:11.5px;color:#a15c00">' + esc(x.concepto) + '</div>' : '') + '</td><td>' + bodMovDeA(x) + '</td>' +
       '<td class="left"><b style="color:#b71c1c;text-decoration:underline">' + esc(x.referencia || 'sin número') + '</b>' + (x.obs ? '<div style="color:#888;font-size:12px">' + esc(x.obs) + '</div>' : '') + '</td>' +
       '<td>' + x.lineas.length + ' <span style="color:#888">línea' + (x.lineas.length === 1 ? '' : 's') + '</span></td><td>' + firmaCelda(x) + '</td><td>' + esc(x.usuario) + '</td>' +
       (adm ? '<td><button class="btnMini" onclick="event.stopPropagation();eliminarMov(\'' + escJs(x.grupo) + '\')">🗑️</button></td>' : '') + '</tr>').join('') + '</tbody></table>';
@@ -11748,8 +11785,10 @@ function abVerTodo() {
 
 /* ---------- Formulario de movimiento ---------- */
 
+/* Devolución de destajo: cable sobrante (material de corte) de la móvil a bodega (queda no disponible) y de bodega al proveedor */
+const CONC_DEST_MOVIL = 'Destajo: cable sobrante de móvil a bodega', CONC_DEST_PROV = 'Devolución de destajo a proveedor';
 const MV_CONC = {
-  INGRESO: ['Abastecimiento del cliente (RQ)', 'Devolución a proveedor', 'Devolución de equipos dañados', 'Reposición por garantía', 'Otro'],
+  INGRESO: ['Abastecimiento del cliente (RQ)', 'Devolución a proveedor', 'Devolución de equipos dañados', CONC_DEST_PROV, 'Reposición por garantía', 'Otro'],
   DEV_PROV: ['Devolución por material dañado', 'Devolución por excedente', 'Otro']
 };
 
@@ -11866,6 +11905,13 @@ async function mvImportar(inp) {
 
 function mvRenumerar() { document.querySelectorAll('#mvLineas .mvNum').forEach((e, i) => { e.textContent = i + 1; }); }
 
+function mvMatsLista() {
+  let l = bodMats(false);
+  if (mvTipo === 'DEV_MOVIL' && $('mvMotivo') && $('mvMotivo').value === 'DESTAJO') l = l.filter(m => m.categoria === 'De corte');
+  if (mvTipo === 'INGRESO' && $('mvConcepto').value === CONC_DEST_PROV) l = l.filter(m => m.categoria === 'De corte' && ((bodDatos.bodega[m.clave] || {}).destajo || 0) > 0);
+  return l;
+}
+function mvRefrescarLista() { if ($('mvDL')) $('mvDL').innerHTML = mvMatsLista().map(m => '<option value="' + esc(mvEtiqMat(m)) + '"></option>').join(''); }
 function mvEtiqMat(m) { return (m.codigo ? codP(m.codigo) + ' · ' : '') + m.material + ' (' + m.unidad + ')'; }
 
 /* Texto escrito/elegido en la línea → clave del material (por código o nombre) */
@@ -11887,10 +11933,10 @@ function mvGridCols(d) {
   d.style.gridTemplateColumns = mvBorrador ? '28px 1fr 170px 110px 170px 36px' : (dan ? '28px 1fr 120px 130px 36px' : '28px 1fr 120px 36px');
   const i = d.querySelector('.mvDan'); if (i) i.style.display = dan ? '' : 'none';
 }
-function mvDanVis() { const cm = $('mvCampoMotivo'); if (cm) cm.style.display = mvTipo === 'DEV_MOVIL' && !mvBorrador ? '' : 'none'; const cc = $('mvCampoCatDan'); if (cc) { cc.style.display = mvTipo === 'DEV_MOVIL' && !mvBorrador ? '' : 'none'; if (!$('mvCatDan').options.length) $('mvCatDan').innerHTML = DAN_CATS.map(c => '<option>' + esc(c) + '</option>').join(''); } document.querySelectorAll('#mvLineas .mvLinea').forEach(mvGridCols); const t = $('mvNotaAj'); if (t && mvTipo === 'DEV_MOVIL') t.textContent = '— en «De ellos dañados» anota cuántos vienen dañados o defectuosos: entran a la bodega como «para devolución» (no disponibles)'; }
+function mvDanVis() { const cm = $('mvCampoMotivo'); if (cm) cm.style.display = mvTipo === 'DEV_MOVIL' && !mvBorrador ? '' : 'none'; const dest = $('mvMotivo') && $('mvMotivo').value === 'DESTAJO'; const cc = $('mvCampoCatDan'); if (cc) { cc.style.display = mvTipo === 'DEV_MOVIL' && !mvBorrador && !dest ? '' : 'none'; if (!$('mvCatDan').options.length) $('mvCatDan').innerHTML = DAN_CATS.map(c => '<option>' + esc(c) + '</option>').join(''); } document.querySelectorAll('#mvLineas .mvLinea').forEach(mvGridCols); mvRefrescarLista(); const t = $('mvNotaAj'); if (t && mvTipo === 'DEV_MOVIL') t.textContent = dest ? '— cable sobrante de destajo: entra a la bodega como «no disponible» hasta devolverlo al proveedor' : '— en «De ellos dañados» anota cuántos vienen dañados o defectuosos: entran a la bodega como «para devolución» (no disponibles)'; }
 function mvAgregarLinea(clave, cantidad, danados) {
   if (!$('mvDL')) { const dl = document.createElement('datalist'); dl.id = 'mvDL'; document.body.appendChild(dl); }
-  $('mvDL').innerHTML = bodMats(false).map(m => '<option value="' + esc(mvEtiqMat(m)) + '"></option>').join('');
+  mvRefrescarLista();
   const d = document.createElement('div');
   d.className = 'mvLinea';
   d.style.cssText = 'display:grid;grid-template-columns:' + (mvBorrador ? '28px 1fr 170px 110px 170px 36px' : '28px 1fr 120px 36px') + ';gap:8px;margin-bottom:6px;align-items:center';
@@ -12125,17 +12171,19 @@ function editarDoc() {
   $('mvRef').value = x.referencia || '';
   $('mvObs').value = x.obs || '';
   if (MV_CONC[tipoForm]) {
-    const c = x.tipo === 'DEV_PROV' ? (x.concepto === 'Devolución de equipos dañados' ? x.concepto : 'Devolución a proveedor') : x.concepto;
+    const c = x.tipo === 'DEV_PROV' ? (x.concepto === 'Devolución de equipos dañados' || x.concepto === CONC_DEST_PROV ? x.concepto : 'Devolución a proveedor') : x.concepto;
     if (c && MV_CONC[tipoForm].indexOf(c) >= 0) $('mvConcepto').value = c;
     mvActualizarSentido();
   }
+  if (x.tipo === 'DEV_MOVIL' && x.concepto === CONC_DEST_MOVIL) { $('mvMotivo').value = 'DESTAJO'; mvDanVis(); }
 }
 
 function mvActualizarSentido() {
   const el = $('mvSentido');
   if (!MV_CONC[mvTipo]) { el.textContent = ''; return; }
-  const cv = $('mvConcepto').value, resta = cv === 'Devolución a proveedor' || cv === 'Devolución de equipos dañados';
-  el.innerHTML = cv === 'Devolución de equipos dañados' ? '<span style="color:#b71c1c">⬆ Resta de la bodega (sale hacia el proveedor) y pasan a «Devuelto al proveedor» en Equipos dañados.</span> <span style="color:#666">Quita las líneas que no devuelves o baja la cantidad; el máximo es lo que está pendiente de cada material.</span>' : resta ? '<span style="color:#b71c1c">⬆ Resta de la bodega (sale hacia el proveedor)</span>' : '<span style="color:#2e7d32">⬇ Suma a la bodega</span>';
+  const cv = $('mvConcepto').value, resta = cv === 'Devolución a proveedor' || cv === 'Devolución de equipos dañados' || cv === CONC_DEST_PROV;
+  mvRefrescarLista();
+  el.innerHTML = cv === CONC_DEST_PROV ? '<span style="color:#b71c1c">⬆ Resta de la bodega (sale hacia el proveedor) y pasa a «Devuelto al proveedor» como sobrante de destajo.</span> <span style="color:#666">Solo material de corte; el máximo es lo que está pendiente de cada material.</span>' : cv === 'Devolución de equipos dañados' ? '<span style="color:#b71c1c">⬆ Resta de la bodega (sale hacia el proveedor) y pasan a «Devuelto al proveedor» en Equipos dañados.</span> <span style="color:#666">Quita las líneas que no devuelves o baja la cantidad; el máximo es lo que está pendiente de cada material.</span>' : resta ? '<span style="color:#b71c1c">⬆ Resta de la bodega (sale hacia el proveedor)</span>' : '<span style="color:#2e7d32">⬇ Suma a la bodega</span>';
 }
 
 function cerrarMov() { $('modalMov').classList.remove('show'); }
@@ -12174,7 +12222,16 @@ async function guardarMov() {
       if (falta.length) { toast('Falta: ' + falta.join(', ') + '.'); btn.disabled = false; return; }
     }
     if (mvTipo === 'DEV_MOVIL' && lineas.some(l => Number(l.danados) > Number(l.cantidad))) { toast('Los dañados no pueden ser más que la cantidad devuelta.'); btn.disabled = false; return; }
-    const tipoReal = mvTipo === 'INGRESO' && ($('mvConcepto').value === 'Devolución a proveedor' || $('mvConcepto').value === 'Devolución de equipos dañados') ? 'DEV_PROV' : mvTipo;
+    const destMovil = mvTipo === 'DEV_MOVIL' && $('mvMotivo').value === 'DESTAJO', destProv = mvTipo === 'INGRESO' && $('mvConcepto').value === CONC_DEST_PROV;
+    if (destMovil || destProv) {
+      const noCorte = lineas.filter(l => ((bodDatos.materiales.find(m => m.clave === l.clave) || {}).categoria) !== 'De corte').map(l => bodMatNombre(l.clave));
+      if (noCorte.length) { toast('La devolución de destajo solo aplica a material de corte. Quita: ' + noCorte.join(', ') + '.'); btn.disabled = false; return; }
+      if (destProv) {
+        const pasan = lineas.filter(l => Number(l.cantidad) > ((bodDatos.bodega[l.clave] || {}).destajo || 0) + 1e-9).map(l => bodMatNombre(l.clave) + ' (pendiente ' + fmtN((bodDatos.bodega[l.clave] || {}).destajo || 0) + ')');
+        if (pasan.length) { toast('No hay tanto sobrante de destajo pendiente en: ' + pasan.join(', ') + '.'); btn.disabled = false; return; }
+      }
+    }
+    const tipoReal = mvTipo === 'INGRESO' && ($('mvConcepto').value === 'Devolución a proveedor' || $('mvConcepto').value === 'Devolución de equipos dañados' || $('mvConcepto').value === CONC_DEST_PROV) ? 'DEV_PROV' : mvTipo;
     if (mvTipo === 'TRASLADO' && $('mvMovil').value) {
       const st = bodDatos.stockMovil[$('mvMovil').value] || {};
       const cortos = lineas.filter(l => ((st[l.clave] || {}).actual || 0) < Number(l.cantidad)).map(l => bodMatNombre(l.clave) + ' (tiene ' + fmtN((st[l.clave] || {}).actual || 0) + ')');
@@ -12182,7 +12239,7 @@ async function guardarMov() {
     }
     const rg = await api('guardarMovimientoInvWeb', {
       grupo: mvEditGrupo, tipo: tipoReal, fecha: $('mvFecha').value, idMovil: $('mvMovil').value, idMovilDestino: $('mvMovilDestino').value,
-      categoriaDano: mvTipo === 'DEV_MOVIL' ? $('mvCatDan').value : '', referencia: $('mvRef').value, obs: (mvTipo === 'DEV_MOVIL' && $('mvMotivo').value ? ($('mvMotivo').value === 'EQUIPO' ? 'Equipo dañado' : 'Material dañado') + ($('mvObs').value ? ' · ' : '') : '') + $('mvObs').value, lineas: lineas, concepto: MV_CONC[mvTipo] ? $('mvConcepto').value : ''
+      categoriaDano: mvTipo === 'DEV_MOVIL' ? $('mvCatDan').value : '', referencia: $('mvRef').value, obs: (mvTipo === 'DEV_MOVIL' && $('mvMotivo').value && $('mvMotivo').value !== 'DESTAJO' ? ($('mvMotivo').value === 'EQUIPO' ? 'Equipo dañado' : 'Material dañado') + ($('mvObs').value ? ' · ' : '') : '') + $('mvObs').value, lineas: lineas, concepto: MV_CONC[mvTipo] ? $('mvConcepto').value : (destMovil ? CONC_DEST_MOVIL : '')
     });
     const wasEdit = !!mvEditGrupo;
     const idDestinoSel = $('mvMovilDestino').value, idMovilSel = $('mvMovil').value;
@@ -15586,6 +15643,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 131 · 20-oct 09:46</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 133 · 20-oct 11:26</div>
 </body>
 </html>
