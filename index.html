@@ -1097,11 +1097,12 @@
             <div class="field" style="min-width:150px"><label>Vista</label><select id="ingVista" onchange="renderIngresos()"><option value="doc">Por documento</option><option value="mat">Matriz material × documento</option></select></div>
             <button class="btn secondary" onclick="cargarIngresos()">↻ Actualizar</button>
             <button class="btn secondary" onclick="ingVerTodo()">📅 Ver todo el historial</button>
-            <button class="btn primary" onclick="ingDevolverDanados()">↩️ Devolver equipos dañados</button>
-            <button class="btn primary" onclick="ingDevolverDestajo()">✂️ Devolver destajo al proveedor</button>
           </div>
-          <div class="toolbar ingEd">
+          <div class="toolbar ingEd" style="gap:8px">
             <button class="btn primary" onclick="abrirMov('INGRESO')">➕ Registrar documento</button>
+            <span style="flex:1"></span>
+            <button class="btn secondary" onclick="ingDevolverDanados()">↩️ Devolver equipos dañados</button>
+            <button class="btn secondary" onclick="ingDevolverDestajo()">✂️ Devolver destajo al proveedor</button>
           </div>
           <div id="ingCards" class="cards segCards"></div>
           <div class="panel">
@@ -1129,7 +1130,8 @@
           </div>
           <div class="toolbar abEd">
             <button class="btn primary" onclick="abrirMov('ENTREGA')">➕ Registrar movimiento</button>
-            <button class="btn primary" onclick="abDestajoMovil()">✂️ Devolución de destajo (cable sobrante)</button>
+            <span style="flex:1"></span>
+            <button class="btn secondary" onclick="abDestajoMovil()">✂️ Devolución de destajo (cable sobrante)</button>
           </div>
           <div class="panel">
             <div class="panelHead"><div><h2>Movimientos de móviles</h2>
@@ -1151,11 +1153,14 @@
             <div class="field" style="min-width:190px"><label>Categoría del daño</label><select id="danCat" onchange="renderDanados()"></select></div>
             <div class="field"><label>Desde</label><input type="date" id="danDesde" onchange="renderDanados()"></div>
             <div class="field"><label>Hasta</label><input type="date" id="danHasta" onchange="renderDanados()"></div>
-            <button class="btn primary" onclick="danForm()">➕ Registrar dañados de bodega</button>
-            <button class="btn primary" onclick="ingDevolverDanados()">↩️ Devolver equipos dañados</button>
-            <button class="btn primary" onclick="ingDevolverDestajo()">✂️ Devolver destajo al proveedor</button>
             <button class="btn secondary" onclick="danExcel()">📥 Excel</button>
             <button class="btn secondary" onclick="cargarDanados()">↻</button>
+          </div>
+          <div class="toolbar ingEd" style="gap:8px">
+            <button class="btn primary" onclick="danForm()">➕ Registrar dañados de bodega</button>
+            <span style="flex:1"></span>
+            <button class="btn secondary" onclick="ingDevolverDanados()">↩️ Devolver equipos dañados</button>
+            <button class="btn secondary" onclick="ingDevolverDestajo()">✂️ Devolver destajo al proveedor</button>
           </div>
           <div id="danCards" class="cards segCards"></div>
           <div class="panel">
@@ -11055,7 +11060,6 @@ async function ingDevolverDanados() {
 async function ingDevolverDestajo() {
   try { await cargarBodega(); } catch (e) { return; }
   const lineas = (bodDatos.materiales || []).filter(m => ((bodDatos.bodega[m.clave] || {}).destajo || 0) > 0).map(m => ({ clave: m.clave, cantidad: bodDatos.bodega[m.clave].destajo }));
-  if (!lineas.length) { toast('No hay cable sobrante de destajo pendiente de devolver al proveedor.'); return; }
   abrirMov('INGRESO', '', lineas);
   $('mvConcepto').value = CONC_DEST_PROV;
   $('mvTitulo').textContent = '✂️ Devolver sobrante de destajo al proveedor';
@@ -11908,7 +11912,7 @@ function mvRenumerar() { document.querySelectorAll('#mvLineas .mvNum').forEach((
 function mvMatsLista() {
   let l = bodMats(false);
   if (mvTipo === 'DEV_MOVIL' && $('mvMotivo') && $('mvMotivo').value === 'DESTAJO') l = l.filter(m => m.categoria === 'De corte');
-  if (mvTipo === 'INGRESO' && $('mvConcepto').value === CONC_DEST_PROV) l = l.filter(m => m.categoria === 'De corte' && ((bodDatos.bodega[m.clave] || {}).destajo || 0) > 0);
+  if (mvTipo === 'INGRESO' && $('mvConcepto').value === CONC_DEST_PROV) l = l.filter(m => m.categoria === 'De corte');
   return l;
 }
 function mvRefrescarLista() { if ($('mvDL')) $('mvDL').innerHTML = mvMatsLista().map(m => '<option value="' + esc(mvEtiqMat(m)) + '"></option>').join(''); }
@@ -12183,7 +12187,7 @@ function mvActualizarSentido() {
   if (!MV_CONC[mvTipo]) { el.textContent = ''; return; }
   const cv = $('mvConcepto').value, resta = cv === 'Devolución a proveedor' || cv === 'Devolución de equipos dañados' || cv === CONC_DEST_PROV;
   mvRefrescarLista();
-  el.innerHTML = cv === CONC_DEST_PROV ? '<span style="color:#b71c1c">⬆ Resta de la bodega (sale hacia el proveedor) y pasa a «Devuelto al proveedor» como sobrante de destajo.</span> <span style="color:#666">Solo material de corte; el máximo es lo que está pendiente de cada material.</span>' : cv === 'Devolución de equipos dañados' ? '<span style="color:#b71c1c">⬆ Resta de la bodega (sale hacia el proveedor) y pasan a «Devuelto al proveedor» en Equipos dañados.</span> <span style="color:#666">Quita las líneas que no devuelves o baja la cantidad; el máximo es lo que está pendiente de cada material.</span>' : resta ? '<span style="color:#b71c1c">⬆ Resta de la bodega (sale hacia el proveedor)</span>' : '<span style="color:#2e7d32">⬇ Suma a la bodega</span>';
+  el.innerHTML = cv === CONC_DEST_PROV ? '<span style="color:#b71c1c">⬆ Resta de la bodega (sale hacia el proveedor) y pasa a «Devuelto al proveedor» como sobrante de destajo.</span> <span style="color:#666">Solo material de corte. Si la boleta trae más que el sobrante registrado desde las móviles, el resto se toma del cable que ya está en la bodega.</span>' : cv === 'Devolución de equipos dañados' ? '<span style="color:#b71c1c">⬆ Resta de la bodega (sale hacia el proveedor) y pasan a «Devuelto al proveedor» en Equipos dañados.</span> <span style="color:#666">Quita las líneas que no devuelves o baja la cantidad; el máximo es lo que está pendiente de cada material.</span>' : resta ? '<span style="color:#b71c1c">⬆ Resta de la bodega (sale hacia el proveedor)</span>' : '<span style="color:#2e7d32">⬇ Suma a la bodega</span>';
 }
 
 function cerrarMov() { $('modalMov').classList.remove('show'); }
@@ -12226,9 +12230,9 @@ async function guardarMov() {
     if (destMovil || destProv) {
       const noCorte = lineas.filter(l => ((bodDatos.materiales.find(m => m.clave === l.clave) || {}).categoria) !== 'De corte').map(l => bodMatNombre(l.clave));
       if (noCorte.length) { toast('La devolución de destajo solo aplica a material de corte. Quita: ' + noCorte.join(', ') + '.'); btn.disabled = false; return; }
-      if (destProv) {
-        const pasan = lineas.filter(l => Number(l.cantidad) > ((bodDatos.bodega[l.clave] || {}).destajo || 0) + 1e-9).map(l => bodMatNombre(l.clave) + ' (pendiente ' + fmtN((bodDatos.bodega[l.clave] || {}).destajo || 0) + ')');
-        if (pasan.length) { toast('No hay tanto sobrante de destajo pendiente en: ' + pasan.join(', ') + '.'); btn.disabled = false; return; }
+      if (destProv && !mvEditGrupo) {
+        const pasan = lineas.filter(l => Number(l.cantidad) > ((bodDatos.bodega[l.clave] || {}).destajo || 0) + 1e-9).map(l => bodMatNombre(l.clave) + ': pides ' + fmtN(l.cantidad) + ', sobrante registrado ' + fmtN((bodDatos.bodega[l.clave] || {}).destajo || 0));
+        if (pasan.length && !confirm('Hay más cable de destajo en esta boleta que el sobrante registrado desde las móviles:\n\n' + pasan.join('\n') + '\n\nLo que falta se toma del cable que ya está en la bodega y se registra como sobrante de destajo. ¿Continuar?')) { btn.disabled = false; return; }
       }
     }
     const tipoReal = mvTipo === 'INGRESO' && ($('mvConcepto').value === 'Devolución a proveedor' || $('mvConcepto').value === 'Devolución de equipos dañados' || $('mvConcepto').value === CONC_DEST_PROV) ? 'DEV_PROV' : mvTipo;
@@ -15643,6 +15647,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 133 · 20-oct 11:26</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 134 · 20-oct 11:32</div>
 </body>
 </html>

@@ -6823,11 +6823,12 @@ function guardarMovimientoInvWeb(token, d) {
       claves.forEach(c => { const max = invRedondear_((pend[c] || 0) + (propios[c] || 0)); if (suma[c] > max + 1e-9) throw new Error(porClave[c].material + ': solo hay ' + max + ' dañado(s) pendiente(s) de devolver.'); });
     }
 
-    /* Devolución de destajo al proveedor: solo se puede devolver el sobrante de destajo que está pendiente */
+    /* Devolución de destajo al proveedor: lo que supera el sobrante ya registrado se toma del cable que ya estaba en la bodega (se registra como sobrante y sale en el mismo documento) */
+    const exceso = {};
     if (esDevDest) {
       const pendD = invDanadosMapa_('dest'), propiosD = {};
-      if (editando) leerObjetos_(invHoja_('DAN')).forEach(r => { if (txt_(r.Origen) === editando && txt_(r.Tipo) === 'BAJA') propiosD[txt_(r.Clave)] = (propiosD[txt_(r.Clave)] || 0) + invNum_(r.Cantidad); });
-      claves.forEach(c => { const max = invRedondear_((pendD[c] || 0) + (propiosD[c] || 0)); if (suma[c] > max + 1e-9) throw new Error(porClave[c].material + ': solo hay ' + max + ' de sobrante de destajo pendiente de devolver.'); });
+      if (editando) leerObjetos_(invHoja_('DAN')).forEach(r => { if (txt_(r.Origen) === editando) propiosD[txt_(r.Clave)] = (propiosD[txt_(r.Clave)] || 0) + (txt_(r.Tipo) === 'BAJA' ? invNum_(r.Cantidad) : -invNum_(r.Cantidad)); });
+      claves.forEach(c => { const max = Math.max(0, invRedondear_((pendD[c] || 0) + (propiosD[c] || 0))); if (suma[c] > max + 1e-9) exceso[c] = invRedondear_(suma[c] - max); });
     }
 
     /* Documentos de la bodega principal (con concepto): todos los datos son obligatorios */
@@ -6880,6 +6881,11 @@ function guardarMovimientoInvWeb(token, d) {
         Categoria: catD, Fuente: 'MOVIL', ID_Movil: m ? String(m.ID_Movil) : '', Movil: m ? txt_(m.Movil) : '', Documento: consec })));
     }
     /* Devolución a proveedor: lo que estaba dañado en bodega sale de la lista de pendientes (queda como «devuelto al proveedor») */
+    if (esDevDest) {
+      const ex = Object.keys(exceso);
+      if (ex.length) invAgregar_(invHoja_('DAN'), 'DAN', ex.map(c => ({ ID: 'DX' + grupo + '_' + c.slice(0, 12), Fecha: fecha, Tipo: 'DANADO', Clave: c, Material: porClave[c].material, Cantidad: exceso[c],
+        Motivo: ('Sobrante de destajo que ya estaba en bodega' + (txt_(d.referencia) ? ' · ref. ' + txt_(d.referencia) : '')).slice(0, 200), Usuario: usuarioDoc, Creado: segAhora_(), Origen: grupo, Categoria: INV.CAT_DESTAJO, Fuente: 'BODEGA', ID_Movil: '', Movil: '', Documento: consec })));
+    }
     if (esDevDan || esDevDest) {
       const bajas = claves.map(c => ({ ID: 'BP' + grupo + '_' + c.slice(0, 12), Fecha: fecha, Tipo: 'BAJA', Clave: c, Material: porClave[c].material, Cantidad: suma[c],
         Motivo: ((esDevDest ? 'Sobrante de destajo devuelto al proveedor' : 'Devuelto al proveedor') + (txt_(d.referencia) ? ' · ref. ' + txt_(d.referencia) : '')).slice(0, 200), Usuario: usuarioDoc, Creado: segAhora_(), Origen: grupo, Categoria: esDevDest ? INV.CAT_DESTAJO : '', Fuente: '', ID_Movil: '', Movil: '', Documento: consec }));
