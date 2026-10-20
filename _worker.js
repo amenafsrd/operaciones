@@ -1806,13 +1806,16 @@ function obtenerSemanasWeb(token, year) {
 
   const arr = [];
   const total = semanasEnAno_(year);
+  const cerradas = calCerradas_();
 
   for (let w = 1; w <= total; w++) {
     const info = obtenerSemanaInfo_(year, w);
     arr.push({
       semana: w,
       inicio: formatearFecha_(info.fechas[0]),
-      fin: formatearFecha_(info.fechas[6])
+      fin: formatearFecha_(info.fechas[6]),
+      inicioISO: formatearFechaISO_(info.fechas[0]),
+      bloqueada: !!cerradas[calClaveSemana_(year, w)]
     });
   }
 
@@ -1930,7 +1933,8 @@ function calClaveSemana_(year, week) { return Number(year) + '-' + Number(week);
 /* Cierra o reabre una semana del cronograma. Cerrar: cualquiera que pueda editar. Reabrir: solo el administrador. */
 function cerrarCronogramaWeb(token, year, week, cerrar) {
 
-  const ses = requerirSesion_(token, cerrar ? 'operador' : 'admin');
+  /* Es un bloqueo contra errores de manipulación: cualquier usuario con permiso de edición puede bloquear o desbloquear */
+  const ses = requerirSesion_(token, 'operador');
   const info = obtenerSemanaInfo_(year, week);
   const k = calClaveSemana_(info.year, info.week);
 
@@ -2074,7 +2078,7 @@ function guardarCalendarioWeb(token, cambios, comentario) {
     const f = convertirFecha_(c.fecha);
     if (!f) return;
     const sem = semanaISO_(f), k = calClaveSemana_(anoISO_(f), sem);
-    if (cerradas[k]) throw new Error('El cronograma de la semana ' + sem + ' está CERRADO (por ' + (cerradas[k].nombre || cerradas[k].por) + ' el ' + cerradas[k].fecha + '). Pide al administrador que lo reabra para modificarlo.');
+    if (cerradas[k]) throw new Error('El cronograma de la semana ' + sem + ' tiene la edición BLOQUEADA (por ' + (cerradas[k].nombre || cerradas[k].por) + ' el ' + cerradas[k].fecha + '). Desbloquea la edición del cronograma para modificarlo.');
   });
 
   const bitacora = [];
