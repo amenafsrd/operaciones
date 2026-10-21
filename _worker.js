@@ -4442,7 +4442,7 @@ const SEG = {
   PENALIZACIONES: { 'Ausencia': 75000, 'Abandono de ruta': 25000, 'Salida temprano': 0, 'Llegada tarde': 0, 'Incumplimiento de procedimiento': 0, 'Daño o accidente': 0, 'Otra penalización': 0 },
   MOTIVOS_AUS: ['Sin aviso', 'Enfermedad / incapacidad', 'Permiso', 'Vacaciones', 'Falla de vehículo', 'Calamidad / emergencia', 'Salió sin autorización', 'Cita médica', 'Asunto personal / familiar', 'Otro'],
 
-  CORTES: ['6am', '7am', '8am', '9am', '10am', '11am', '12md', '1pm', '2pm', '3pm', '4pm', '5pm', '6pm', 'Cierre'],
+  CORTES: ['Entrega de rutas', '6am', '7am', '8am', '9am', '10am', '11am', '12md', '1pm', '2pm', '3pm', '4pm', '5pm', '6pm', 'Cierre'],
 
   MOTIVOS: [
     'SUSPENDIDA CLIENTE NO DESEA EL SERVICIO',
