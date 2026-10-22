@@ -4809,7 +4809,7 @@ function obtenerSeguimientoWeb(token, fecha) {
       filas[id] = {
         idMovil: id, movil: txt_(m.Movil), tecnico: '', zona: txt_(m.Domicilio),
         estadoCal: '', estadoMovil: '', asignadas: 0, relleno: 0, reasignadas: 0,
-        iniciadas: 0, instaladas: 0, suspendidas: 0, pendientes: 0, pendPlataforma: 0, reasigPlat: 0,
+        iniciadas: 0, instaladas: 0, suspendidas: 0, retiradas: 0, pendientes: 0, pendPlataforma: 0, reasigPlat: 0,
         horaInicio: '', horaManual: '', almuerzoDesde: '', salidaVB: '', ultimaFin: '', sinIniciarMin: null, enAlmuerzo: false, almuerzoHasta: '', horaAuto: '', justificacion: '', obs: '', tarde: false,
         auto: auto
       };
@@ -4846,8 +4846,8 @@ function obtenerSeguimientoWeb(token, fecha) {
     lista.push(item);
 
     if (estado === 'DESAPARECIDA' && !marcadas[orden]) { desaparecidas.push(item); return; }
-    /* Retiradas de la ruta por el cliente: se registran aparte, no cuentan como asignadas, suspendidas ni pendientes */
-    if (estado === 'DESAPARECIDA' && retiradas[orden]) { if (!vistos['R' + orden]) { vistos['R' + orden] = true; item.obs = txt_(retiradas[orden].Observacion); retList.push(item); } return; }
+    /* Retiradas de la ruta por el cliente: cuentan en la carga del día (asignadas) pero no como pendientes ni suspendidas */
+    if (estado === 'DESAPARECIDA' && retiradas[orden]) { if (!vistos['R' + orden]) { vistos['R' + orden] = true; item.obs = txt_(retiradas[orden].Observacion); retList.push(item); if (m && auto) { const rr = asegurar(m); rr.asignadas++; rr.retiradas++; } } return; }
     if (estado === 'DESAPARECIDA' && marcadas[orden] && vistos[orden]) return;
     if (vistos[orden]) return;
     vistos[orden] = true;
@@ -4921,7 +4921,7 @@ function obtenerSeguimientoWeb(token, fecha) {
     r.obs = txt_(d.Obs);
   });
 
-  const tot = { asignadas: 0, relleno: 0, reasignadas: 0, iniciadas: 0, instaladas: 0, suspendidas: 0, pendientes: 0 };
+  const tot = { asignadas: 0, relleno: 0, reasignadas: 0, iniciadas: 0, instaladas: 0, suspendidas: 0, retiradas: 0, pendientes: 0 };
 
   const resultado = Object.keys(filas).map(id => {
     const r = filas[id];
@@ -4931,7 +4931,7 @@ function obtenerSeguimientoWeb(token, fecha) {
     if (!r.horaInicio) r.horaInicio = r.horaAuto;
     r.sinCarga = (r.asignadas + r.relleno) === 0;
     r.pendientes = r.sinCarga ? 0 :
-      (r.asignadas + r.relleno) - (r.instaladas + r.iniciadas) - r.suspendidas - (r.reasignadas - r.reasigPlat);
+      (r.asignadas + r.relleno) - (r.instaladas + r.iniciadas) - r.suspendidas - r.retiradas - (r.reasignadas - r.reasigPlat);
     r.tarde = (!r.estadoCal || r.estadoCal === 'Activa') && !!r.horaInicio && r.horaInicio > SEG.HORA_TARDE;
     Object.keys(tot).forEach(k => { tot[k] += r[k]; });
     return r;
@@ -5058,7 +5058,6 @@ function obtenerSeguimientoWeb(token, fecha) {
   }
 
   tot.desaparecidas = desaparecidas.length;
-  tot.retiradas = retList.length;
   tot.movidas = movidas.length;
 
   return {
