@@ -9219,7 +9219,8 @@ function renderDesaparecidas() {
       '<div class="field" style="min-width:320px;flex:1"><label>Motivo de la suspensión</label><select id="segDesapMotivo"><option value="">Elige el motivo...</option>' +
       d.listaMotivos.map(m => '<option value="' + esc(m) + '">' + esc(m) + '</option>').join('') + '</select></div>' +
       '<div class="field" style="min-width:240px;flex:1"><label>Observación (opcional)</label><input id="segDesapObs" autocomplete="off"></div>' +
-      '<button id="segDesapBtn" class="btn primary" onclick="segMarcarSuspendidas()" disabled>Marcar como suspendidas</button></div>';
+      '<button id="segDesapBtn" class="btn primary" onclick="segMarcarSuspendidas()" disabled>Marcar como suspendidas</button>' +
+      '<button id="segRetBtn" class="btn secondary" title="El cliente las quitó de la ruta sin dar explicación: quedan registradas como «retirada de la ruta por el cliente»" onclick="segMarcarRetiradas()" disabled>🚫 ¿Se retiran de la ruta?</button></div>';
   }
 
   $('segDesapContenido').innerHTML = h;
@@ -9236,6 +9237,25 @@ function segToggleDesap(orden, v) {
   if (b) {
     b.disabled = !n;
     b.textContent = n ? 'Marcar ' + n + (n === 1 ? ' OT' : ' OT') + ' como suspendidas' : 'Marcar como suspendidas';
+  }
+  const r = $('segRetBtn');
+  if (r) { r.disabled = !n; r.textContent = n ? '🚫 Se retiran de la ruta (' + n + ')' : '🚫 ¿Se retiran de la ruta?'; }
+}
+
+const SEG_MOTIVO_RETIRADA = 'RETIRADA DE LA RUTA POR EL CLIENTE (SIN EXPLICACIÓN)';
+async function segMarcarRetiradas() {
+  const ordenes = Object.keys(segSelDesap);
+  if (!ordenes.length) return;
+  if (!confirm('¿Confirmas que el cliente retiró ' + ordenes.length + ' OT de la ruta sin dar explicación?\n\nQuedan registradas como «' + SEG_MOTIVO_RETIRADA.toLowerCase() + '» y no cuentan como pendientes.')) return;
+  $('segRetBtn').disabled = true; $('segDesapBtn').disabled = true;
+  try {
+    if (segDirty() && !(await segGuardar(true))) { segToggleDesap('', false); return; }
+    const r = await api('marcarSuspendidasWeb', segDatos.fecha, ordenes, SEG_MOTIVO_RETIRADA, $('segDesapObs').value);
+    toast(r.marcadas + ' OT marcadas como retiradas de la ruta' + (r.omitidas ? ' (' + r.omitidas + ' ya estaban o no aplican)' : '') + '.');
+    await cargarSeg();
+  } catch (e) {
+    mostrarError(e, 'No se pudo marcar.');
+    segToggleDesap('', false);
   }
 }
 
@@ -15830,6 +15850,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 146 · 22-oct 11:49</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 147 · 22-oct 15:07</div>
 </body>
 </html>

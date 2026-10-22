@@ -4453,6 +4453,7 @@ const SEG = {
   CORTES: ['Entrega de rutas', '6am', '7am', '8am', '9am', '10am', '11am', '12md', '1pm', '2pm', '3pm', '4pm', '5pm', '6pm', 'Cierre'],
 
   MOTIVOS: [
+    'RETIRADA DE LA RUTA POR EL CLIENTE (SIN EXPLICACIÓN)',
     'SUSPENDIDA CLIENTE NO DESEA EL SERVICIO',
     'SUSPENDIDA CLIENTE NO SE LOCALIZA',
     'SUSPENDIDA FUERA DE RUTA',
