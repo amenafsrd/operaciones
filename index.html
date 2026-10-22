@@ -12696,11 +12696,11 @@ async function consEjecutar(mapa) {
     if (r.materialesNuevos.length) h += '<li>🆕 Materiales nuevos agregados al catálogo (revisa su unidad): ' + esc(r.materialesNuevos.join(', ')) + '</li>';
     if (r.ignorados && r.ignorados.length) h += '<li>⛔ Ignorados (no descontaron): ' + esc(r.ignorados.join(', ')) + '</li>';
     if (r.sinMovil) h += '<li>⚠️ ' + r.sinMovil + ' OT no se pudieron ligar a una móvil y no descontaron stock.</li>';
-    h += '<li>Cruce con Seguimiento: ' + r.finalizadasSeg + ' OT finalizadas en esas fechas' +
-      (r.noEnSeguimiento ? ' · ' + r.noEnSeguimiento + ' OT del reporte no están finalizadas en Seguimiento' : '') + '.</li></ul>';
-    if (r.totalSinReporte) {
-      h += '<div style="margin-top:8px"><b class="segNeg">⚠️ ' + r.totalSinReporte + ' OT finalizadas en Seguimiento no vienen en el reporte de materiales:</b> ' +
-        r.sinReporte.map(x => esc(x.orden) + ' (M' + esc(x.movil) + ')').join(', ') + (r.totalSinReporte > r.sinReporte.length ? '…' : '') + '</div>';
+    h += '</ul>';
+    if (!r.nuevas && !r.cambiadas && !r.totalAusentes) h += '<div style="margin-top:8px"><b>Sin diferencias:</b> este archivo trae lo mismo que ya estaba importado.</div>';
+    if (r.totalAusentes) {
+      h += '<div style="margin-top:8px"><b class="segNeg">⚠️ ' + r.totalAusentes + ' OT ya importadas con esas fechas no vienen en este archivo</b> (se dejaron como estaban): ' +
+        r.ausentes.map(x => esc(x.orden) + ' (M' + esc(x.movil) + ')').join(', ') + (r.totalAusentes > r.ausentes.length ? '…' : '') + '</div>';
     }
     if (r.cambiadas) {
       h += '<div style="margin-top:8px"><b style="color:#b8860b">🔄 OT que cambiaron respecto a la carga anterior (ya quedaron actualizadas):</b><ul style="margin:4px 0 0 18px">' +
@@ -15793,6 +15793,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 142 · 21-oct 21:55</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 143 · 21-oct 22:18</div>
 </body>
 </html>

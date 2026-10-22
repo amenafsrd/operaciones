@@ -7301,14 +7301,10 @@ function importarConsumoWeb(token, filas, archivo, mapa) {
       Clave: txt_(r.Clave), Material: txt_(r.Material), Cantidad: invNum_(r.Cantidad), Archivo: txt_(r.Archivo), Carga: txt_(r.Carga), Contrato: txt_(r.Contrato)
     })).concat(nuevas));
 
-    /* Cruce con Seguimiento: OT finalizadas que no vinieron en el reporte de materiales */
+    /* Solo se compara contra lo ya importado: OT que estaban cargadas en las fechas de este archivo y ahora no vienen */
     const dias = Object.keys(fechas);
-    const finSeg = segLeer_('OT', dias.slice().sort()[0], dias.slice().sort().pop()).filter(o => dias.indexOf(txt_(o.Fecha)) !== -1 && txt_(o.Estado).toUpperCase() === 'FINALIZADA');
-    const finSet = {};
-    finSeg.forEach(o => { finSet[txt_(o.N_Orden)] = o; });
-    const sinReporte = finSeg.filter(o => !porOrden[txt_(o.N_Orden)])
-      .map(o => ({ orden: txt_(o.N_Orden), movil: txt_(o.Movil), fecha: txt_(o.Fecha) }));
-    const noEnSeguimiento = ordenes.filter(o => !finSet[o]).length;
+    const ausentes = Object.keys(prev).filter(o => !porOrden[o] && dias.indexOf(prev[o].fecha) !== -1)
+      .map(o => ({ orden: o, movil: prev[o].movil, fecha: prev[o].fecha }));
 
     invAgregar_(invHoja_('CARGAS'), 'CARGAS', [{
       Fecha_Hora: horaCarga, Archivo: archivo, Filas: filas.length, OT: ordenes.length,
@@ -7321,8 +7317,7 @@ function importarConsumoWeb(token, filas, archivo, mapa) {
       ok: true, filas: filas.length, ordenes: ordenes.length, lineas: lineas, sinMovil: sinMovil,
       nuevas: nNuevas, sinCambios: nSin, cambiadas: nCamb, cambios: cambios.slice(0, 60),
       fechas: dias.sort(), materialesNuevos: nuevos, ignorados: ignorados,
-      finalizadasSeg: finSeg.length, sinReporte: sinReporte.slice(0, 60), totalSinReporte: sinReporte.length,
-      noEnSeguimiento: noEnSeguimiento
+      ausentes: ausentes.slice(0, 60), totalAusentes: ausentes.length
     };
   });
 }
