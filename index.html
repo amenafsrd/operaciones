@@ -11764,12 +11764,12 @@ function renderAbastecimiento() {
   l = l.slice().sort((a, b) => { const A = cNum(a), B = cNum(b); return A === B ? ((a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0) || (String(a.creado) < String(b.creado) ? 1 : -1)) : (A < B ? 1 : -1); });
   abLista = l;
   const todosM = l.every(x => abSel.has(x.grupo));
-  $('abTabla').innerHTML = '<table class="table" style="min-width:880px"><thead><tr><th style="width:34px"><input type="checkbox" title="Marcar / desmarcar todos los que se ven" ' + (todosM ? 'checked' : '') + ' onchange="abMarcarTodos(this.checked)"></th><th>Consecutivo</th><th>Fecha</th><th class="left">Tipo</th><th>De → A</th><th class="left">Documento</th><th>Materiales</th><th>Recibido</th><th>Registró</th>' +
+  $('abTabla').innerHTML = '<table class="table" style="min-width:880px"><thead><tr><th style="width:34px"><input type="checkbox" title="Marcar / desmarcar todos los que se ven" ' + (todosM ? 'checked' : '') + ' onchange="abMarcarTodos(this.checked)"></th><th>Consecutivo</th><th>Fecha</th><th class="left">Tipo</th><th>De → A</th><th class="left">Documento</th><th>Materiales</th><th class="left">Recibido</th><th>Registró</th>' +
     (adm ? '<th></th>' : '') + '</tr></thead><tbody>' +
     l.map((x, i) => '<tr style="cursor:pointer" title="Ver el detalle" onclick="verDoc(' + i + ',true)"><td onclick="event.stopPropagation()"><input type="checkbox" ' + (abSel.has(x.grupo) ? 'checked' : '') + ' onchange="abMarcar(\'' + escJs(x.grupo) + '\',this.checked)"></td><td><b>' + esc(x.consecutivo || '—') + '</b></td><td>' + esc(fmtFechaSeg(x.fecha)) + '</td>' +
       '<td class="left"><b>' + esc(abDatos.tipos[x.tipo] || x.tipo) + '</b>' + (x.concepto ? '<div style="font-size:11.5px;color:#a15c00">' + esc(x.concepto) + '</div>' : '') + '</td><td>' + bodMovDeA(x) + '</td>' +
       '<td class="left"><b style="color:#b71c1c;text-decoration:underline">' + esc(x.referencia || 'sin número') + '</b>' + (x.obs ? '<div style="color:#888;font-size:12px">' + esc(x.obs) + '</div>' : '') + '</td>' +
-      '<td>' + x.lineas.length + ' <span style="color:#888">línea' + (x.lineas.length === 1 ? '' : 's') + '</span></td><td>' + firmaCelda(x) + '</td><td>' + esc(x.usuario) + '</td>' +
+      '<td>' + x.lineas.length + ' <span style="color:#888">línea' + (x.lineas.length === 1 ? '' : 's') + '</span></td><td class="left">' + firmaCelda(x) + '</td><td>' + esc(x.usuario) + '</td>' +
       (adm ? '<td><button class="btnMini" onclick="event.stopPropagation();eliminarMov(\'' + escJs(x.grupo) + '\')">🗑️</button></td>' : '') + '</tr>').join('') + '</tbody></table>';
   abBarra();
 }
@@ -15793,6 +15793,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 143 · 21-oct 22:18</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 144 · 22-oct 07:56</div>
 </body>
 </html>
