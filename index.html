@@ -1145,6 +1145,7 @@
           <div class="panel">
             <div class="panelHead"><div><h2>Movimientos de móviles</h2>
               <div style="font-size:12px;color:#777;margin-top:3px">Cada fila es un movimiento (abastecimiento desde bodega, préstamo entre móviles, devolución, ajuste). Haz clic en una fila para ver sus líneas. Un préstamo deja el material registrado entre las dos móviles sin pasar por la bodega.</div></div></div>
+            <div id="abSelBar" style="display:none;padding:8px 14px;border-bottom:1px solid #e6e9ef;background:#fff8e1;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px"></div>
             <div id="abTabla" class="tableWrap"></div>
           </div>
           <div class="panel" style="margin-top:12px">
@@ -1617,6 +1618,18 @@
       <div class="modalActions">
         <button class="btn secondary" onclick="iiOmitir()">Omitir este archivo</button>
         <button id="iiAplicar" class="btn primary" onclick="iiAplicar()">✅ Aplicar al conteo</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modalConsCampos" class="modalBg">
+    <div class="modal" style="width:min(640px,100%)">
+      <h3>Elegir columnas del reporte</h3>
+      <div style="font-size:12.5px;color:#666;margin:4px 0 10px">No encontré todas las columnas que necesito con el nombre esperado. Elige cuál columna de tu archivo corresponde a cada dato. Se recuerda la elección para los próximos archivos.</div>
+      <div id="consCamposTabla"></div>
+      <div class="modalActions">
+        <button class="btn secondary" onclick="consCamposCerrar(null)">Cancelar</button>
+        <button class="btn primary" onclick="consCamposOk()">Continuar</button>
       </div>
     </div>
   </div>
@@ -11745,21 +11758,61 @@ function renderAbastecimiento() {
   if ($('abTipo').value) l = l.filter(x => x.tipo === $('abTipo').value);
   const mv = $('abMovil').value;
   if (mv) l = l.filter(x => x.idMovil === mv || x.idMovilDestino === mv);
-  if (!l.length) { $('abTabla').innerHTML = '<div class="empty">No hay movimientos de móviles en ese rango.</div>'; return; }
+  if (!l.length) { $('abTabla').innerHTML = '<div class="empty">No hay movimientos de móviles en ese rango.</div>'; abBarra(); return; }
   /* Consecutivo mayor arriba (los documentos sin consecutivo van al final, los más recientes primero) */
   const cNum = x => { const m = String(x.consecutivo || '').match(/(\d+)\s*$/); return m ? Number(m[1]) : -1; };
   l = l.slice().sort((a, b) => { const A = cNum(a), B = cNum(b); return A === B ? ((a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0) || (String(a.creado) < String(b.creado) ? 1 : -1)) : (A < B ? 1 : -1); });
   abLista = l;
-  $('abTabla').innerHTML = '<table class="table" style="min-width:880px"><thead><tr><th>Consecutivo</th><th>Fecha</th><th class="left">Tipo</th><th>De → A</th><th class="left">Documento</th><th>Materiales</th><th>Recibido</th><th>Registró</th>' +
+  const todosM = l.every(x => abSel.has(x.grupo));
+  $('abTabla').innerHTML = '<table class="table" style="min-width:880px"><thead><tr><th style="width:34px"><input type="checkbox" title="Marcar / desmarcar todos los que se ven" ' + (todosM ? 'checked' : '') + ' onchange="abMarcarTodos(this.checked)"></th><th>Consecutivo</th><th>Fecha</th><th class="left">Tipo</th><th>De → A</th><th class="left">Documento</th><th>Materiales</th><th>Recibido</th><th>Registró</th>' +
     (adm ? '<th></th>' : '') + '</tr></thead><tbody>' +
-    l.map((x, i) => '<tr style="cursor:pointer" title="Ver el detalle" onclick="verDoc(' + i + ',true)"><td><b>' + esc(x.consecutivo || '—') + '</b></td><td>' + esc(fmtFechaSeg(x.fecha)) + '</td>' +
+    l.map((x, i) => '<tr style="cursor:pointer" title="Ver el detalle" onclick="verDoc(' + i + ',true)"><td onclick="event.stopPropagation()"><input type="checkbox" ' + (abSel.has(x.grupo) ? 'checked' : '') + ' onchange="abMarcar(\'' + escJs(x.grupo) + '\',this.checked)"></td><td><b>' + esc(x.consecutivo || '—') + '</b></td><td>' + esc(fmtFechaSeg(x.fecha)) + '</td>' +
       '<td class="left"><b>' + esc(abDatos.tipos[x.tipo] || x.tipo) + '</b>' + (x.concepto ? '<div style="font-size:11.5px;color:#a15c00">' + esc(x.concepto) + '</div>' : '') + '</td><td>' + bodMovDeA(x) + '</td>' +
       '<td class="left"><b style="color:#b71c1c;text-decoration:underline">' + esc(x.referencia || 'sin número') + '</b>' + (x.obs ? '<div style="color:#888;font-size:12px">' + esc(x.obs) + '</div>' : '') + '</td>' +
       '<td>' + x.lineas.length + ' <span style="color:#888">línea' + (x.lineas.length === 1 ? '' : 's') + '</span></td><td>' + firmaCelda(x) + '</td><td>' + esc(x.usuario) + '</td>' +
       (adm ? '<td><button class="btnMini" onclick="event.stopPropagation();eliminarMov(\'' + escJs(x.grupo) + '\')">🗑️</button></td>' : '') + '</tr>').join('') + '</tbody></table>';
+  abBarra();
 }
 
 let abLista = [];
+
+/* Movimientos marcados para exportar (se conservan al filtrar o actualizar) */
+const abSel = new Set();
+function abMarcar(g, on) { if (on) abSel.add(g); else abSel.delete(g); abBarra(); const h = document.querySelector('#abTabla thead input'); if (h) h.checked = abLista.length > 0 && abLista.every(x => abSel.has(x.grupo)); }
+function abMarcarTodos(on) { abLista.forEach(x => { if (on) abSel.add(x.grupo); else abSel.delete(x.grupo); }); renderAbastecimiento(); }
+function abBarra() {
+  const b = $('abSelBar'); if (!b) return;
+  const n = abSel.size;
+  b.style.display = n ? 'flex' : 'none';
+  if (n) b.innerHTML = '<b>' + n + ' movimiento' + (n === 1 ? '' : 's') + ' marcado' + (n === 1 ? '' : 's') + '</b><button class="btn primary" onclick="abExportarZip(this)">📦 Exportar PDF (ZIP)</button><button class="btn secondary" onclick="abSel.clear();renderAbastecimiento()">Quitar marcas</button>';
+}
+async function abExportarZip(btn) {
+  const docs = (abDatos.movimientos || []).filter(x => abSel.has(x.grupo));
+  if (!docs.length) { toast('Marca al menos un movimiento.'); return; }
+  const cNum = x => { const m = String(x.consecutivo || '').match(/(\d+)\s*$/); return m ? Number(m[1]) : 1e12; };
+  docs.sort((a, b) => cNum(a) - cNum(b));
+  const txt0 = btn.textContent, fuente0 = docFuente; btn.disabled = true;
+  try {
+    await cargarLib('jspdf', URL_JSPDF); await cargarLib('jszip', URL_JSZIP);
+    docFuente = abDatos;
+    const Z = new JSZip(), usados = {}; let fallos = 0;
+    for (let i = 0; i < docs.length; i++) {
+      const x = docs[i]; btn.textContent = 'Generando ' + (i + 1) + ' de ' + docs.length + '…';
+      try {
+        let f = null; const bod = esDocBodega(x);
+        if (x.firmado && !bod) { try { f = await api('obtenerFirmaInvWeb', x.grupo); } catch (e) { f = null; } }
+        const d = docArmarPdf(x, f);
+        let nom = String(x.consecutivo || x.referencia || 'documento').replace(/[\\/:*?"<>|]+/g, '-').trim() + (x.firmado && !bod ? '_firmado' : '');
+        if (usados[nom]) nom += '_' + (++usados[nom]); else usados[nom] = 1;
+        Z.file(nom + '.pdf', d.output('arraybuffer'));
+      } catch (e) { fallos++; console.warn('PDF no generado', x.consecutivo, e); }
+    }
+    btn.textContent = 'Comprimiendo…';
+    pmBajar(await Z.generateAsync({ type: 'blob', compression: 'DEFLATE' }), 'Movimientos_de_moviles_' + hoyISO() + '.zip');
+    toast((docs.length - fallos) + ' PDF exportados en un ZIP.' + (fallos ? ' ' + fallos + ' no se pudieron generar.' : ''), 5000);
+  } catch (e) { mostrarError(e, 'No se pudo exportar.'); }
+  finally { docFuente = fuente0; btn.disabled = false; btn.textContent = txt0; }
+}
 
 /* Orden por columna para cualquier tabla ya dibujada: clic en el encabezado = ascendente ▲, otro clic = descendente ▼, otro = orden original. */
 const ordEstado = {};
@@ -12481,6 +12534,56 @@ function consCant(v) {
   return isNaN(n) ? 0 : n;
 }
 
+/* Datos de la OT que el reporte debe traer. Si alguno no se encuentra por nombre, la persona elige la columna. */
+const CONS_CAMPOS = [
+  { id: 'N_Orden', et: 'N.º de orden (OT)', req: true, exacto: ['n_orden', 'norden', 'orden', 'ot', 'n_ot'], aprox: /orden|(^|_)ot(_|$)/ },
+  { id: 'Codigo_Movil', et: 'Código de la móvil', req: 'movil', exacto: ['codigo_movil', 'cod_movil', 'codigomovil'], aprox: /(cod|id).*movil|movil.*(cod|id)/ },
+  { id: 'Nombre_Movil', et: 'Nombre de la móvil', req: 'movil', exacto: ['nombre_movil', 'movil'], aprox: /movil|vehiculo|cuadrilla/ },
+  { id: 'Fecha_Cierre', et: 'Fecha de cierre', req: true, exacto: ['fecha_cierre', 'fecha_de_cierre', 'fecha'], aprox: /fecha.*(cierre|final|close)|(cierre|final|close).*fecha|fecha/ },
+  { id: 'Contrato', et: 'Contrato', req: false, exacto: ['contrato'], aprox: /contrato/ }
+];
+let consCamposRes = null, consCamposCols = [];
+function consCamposAuto(cols, prefer) {
+  const usados = {}, mapa = {};
+  CONS_CAMPOS.forEach(c => {
+    let k = prefer && prefer[c.id] && cols.indexOf(prefer[c.id]) >= 0 ? prefer[c.id] : null;
+    if (!k) k = cols.find(x => !usados[x] && c.exacto.indexOf(consNormCol(x)) >= 0);
+    if (!k) k = cols.find(x => !usados[x] && c.aprox.test(consNormCol(x)));
+    if (k) { usados[k] = 1; mapa[c.id] = k; }
+  });
+  return mapa;
+}
+function consCamposFalta(mapa) {
+  const f = [];
+  CONS_CAMPOS.forEach(c => { if (c.req === true && !mapa[c.id]) f.push(c.et); });
+  if (!mapa.Codigo_Movil && !mapa.Nombre_Movil) f.push('Móvil (código o nombre)');
+  return f;
+}
+function consCamposPintar(mapa) {
+  const ops = k => '<option value="">— no importar —</option>' + consCamposCols.map(x => '<option value="' + esc(x) + '"' + (x === k ? ' selected' : '') + '>' + esc(String(x).trim()) + '</option>').join('');
+  $('consCamposTabla').innerHTML = '<table class="table"><tbody>' + CONS_CAMPOS.map(c => '<tr><td class="left"><b>' + c.et + '</b>' + (c.req === true ? ' <span style="color:#b00">*</span>' : '') + '</td><td class="left"><select data-c="' + c.id + '" style="width:100%">' + ops(mapa[c.id]) + '</select></td></tr>').join('') + '</tbody></table>' +
+    '<div style="font-size:11.5px;color:#777;margin-top:6px">* obligatorio. Para la móvil basta con el código o el nombre.</div>';
+}
+function consCamposCerrar(v) { $('modalConsCampos').classList.remove('show'); const r = consCamposRes; consCamposRes = null; if (r) r(v); }
+function consCamposOk() {
+  const m = {};
+  $('consCamposTabla').querySelectorAll('select').forEach(sel => { if (sel.value) m[sel.dataset.c] = sel.value; });
+  const f = consCamposFalta(m);
+  if (f.length) { toast('Falta elegir: ' + f.join(', ') + '.', 5000); return; }
+  const vals = Object.keys(m).map(k => m[k]);
+  if (new Set(vals).size !== vals.length) { toast('Elegiste la misma columna para dos datos distintos.', 5000); return; }
+  try { localStorage.setItem('consCampos', JSON.stringify(m)); } catch (e) {}
+  consCamposCerrar(m);
+}
+/* Devuelve {campo → columna del archivo} o null si la persona cancela */
+function consResolverCampos(cols) {
+  let pref = null; try { pref = JSON.parse(localStorage.getItem('consCampos') || 'null'); } catch (e) {}
+  const mapa = consCamposAuto(cols, pref);
+  if (!consCamposFalta(mapa).length) return Promise.resolve(mapa);
+  consCamposCols = cols;
+  return new Promise(res => { consCamposRes = res; consCamposPintar(mapa); $('modalConsCampos').classList.add('show'); });
+}
+
 async function bodImportarConsumo(inp) {
 
   const file = inp.files && inp.files[0];
@@ -12491,6 +12594,12 @@ async function bodImportarConsumo(inp) {
     const filas = await segLeerExcel(file, ['n_orden', 'norden']);
     if (!filas.length) throw new Error('El archivo no trae filas.');
     if (!bodDatos) await cargarBodega();
+
+    /* Las columnas de la OT se identifican (o la persona las elige) y se renombran al nombre estándar */
+    const campos = await consResolverCampos(Object.keys(filas[0]));
+    if (!campos) return;
+    const ren = {}; Object.keys(campos).forEach(c => { ren[campos[c]] = c; });
+    filas.forEach((f, i) => { const g = {}; Object.keys(f).forEach(k => { g[ren[k] || k] = f[k]; }); filas[i] = g; });
 
     const mats = (bodDatos.materiales || []).filter(m => m.activo !== false);
     const cols = Object.keys(filas[0]).filter(k => CONS_INFO.indexOf(consNormCol(k)) === -1);
@@ -15684,6 +15793,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 140 · 20-oct 18:38</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 142 · 21-oct 21:55</div>
 </body>
 </html>
