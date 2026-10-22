@@ -8951,6 +8951,7 @@ function segRecalcular() {
     '<div class="card"><div class="n">' + t.reasignadas + '</div><div class="t">Reasignadas</div></div>' +
     '<div class="card p"><div class="n">' + t.pendientes + '</div><div class="t" title="Incluye las reasignadas que siguen en el corte">Pendientes (con reasignadas)</div></div>' +
     '<div class="card"><div class="n">' + d.desaparecidas.length + '</div><div class="t">Ya no aparecen (por marcar)</div></div>' +
+    ((d.retiradas || []).length ? '<div class="card"><div class="n">' + d.retiradas.length + '</div><div class="t" title="Las quitó el cliente de la ruta: no cuentan como asignadas, suspendidas ni pendientes">Retiradas de la ruta</div></div>' : '') +
     '<div class="card"><div class="n">' + d.movidas.length + '</div><div class="t">Movidas de móvil</div></div>';
 }
 
@@ -9199,8 +9200,12 @@ function renderDesaparecidas() {
   const l = d.desaparecidas;
   segSelDesap = {};
 
+  const ret = d.retiradas || [];
+  const retHtml = ret.length ? '<div style="padding:12px 15px;border-top:1px solid #e6e9ef"><b>🚫 Retiradas de la ruta por el cliente (' + ret.length + ')</b> <span style="font-size:12px;color:#777">· no cuentan como asignadas, suspendidas ni pendientes</span>' +
+    '<div class="tableWrap"><table class="table" style="min-width:600px"><thead><tr><th>OT</th><th>Contrato</th><th>Móvil</th><th>Tipo</th><th class="left">Observación</th><th>Visto por última vez</th></tr></thead><tbody>' +
+    ret.map(x => '<tr><td><b>' + esc(x.orden) + '</b></td><td>' + esc(x.contrato) + '</td><td>' + esc(x.movil) + '</td><td>' + esc(x.tipo) + '</td><td class="left">' + esc(x.obs || '') + '</td><td>corte ' + esc(x.ultimoCorte) + '</td></tr>').join('') + '</tbody></table></div></div>' : '';
   if (!l.length) {
-    $('segDesapContenido').innerHTML = '<div class="empty">Ninguna OT ha desaparecido de la plataforma, o ya están todas marcadas.</div>';
+    $('segDesapContenido').innerHTML = '<div class="empty">Ninguna OT ha desaparecido de la plataforma, o ya están todas marcadas.</div>' + retHtml;
     return;
   }
 
@@ -9223,7 +9228,7 @@ function renderDesaparecidas() {
       '<button id="segRetBtn" class="btn secondary" title="El cliente las quitó de la ruta sin dar explicación: quedan registradas como «retirada de la ruta por el cliente»" onclick="segMarcarRetiradas()" disabled>🚫 ¿Se retiran de la ruta?</button></div>';
   }
 
-  $('segDesapContenido').innerHTML = h;
+  $('segDesapContenido').innerHTML = h + retHtml;
 }
 
 function segSelTodasDesap(v) {
@@ -9246,7 +9251,7 @@ const SEG_MOTIVO_RETIRADA = 'RETIRADA DE LA RUTA POR EL CLIENTE (SIN EXPLICACIÓ
 async function segMarcarRetiradas() {
   const ordenes = Object.keys(segSelDesap);
   if (!ordenes.length) return;
-  if (!confirm('¿Confirmas que el cliente retiró ' + ordenes.length + ' OT de la ruta sin dar explicación?\n\nQuedan registradas como «' + SEG_MOTIVO_RETIRADA.toLowerCase() + '» y no cuentan como pendientes.')) return;
+  if (!confirm('¿Confirmas que el cliente retiró ' + ordenes.length + ' OT de la ruta sin dar explicación?\n\nQuedan registradas como «' + SEG_MOTIVO_RETIRADA.toLowerCase() + '» y no cuentan como asignadas, suspendidas ni pendientes.')) return;
   $('segRetBtn').disabled = true; $('segDesapBtn').disabled = true;
   try {
     if (segDirty() && !(await segGuardar(true))) { segToggleDesap('', false); return; }
@@ -15850,6 +15855,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 147 · 22-oct 15:07</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 148 · 22-oct 15:15</div>
 </body>
 </html>

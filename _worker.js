@@ -4783,7 +4783,9 @@ function obtenerSeguimientoWeb(token, fecha) {
 
   /* OT que ya no aparecen en la plataforma y el back office marcó como suspendidas */
   const marcadas = {};
-  suspManual.forEach(s => { if (txt_(s.N_Orden)) marcadas[txt_(s.N_Orden)] = 1; });
+  const esRetirada = s => txt_(s.Motivo).indexOf('RETIRADA DE LA RUTA POR EL CLIENTE') === 0;
+  const retiradas = {}, retList = [];
+  suspManual.forEach(s => { if (txt_(s.N_Orden)) { marcadas[txt_(s.N_Orden)] = 1; if (esRetirada(s)) retiradas[txt_(s.N_Orden)] = s; } });
   const estadoPorOrden = {};
   ots.forEach(o => { estadoPorOrden[txt_(o.N_Orden)] = txt_(o.Estado).toUpperCase(); });
   const dias = segLeer_('DIA', fecha, fecha).filter(d => txt_(d.Fecha) === fecha);
@@ -4844,6 +4846,8 @@ function obtenerSeguimientoWeb(token, fecha) {
     lista.push(item);
 
     if (estado === 'DESAPARECIDA' && !marcadas[orden]) { desaparecidas.push(item); return; }
+    /* Retiradas de la ruta por el cliente: se registran aparte, no cuentan como asignadas, suspendidas ni pendientes */
+    if (estado === 'DESAPARECIDA' && retiradas[orden]) { if (!vistos['R' + orden]) { vistos['R' + orden] = true; item.obs = txt_(retiradas[orden].Observacion); retList.push(item); } return; }
     if (estado === 'DESAPARECIDA' && marcadas[orden] && vistos[orden]) return;
     if (vistos[orden]) return;
     vistos[orden] = true;
@@ -4880,6 +4884,7 @@ function obtenerSeguimientoWeb(token, fecha) {
   suspPlat.forEach(s => { ordenesPlat[s.orden] = 1; contratosPlat[s.contrato] = 1; });
 
   const suspManualFiltradas = suspManual.filter(s =>
+    !(txt_(s.N_Orden) && retiradas[txt_(s.N_Orden)] && estadoPorOrden[txt_(s.N_Orden)] === 'DESAPARECIDA') &&
     !(txt_(s.N_Orden) && estadoPorOrden[txt_(s.N_Orden)] && estadoPorOrden[txt_(s.N_Orden)] !== 'DESAPARECIDA') &&
     !(txt_(s.N_Orden) && ordenesPlat[txt_(s.N_Orden)]) &&
     !(!txt_(s.N_Orden) && txt_(s.Contrato) && contratosPlat[txt_(s.Contrato)]));
@@ -5053,6 +5058,7 @@ function obtenerSeguimientoWeb(token, fecha) {
   }
 
   tot.desaparecidas = desaparecidas.length;
+  tot.retiradas = retList.length;
   tot.movidas = movidas.length;
 
   return {
@@ -5064,6 +5070,7 @@ function obtenerSeguimientoWeb(token, fecha) {
     ordenes: lista,
     sinMovil: sinMovil,
     desaparecidas: desaparecidas,
+    retiradas: retList,
     movidas: movidas,
     cortes: cortes,
     motivos: Object.keys(motivos).map(k => ({ motivo: k, total: motivos[k] }))
