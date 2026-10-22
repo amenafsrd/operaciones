@@ -1187,6 +1187,7 @@
               <option value="PEND">Pendientes (borrador + alistado)</option><option value="BORRADOR">📝 Borrador</option><option value="ALISTADO">📦 Alistado (listo en físico)</option>
               <option value="APLICADO">✅ Aplicados</option><option value="">Todos</option></select></div>
             <div class="field" style="min-width:170px"><label>Móvil</label><select id="aliMovil" onchange="renderAlistos()"></select></div>
+            <div class="field" style="min-width:150px"><label>Vista</label><select id="aliVista" onchange="renderAlistos()"><option value="lista">Lista de alistos</option><option value="matriz">▦ Matriz de material</option></select></div>
             <button class="btn secondary" onclick="cargarAlistos()">↻ Actualizar</button>
           </div>
           <div class="toolbar aliEd">
@@ -1944,14 +1945,14 @@
       </div>
 
       <div class="field" style="margin-top:12px">
-        <label>Módulos a los que puede entrar</label>
-        <div id="uModulos" style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px 14px;margin-top:4px">
-          <label style="font-weight:400"><input type="checkbox" value="cronograma"> 📅 Cronograma</label>
-          <label style="font-weight:400"><input type="checkbox" value="moviles"> 🚐 Móviles</label>
-          <label style="font-weight:400"><input type="checkbox" value="seguimiento"> 📋 Seguimiento</label>
-          <label style="font-weight:400"><input type="checkbox" value="bodega"> 📦 Bodega</label>
-          <label style="font-weight:400"><input type="checkbox" value="cotizaciones"> 💼 Cotizaciones</label>
-          <label style="font-weight:400"><input type="checkbox" value="resumen"> 📊 Resumen</label>
+        <label>Acceso por módulo</label>
+        <div id="uModulos" style="display:grid;grid-template-columns:1fr 150px;gap:6px 14px;margin-top:4px;align-items:center">
+          <label style="font-weight:400">📅 Cronograma</label><select data-m="cronograma"><option value="">Sin acceso</option><option value="ver">Solo ver</option><option value="trab">Puede trabajar</option></select>
+          <label style="font-weight:400">🚐 Móviles</label><select data-m="moviles"><option value="">Sin acceso</option><option value="ver">Solo ver</option><option value="trab">Puede trabajar</option></select>
+          <label style="font-weight:400">📋 Seguimiento</label><select data-m="seguimiento"><option value="">Sin acceso</option><option value="ver">Solo ver</option><option value="trab">Puede trabajar</option></select>
+          <label style="font-weight:400">📦 Bodega</label><select data-m="bodega"><option value="">Sin acceso</option><option value="ver">Solo ver</option><option value="trab">Puede trabajar</option></select>
+          <label style="font-weight:400">💼 Cotizaciones</label><select data-m="cotizaciones"><option value="">Sin acceso</option><option value="ver">Solo ver</option><option value="trab">Puede trabajar</option></select>
+          <label style="font-weight:400">📊 Resumen</label><select data-m="resumen"><option value="">Sin acceso</option><option value="ver">Solo ver</option><option value="trab">Puede trabajar</option></select>
         </div>
         <div id="uModNota" class="nota" style="padding:6px 0 0"></div>
       </div>
@@ -2700,7 +2701,12 @@ function hoyISO() {
   return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
 }
 
-function puedeEditar() { return !!sesion && sesion.rol !== 'consulta'; }
+function puedeEditar() {
+  if (!sesion || sesion.rol === 'consulta') return false;
+  if (sesion.rol === 'admin') return true;
+  const m = MODULOS_NAV[vistaActual];                       /* «Solo ver» en el módulo que se está usando */
+  return !(m && (sesion.ver || []).indexOf(m) !== -1);
+}
 function esAdmin() { return !!sesion && sesion.rol === 'admin'; }
 
 /* Módulos que el administrador le asignó al usuario (el administrador entra a todos) */
@@ -2817,7 +2823,7 @@ function entrar() {
   apiPublica('loginWeb', $('lUsuario').value, $('lClave').value)
     .then(r => {
       token = r.token; refreshTok = r.refresh || null;
-      sesion = { usuario: r.usuario, nombre: r.nombre, rol: r.rol, modulos: r.modulos || [], foto: r.foto || '' };
+      sesion = { usuario: r.usuario, nombre: r.nombre, rol: r.rol, modulos: r.modulos || [], ver: r.ver || [], foto: r.foto || '' };
       guardarToken(token);
       $('lClave').value = '';
       mostrarApp();
@@ -4067,7 +4073,7 @@ function cargarUsuarios() {
           '<td class="left">' + (u.correo ? esc(u.correo) : '<span class="muted">—</span>') + '</td>' +
           '<td class="left" style="font-size:12px">' + (u.ficha && u.ficha.ingreso ? 'Ingreso ' + esc(fmtFechaSeg(u.ficha.ingreso)) + (u.ficha.telefono ? '<br>' + esc(u.ficha.telefono) : '') : '<span class="muted">' + (u.ficha ? 'Falta fecha de ingreso' : 'Sin ficha') + '</span>') + '</td>' +
           '<td>' + esc(ETIQUETA_ROL[u.rol] || u.rol) + '</td>' +
-          '<td class="left" style="font-size:12px">' + (u.rol === 'admin' ? 'Todos' : esc((u.modulos || []).map(m => ({ cronograma: 'Cronograma', moviles: 'Móviles', seguimiento: 'Seguimiento', bodega: 'Bodega', cotizaciones: 'Cotizaciones', resumen: 'Resumen' })[m] || m).join(', ') || 'Ninguno')) + '</td>' +
+          '<td class="left" style="font-size:12px">' + (u.rol === 'admin' ? 'Todos' : esc((u.modulos || []).map(m => (({ cronograma: 'Cronograma', moviles: 'Móviles', seguimiento: 'Seguimiento', bodega: 'Bodega', cotizaciones: 'Cotizaciones', resumen: 'Resumen' })[m] || m) + ((u.ver || []).indexOf(m) !== -1 ? ' (ver)' : '')).join(', ') || 'Ninguno')) + '</td>' +
           '<td><span class="tag ' + (u.activo ? 'tag-active' : 'tag-inactive') + '">' +
             (u.activo ? 'Activo' : 'Desactivado') + '</span>' +
             (u.pendienteClave ? '<br><small>pendiente de crear su contraseña</small>' : '') + '</td>' +
@@ -4083,12 +4089,19 @@ function cargarUsuarios() {
     .catch(err => mostrarError(err, 'No se pudieron cargar los usuarios.'));
 }
 
-function uSetModulos(lista) { Array.from($('uModulos').querySelectorAll('input')).forEach(i => { i.checked = lista.indexOf(i.value) !== -1; }); uRolCambio(); }
-function uGetModulos() { return Array.from($('uModulos').querySelectorAll('input')).filter(i => i.checked).map(i => i.value); }
+/* lista: ['bodega', 'cronograma:ver', ...] (sin sufijo = puede trabajar; ':ver' = solo ver) */
+function uSetModulos(lista) {
+  Array.from($('uModulos').querySelectorAll('select')).forEach(sel => {
+    const m = sel.dataset.m;
+    sel.value = lista.indexOf(m + ':ver') !== -1 ? 'ver' : lista.indexOf(m) !== -1 ? 'trab' : '';
+  });
+  uRolCambio();
+}
+function uGetModulos() { return Array.from($('uModulos').querySelectorAll('select')).filter(sel => sel.value).map(sel => sel.dataset.m + (sel.value === 'ver' ? ':ver' : '')); }
 function uRolCambio() {
-  const adm = $('uRol').value === 'admin';
-  Array.from($('uModulos').querySelectorAll('input')).forEach(i => { if (adm) i.checked = true; i.disabled = adm; });
-  $('uModNota').textContent = adm ? 'El administrador entra a todos los módulos.' : 'Cotizaciones solo la ven los usuarios con ese módulo marcado.';
+  const adm = $('uRol').value === 'admin', con = $('uRol').value === 'consulta';
+  Array.from($('uModulos').querySelectorAll('select')).forEach(sel => { if (adm) sel.value = 'trab'; sel.disabled = adm; });
+  $('uModNota').textContent = adm ? 'El administrador entra a todos los módulos y puede trabajar en todos.' : (con ? 'El rol Consulta solo puede ver, sin importar lo que elijas.' : 'Sin acceso: el módulo no aparece. Solo ver: entra pero no puede crear, editar ni eliminar. Cotizaciones solo la ven los usuarios con ese módulo.');
 }
 
 function uFichaPoner(f) {
@@ -4146,7 +4159,7 @@ function editarUsuario(usuario) {
   $('uCorreo').value = u.correo || '';
   $('uUsuario').value = u.usuario;
   $('uRol').value = u.rol;
-  uSetModulos(u.modulos || []);
+  uSetModulos((u.modulos || []).map(m => (u.ver || []).indexOf(m) !== -1 ? m + ':ver' : m));
   $('uActivo').value = u.activo ? 'SI' : 'NO';
   uFichaPoner(u.ficha);
   $('uCampoUsuario').style.display = 'block';
@@ -6988,6 +7001,7 @@ function mostrarVista(v, forzar) {
   if (v === 'pagomov') abrirPagoMov();
   if (v === 'moviles' && admin) abrirFichas();
   if (v === 'calendario' && calendarioObsoleto && !Object.keys(cambios).length) cargarCalendario();
+  if (v === 'calendario' && calendario) { $('btnExport').style.display = puedeEditar() ? '' : 'none'; renderizarCalendario(); }
   sideRefrescar(); setTimeout(sideRefrescar, 300);
 }
 
@@ -12093,9 +12107,32 @@ function renderAlistos() {
   $('aliCards').innerHTML = '<div class="card"><div class="n">' + n('BORRADOR') + '</div><div class="t">📝 Borradores</div></div><div class="card"><div class="n">' + n('ALISTADO') + '</div><div class="t">📦 Alistados (esperando la móvil)</div></div><div class="card"><div class="n">' + n('APLICADO') + '</div><div class="t">✅ Aplicados</div></div>';
   const l = aliFiltrados().sort((a, b) => (a.estado === 'APLICADO') - (b.estado === 'APLICADO') || (Number(a.movil) || 0) - (Number(b.movil) || 0) || a.alisto.localeCompare(b.alisto));
   if (!l.length) { $('aliTabla').innerHTML = '<div class="empty">No hay alistos con ese filtro.</div>'; return; }
+  if ($('aliVista').value === 'matriz') { aliMatriz(l); return; }
   $('aliTabla').innerHTML = '<table class="table" style="min-width:760px"><thead><tr><th>Alisto</th><th>Fecha</th><th>Móvil</th><th>Materiales</th><th>Estado</th><th class="left">Preparó</th><th>Entrega registrada</th></tr></thead><tbody>' +
     l.map(a => '<tr style="cursor:pointer" title="Ver el detalle" onclick="verAlisto(\'' + escJs(a.alisto) + '\')"><td><b>' + esc(a.alisto) + '</b></td><td>' + esc(fmtFechaSeg(a.fecha)) + '</td><td><b>M' + esc(a.movil) + '</b></td><td>' + a.lineas.length + ' <span style="color:#888">línea' + (a.lineas.length === 1 ? '' : 's') + '</span></td><td>' + aliBadge(a.estado) + '</td>' +
       '<td class="left">' + esc(a.alistado || '—') + '</td><td>' + (a.consecutivoMov ? '<b>' + esc(a.consecutivoMov) + '</b>' : '<span style="color:#bbb">—</span>') + '</td></tr>').join('') + '</tbody></table>';
+}
+
+/* Matriz: material alistado por móvil (respeta los filtros de estado y móvil) */
+function aliMatriz(l) {
+  const movs = {}, cant = {}, tot = {};
+  l.forEach(a => {
+    movs[a.idMovil] = a.movil;
+    a.lineas.forEach(y => {
+      const c = cant[y.clave] = cant[y.clave] || {};
+      c[a.idMovil] = (c[a.idMovil] || 0) + y.cantidad;
+      tot[y.clave] = (tot[y.clave] || 0) + y.cantidad;
+    });
+  });
+  const cols = Object.keys(movs).sort((a, b) => (Number(movs[a]) || 0) - (Number(movs[b]) || 0));
+  const mats = (aliDatos.materiales || []).filter(m => tot[m.clave]);
+  const totCol = {}; cols.forEach(c => { totCol[c] = mats.reduce((a, m) => a + ((cant[m.clave] || {})[c] || 0), 0); });
+  $('aliTabla').innerHTML = '<div style="font-size:12px;color:#777;padding:4px 2px 8px">Material de los <b>' + l.length + '</b> alisto' + (l.length === 1 ? '' : 's') + ' del filtro, sumado por móvil.</div>' +
+    '<table class="table" style="font-size:12.5px;min-width:' + (380 + cols.length * 80) + 'px"><thead><tr><th>Código</th><th class="left">Material</th><th>Und.</th>' +
+    cols.map(c => '<th>M' + esc(movs[c]) + '</th>').join('') + '<th>Total</th></tr></thead><tbody>' +
+    mats.map(m => '<tr><td>' + esc(codP(m.codigo)) + '</td><td class="left"><b>' + esc(m.material) + '</b></td><td>' + esc(m.unidad || '') + '</td>' +
+      cols.map(c => { const q = (cant[m.clave] || {})[c]; return '<td>' + (q ? fmtN(q) : '<span class="segSinCarga">—</span>') + '</td>'; }).join('') + '<td><b>' + fmtN(tot[m.clave]) + '</b></td></tr>').join('') +
+    '<tr style="background:#f4f6fa"><td></td><td class="left"><b>Líneas de material</b></td><td></td>' + cols.map(c => '<td><b>' + mats.filter(m => (cant[m.clave] || {})[c]).length + '</b></td>').join('') + '<td><b>' + mats.length + '</b></td></tr></tbody></table>';
 }
 
 function aliMatInfo(clave) { return (aliDatos.materiales || []).find(m => m.clave === clave) || {}; }
@@ -14308,7 +14345,7 @@ if (FP_ENLACE) window.addEventListener('DOMContentLoaded', fpIniciar);
     .then(r => r || (refreshTok ? renovarAcceso().then(validar) : null))
     .then(r => {
       if (r) {
-        sesion = { usuario: r.usuario, nombre: r.nombre, rol: r.rol, modulos: r.modulos || [], foto: '' };
+        sesion = { usuario: r.usuario, nombre: r.nombre, rol: r.rol, modulos: r.modulos || [], ver: r.ver || [], foto: '' };
         mostrarApp();
         api('miPerfilWeb').then(p => { sesion.foto = (p && p.foto) || ''; pintarAvatar(); }).catch(() => {});
       } else {
@@ -15793,6 +15830,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 144 · 22-oct 07:56</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 146 · 22-oct 11:49</div>
 </body>
 </html>

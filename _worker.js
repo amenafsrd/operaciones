@@ -572,12 +572,18 @@ function modulosDe_(rol, texto) {
   if (String(rol).toLowerCase() === 'admin') return todos;
   const t = String(texto || '').trim();
   if (!t) return todos.filter(k => k !== 'cotizaciones');
-  return t.split(',').map(x => x.trim()).filter(k => MODULOS[k]);
+  return t.split(',').map(x => x.trim().replace(/:ver$/, '')).filter(k => MODULOS[k]);
+}
+
+/* Módulos en los que el usuario solo puede ver (se guardan como «bodega:ver») */
+function modulosVerDe_(rol, texto) {
+  if (String(rol).toLowerCase() === 'admin') return [];
+  return String(texto || '').split(',').map(x => x.trim()).filter(x => /:ver$/.test(x)).map(x => x.replace(/:ver$/, '')).filter(k => MODULOS[k]);
 }
 
 function limpiarModulos_(m) {
   if (m === undefined || m === null) return undefined;
-  const l = (Array.isArray(m) ? m : String(m).split(',')).map(x => String(x).trim()).filter(k => MODULOS[k]);
+  const l = (Array.isArray(m) ? m : String(m).split(',')).map(x => String(x).trim()).filter(k => MODULOS[k.replace(/:ver$/, '')]);
   return l.length ? l.join(',') : 'NINGUNO';
 }
 
@@ -736,7 +742,7 @@ function requerirSesion_(token, minimo) {
   /* El usuario se vuelve a comprobar en el Sheet como máximo cada 60 segundos.
      Así, desactivar a alguien o cambiarle el rol surte efecto en menos de un minuto,
      sin leer la hoja USUARIOS en cada acción. */
-  if (!ses.rol || !ses.vt || !ses.modulos || ahora - ses.vt > 60000) {
+  if (!ses.rol || !ses.vt || !ses.modulos || !ses.ver || ahora - ses.vt > 60000) {
 
     const reg = buscarUsuario_(ses.usuario);
 
@@ -748,6 +754,7 @@ function requerirSesion_(token, minimo) {
     ses.rol = String(reg.Rol || '').toLowerCase();
     ses.nombre = String(reg.Nombre || reg.Usuario);
     ses.modulos = modulosDe_(ses.rol, reg.Modulos);
+    ses.ver = modulosVerDe_(ses.rol, reg.Modulos);
     ses.vt = ahora;
 
     raw = JSON.stringify(ses);
@@ -758,7 +765,7 @@ function requerirSesion_(token, minimo) {
     throw new Error('No tienes permiso para realizar esta acción.');
   }
 
-  return { usuario: ses.usuario, nombre: ses.nombre, rol: ses.rol, modulos: ses.modulos || [] };
+  return { usuario: ses.usuario, nombre: ses.nombre, rol: ses.rol, modulos: ses.modulos || [], ver: ses.ver || [] };
 }
 
 function loginWeb(usuario, clave) {
@@ -802,7 +809,7 @@ function loginWeb(usuario, clave) {
   } catch (e) { /* no es crítico */ }
 
   return {
-    token: token, usuario: u, nombre: nombre, rol: rol, modulos: modulosDe_(rol, reg.Modulos),
+    token: token, usuario: u, nombre: nombre, rol: rol, modulos: modulosDe_(rol, reg.Modulos), ver: modulosVerDe_(rol, reg.Modulos),
     foto: String(reg.Foto || ''), accesoPrevio: previo,
     cambiarClave: String(reg.Debe_Cambiar_Clave || '') === 'SI'
   };
@@ -876,6 +883,7 @@ function listarUsuariosWeb(token) {
     pendienteClave: String(x.Debe_Cambiar_Clave || '') === 'SI',
     rol: String(x.Rol || '').toLowerCase(),
     modulos: modulosDe_(String(x.Rol || '').toLowerCase(), x.Modulos),
+    ver: modulosVerDe_(String(x.Rol || '').toLowerCase(), x.Modulos),
     foto: String(x.Foto || ''),
     ficha: fichas[normalizarUsuario_(x.Usuario)] || null,
     activo: String(x.Activo) === 'SI',
