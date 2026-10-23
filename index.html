@@ -1233,6 +1233,7 @@
             <div class="toolbar" style="padding:0 15px 10px">
               <div class="field" style="min-width:200px"><label>Buscar OT, contrato o material</label><input id="bodDetBuscar" oninput="renderBodConsDet()" placeholder="OT, contrato o material"></div>
               <div class="field" style="min-width:140px"><label>Móvil</label><select id="bodDetMovil" onchange="renderBodConsDet()"></select></div>
+              <div class="field" style="min-width:170px"><label>Cambios al subir cortes</label><select id="bodDetCamb" onchange="renderBodConsDet()"><option value="">Todas las OT</option><option value="si">🔄 Solo OT con cambios</option></select></div>
               <div id="bodDetCuenta" class="muted" style="font-size:12.5px;align-self:center"></div>
             </div>
             <div id="bodTablaDet" class="tableWrap"></div>
@@ -12469,7 +12470,8 @@ async function cargarBodCons() {
 function bodConsDetFiltrado() {
   const q = ($('bodDetBuscar').value || '').trim().toLowerCase();
   const mv = $('bodDetMovil').value;
-  return bodConsDet.filter(o => (!mv || o.idMovil === mv) &&
+  const camb = $('bodDetCamb') ? $('bodDetCamb').value : '';
+  return bodConsDet.filter(o => (!mv || o.idMovil === mv) && (!camb || o.cambio) &&
     (!q || o.orden.toLowerCase().indexOf(q) !== -1 || String(o.contrato || '').toLowerCase().indexOf(q) !== -1 || o.items.some(i => String(i.material).toLowerCase().indexOf(q) !== -1)));
 }
 
@@ -12487,17 +12489,17 @@ function renderBodConsDet() {
   const coincide = (o, i) => !q || o.orden.toLowerCase().indexOf(q) !== -1 || String(o.contrato || '').toLowerCase().indexOf(q) !== -1 || String(i.material).toLowerCase().indexOf(q) !== -1;
   const filas = [];
   l.forEach(o => o.items.forEach(i => { if (coincide(o, i)) filas.push({ o: o, i: i }); }));
-  $('bodDetCuenta').textContent = filas.length + ' líneas · ' + l.length + ' OT';
+  $('bodDetCuenta').textContent = filas.length + ' líneas · ' + l.length + ' OT' + (l.some(o => o.cambio) ? ' · ' + l.filter(o => o.cambio).length + ' con cambios' : '');
 
   if (!filas.length) { $('bodTablaDet').innerHTML = '<div class="empty">No hay consumo para mostrar en ese rango o filtro.</div>'; return; }
 
   if (bodVista === 'col') {
     const d = bodConsColumnas(l);
-    $('bodTablaDet').innerHTML = '<table class="table" style="font-size:12px;min-width:' + (420 + d.mats.length * 95) + 'px"><thead><tr><th style="position:sticky;left:0;z-index:2">OT</th><th>Fecha</th><th>Contrato</th><th>Móvil</th>' +
-      d.mats.map(m => '<th style="min-width:88px;white-space:normal;line-height:1.2;font-size:11px">' + esc(m.material) + '</th>').join('') + '</tr></thead><tbody>' +
-      d.filas.map(f => '<tr><td style="position:sticky;left:0;background:#fff"><b>' + esc(f.o.orden) + '</b></td><td>' + esc(fmtFechaSeg(f.o.fecha)) + '</td><td>' + esc(f.o.contrato || '—') + '</td><td>M' + esc(f.o.movil) + '</td>' +
-        d.mats.map(m => '<td>' + (f.q[m.clave] ? '<b>' + fmtN(f.q[m.clave]) + '</b>' : '<span class="segSinCarga">—</span>') + '</td>').join('') + '</tr>').join('') +
-      '<tr style="background:#f4f6fa;font-weight:700"><td style="position:sticky;left:0;background:#f4f6fa">Total</td><td></td><td></td><td></td>' + d.mats.map(m => '<td>' + fmtN(d.tot[m.clave]) + '</td>').join('') + '</tr></tbody></table>';
+    $('bodTablaDet').innerHTML = '<table class="table" style="font-size:12px;min-width:' + (620 + d.mats.length * 95) + 'px"><thead><tr><th style="position:sticky;left:0;z-index:2">OT</th><th>Fecha</th><th>Contrato</th><th>Móvil</th>' +
+      d.mats.map(m => '<th style="min-width:88px;white-space:normal;line-height:1.2;font-size:11px">' + esc(m.material) + '</th>').join('') + '<th class="left" style="min-width:200px">Cambio en el último corte</th></tr></thead><tbody>' +
+      d.filas.map(f => '<tr><td style="position:sticky;left:0;background:#fff"><b>' + esc(f.o.orden) + '</b>' + bodCambioMarca(f.o) + '</td><td>' + esc(fmtFechaSeg(f.o.fecha)) + '</td><td>' + esc(f.o.contrato || '—') + '</td><td>M' + esc(f.o.movil) + '</td>' +
+        d.mats.map(m => '<td>' + (f.q[m.clave] ? '<b>' + fmtN(f.q[m.clave]) + '</b>' : '<span class="segSinCarga">—</span>') + '</td>').join('') + '<td class="left" style="font-size:11.5px">' + bodCambioTxt(f.o) + '</td></tr>').join('') +
+      '<tr style="background:#f4f6fa;font-weight:700"><td style="position:sticky;left:0;background:#f4f6fa">Total</td><td></td><td></td><td></td>' + d.mats.map(m => '<td>' + fmtN(d.tot[m.clave]) + '</td>').join('') + '<td></td></tr></tbody></table>';
     return;
   }
 
@@ -12507,7 +12509,7 @@ function renderBodConsDet() {
     l.forEach(o => {
       const its = o.items.filter(i => coincide(o, i));
       if (!its.length) return;
-      h += '<tr style="background:#eef3fa;font-weight:700"><td class="left">🧾 OT ' + esc(o.orden) + '</td><td>' + esc(o.contrato || '—') + '</td><td>M' + esc(o.movil) + '</td><td>' + esc(fmtFechaSeg(o.fecha)) +
+      h += '<tr style="background:#eef3fa;font-weight:700"><td class="left">🧾 OT ' + esc(o.orden) + bodCambioMarca(o) + '</td><td>' + esc(o.contrato || '—') + '</td><td>M' + esc(o.movil) + '</td><td>' + esc(fmtFechaSeg(o.fecha)) +
         '</td><td>' + its.length + ' mat.</td><td class="left" style="color:#777;font-weight:400">' + esc(o.archivo) + '</td></tr>';
       its.forEach(i => { h += '<tr><td class="left" style="padding-left:28px">' + esc(i.material) + '</td><td></td><td></td><td></td><td><b>' + fmtN(i.cantidad) + '</b></td><td></td></tr>'; });
     });
@@ -12516,11 +12518,15 @@ function renderBodConsDet() {
   }
 
   $('bodTablaDet').innerHTML =
-    '<table class="table" style="font-size:12px;min-width:700px"><thead><tr><th>Fecha</th><th>OT</th><th>Contrato</th><th>Móvil</th><th class="left">Material</th><th>Cantidad</th><th class="left">Archivo</th></tr></thead><tbody>' +
-    filas.map(f => '<tr><td>' + esc(fmtFechaSeg(f.o.fecha)) + '</td><td><b>' + esc(f.o.orden) + '</b></td><td>' + esc(f.o.contrato || '—') + '</td><td>M' + esc(f.o.movil) + '</td>' +
+    '<table class="table" style="font-size:12px;min-width:700px"><thead><tr><th>Fecha</th><th>OT</th><th>Contrato</th><th>Móvil</th><th class="left">Material</th><th>Cantidad</th><th class="left">Archivo</th><th class="left">Cambio en el último corte</th></tr></thead><tbody>' +
+    filas.map(f => '<tr><td>' + esc(fmtFechaSeg(f.o.fecha)) + '</td><td><b>' + esc(f.o.orden) + '</b>' + bodCambioMarca(f.o) + '</td><td>' + esc(f.o.contrato || '—') + '</td><td>M' + esc(f.o.movil) + '</td>' +
       '<td class="left">' + esc(f.i.material) + '</td><td><b>' + fmtN(f.i.cantidad) + '</b></td>' +
-      '<td class="left" style="color:#777">' + esc(f.o.archivo) + '</td></tr>').join('') + '</tbody></table>';
+      '<td class="left" style="color:#777">' + esc(f.o.archivo) + '</td><td class="left" style="font-size:11.5px">' + bodCambioTxt(f.o) + '</td></tr>').join('') + '</tbody></table>';
 }
+
+/* Marca de OT que cambió al subir un corte (detalle y hora de la carga que la cambió) */
+function bodCambioMarca(o) { return o.cambio ? ' <span class="segBadge t" style="background:#fff3cd;color:#8a6d00" title="' + esc(o.cambio + ' · corte subido ' + (o.carga || '')) + '">🔄 cambió</span>' : ''; }
+function bodCambioTxt(o) { return o.cambio ? '<span style="color:#8a6d00">' + esc(o.cambio) + '</span><div style="color:#999;font-size:11px">corte ' + esc((o.carga || '').slice(0, 16)) + '</div>' : '<span class="segSinCarga">—</span>'; }
 
 /* Una fila por OT y un material por columna (solo los materiales usados en el filtro) */
 function bodConsColumnas(l) {
@@ -12550,9 +12556,9 @@ async function bodConsExcel() {
   const filas = [];
   if (bodVista === 'col') {
     const d = bodConsColumnas(l);
-    d.filas.forEach(f => { const r = { Fecha: f.o.fecha, OT: f.o.orden, Contrato: f.o.contrato || '', Móvil: 'M' + f.o.movil }; d.mats.forEach(m => { r[m.material] = f.q[m.clave] || ''; }); filas.push(r); });
+    d.filas.forEach(f => { const r = { Fecha: f.o.fecha, OT: f.o.orden, Contrato: f.o.contrato || '', Móvil: 'M' + f.o.movil }; d.mats.forEach(m => { r[m.material] = f.q[m.clave] || ''; }); r['Cambio en el último corte'] = f.o.cambio || ''; filas.push(r); });
   } else
-  l.forEach(o => o.items.forEach(i => filas.push({ Fecha: o.fecha, OT: o.orden, Contrato: o.contrato || '', Móvil: 'M' + o.movil, Material: i.material, Cantidad: i.cantidad, Archivo: o.archivo })));
+  l.forEach(o => o.items.forEach(i => filas.push({ Fecha: o.fecha, OT: o.orden, Contrato: o.contrato || '', Móvil: 'M' + o.movil, Material: i.material, Cantidad: i.cantidad, Archivo: o.archivo, 'Cambio en el último corte': o.cambio || '' })));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(filas), 'Consumo');
   await xlsxMarca(wb, 'Consumo_por_OT_' + $('bodConsDesde').value + '_' + $('bodConsHasta').value + '.xlsx', 'Consumo de materiales por OT');
@@ -15883,6 +15889,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 150 · 22-oct 20:02</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 151 · 22-oct 21:33</div>
 </body>
 </html>

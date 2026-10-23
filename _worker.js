@@ -5968,7 +5968,7 @@ const INV = {
     MAT: ['Clave', 'Material', 'Unidad', 'Minimo_Bodega', 'Activo', 'Alias', 'Orden', 'Codigo', 'Objetivo_Base', 'Categoria', 'Costo_Unitario', 'Stock_Completo'],
     MOV: ['Grupo', 'Fecha', 'Tipo', 'Clave', 'Material', 'Cantidad', 'ID_Movil', 'Movil',
       'Referencia', 'Obs', 'Usuario', 'Creado', 'Concepto', 'Consecutivo', 'Linea', 'Editado'],
-    CON: ['Fecha', 'N_Orden', 'ID_Movil', 'Movil', 'Clave', 'Material', 'Cantidad', 'Archivo', 'Carga', 'Contrato'],
+    CON: ['Fecha', 'N_Orden', 'ID_Movil', 'Movil', 'Clave', 'Material', 'Cantidad', 'Archivo', 'Carga', 'Contrato', 'Cambio'],
     OBJ: ['ID_Movil', 'Clave', 'Objetivo'],
     CARGAS: ['Fecha_Hora', 'Archivo', 'Filas', 'OT', 'Fechas', 'Sin_Movil', 'Usuario', 'Nuevas', 'Cambiadas', 'Sin_Cambios', 'Cambios'],
     ALE: ['Clave', 'Usuario', 'Fecha_Hora', 'Disponible'],
@@ -7278,7 +7278,7 @@ function importarConsumoWeb(token, filas, archivo, mapa) {
       p.items[c] = invRedondear_((p.items[c] || 0) + invNum_(r.Cantidad));
     });
 
-    const cambios = [], reemplazar = {}, nuevas = [];
+    const cambios = [], reemplazar = {}, nuevas = [], cambioTxt = {};
     let lineas = 0, nNuevas = 0, nSin = 0, nCamb = 0;
     const fmtQ = v => String(invRedondear_(v));
 
@@ -7297,12 +7297,13 @@ function importarConsumoWeb(token, filas, archivo, mapa) {
         if (!dif.length) { nSin++; return; }
         nCamb++;
         reemplazar[o] = true;
+        cambioTxt[o] = dif.join(' · ').slice(0, 400);
         cambios.push({ orden: o, movil: txt_(x.m.Movil), detalle: dif });
       } else nNuevas++;
       Object.keys(x.cant).forEach(c => {
         nuevas.push({
           Fecha: x.fecha, N_Orden: o, ID_Movil: String(x.m.ID_Movil), Movil: txt_(x.m.Movil),
-          Clave: c, Material: nombreDe[c] || c, Cantidad: x.cant[c], Archivo: archivo, Carga: horaCarga, Contrato: x.contrato
+          Clave: c, Material: nombreDe[c] || c, Cantidad: x.cant[c], Archivo: archivo, Carga: horaCarga, Contrato: x.contrato, Cambio: cambioTxt[o] || ''
         });
         lineas++;
       });
@@ -7313,7 +7314,7 @@ function importarConsumoWeb(token, filas, archivo, mapa) {
 
     invReescribir_(shCon, 'CON', previas.map(r => ({
       Fecha: invFecha_(r.Fecha), N_Orden: txt_(r.N_Orden), ID_Movil: txt_(r.ID_Movil), Movil: txt_(r.Movil),
-      Clave: txt_(r.Clave), Material: txt_(r.Material), Cantidad: invNum_(r.Cantidad), Archivo: txt_(r.Archivo), Carga: txt_(r.Carga), Contrato: txt_(r.Contrato)
+      Clave: txt_(r.Clave), Material: txt_(r.Material), Cantidad: invNum_(r.Cantidad), Archivo: txt_(r.Archivo), Carga: txt_(r.Carga), Contrato: txt_(r.Contrato), Cambio: txt_(r.Cambio)
     })).concat(nuevas));
 
     /* Solo se compara contra lo ya importado: OT que estaban cargadas en las fechas de este archivo y ahora no vienen */
@@ -7355,7 +7356,7 @@ function obtenerConsumoDetalleWeb(token, desde, hasta) {
     const f = invFecha_(r.Fecha);
     if (f < desde || f > hasta) return;
     const o = txt_(r.N_Orden);
-    const x = ots[o] = ots[o] || { orden: o, fecha: f, idMovil: txt_(r.ID_Movil), movil: txt_(r.Movil), archivo: txt_(r.Archivo), carga: txt_(r.Carga), contrato: txt_(r.Contrato) || contratoSeg[segOrden_(o)] || '', items: [] };
+    const x = ots[o] = ots[o] || { orden: o, fecha: f, idMovil: txt_(r.ID_Movil), movil: txt_(r.Movil), archivo: txt_(r.Archivo), carga: txt_(r.Carga), contrato: txt_(r.Contrato) || contratoSeg[segOrden_(o)] || '', cambio: txt_(r.Cambio), items: [] };
     x.items.push({ clave: txt_(r.Clave), material: txt_(r.Material), cantidad: invNum_(r.Cantidad) });
   });
 
@@ -7389,7 +7390,7 @@ function eliminarCargaConsumoWeb(token, hora) {
 
     invReescribir_(shCon, 'CON', quedan.map(r => ({
       Fecha: invFecha_(r.Fecha), N_Orden: txt_(r.N_Orden), ID_Movil: txt_(r.ID_Movil), Movil: txt_(r.Movil),
-      Clave: txt_(r.Clave), Material: txt_(r.Material), Cantidad: invNum_(r.Cantidad), Archivo: txt_(r.Archivo), Carga: txt_(r.Carga), Contrato: txt_(r.Contrato)
+      Clave: txt_(r.Clave), Material: txt_(r.Material), Cantidad: invNum_(r.Cantidad), Archivo: txt_(r.Archivo), Carga: txt_(r.Carga), Contrato: txt_(r.Contrato), Cambio: txt_(r.Cambio)
     })));
 
     shCar.deleteRow(car._fila);
