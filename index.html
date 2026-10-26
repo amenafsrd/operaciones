@@ -1052,7 +1052,6 @@
           <button id="stBodRes" class="active" onclick="bodSubtab('res')">🏠 General</button>
           <button id="stBodIng" onclick="bodSubtab('ing')">📦 Bodega principal</button>
           <button id="stBodAbas" onclick="bodSubtab('abas')">🚐 Abastecimiento de móviles</button>
-          <button id="stBodDes" onclick="bodSubtab('des')">🚚 Despacho</button>
           <button id="stBodAli" onclick="bodSubtab('ali')">📋 Alistos</button>
           <button id="stBodMoviles" onclick="bodSubtab('moviles')">🚐 Stock de móviles</button>
           <button id="stBodDan" onclick="bodSubtab('dan')">🛠️ Equipos dañados</button>
@@ -1186,12 +1185,6 @@
         </div>
 
         <!-- Alistos: borradores de entrega que se preparan en físico -->
-        <div id="bodPanelDes" style="display:none">
-          <div class="toolbar"><button class="btn secondary" onclick="desCargar()">↻ Actualizar</button>
-            <div style="font-size:13px;color:#555;align-self:center">Material listo para entregar. Toca una móvil, quien recibe firma y quien entrega pone su usuario y clave.</div></div>
-          <div id="desLista" class="desGrid"></div>
-        </div>
-
         <div id="bodPanelAli" style="display:none">
           <div class="toolbar">
             <div class="field" style="min-width:190px"><label>Estado</label><select id="aliEstado" onchange="renderAlistos()">
@@ -1689,6 +1682,19 @@
     </div>
   </div>
 
+  <div id="despPantalla" style="display:none;position:fixed;inset:0;z-index:40;background:#eef1f6;overflow:auto">
+    <div style="background:#1d2433;color:#fff;padding:12px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;position:sticky;top:0">
+      <img id="despLogo" alt="" style="height:38px;background:#fff;border-radius:6px;padding:3px">
+      <div style="flex:1;min-width:180px"><div style="font-size:19px;font-weight:700">🚚 Despacho de bodega</div><div id="despQuien2" style="font-size:13px;opacity:.85"></div></div>
+      <button class="btn secondary" onclick="desCargar()">↻ Actualizar</button>
+      <button class="btn secondary" onclick="salir()">Salir</button>
+    </div>
+    <div style="padding:16px;max-width:1100px;margin:0 auto">
+      <div style="font-size:14px;color:#555">Material listo para entregar. Toca una móvil, quien recibe firma y confirma. La entrega queda a tu nombre.</div>
+      <div id="desLista" class="desGrid"></div>
+    </div>
+  </div>
+
   <div id="modalDesp" class="modalBg">
     <div class="modal" style="width:min(640px,100%)">
       <h3 id="desTitulo">Entrega de material</h3>
@@ -1696,12 +1702,7 @@
       <div class="field"><label>Nombre de quien recibe *</label><input id="desNombre" autocomplete="off" style="font-size:16px"></div>
       <div style="font-size:12px;color:#777;margin:8px 0 4px">Quien recibe firma con el dedo:</div>
       <canvas id="desCanvas" width="400" height="170" style="width:100%;max-width:560px;border:2px solid #999;border-radius:8px;background:#fff;touch-action:none"></canvas>
-      <div style="margin-top:10px;padding:8px 10px;background:#fff8e1;border:1px solid #ffe082;border-radius:8px">
-        <div style="font-size:13px;margin-bottom:6px"><b>Quien entrega</b> (queda registrado en el documento)</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <div class="field" style="flex:1;min-width:150px"><label>Usuario *</label><input id="desUsuario" autocomplete="off" autocapitalize="none" style="font-size:16px"></div>
-          <div class="field" style="flex:1;min-width:150px"><label>Contraseña *</label><input id="desClave" type="password" autocomplete="off" style="font-size:16px"></div>
-        </div></div>
+      <div id="desQuien" style="margin-top:10px;padding:8px 10px;background:#fff8e1;border:1px solid #ffe082;border-radius:8px;font-size:14px"></div>
       <div class="modalActions">
         <button class="btn secondary" onclick="desBorrar()">🧹 Borrar firma</button>
         <button class="btn secondary" onclick="$('modalDesp').classList.remove('show')">Cancelar</button>
@@ -2821,6 +2822,7 @@ function mostrarError(err, prefijo) {
    ========================================================= */
 
 function guardarToken(t) {
+  if (DESP_MODO && t) return;   /* la página de despacho nunca recuerda la sesión */
   try {
     const rec = localStorage.getItem('srd_rec') === '1';
     if (t) {
@@ -2943,6 +2945,8 @@ function perfilGuardar() {
 
 function mostrarApp() {
 
+  if (DESP_MODO) { despArrancar(); return; }
+
   $('loginBg').classList.add('hide');
   $('app').style.display = '';
 
@@ -2996,6 +3000,7 @@ function cerrarSesionLocal(mensaje) {
   actualizarAviso();
 
   $('app').style.display = 'none';
+  $('despPantalla').style.display = 'none';
   $('loginBg').classList.remove('hide');
   $('lError').textContent = mensaje || '';
   $('lClave').value = '';
@@ -11217,10 +11222,23 @@ async function cargarCambiosBodega(ambito) {
 }
 
 /* ---------- Despacho (tablet de bodega) ---------- */
-let desDatos = null, desAct = null, desDibujo = false, desTrazos = 0;
+const DESP_MODO = new URLSearchParams(location.search).has('despacho');
+let desDatos = null, desAct = null, desDibujo = false, desTrazos = 0, desTimer = null;
+function despArrancar() {
+  $('loginBg').classList.add('hide'); $('app').style.display = 'none';
+  $('despPantalla').style.display = 'block';
+  $('despLogo').src = CT_LOGO;
+  $('despQuien2').textContent = 'Entrega: ' + sesion.nombre;
+  document.title = 'Despacho · SRD';
+  desCargar();
+  const rearmar = () => { clearTimeout(desTimer); desTimer = setTimeout(() => { if (token) { cerrarSesionLocal('Se cerró la sesión por inactividad.'); } }, 5 * 60 * 1000); };
+  if (!window._desInact) { window._desInact = true; ['pointerdown', 'keydown', 'touchstart'].forEach(n => document.addEventListener(n, () => { if (token) rearmar(); }, true)); }
+  rearmar();
+}
 async function desCargar() {
   $('desLista').innerHTML = '<div class="loading">Cargando...</div>';
-  try { desDatos = await api('obtenerAlistosWeb'); } catch (e) { mostrarError(e, 'No se pudo cargar el material listo.'); return; }
+  if (sesion.rol === 'consulta') { $('desLista').innerHTML = '<div class="empty">Tu usuario es de solo consulta y no puede despachar. Entra con un usuario que tenga permiso para trabajar en Bodega.</div>'; return; }
+  try { desDatos = await api('obtenerAlistosWeb'); if (!bodDatos) bodDatos = await api('obtenerBodegaWeb'); } catch (e) { mostrarError(e, 'No se pudo cargar el material listo.'); return; }
   const l = desDatos.alistos.filter(a => a.estado === 'ALISTADO').sort((a, b) => String(a.movil).localeCompare(String(b.movil), 'es', { numeric: true }));
   $('desLista').innerHTML = !l.length ? '<div class="empty">No hay material listo para despachar. Cuando un alisto pase a «Alistado» aparecerá aquí.</div>' :
     l.map(a => {
@@ -11236,7 +11254,7 @@ function desAbrir(id) {
   const mv = (bodDatos && bodDatos.moviles || []).find(m => m.idMovil === a.idMovil) || {};
   $('desTitulo').textContent = '🚚 Entrega a móvil ' + a.movil;
   $('desNombre').value = mv.tecnico || '';
-  $('desUsuario').value = ''; $('desClave').value = '';
+  $('desQuien').innerHTML = '<b>Entrega:</b> ' + esc(sesion.nombre) + ' <span style="color:#777">(queda registrado en el documento)</span>';
   $('desResumen').innerHTML = a.lineas.slice().sort((x, y) => (x.linea || 0) - (y.linea || 0)).map((y, i) => {
     const m = (desDatos.materiales || []).find(z => z.clave === y.clave) || {};
     return '<div style="display:flex;gap:10px;align-items:center;padding:6px 4px;border-bottom:1px solid #eee"><span style="color:#888;width:22px">' + (y.linea || i + 1) + '</span><b style="flex:1">' + esc(y.material) + '</b><span style="white-space:nowrap"><b>' + fmtN(y.cantidad) + '</b> ' + esc(m.unidad || '') + '</span></div>';
@@ -11260,16 +11278,14 @@ function desBorrar() {
   desTrazos = 0;
 }
 async function desConfirmar() {
-  const nombre = $('desNombre').value.trim(), us = $('desUsuario').value.trim(), cl = $('desClave').value;
+  const nombre = $('desNombre').value.trim();
   if (!nombre) { toast('Escribe el nombre de quien recibe.'); return; }
   if (desTrazos < 5) { toast('Falta la firma de quien recibe.'); return; }
-  if (!us || !cl) { toast('Quien entrega debe poner su usuario y contraseña.'); return; }
   const btn = $('desGuardar'); btn.disabled = true;
   try {
-    const r = await api('despachoEntregaWeb', desAct.alisto, us, cl, nombre, $('desCanvas').toDataURL('image/png'));
+    const r = await api('despachoEntregaWeb', desAct.alisto, nombre, $('desCanvas').toDataURL('image/png'));
     $('modalDesp').classList.remove('show');
-    $('desClave').value = '';
-    toast('Entrega registrada: entrega ' + r.entrega + ', recibe ' + nombre + '.', 5000);
+    toast('Entrega registrada. Entrega ' + r.entrega + ', recibe ' + nombre + '.', 5000);
     bodSucio = true;
     desCargar();
     try {
@@ -11284,7 +11300,7 @@ async function desConfirmar() {
 
 function bodSubtab(s) {
   bodSub = s;
-  const m = { res: 'Res', des: 'Des', moviles: 'Moviles', dan: 'Dan', ing: 'Ing', abas: 'Abas', ali: 'Ali', cons: 'Cons', inv: 'Inv', dev: 'Dev', cat: 'Cat' };
+  const m = { res: 'Res', moviles: 'Moviles', dan: 'Dan', ing: 'Ing', abas: 'Abas', ali: 'Ali', cons: 'Cons', inv: 'Inv', dev: 'Dev', cat: 'Cat' };
   Object.keys(m).forEach(k => {
     $('bodPanel' + m[k]).style.display = k === s ? 'block' : 'none';
     $('stBod' + m[k]).classList.toggle('active', k === s);
@@ -11294,7 +11310,6 @@ function bodSubtab(s) {
   if (s === 'ing') { cargarIngresos(); cargarCambiosBodega('ing'); }
   if (s === 'abas') { cargarAbastecimiento(); cargarCambiosBodega('abas'); }
   if (s === 'ali') cargarAlistos();
-  if (s === 'des') desCargar();
   if (s === 'cons') cargarBodCons();
   if (s === 'inv') cargarCortes();
   if (s === 'dev') cargarDevoluciones();
@@ -14509,7 +14524,7 @@ if (FP_ENLACE) window.addEventListener('DOMContentLoaded', fpIniciar);
 
 (function iniciar() {
 
-  if (FP_ENLACE) return;
+  if (FP_ENLACE || DESP_MODO) return;
   const t = leerToken();
   if (!t) return;
 
@@ -16004,6 +16019,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 158 · 26-oct 13:07</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 159 · 26-oct 13:27</div>
 </body>
 </html>

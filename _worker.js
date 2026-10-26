@@ -12913,18 +12913,6 @@ async function atender_(fn, args) {
   if (PUBLICAS_API.has(fn)) { const rp = await ejecutar_(fn, args, ''); return rp.resultado; }   // enlace de firma: sin sesión, el código del enlace es la llave
   const token = args[0];
   const email = await correoDeToken_(token);
-  if (fn === 'despachoEntregaWeb') {
-    // Tablet de bodega: la sesión de la tablet solo abre la pantalla; quien entrega pone su usuario y contraseña y la entrega se registra a su nombre
-    const u = String(args[2] || '').trim(), clave = String(args[3] || '');
-    if (!u || !clave) throw new Error('Quien entrega debe poner su usuario y contraseña.');
-    const p1 = await ejecutar_('loginPaso1_', [u], '');
-    const info = p1.resultado;
-    if (!info || !info.correo) throw new Error('Quien entrega: usuario o contraseña incorrectos.');
-    const t = await authToken_('password', { email: info.correo, password: clave });
-    if (!t || !t.access_token) throw new Error('Quien entrega: usuario o contraseña incorrectos.');
-    const rd = await ejecutar_(fn, [t.access_token, args[1], args[4], args[5]], info.correo);
-    return rd.resultado;
-  }
   if (fn === 'cambiarClaveWeb') {
     // se comprueba la contraseña actual antes de cambiarla
     const ok = await authToken_('password', { email, password: String(args[1] || '') });
