@@ -668,6 +668,10 @@
 .pmDDm .btn{justify-content:flex-start;text-align:left;white-space:nowrap}
 #selAno,.calSemBtn{height:44px;box-sizing:border-box;font-size:15px}
 .calSemBtn{padding:0 12px}
+.desGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;margin-top:12px}
+.desCard{background:#fff;border:2px solid #c5e1a5;border-radius:14px;padding:18px;text-align:left;cursor:pointer;font:inherit;box-shadow:0 2px 6px rgba(0,0,0,.08)}
+.desCard:active{background:#f1f8e9}
+.desMov{font-size:24px;font-weight:700;color:#1d2433}.desTec{font-size:16px;margin:2px 0 8px}.desInfo{font-size:13px;color:#666}
 </style>
 </head>
 
@@ -1048,6 +1052,7 @@
           <button id="stBodRes" class="active" onclick="bodSubtab('res')">🏠 General</button>
           <button id="stBodIng" onclick="bodSubtab('ing')">📦 Bodega principal</button>
           <button id="stBodAbas" onclick="bodSubtab('abas')">🚐 Abastecimiento de móviles</button>
+          <button id="stBodDes" onclick="bodSubtab('des')">🚚 Despacho</button>
           <button id="stBodAli" onclick="bodSubtab('ali')">📋 Alistos</button>
           <button id="stBodMoviles" onclick="bodSubtab('moviles')">🚐 Stock de móviles</button>
           <button id="stBodDan" onclick="bodSubtab('dan')">🛠️ Equipos dañados</button>
@@ -1181,6 +1186,12 @@
         </div>
 
         <!-- Alistos: borradores de entrega que se preparan en físico -->
+        <div id="bodPanelDes" style="display:none">
+          <div class="toolbar"><button class="btn secondary" onclick="desCargar()">↻ Actualizar</button>
+            <div style="font-size:13px;color:#555;align-self:center">Material listo para entregar. Toca una móvil, quien recibe firma y quien entrega pone su usuario y clave.</div></div>
+          <div id="desLista" class="desGrid"></div>
+        </div>
+
         <div id="bodPanelAli" style="display:none">
           <div class="toolbar">
             <div class="field" style="min-width:190px"><label>Estado</label><select id="aliEstado" onchange="renderAlistos()">
@@ -1675,6 +1686,27 @@
       <div id="aliDatos" style="font-size:13px;line-height:1.6;margin-bottom:10px"></div>
       <div id="aliLineas" class="tableWrap" style="max-height:48vh"></div>
       <div class="modalActions" id="aliAcciones" style="flex-wrap:wrap"></div>
+    </div>
+  </div>
+
+  <div id="modalDesp" class="modalBg">
+    <div class="modal" style="width:min(640px,100%)">
+      <h3 id="desTitulo">Entrega de material</h3>
+      <div id="desResumen" style="font-size:14px;margin-bottom:8px;max-height:30vh;overflow:auto"></div>
+      <div class="field"><label>Nombre de quien recibe *</label><input id="desNombre" autocomplete="off" style="font-size:16px"></div>
+      <div style="font-size:12px;color:#777;margin:8px 0 4px">Quien recibe firma con el dedo:</div>
+      <canvas id="desCanvas" width="400" height="170" style="width:100%;max-width:560px;border:2px solid #999;border-radius:8px;background:#fff;touch-action:none"></canvas>
+      <div style="margin-top:10px;padding:8px 10px;background:#fff8e1;border:1px solid #ffe082;border-radius:8px">
+        <div style="font-size:13px;margin-bottom:6px"><b>Quien entrega</b> (queda registrado en el documento)</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <div class="field" style="flex:1;min-width:150px"><label>Usuario *</label><input id="desUsuario" autocomplete="off" autocapitalize="none" style="font-size:16px"></div>
+          <div class="field" style="flex:1;min-width:150px"><label>Contraseña *</label><input id="desClave" type="password" autocomplete="off" style="font-size:16px"></div>
+        </div></div>
+      <div class="modalActions">
+        <button class="btn secondary" onclick="desBorrar()">🧹 Borrar firma</button>
+        <button class="btn secondary" onclick="$('modalDesp').classList.remove('show')">Cancelar</button>
+        <button id="desGuardar" class="btn primary" onclick="desConfirmar()">✅ Confirmar entrega</button>
+      </div>
     </div>
   </div>
 
@@ -11184,9 +11216,75 @@ async function cargarCambiosBodega(ambito) {
   } catch (e) { cont.innerHTML = '<div class="empty">No se pudo cargar el historial.</div>'; }
 }
 
+/* ---------- Despacho (tablet de bodega) ---------- */
+let desDatos = null, desAct = null, desDibujo = false, desTrazos = 0;
+async function desCargar() {
+  $('desLista').innerHTML = '<div class="loading">Cargando...</div>';
+  try { desDatos = await api('obtenerAlistosWeb'); } catch (e) { mostrarError(e, 'No se pudo cargar el material listo.'); return; }
+  const l = desDatos.alistos.filter(a => a.estado === 'ALISTADO').sort((a, b) => String(a.movil).localeCompare(String(b.movil), 'es', { numeric: true }));
+  $('desLista').innerHTML = !l.length ? '<div class="empty">No hay material listo para despachar. Cuando un alisto pase a «Alistado» aparecerá aquí.</div>' :
+    l.map(a => {
+      const mv = (bodDatos && bodDatos.moviles || []).find(m => m.idMovil === a.idMovil) || {};
+      const tot = a.lineas.reduce((t, x) => t + (Number(x.cantidad) || 0), 0);
+      return '<button class="desCard" onclick="desAbrir(\'' + esc(a.alisto) + '\')"><div class="desMov">Móvil ' + esc(a.movil) + '</div><div class="desTec">' + esc(mv.tecnico || '') + '</div><div class="desInfo">' + a.lineas.length + ' materiales · ' + fmtN(tot) + ' unidades</div><div class="desInfo">' + esc(a.alisto) + '</div></button>';
+    }).join('');
+}
+function desAbrir(id) {
+  const a = desDatos && desDatos.alistos.find(x => x.alisto === id);
+  if (!a) return;
+  desAct = a;
+  const mv = (bodDatos && bodDatos.moviles || []).find(m => m.idMovil === a.idMovil) || {};
+  $('desTitulo').textContent = '🚚 Entrega a móvil ' + a.movil;
+  $('desNombre').value = mv.tecnico || '';
+  $('desUsuario').value = ''; $('desClave').value = '';
+  $('desResumen').innerHTML = a.lineas.slice().sort((x, y) => (x.linea || 0) - (y.linea || 0)).map((y, i) => {
+    const m = (desDatos.materiales || []).find(z => z.clave === y.clave) || {};
+    return '<div style="display:flex;gap:10px;align-items:center;padding:6px 4px;border-bottom:1px solid #eee"><span style="color:#888;width:22px">' + (y.linea || i + 1) + '</span><b style="flex:1">' + esc(y.material) + '</b><span style="white-space:nowrap"><b>' + fmtN(y.cantidad) + '</b> ' + esc(m.unidad || '') + '</span></div>';
+  }).join('');
+  $('modalDesp').classList.add('show');
+  desBorrar();
+  const c = $('desCanvas');
+  if (!c.dataset.listo) {
+    c.dataset.listo = '1';
+    const pos = e => { const r = c.getBoundingClientRect(); return { x: (e.clientX - r.left) * c.width / r.width, y: (e.clientY - r.top) * c.height / r.height }; };
+    const g = c.getContext('2d');
+    c.addEventListener('pointerdown', e => { e.preventDefault(); c.setPointerCapture(e.pointerId); desDibujo = true; const p = pos(e); g.beginPath(); g.moveTo(p.x, p.y); g.lineTo(p.x + 0.1, p.y + 0.1); g.stroke(); desTrazos++; });
+    c.addEventListener('pointermove', e => { if (!desDibujo) return; e.preventDefault(); const p = pos(e); g.lineTo(p.x, p.y); g.stroke(); desTrazos++; });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(n => c.addEventListener(n, () => { desDibujo = false; }));
+  }
+}
+function desBorrar() {
+  const c = $('desCanvas'), g = c.getContext('2d');
+  g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+  g.strokeStyle = '#111'; g.lineWidth = 2.5; g.lineCap = 'round'; g.lineJoin = 'round';
+  desTrazos = 0;
+}
+async function desConfirmar() {
+  const nombre = $('desNombre').value.trim(), us = $('desUsuario').value.trim(), cl = $('desClave').value;
+  if (!nombre) { toast('Escribe el nombre de quien recibe.'); return; }
+  if (desTrazos < 5) { toast('Falta la firma de quien recibe.'); return; }
+  if (!us || !cl) { toast('Quien entrega debe poner su usuario y contraseña.'); return; }
+  const btn = $('desGuardar'); btn.disabled = true;
+  try {
+    const r = await api('despachoEntregaWeb', desAct.alisto, us, cl, nombre, $('desCanvas').toDataURL('image/png'));
+    $('modalDesp').classList.remove('show');
+    $('desClave').value = '';
+    toast('Entrega registrada: entrega ' + r.entrega + ', recibe ' + nombre + '.', 5000);
+    bodSucio = true;
+    desCargar();
+    try {
+      abDatos = await api('obtenerMovimientosInvWeb', '2020-01-01', '2099-12-31');
+      const dx = docPorGrupo(r.grupo);
+      if (dx) compartirDoc(dx);
+    } catch (e) { }
+  } catch (e) {
+    mostrarError(e, 'No se pudo registrar la entrega.');
+  } finally { btn.disabled = false; }
+}
+
 function bodSubtab(s) {
   bodSub = s;
-  const m = { res: 'Res', moviles: 'Moviles', dan: 'Dan', ing: 'Ing', abas: 'Abas', ali: 'Ali', cons: 'Cons', inv: 'Inv', dev: 'Dev', cat: 'Cat' };
+  const m = { res: 'Res', des: 'Des', moviles: 'Moviles', dan: 'Dan', ing: 'Ing', abas: 'Abas', ali: 'Ali', cons: 'Cons', inv: 'Inv', dev: 'Dev', cat: 'Cat' };
   Object.keys(m).forEach(k => {
     $('bodPanel' + m[k]).style.display = k === s ? 'block' : 'none';
     $('stBod' + m[k]).classList.toggle('active', k === s);
@@ -11196,6 +11294,7 @@ function bodSubtab(s) {
   if (s === 'ing') { cargarIngresos(); cargarCambiosBodega('ing'); }
   if (s === 'abas') { cargarAbastecimiento(); cargarCambiosBodega('abas'); }
   if (s === 'ali') cargarAlistos();
+  if (s === 'des') desCargar();
   if (s === 'cons') cargarBodCons();
   if (s === 'inv') cargarCortes();
   if (s === 'dev') cargarDevoluciones();
@@ -15905,6 +16004,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 157 · 26-oct 10:24</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 158 · 26-oct 13:07</div>
 </body>
 </html>
