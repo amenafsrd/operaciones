@@ -10967,7 +10967,11 @@ function devLibro(L) {
   });
   const res = [['Móvil', 'Debe', 'Devuelto', 'Justificado', 'Pendiente']].concat(Object.keys(pm).sort((a, b) => a.localeCompare(b, 'es', { numeric: true })).map(k => [pm[k].movil, pm[k].debe, pm[k].dev, pm[k].jus, pm[k].pen]));
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(res), 'Resumen por móvil');
-  const rq = [['Equipo', 'Debe', 'Devuelto', 'Justificado', 'Pendiente']].concat(Object.keys(pe).sort((a, b) => a.localeCompare(b, 'es')).map(k => [pe[k].eq, pe[k].debe, pe[k].dev, pe[k].jus, pe[k].pen]));
+  /* Total = lo que hay que devolver al cliente: Debe − Justificado (lo pendiente es solo control interno; se alista de lo que hay en bodega) */
+  const claves = Object.keys(pe).sort((a, b) => a.localeCompare(b, 'es'));
+  const rq = [['Equipo', 'Debe', 'Devuelto', 'Justificado', 'Pendiente', 'Total']].concat(claves.map(k => [pe[k].eq, pe[k].debe, pe[k].dev, pe[k].jus, pe[k].pen, pe[k].debe - pe[k].jus]));
+  const suma = i => claves.reduce((a, k) => a + [0, pe[k].debe, pe[k].dev, pe[k].jus, pe[k].pen, pe[k].debe - pe[k].jus][i], 0);
+  rq.push(['TOTAL', suma(1), suma(2), suma(3), suma(4), suma(5)]);
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rq), 'Resumen por equipo');
   return wb;
 }
@@ -15906,6 +15910,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 154 · 26-oct 09:59</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 155 · 26-oct 10:05</div>
 </body>
 </html>
