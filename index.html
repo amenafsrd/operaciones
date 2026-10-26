@@ -2848,6 +2848,7 @@ function leerToken() {
   return null;
 }
 
+try { const uu = localStorage.getItem('srd_ultimo_usuario'); if (uu) { $('lUsuario').value = uu; } } catch (e) { }
 function entrar() {
 
   $('lError').textContent = '';
@@ -2861,6 +2862,7 @@ function entrar() {
       token = r.token; refreshTok = r.refresh || null;
       sesion = { usuario: r.usuario, nombre: r.nombre, rol: r.rol, modulos: r.modulos || [], ver: r.ver || [], foto: r.foto || '' };
       guardarToken(token);
+      try { localStorage.setItem('srd_ultimo_usuario', r.usuario || ''); } catch (e) { }
       $('lClave').value = '';
       mostrarApp();
       if (!r.cambiarClave) mostrarBienvenida(r.accesoPrevio);
@@ -16019,6 +16021,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 159 · 26-oct 13:27</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 160 · 26-oct 13:36</div>
 </body>
 </html>
