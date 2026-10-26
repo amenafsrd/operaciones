@@ -10860,7 +10860,7 @@ async function devAccion(tipo, i) {
       '<div class="field"><label>Cantidad a justificar</label><input id="dvCant" type="number" min="1" max="' + o.pendiente + '" value="' + o.pendiente + '"></div>' +
       '<div class="field"><label>Motivo</label><textarea id="dvMot" rows="3" placeholder="Ej. el cliente conservó el equipo, equipo dañado por el cliente…"></textarea></div>' + devPie('devGuardarJust()', 'Justificar'));
   } else if (tipo === 'cambio') {
-    /* Opciones: lo que trae el Excel + los equipos del catálogo (por su alias o nombre) + EERO, aunque todavía no haya llegado en ningún archivo */
+    /* Opciones fijas en un desplegable (sin escribir, para no crear nombres distintos del mismo equipo): lo que trae el Excel + los equipos del catálogo + EERO */
     const set = new Set(devDatos.lineas.map(x => x.equipo));
     ((typeof bodDatos !== 'undefined' && bodDatos && bodDatos.materiales) || []).filter(m => m.categoria === 'Equipos' && m.activo !== false).forEach(m => {
       const nombres = String(m.alias || '').split(';').map(t => t.trim()).filter(Boolean);
@@ -10870,7 +10870,7 @@ async function devAccion(tipo, i) {
     const eq = Array.from(set).filter(x => x && x !== o.equipo).sort((x, y) => x.localeCompare(y, 'es'));
     devModal('<h3>🔄 Cambiar tipo de equipo</h3>' + devCab(o) +
       '<div style="font-size:12px;color:#777;margin-bottom:8px">Si el equipo a devolver correspondía a otro, mueve la cantidad pendiente a ese equipo.</div>' +
-      '<div class="grid2"><div class="field"><label>Debe devolver realmente</label><input id="dvEq" list="dvEqList" placeholder="Elige o escribe el equipo (p. ej. EERO)" autocomplete="off"><datalist id="dvEqList">' + eq.map(x => '<option value="' + esc(x) + '">').join('') + '</datalist></div>' +
+      '<div class="grid2"><div class="field"><label>Debe devolver realmente</label><select id="dvEq"><option value="">— Elige el equipo —</option>' + eq.map(x => '<option value="' + esc(x) + '">' + esc(x) + '</option>').join('') + '</select></div>' +
       '<div class="field"><label>Cantidad a mover</label><input id="dvCant" type="number" min="1" max="' + o.pendiente + '" value="' + o.pendiente + '"></div></div>' +
       '<div class="field"><label>Motivo</label><textarea id="dvMot" rows="2"></textarea></div>' + devPie('devGuardarCambio()', 'Cambiar'));
   } else if (tipo === 'rev') {
@@ -12564,6 +12564,23 @@ async function bodConsExcel() {
   await xlsxMarca(wb, 'Consumo_por_OT_' + $('bodConsDesde').value + '_' + $('bodConsHasta').value + '.xlsx', 'Consumo de materiales por OT');
 }
 
+/* Exporta a Excel lo que quedó guardado de un archivo importado: una fila por OT y un material por columna */
+async function bodExportarCarga(hora, btn) {
+  const t0 = btn.textContent; btn.disabled = true; btn.textContent = 'Preparando…';
+  try {
+    const r = await api('obtenerCargaConsumoWeb', hora);
+    if (!r.ordenes.length) { toast('Esa importación ya no tiene OT guardadas (las reemplazaron cortes posteriores).', 5000); return; }
+    await cargarLib('xlsx', SEG_URL_XLSX);
+    const d = bodConsColumnas(r.ordenes.map(o => ({ orden: o.orden, fecha: o.fecha, movil: o.movil, contrato: o.contrato, cambio: o.cambio, items: o.items })));
+    const filas = d.filas.map(f => { const x = { 'Fecha cierre': f.o.fecha, 'N Orden': f.o.orden, 'Móvil': 'M' + f.o.movil, Contrato: f.o.contrato || '' }; d.mats.forEach(m => { x[m.material] = f.q[m.clave] || ''; }); x['Cambio en el último corte'] = f.o.cambio || ''; return x; });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(filas), 'Consumo');
+    await xlsxMarca(wb, 'Consumo_' + String(r.archivo || 'importacion').replace(/\.[^.]+$/, '').replace(/[\\/:*?"<>|]+/g, '-') + '.xlsx', 'Consumo de materiales por OT · ' + (r.archivo || ''));
+    toast(r.ordenes.length + ' OT exportadas' + (r.total && r.total !== r.ordenes.length ? ' (el archivo traía ' + r.total + '; las demás las reemplazó o repitió otro corte)' : '') + '.', 6000);
+  } catch (e) { mostrarError(e, 'No se pudo exportar el archivo.'); }
+  finally { btn.disabled = false; btn.textContent = t0; }
+}
+
 async function bodEliminarCarga(hora) {
   const c = (bodDatos.cargas || []).find(x => x.hora === hora);
   if (!c) return;
@@ -12602,9 +12619,9 @@ function renderBodCons() {
 
   const c = bodDatos.cargas;
   $('bodTablaCargas').innerHTML = !c.length ? '<div class="empty">Aún no se ha importado ningún reporte de materiales.</div>' :
-    '<table class="table" style="min-width:700px"><thead><tr><th>Cargado</th><th class="left">Archivo</th><th>OT en el archivo</th><th>Nuevas</th><th>Sin cambios</th><th>Con cambios</th><th>Fechas de cierre</th><th>Sin móvil</th><th>Usuario</th>' + (esAdmin() ? '<th></th>' : '') + '</tr></thead><tbody>' +
+    '<table class="table" style="min-width:700px"><thead><tr><th>Cargado</th><th class="left">Archivo</th><th>OT en el archivo</th><th>Nuevas</th><th>Sin cambios</th><th>Con cambios</th><th>Fechas de cierre</th><th>Sin móvil</th><th>Usuario</th><th></th></tr></thead><tbody>' +
     c.map(x => '<tr><td>' + esc(x.hora) + '</td><td class="left">' + esc(x.archivo) + '</td><td>' + x.ot + '</td><td>' + (x.nuevas == null ? '—' : x.nuevas) + '</td><td>' + (x.nuevas == null ? '—' : x.sinCambios) + '</td><td>' + (x.cambiadas ? '<details><summary style="cursor:pointer"><b style="color:#b8860b">🔄 ' + x.cambiadas + '</b></summary><div style="text-align:left;font-size:12px;max-width:380px">' + x.cambios.map(c => '<div><b>' + esc(c.orden) + '</b> (M' + esc(c.movil) + '): ' + esc((c.detalle || []).join(' · ')) + '</div>').join('') + '</div></details>' : (x.nuevas == null ? '—' : 0)) + '</td><td>' + esc(x.fechas) + '</td><td>' + x.sinMovil + '</td><td>' + esc(x.usuario) + '</td>' +
-      (esAdmin() ? '<td><button class="btn secondary" onclick="bodEliminarCarga(\'' + escJs(x.hora) + '\')">🗑 Eliminar</button></td>' : '') + '</tr>').join('') + '</tbody></table>';
+      '<td style="white-space:nowrap"><button class="btn secondary" title="Exporta a Excel las OT de este archivo tal como están guardadas" onclick="bodExportarCarga(\'' + escJs(x.hora) + '\',this)">⬇ Excel</button>' + (esAdmin() ? ' <button class="btn secondary" onclick="bodEliminarCarga(\'' + escJs(x.hora) + '\')">🗑 Eliminar</button>' : '') + '</td></tr>').join('') + '</tbody></table>';
   bodVistaCons();
 }
 
@@ -15889,6 +15906,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 151 · 22-oct 21:33</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 154 · 26-oct 09:59</div>
 </body>
 </html>
