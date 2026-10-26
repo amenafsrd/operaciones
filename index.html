@@ -8680,7 +8680,7 @@ async function xlsxMarcaBuf(wb, titulo) {
   const hojas = wb.SheetNames.map(n => {
     const ws = wb.Sheets[n]; let A = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: true });
     while (A.length && A[A.length - 1].every(v => v === '' || v == null)) A.pop();
-    return { n: n, A: A, cols: ws['!cols'] || [] };
+    return { n: n, A: A, cols: ws['!cols'] || [], ent: !!ws['!ent'] };
   });
   hojas.forEach((H, hi) => {
     const A = H.A, ancho = A.reduce((m, f) => Math.max(m, f.length), 1);
@@ -8698,7 +8698,7 @@ async function xlsxMarcaBuf(wb, titulo) {
         const v = f[c]; const ref = xmCol(c) + r;
         if (i < enc) { cells += tx(r, c, v, 10); continue; }
         if (i === enc) { cells += '<c r="' + ref + '" s="1" t="inlineStr"><is><t xml:space="preserve">' + xmEsc(v) + '</t></is></c>'; continue; }
-        if (typeof v === 'number' && isFinite(v)) { const mon = XM_MONEDA.test(String(A[enc][c] || '')); cells += '<c r="' + ref + '" s="' + (esTot ? 9 : (mon ? 6 : 7)) + '"><v>' + v + '</v></c>'; }
+        if (typeof v === 'number' && isFinite(v)) { const mon = !H.ent && XM_MONEDA.test(String(A[enc][c] || '')); cells += '<c r="' + ref + '" s="' + (esTot ? (H.ent ? 8 : 9) : (mon ? 6 : 7)) + '"><v>' + v + '</v></c>'; }
         else if (v instanceof Date) cells += '<c r="' + ref + '" s="5" t="inlineStr"><is><t>' + xmEsc(v.toLocaleDateString('es-CR')) + '</t></is></c>';
         else cells += (v === '' || v == null) ? '<c r="' + ref + '" s="' + (esTot ? 8 : 5) + '"/>' : '<c r="' + ref + '" s="' + (esTot ? 8 : 5) + '" t="inlineStr"><is><t xml:space="preserve">' + xmEsc(v) + '</t></is></c>';
       }
@@ -10860,14 +10860,8 @@ async function devAccion(tipo, i) {
       '<div class="field"><label>Cantidad a justificar</label><input id="dvCant" type="number" min="1" max="' + o.pendiente + '" value="' + o.pendiente + '"></div>' +
       '<div class="field"><label>Motivo</label><textarea id="dvMot" rows="3" placeholder="Ej. el cliente conservó el equipo, equipo dañado por el cliente…"></textarea></div>' + devPie('devGuardarJust()', 'Justificar'));
   } else if (tipo === 'cambio') {
-    /* Opciones fijas en un desplegable (sin escribir, para no crear nombres distintos del mismo equipo): lo que trae el Excel + los equipos del catálogo + EERO */
-    const set = new Set(devDatos.lineas.map(x => x.equipo));
-    ((typeof bodDatos !== 'undefined' && bodDatos && bodDatos.materiales) || []).filter(m => m.categoria === 'Equipos' && m.activo !== false).forEach(m => {
-      const nombres = String(m.alias || '').split(';').map(t => t.trim()).filter(Boolean);
-      (nombres.length ? nombres : [m.material]).forEach(t => set.add(t.slice(0, 40)));
-    });
-    if (!Array.from(set).some(t => /eero/i.test(t))) set.add('EERO');
-    const eq = Array.from(set).filter(x => x && x !== o.equipo).sort((x, y) => x.localeCompare(y, 'es'));
+    /* Opciones: solo los equipos que traen los Excel cargados (los mismos del filtro «Todos los equipos»), en desplegable y sin escribir */
+    const eq = Array.from(new Set(devDatos.lineas.map(x => x.equipo))).filter(x => x && x !== o.equipo).sort((x, y) => x.localeCompare(y, 'es'));
     devModal('<h3>🔄 Cambiar tipo de equipo</h3>' + devCab(o) +
       '<div style="font-size:12px;color:#777;margin-bottom:8px">Si el equipo a devolver correspondía a otro, mueve la cantidad pendiente a ese equipo.</div>' +
       '<div class="grid2"><div class="field"><label>Debe devolver realmente</label><select id="dvEq"><option value="">— Elige el equipo —</option>' + eq.map(x => '<option value="' + esc(x) + '">' + esc(x) + '</option>').join('') + '</select></div>' +
@@ -10972,7 +10966,8 @@ function devLibro(L) {
   const rq = [['Equipo', 'Debe', 'Devuelto', 'Justificado', 'Pendiente', 'Total']].concat(claves.map(k => [pe[k].eq, pe[k].debe, pe[k].dev, pe[k].jus, pe[k].pen, pe[k].debe - pe[k].jus]));
   const suma = i => claves.reduce((a, k) => a + [0, pe[k].debe, pe[k].dev, pe[k].jus, pe[k].pen, pe[k].debe - pe[k].jus][i], 0);
   rq.push(['TOTAL', suma(1), suma(2), suma(3), suma(4), suma(5)]);
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rq), 'Resumen por equipo');
+  const wsq = XLSX.utils.aoa_to_sheet(rq); wsq['!ent'] = true;   /* cantidades enteras, no moneda (aunque la columna se llame «Total») */
+  XLSX.utils.book_append_sheet(wb, wsq, 'Resumen por equipo');
   return wb;
 }
 function devLineasExport() {
@@ -15910,6 +15905,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 155 · 26-oct 10:05</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 157 · 26-oct 10:24</div>
 </body>
 </html>
