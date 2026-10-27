@@ -1138,6 +1138,7 @@
             <div class="field" style="min-width:170px"><label>Tipo</label><select id="abTipo" onchange="renderAbastecimiento()">
               <option value="">Todos</option><option value="ENTREGA">Entrega desde bodega</option><option value="TRASLADO">Traslado entre móviles</option>
               <option value="DEV_MOVIL">Devolución a bodega</option><option value="AJ_MOVIL">Ajuste de móvil</option></select></div>
+            <div class="field" style="min-width:150px"><label>Vista</label><select id="abVista" onchange="renderAbastecimiento()"><option value="lista">Lista de movimientos</option><option value="matriz">▦ Matriz de material</option></select></div>
             <button class="btn secondary" onclick="cargarAbastecimiento()">↻ Actualizar</button>
             <button class="btn secondary" onclick="abVerTodo()">📅 Ver todo el historial</button>
           </div>
@@ -11941,6 +11942,7 @@ function renderAbastecimiento() {
   const cNum = x => { const m = String(x.consecutivo || '').match(/(\d+)\s*$/); return m ? Number(m[1]) : -1; };
   l = l.slice().sort((a, b) => { const A = cNum(a), B = cNum(b); return A === B ? ((a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0) || (String(a.creado) < String(b.creado) ? 1 : -1)) : (A < B ? 1 : -1); });
   abLista = l;
+  if ($('abVista').value === 'matriz') { abMatriz(l); abBarra(); return; }
   const todosM = l.every(x => abSel.has(x.grupo));
   $('abTabla').innerHTML = '<table class="table" style="min-width:880px"><thead><tr><th style="width:34px"><input type="checkbox" title="Marcar / desmarcar todos los que se ven" ' + (todosM ? 'checked' : '') + ' onchange="abMarcarTodos(this.checked)"></th><th>Consecutivo</th><th>Fecha</th><th class="left">Tipo</th><th>De → A</th><th class="left">Documento</th><th>Materiales</th><th class="left">Recibido</th><th>Registró</th>' +
     (adm ? '<th></th>' : '') + '</tr></thead><tbody>' +
@@ -11953,6 +11955,31 @@ function renderAbastecimiento() {
 }
 
 let abLista = [];
+
+/* Matriz de material de los movimientos del filtro: filas = material, columnas = móvil. Entrega suma, devolución resta, préstamo resta a quien presta y suma a quien recibe. */
+function abMatriz(l) {
+  const movs = {}, cant = {}, tot = {}, nom = {};
+  (bodDatos && bodDatos.moviles || []).forEach(m => { nom[m.idMovil] = m.movil; });
+  const sumar = (id, nm, c, q) => { if (!id) return; movs[id] = nm || nom[id] || id; const k = cant[c] = cant[c] || {}; k[id] = (k[id] || 0) + q; tot[c] = (tot[c] || 0) + q; };
+  l.forEach(x => x.lineas.forEach(y => {
+    const q = Number(y.cantidad) || 0;
+    if (x.tipo === 'ENTREGA' || x.tipo === 'AJ_MOVIL') sumar(x.idMovil, x.movil, y.clave, q);
+    else if (x.tipo === 'DEV_MOVIL') sumar(x.idMovil, x.movil, y.clave, -q);
+    else if (x.tipo === 'TRASLADO') { sumar(x.idMovil, x.movil, y.clave, -q); sumar(x.idMovilDestino, x.movilDestino, y.clave, q); }
+  }));
+  const cols = Object.keys(movs).sort((a, b) => (Number(movs[a]) || 0) - (Number(movs[b]) || 0));
+  const lista = (abDatos.materiales || (bodDatos && bodDatos.materiales) || []);
+  const info = {}; lista.forEach(m => { info[m.clave] = m; });
+  const claves = Object.keys(tot).sort((a, b) => String((info[a] || {}).material || a).localeCompare(String((info[b] || {}).material || b), 'es'));
+  const f = q => q ? '<span style="' + (q < 0 ? 'color:#b71c1c' : '') + '">' + fmtN(q) + '</span>' : '<span class="segSinCarga">—</span>';
+  const tc = {}; cols.forEach(c => { tc[c] = claves.reduce((a, k) => a + ((cant[k] || {})[c] ? 1 : 0), 0); });
+  $('abTabla').innerHTML = '<div style="font-size:12px;color:#777;padding:4px 2px 8px">Material de los <b>' + l.length + '</b> movimiento' + (l.length === 1 ? '' : 's') + ' del filtro, por móvil. Las entregas y ajustes suman; las devoluciones a bodega restan (rojo); en un préstamo resta quien presta y suma quien recibe.</div>' +
+    (!claves.length ? '<div class="empty">No hay material para mostrar.</div>' :
+    '<table class="table" style="font-size:12.5px;min-width:' + (380 + cols.length * 80) + 'px"><thead><tr><th>Código</th><th class="left">Material</th><th>Und.</th>' + cols.map(c => '<th>M' + esc(movs[c]) + '</th>').join('') + '<th>Total</th></tr></thead><tbody>' +
+    claves.map(k => { const m = info[k] || {}; const nm = m.material || ((l.find(x => x.lineas.some(y => y.clave === k)) || { lineas: [] }).lineas.find(y => y.clave === k) || {}).material || k;
+      return '<tr><td>' + esc(codP(m.codigo)) + '</td><td class="left"><b>' + esc(nm) + '</b></td><td>' + esc(m.unidad || '') + '</td>' + cols.map(c => '<td>' + f((cant[k] || {})[c]) + '</td>').join('') + '<td><b>' + f(tot[k]) + '</b></td></tr>'; }).join('') +
+    '<tr style="background:#f4f6fa"><td></td><td class="left"><b>Líneas de material</b></td><td></td>' + cols.map(c => '<td><b>' + tc[c] + '</b></td>').join('') + '<td><b>' + claves.length + '</b></td></tr></tbody></table>');
+}
 
 /* Movimientos marcados para exportar (se conservan al filtrar o actualizar) */
 const abSel = new Set();
@@ -16043,6 +16070,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 161 · 27-oct 13:40</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 162 · 27-oct 13:48</div>
 </body>
 </html>
