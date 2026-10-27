@@ -1289,6 +1289,7 @@
               <div style="display:flex;gap:8px;flex-wrap:nowrap;flex:none">
                 <button class="btn primary" id="devBtnImp" style="white-space:nowrap" onclick="$('devArchivo').click()">📥 Cargar Excel</button>
                 <button class="btn" style="white-space:nowrap" onclick="devExportarModal()">📊 Exportar</button>
+                <button class="btn" style="white-space:nowrap" onclick="devBoletas()">📄 Boletas registradas</button>
               </div>
             </div>
             <input type="file" id="devArchivo" accept=".xlsx,.xls" style="display:none" onchange="devImportar(this)">
@@ -10611,6 +10612,27 @@ function devColor(e) {
 function devModal(html) { $('devModal').innerHTML = html; $('devModalBg').classList.add('show'); }
 function devCerrar() { $('devModalBg').classList.remove('show'); }
 
+/* Boletas registradas: revisar y anular las que se aplicaron por error (los equipos vuelven a pendiente) */
+async function devBoletas() {
+  devModal('<h3>📄 Boletas registradas</h3><div class="loading">Cargando...</div>');
+  let L;
+  try { L = await api('obtenerBoletasDevolucionWeb'); } catch (e) { devCerrar(); mostrarError(e, 'No se pudieron cargar las boletas.'); return; }
+  window._devBol = L;
+  const adm = esAdmin();
+  devModal('<h3>📄 Boletas registradas</h3><div style="font-size:12px;color:#777;margin-bottom:8px">' + (adm ? 'Si una boleta se aplicó por error, <b>anúlala</b>: los equipos vuelven a «pendiente» y puedes registrarla de nuevo con las cantidades correctas.' : 'Solo un administrador puede anular boletas.') + '</div>' +
+    (!L.length ? '<div class="empty">Aún no hay boletas registradas.</div>' :
+      '<div style="max-height:60vh;overflow:auto"><table class="table" style="min-width:0;font-size:12.5px"><thead><tr><th>Fecha</th><th class="left">Boleta</th><th class="left">Móviles</th><th class="left">Equipos</th><th>Registró</th><th></th></tr></thead><tbody>' +
+      L.map((b, i) => '<tr><td style="white-space:nowrap">' + esc(fmtFechaSeg(b.fecha)) + '</td><td class="left"><b>' + esc(b.boleta || '(sin boleta)') + '</b></td><td class="left">' + esc(b.moviles.length > 6 ? b.moviles.length + ' móviles' : b.moviles.join(', ')) + '</td><td class="left">' +
+        Object.keys(b.equipos).map(e => esc(e) + ' <b>×' + fmtN(b.equipos[e]) + '</b>').join('<br>') + '</td><td>' + esc(b.usuario) + '</td><td>' + (adm ? '<button class="btn secondary" onclick="devAnularBoleta(' + i + ')">↩ Anular</button>' : '') + '</td></tr>').join('') + '</tbody></table></div>') +
+    '<div class="modalActions"><button class="btn" onclick="devCerrar()">Cerrar</button></div>');
+}
+async function devAnularBoleta(i) {
+  const b = (window._devBol || [])[i]; if (!b) return;
+  if (!confirm('¿Anular ' + (b.boleta ? 'la boleta ' + b.boleta : 'esta entrega') + '?\n\n' + fmtN(b.unidades) + ' equipo(s) vuelven a quedar como pendientes. Las justificaciones no se tocan.')) return;
+  try { const r = await api('anularBoletaDevolucionWeb', b.clave); toast('Boleta anulada: ' + fmtN(r.unidades) + ' equipo(s) volvieron a pendiente.', 5000); await cargarDevoluciones(); devBoletas(); }
+  catch (e) { mostrarError(e, 'No se pudo anular la boleta.'); }
+}
+
 async function cargarDevoluciones() {
   try { devDatos = await api('obtenerDevolucionesWeb'); }
   catch (e) { mostrarError(e, 'No se pudieron cargar las devoluciones.'); return; }
@@ -16021,6 +16043,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 160 · 26-oct 13:36</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 161 · 27-oct 13:40</div>
 </body>
 </html>
