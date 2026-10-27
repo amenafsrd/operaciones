@@ -6864,13 +6864,9 @@ function guardarMovimientoInvWeb(token, d) {
     if (esDestMovil || esDevDest) claves.forEach(c => { if (porClave[c].categoria !== 'De corte') throw new Error(porClave[c].material + ': la devolución de destajo solo aplica a material de corte (cable, fibra).'); });
     Object.keys(danDe).forEach(c => { if (danDe[c] > suma[c] + 1e-9) throw new Error(porClave[c].material + ': los dañados (' + danDe[c] + ') no pueden ser más que lo devuelto (' + suma[c] + ').'); });
 
-    /* Devolución de equipos dañados al proveedor: solo se puede devolver lo que está registrado como dañado y pendiente */
+    /* Devolución de equipos dañados al proveedor: el módulo de dañados es solo un mapa. Se puede devolver más o menos de lo registrado
+       como dañado; el pendiente nunca baja de cero y no se bloquea nada. */
     const esDevDan = tipo === 'DEV_PROV' && txt_(d.concepto) === 'Devolución de equipos dañados';
-    if (esDevDan) {
-      const pend = invDanadosMapa_('dan'), propios = {};
-      if (editando) leerObjetos_(invHoja_('DAN')).forEach(r => { if (txt_(r.Origen) === editando && txt_(r.Tipo) === 'BAJA') propios[txt_(r.Clave)] = (propios[txt_(r.Clave)] || 0) + invNum_(r.Cantidad); });
-      claves.forEach(c => { const max = invRedondear_((pend[c] || 0) + (propios[c] || 0)); if (suma[c] > max + 1e-9) throw new Error(porClave[c].material + ': solo hay ' + max + ' dañado(s) pendiente(s) de devolver.'); });
-    }
 
     /* Devolución de destajo al proveedor: lo que supera el sobrante ya registrado se toma del cable que ya estaba en la bodega (se registra como sobrante y sale en el mismo documento) */
     const exceso = {};

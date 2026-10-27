@@ -12498,7 +12498,7 @@ function mvActualizarSentido() {
   if (!MV_CONC[mvTipo]) { el.textContent = ''; return; }
   const cv = $('mvConcepto').value, resta = cv === 'Devolución a proveedor' || cv === 'Devolución de equipos dañados' || cv === CONC_DEST_PROV;
   mvRefrescarLista();
-  el.innerHTML = cv === CONC_DEST_PROV ? '<span style="color:#b71c1c">⬆ Resta de la bodega (sale hacia el proveedor) y pasa a «Devuelto al proveedor» como sobrante de destajo.</span> <span style="color:#666">Solo material de corte. Si la boleta trae más que el sobrante registrado desde las móviles, el resto se toma del cable que ya está en la bodega.</span>' : cv === 'Devolución de equipos dañados' ? '<span style="color:#b71c1c">⬆ Resta de la bodega (sale hacia el proveedor) y pasan a «Devuelto al proveedor» en Equipos dañados.</span> <span style="color:#666">Quita las líneas que no devuelves o baja la cantidad; el máximo es lo que está pendiente de cada material.</span>' : resta ? '<span style="color:#b71c1c">⬆ Resta de la bodega (sale hacia el proveedor)</span>' : '<span style="color:#2e7d32">⬇ Suma a la bodega</span>';
+  el.innerHTML = cv === CONC_DEST_PROV ? '<span style="color:#b71c1c">⬆ Resta de la bodega (sale hacia el proveedor) y pasa a «Devuelto al proveedor» como sobrante de destajo.</span> <span style="color:#666">Solo material de corte. Si la boleta trae más que el sobrante registrado desde las móviles, el resto se toma del cable que ya está en la bodega.</span>' : cv === 'Devolución de equipos dañados' ? '<span style="color:#b71c1c">⬆ Resta de la bodega (sale hacia el proveedor) y pasan a «Devuelto al proveedor» en Equipos dañados.</span> <span style="color:#666">Pon las cantidades que realmente devuelves: pueden ser más o menos de lo registrado como dañado, el módulo de dañados solo es un mapa y no limita la devolución.</span>' : resta ? '<span style="color:#b71c1c">⬆ Resta de la bodega (sale hacia el proveedor)</span>' : '<span style="color:#2e7d32">⬇ Suma a la bodega</span>';
 }
 
 function cerrarMov() { $('modalMov').classList.remove('show'); }
@@ -16071,6 +16071,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 163 · 27-oct 14:26</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 164 · 27-oct 14:32</div>
 </body>
 </html>
