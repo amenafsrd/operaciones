@@ -6364,33 +6364,48 @@ function registrarDanadoInvWeb(token, d) {
     return { ok: true, lineas: claves.length };
   });
 }
-/* Corrige la cantidad (y la categoría o el detalle) de un registro de dañados */
+/* Corrige la cantidad (y la categoría o el detalle) de un registro de dañados o de una devolución al proveedor. Solo el administrador.
+   No se bloquea aunque ya se haya devuelto: la devolución al proveedor también se puede corregir (y con ella el documento de bodega). */
 function editarDanadoInvWeb(token, id, cantidad, categoria, motivo) {
-  const ses = requerirSesion_(token, 'operador');
+  const ses = requerirSesion_(token, 'admin');
   const q = invRedondear_(invNum_(cantidad));
   if (!(q > 0)) throw new Error('La cantidad debe ser mayor que cero.');
   categoria = txt_(categoria);
-  if (INV.CAT_DANO.indexOf(categoria) < 0 && categoria !== INV.CAT_DESTAJO) throw new Error('Elige la categoría del daño.');
   return conBloqueo_(() => {
     const sh = invHoja_('DAN'), t = leerTabla_(sh);
     for (let i = 1; i < t.values.length; i++) {
       const r = t.values[i];
       if (txt_(r[t.idx.ID]) !== txt_(id)) continue;
-      if (txt_(r[t.idx.Tipo]) !== 'DANADO') throw new Error('Solo se pueden corregir los registros de equipos dañados.');
+      const tipoR = txt_(r[t.idx.Tipo]);
+      if (tipoR !== 'DANADO' && tipoR !== 'BAJA') throw new Error('Solo se pueden corregir los registros de equipos dañados y de devoluciones al proveedor.');
       const c = txt_(r[t.idx.Clave]), antes = invNum_(r[t.idx.Cantidad]), dif = invRedondear_(q - antes);
-      const esDestRow = txt_(r[t.idx.Categoria]) === INV.CAT_DESTAJO;
-      if (esDestRow !== (categoria === INV.CAT_DESTAJO)) throw new Error('No se puede cambiar un registro entre «dañado» y «sobrante de destajo».');
-      const pend = invDanadosMapa_(esDestRow ? 'dest' : 'dan')[c] || 0;
-      if (dif < 0 && pend + dif < -1e-9) throw new Error('No se puede bajar a ' + q + ': ya se devolvieron al proveedor ' + invRedondear_(-(pend + dif)) + ' de estos equipos.');
-      if (dif > 0) {
-        const sal = invSaldos_(leerObjetos_(invHoja_('MOV')), []);
-        const libres = ((sal.bodega[c] || {}).disponible || 0) - (invDanadosMapa_()[c] || 0);
-        if (dif > libres + 1e-9) throw new Error('Solo hay ' + invRedondear_(Math.max(0, libres)) + ' disponible(s) más en bodega para marcar como dañado(s).');
+      if (tipoR === 'DANADO') {
+        if (INV.CAT_DANO.indexOf(categoria) < 0 && categoria !== INV.CAT_DESTAJO) throw new Error('Elige la categoría del daño.');
+        const esDestRow = txt_(r[t.idx.Categoria]) === INV.CAT_DESTAJO;
+        if (esDestRow !== (categoria === INV.CAT_DESTAJO)) throw new Error('No se puede cambiar un registro entre «dañado» y «sobrante de destajo».');
+        if (dif > 0) {
+          const sal = invSaldos_(leerObjetos_(invHoja_('MOV')), []);
+          const libres = ((sal.bodega[c] || {}).disponible || 0) - (invDanadosMapa_()[c] || 0);
+          if (dif > libres + 1e-9) throw new Error('Solo hay ' + invRedondear_(Math.max(0, libres)) + ' disponible(s) más en bodega para marcar como dañado(s).');
+        }
+        sh.getRange(i + 1, t.idx.Categoria + 1).setValue(categoria);
+      } else {
+        /* Devolución al proveedor: el documento «Devolución a proveedor» de la bodega debe quedar con la misma cantidad */
+        const grupo = txt_(r[t.idx.Origen]);
+        if (grupo) {
+          const shM = invHoja_('MOV'), tm = leerTabla_(shM);
+          for (let k = 1; k < tm.values.length; k++) {
+            const rm = tm.values[k];
+            if (txt_(rm[tm.idx.Grupo]) === grupo && txt_(rm[tm.idx.Clave]) === c && txt_(rm[tm.idx.Tipo]) === 'DEV_PROV') {
+              shM.getRange(k + 1, tm.idx.Cantidad + 1).setValue(q);
+              if (tm.idx.Editado !== undefined) shM.getRange(k + 1, tm.idx.Editado + 1).setValue(ses.usuario + ' · ' + segAhora_());
+            }
+          }
+        }
       }
       sh.getRange(i + 1, t.idx.Cantidad + 1).setValue(q);
-      sh.getRange(i + 1, t.idx.Categoria + 1).setValue(categoria);
       sh.getRange(i + 1, t.idx.Motivo + 1).setValue(txt_(motivo).replace(/\s+/g, ' ').slice(0, 200));
-      invLog_(ses, 'Registro de equipos dañados corregido', txt_(r[t.idx.Material]) + ': ' + antes + ' → ' + q, 'DAN');
+      invLog_(ses, tipoR === 'BAJA' ? 'Devolución al proveedor corregida' : 'Registro de equipos dañados corregido', txt_(r[t.idx.Material]) + ': ' + antes + ' → ' + q, 'DAN');
       return { ok: true };
     }
     throw new Error('No se encontró el registro.');

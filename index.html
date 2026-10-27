@@ -11127,7 +11127,7 @@ function renderDanados() {
   $('danTabla').innerHTML = pend + '<div style="font-weight:700;margin:4px 0">Registro (' + L.length + ')</div>' + (L.length ? '<table class="table" style="font-size:12.5px;min-width:900px"><thead><tr><th>Fecha</th><th class="left">Material</th><th>Cant.</th><th class="left">Movimiento</th><th class="left">Origen / quién</th><th class="left">Categoría</th><th class="left">Detalle</th><th class="left">Documento</th><th class="left">Registró</th><th></th></tr></thead><tbody>' +
     L.map(h => '<tr><td>' + esc(fmtFechaSeg ? fmtFechaSeg(h.fecha) : h.fecha) + '</td><td class="left"><b>' + esc(h.material) + '</b></td><td><b>' + fmtN(h.cantidad) + '</b></td><td class="left">' + (h.tipo === 'DANADO' && h.categoria === (danDatos.catDestajo || 'Sobrante de destajo') ? '✂️ Sobrante de destajo' : (DAN_TIPO[h.tipo] || esc(h.tipo))) + '</td>' +
       '<td class="left">' + (h.tipo !== 'DANADO' ? '—' : h.fuente === 'MOVIL' ? '🚐 Móvil <b>M' + esc(h.movil) + '</b>' : '🏭 Bodega') + '</td><td class="left">' + esc(h.categoria || '—') + '</td><td class="left">' + esc(h.motivo) + '</td><td class="left">' + (h.documento ? '<b>' + esc(h.documento) + '</b>' : '—') + '</td><td class="left">' + esc(h.usuario) + '</td>' +
-      '<td style="white-space:nowrap">' + (puedeEditar() && h.tipo === 'DANADO' ? '<button class="btnMini" title="Corregir cantidad, categoría o detalle" onclick="danEditar(\'' + escJs(h.id) + '\')">✏️</button> ' : '') + (adm && !h.origen ? '<button class="btnMini" title="Eliminar este registro" onclick="danEliminar(\'' + escJs(h.id) + '\')">✕</button>' : '') + '</td></tr>').join('') + '</tbody></table>' : '<div class="loading">No hay registros con ese filtro.</div>');
+      '<td style="white-space:nowrap">' + (adm && (h.tipo === 'DANADO' || h.tipo === 'BAJA') ? '<button class="btnMini" title="Corregir cantidad, categoría o detalle" onclick="danEditar(\'' + escJs(h.id) + '\')">✏️</button> ' : '') + (adm && !h.origen ? '<button class="btnMini" title="Eliminar este registro" onclick="danEliminar(\'' + escJs(h.id) + '\')">✕</button>' : '') + '</td></tr>').join('') + '</tbody></table>' : '<div class="loading">No hay registros con ese filtro.</div>');
 }
 function danForm() {
   devModal('<h3>🛠️ Registrar equipos dañados que están en bodega</h3>' +
@@ -11161,9 +11161,10 @@ async function danGuardar() {
 }
 function danEditar(id) {
   const h = (danDatos.historial || []).find(x => x.id === id); if (!h) return;
-  devModal('<h3>✏️ Corregir registro de dañados</h3><div style="font-size:13px;margin-bottom:8px"><b>' + esc(h.material) + '</b> · ' + esc(fmtFechaSeg(h.fecha)) + (h.fuente === 'MOVIL' ? ' · móvil M' + esc(h.movil) + ' (' + esc(h.documento) + ')' : '') + '</div>' +
-    '<div style="display:grid;grid-template-columns:130px 1fr;gap:8px;margin-bottom:8px"><label>Cantidad<input id="deCant" type="number" min="0" step="any" value="' + h.cantidad + '"></label><label>Categoría del daño<select id="deCat">' + (h.categoria === (danDatos.catDestajo || 'Sobrante de destajo') ? [h.categoria] : (danDatos.categorias || DAN_CATS)).map(c => '<option' + (c === h.categoria ? ' selected' : '') + '>' + esc(c) + '</option>').join('') + '</select></label></div>' +
+  devModal('<h3>✏️ Corregir ' + (h.tipo === 'BAJA' ? 'devolución al proveedor' : 'registro de dañados') + '</h3><div style="font-size:13px;margin-bottom:8px"><b>' + esc(h.material) + '</b> · ' + esc(fmtFechaSeg(h.fecha)) + (h.fuente === 'MOVIL' ? ' · móvil M' + esc(h.movil) + ' (' + esc(h.documento) + ')' : '') + '</div>' +
+    '<div style="display:grid;grid-template-columns:130px 1fr;gap:8px;margin-bottom:8px"><label>Cantidad<input id="deCant" type="number" min="0" step="any" value="' + h.cantidad + '"></label><label' + (h.tipo === 'BAJA' ? ' style="display:none"' : '') + '>Categoría del daño<select id="deCat">' + (h.categoria === (danDatos.catDestajo || 'Sobrante de destajo') ? [h.categoria] : (danDatos.categorias || DAN_CATS)).map(c => '<option' + (c === h.categoria ? ' selected' : '') + '>' + esc(c) + '</option>').join('') + '</select></label></div>' +
     '<label style="display:block">Detalle<input id="deMot" maxlength="200" value="' + esc(h.motivo) + '" autocomplete="off"></label>' +
+    (h.tipo === 'BAJA' ? '<div style="font-size:12px;color:#9b6a00;margin-top:6px">Se corrige también la cantidad del documento de devolución a proveedor' + (h.documento ? ' (' + esc(h.documento) + ')' : '') + ' en la bodega principal. Solo administrador.</div>' : '') +
     (h.origen ? '<div style="font-size:12px;color:#9b6a00;margin-top:6px">Este registro nació de una devolución de móvil. Si luego editas ese documento, se vuelve a calcular con lo que digas allá.</div>' : '') +
     '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn primary" onclick="danEditarOk(\'' + escJs(id) + '\')">Guardar</button><button class="btn secondary" onclick="devCerrar()">Cancelar</button></div>');
 }
@@ -16070,6 +16071,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 162 · 27-oct 13:48</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 163 · 27-oct 14:26</div>
 </body>
 </html>
