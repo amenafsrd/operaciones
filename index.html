@@ -659,6 +659,15 @@
 .calOpc{display:flex;flex-direction:column;gap:6px;padding-bottom:4px}
 .calBtns{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;margin-left:auto}
 .calBtns .btn{white-space:nowrap}
+.calMenu>summary.btn{height:44px;box-sizing:border-box;padding:0 16px;font-weight:600;color:#334;background:#fff;border:1px solid #cfd6df;box-shadow:none}
+.calMenu>summary.btn:hover{background:#f3f5f8}
+.calMenu .pmDDm{padding:6px;gap:2px;min-width:210px}
+.calMenu .pmDDm .btn{border:0;background:transparent;box-shadow:none;color:#223;font-weight:500;padding:9px 12px;border-radius:6px;width:100%}
+.calMenu .pmDDm .btn:hover{background:#f1f3f7}
+.calMenu .pmDDm .chkInline{padding:8px 10px;border-radius:6px;cursor:pointer;font-size:13.5px;color:#223}
+.calMenu .pmDDm .chkInline:hover{background:#f1f3f7}
+#calPanelHis .panelHead{padding:10px 14px}
+#calPanelHis .panelHead h2{font-size:15px;font-weight:600;color:#334}
 
 .pmDD{position:relative;display:inline-block}
 .pmDD>summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;white-space:nowrap}
@@ -791,10 +800,12 @@
             <div id="calSemPanel" class="calSemPanel" style="display:none"></div>
           </div>
           <div class="calOpc">
-          <label class="chkInline">
-            <input type="checkbox" id="calVacantes" checked onchange="renderizarCalendario()"> Mostrar móviles sin técnico
-          </label>
-          <label class="chkInline"><input type="checkbox" id="calFCambios" onchange="renderizarCalendario()"> Solo con cambios sin guardar</label>
+            <details class="pmDD calMenu" ontoggle="pmDDt(this)"><summary class="btn secondary">Mostrar ▾</summary>
+              <div class="pmDDm">
+                <label class="chkInline"><input type="checkbox" id="calVacantes" checked onchange="renderizarCalendario()"> Móviles sin técnico</label>
+                <label class="chkInline"><input type="checkbox" id="calFCambios" onchange="renderizarCalendario()"> Solo con cambios sin guardar</label>
+              </div>
+            </details>
           </div>
           <div style="display:none">
           <div class="field" style="min-width:200px"><label>Buscar</label><input id="calBuscar" oninput="renderizarCalendario()" placeholder="Móvil, técnico, zona o contrata"></div>
@@ -804,10 +815,14 @@
           </div>
           <span style="flex:1 1 20px"></span>
           <div class="calBtns">
-          <button id="btnActivarTodas" class="btn secondary" title="Pone «Activa» en todas las casillas vacías de las móviles con técnico (no toca las que ya tienen estado)" onclick="activarTodas()">✅ Activar todas</button>
-          <button id="btnDeshacerCal" class="btn secondary" title="Deshace el último cambio (o el último guardado)" onclick="deshacerCalendario()">↩️ Deshacer</button>
-          <button id="btnCerrarCal" class="btn secondary" title="Bloquea la edición de esta semana para evitar cambios por error de manipulación" onclick="cerrarCronograma()">🔒 Bloquear edición</button>
-          <button id="btnExport" class="btn warning" onclick="exportarCalendarioCliente()" style="display:none">📥 Calendario Cliente (Excel)</button>
+            <details class="pmDD calMenu" id="calAccDD" ontoggle="pmDDt(this)"><summary class="btn secondary">Acciones ▾</summary>
+              <div class="pmDDm" data-r="1">
+                <button id="btnActivarTodas" class="btn secondary" title="Pone «Activa» en todas las casillas vacías de las móviles con técnico (no toca las que ya tienen estado)" onclick="activarTodas()">Activar todas</button>
+                <button id="btnDeshacerCal" class="btn secondary" title="Deshace el último cambio (o el último guardado)" onclick="deshacerCalendario()">Deshacer</button>
+                <button id="btnCerrarCal" class="btn secondary" title="Bloquea la edición de esta semana para evitar cambios por error de manipulación" onclick="cerrarCronograma()">Bloquear edición</button>
+                <button id="btnExport" class="btn secondary" onclick="exportarCalendarioCliente()" style="display:none">Calendario Cliente (Excel)</button>
+              </div>
+            </details>
           </div>
         </div>
 
@@ -843,11 +858,11 @@
           </div>
         </div>
         <div class="panel" id="calPanelHis" style="margin-top:12px">
-          <div class="panelHead">
-            <h2>🕘 Historial de modificaciones</h2>
-            <span id="tituloHistorial"></span>
+          <div class="panelHead" style="cursor:pointer" onclick="calHisToggle()" title="Mostrar u ocultar el historial">
+            <h2>Historial de modificaciones</h2>
+            <span><span id="tituloHistorial"></span> <span id="calHisFlecha" style="margin-left:6px;color:#667">▸</span></span>
           </div>
-          <div id="historialContenido">
+          <div id="historialContenido" style="display:none">
             <div class="loading">Cargando historial...</div>
           </div>
         </div>
@@ -3268,7 +3283,7 @@ function renderizarCalendario() {
   $('btnDeshacerCal').style.display = calEditable() ? '' : 'none';
   const cer = calendario.cerrado;
   $('btnCerrarCal').style.display = puedeEditar() ? '' : 'none';
-  $('btnCerrarCal').textContent = cer ? '🔓 Desbloquear edición' : '🔒 Bloquear edición';
+  $('btnCerrarCal').textContent = cer ? 'Desbloquear edición' : 'Bloquear edición';
   $('btnCerrarCal').title = cer ? 'Permite volver a hacer cambios en esta semana' : 'Bloquea la edición de esta semana para evitar cambios por error de manipulación';
   $('calBannerCerrado').style.display = cer ? '' : 'none';
   $('calBannerCerrado').innerHTML = cer ? '<div style="background:#fff3cd;border:1px solid #f0d78a;border-radius:8px;padding:9px 12px;margin:0 0 10px;font-size:13.5px">🔒 <b>Edición bloqueada</b> por ' + esc(cer.nombre || cer.por) + ' el ' + esc(cer.fecha) + '. Para hacer cambios pulsa «Desbloquear edición».</div>' : '';
@@ -7329,6 +7344,14 @@ async function pmGuardarFactura(idCon, v) {
 let pmOF = { q: '', movil: '', serv: '', est: 'todas' }, pmSel = new Set(), pmPag = 0;
 let pmFA = false;
 /* Los menús de Filtros y Más flotan sobre la tabla (position:fixed) para que no los recorte el contenedor */
+function calHisToggle(forzar) {
+  const c = $('historialContenido'); if (!c) return;
+  const abrir = typeof forzar === 'boolean' ? forzar : c.style.display === 'none';
+  c.style.display = abrir ? '' : 'none';
+  $('calHisFlecha').textContent = abrir ? '▾' : '▸';
+  try { localStorage.setItem('srd_cal_his', abrir ? '1' : '0'); } catch (e) { }
+}
+try { document.addEventListener('DOMContentLoaded', () => { if (localStorage.getItem('srd_cal_his') === '1') calHisToggle(true); }); } catch (e) { }
 function pmDDt(d) {
   if (d.querySelector('#pmFm')) pmFA = d.open;
   const m = d.querySelector('.pmDDm'), sm = d.querySelector('summary');
@@ -16071,6 +16094,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 164 · 27-oct 14:32</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 165 · 27-oct 21:03</div>
 </body>
 </html>
