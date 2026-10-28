@@ -1194,6 +1194,7 @@
             <span style="flex:1"></span>
             <button class="btn secondary" onclick="abDestajoMovil()">✂️ Devolución de destajo (cable sobrante)</button>
           </div>
+          <div id="abPend"></div>
           <div class="panel">
             <div class="panelHead"><div><h2>Movimientos de móviles</h2>
               <div style="font-size:12px;color:#777;margin-top:3px">Cada fila es un movimiento (abastecimiento desde bodega, préstamo entre móviles, devolución, ajuste). Haz clic en una fila para ver sus líneas. Un préstamo deja el material registrado entre las dos móviles sin pasar por la bodega.</div></div></div>
@@ -11461,7 +11462,7 @@ function desPrepararFirma(titulo, resumenHtml, nombre, etNombre, etFirma, quienH
     ['pointerup', 'pointercancel', 'pointerleave'].forEach(n => c.addEventListener(n, () => { desDibujo = false; }));
   }
 }
-let desModo = 'entrega';
+let desModo = 'entrega', desDanTec = '';
 function desLineasHtml(L, conCheck) {
   return L.slice().sort((x, y) => (x.linea || 0) - (y.linea || 0)).map((y, i) => {
     const m = desMats.find(z => z.clave === y.clave) || {};
@@ -11494,8 +11495,8 @@ async function desPdf(grupo) {
 }
 async function desConfirmar() {
   const nombre = $('desNombre').value.trim();
-  if (!nombre) { toast(desModo === 'dan' ? 'Escribe el nombre de quien entrega.' : 'Escribe el nombre de quien recibe.'); return; }
-  if (desTrazos < 5) { toast(desModo === 'dan' ? 'Falta la firma de quien entrega.' : 'Falta la firma de quien recibe.'); return; }
+  if (!nombre) { toast('Escribe el nombre de quien recibe.'); return; }
+  if (desTrazos < 5) { toast('Falta la firma de quien recibe.'); return; }
   if (desModo === 'entrega') {
     const ch = document.querySelectorAll('#desResumen .desEntChk'), f = Array.from(ch).filter(c => !c.checked).length;
     if (f && !confirm('Faltan ' + f + ' material(es) por marcar como entregados. ¿Confirmar la entrega de todos modos?')) return;
@@ -11505,9 +11506,9 @@ async function desConfirmar() {
     const img = $('desCanvas').toDataURL('image/png');
     if (desModo === 'dan') {
       await api('firmarMovimientoInvWeb', desDanGrupo, nombre, img);
-      try { await api('avisarDanadosDespachoWeb', desDanGrupo, nombre); } catch (e) { toast('Se firmó, pero no se pudo avisar a bodega: ' + (e.message || e), 6000); }
+      try { await api('avisarDanadosDespachoWeb', desDanGrupo, nombre, desDanTec); } catch (e) { toast('Se firmó, pero no se pudo avisar a bodega: ' + (e.message || e), 6000); }
       $('modalDesp').classList.remove('show');
-      toast('Recepción firmada por ' + nombre + '. Se avisó a bodega para que la revise.', 5000);
+      toast('Recepción firmada por ' + nombre + '. Quedó pendiente de recibir en bodega.', 5000);
       bodSucio = true; desDanForm(); await desPdf(desDanGrupo);
     } else {
       const r = await api('despachoEntregaWeb', desAct.alisto, nombre, img);
@@ -11532,8 +11533,21 @@ async function desDanForm() {
         '<div style="font-weight:700;margin:12px 0 4px">Material dañado que entrega</div><div id="ddLineas"></div>' +
     '<button class="btn secondary" type="button" onclick="desDanLinea()" style="margin-top:6px">+ Agregar otra línea</button>' +
     '<div class="field" style="margin-top:10px"><label>Observación</label><input id="ddObs" maxlength="200" autocomplete="off" placeholder="ej. no enciende, cable cortado" style="font-size:16px"></div>' +
-    '<div style="text-align:right;margin-top:12px"><button id="ddOk" class="btn primary" style="font-size:16px;padding:10px 22px" onclick="desDanGuardar()">Registrar y firmar</button></div></div>';
+    '<div style="text-align:right;margin-top:12px"><button id="ddOk" class="btn primary" style="font-size:16px;padding:10px 22px" onclick="desDanGuardar()">Registrar y firmar</button></div></div>' +
+    '<div id="desDanRec" style="margin-top:18px"></div>';
   desDanLinea();
+  desDanRecCargar();
+}
+async function desDanRecCargar() {
+  const c = $('desDanRec'); if (!c) return;
+  let d; try { d = await api('obtenerRecepcionesDanadosWeb'); } catch (e) { c.innerHTML = ''; return; }
+  const l = d.recepciones || [], pend = l.filter(x => x.estado === 'PENDIENTE').length;
+  c.innerHTML = '<div style="font-weight:700;margin-bottom:6px">Equipos recibidos (últimos 30 días)' + (pend ? ' · <span style="color:#b45309">' + pend + ' pendiente' + (pend === 1 ? '' : 's') + ' de recibir en bodega</span>' : '') + '</div>' +
+    (!l.length ? '<div class="empty">Todavía no hay recepciones registradas.</div>' :
+      l.map(x => '<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 6px;border-bottom:1px solid #eee"><div style="flex:1"><b>Móvil ' + esc(x.movil) + '</b> · ' + esc(x.resumen) +
+        '<div style="font-size:12.5px;color:#666">Recibió: <b>' + esc(x.recibe) + '</b>' + (x.entrega ? ' · entrega ' + esc(x.entrega) : '') + ' · ' + esc(notifHora(x.fecha)) + '</div></div>' +
+        (x.estado === 'PENDIENTE' ? '<span style="background:#fff3e0;color:#b45309;border-radius:10px;padding:2px 10px;font-size:12px;white-space:nowrap">⏳ Pendiente en bodega</span>' :
+          '<span style="background:#e8f5e9;color:#2e7d32;border-radius:10px;padding:2px 10px;font-size:12px;white-space:nowrap">✔ En bodega · ' + esc(x.recibidoPor) + '</span>') + '</div>').join(''));
 }
 function desDanLinea() {
   const d = document.createElement('div'); d.className = 'ddLin'; d.dataset.n = ++desDanN;
@@ -11558,8 +11572,9 @@ async function desDanGuardar() {
     const r = await api('guardarMovimientoInvWeb', { tipo: 'DEV_MOVIL', fecha: hoyISO(), idMovil: movil, categoriaDano: $('ddCat').value, referencia: '', obs: obs, lineas: lineas.map(l => ({ clave: l.clave, cantidad: l.cantidad, danados: l.danados, linea: l.linea })) });
     desDanGrupo = r.grupo; bodSucio = true;
     const mv = (bodDatos.moviles || []).find(m => m.idMovil === movil) || {};
-    desPrepararFirma('Recepción de dañados · móvil ' + (mv.movil || ''), desLineasHtml(lineas), mv.tecnico || '', 'Nombre de quien entrega *', 'Quien entrega firma con el dedo:',
-      '<b>Recibe:</b> ' + esc(sesion.nombre) + ' <span style="color:#777">(queda registrado en el documento)</span>', 'Confirmar recepción', 'dan');
+    desDanTec = mv.tecnico || '';
+    desPrepararFirma('Recepción de dañados · móvil ' + (mv.movil || ''), desLineasHtml(lineas), sesion.nombre || '', 'Nombre del compañero SRD que recibe *', 'Quien recibe el material firma con el dedo:',
+      '<b>Devuelve:</b> móvil ' + esc(mv.movil || '') + (mv.tecnico ? ' · ' + esc(mv.tecnico) : '') + '<br><span style="color:#b45309">Quien firma es responsable de entregarlo en bodega; quedará pendiente hasta que bodega lo reciba.</span>', 'Confirmar recepción', 'dan');
   } catch (e) { mostrarError(e, 'No se pudo registrar la recepción.'); } finally { b.disabled = false; }
 }
 
@@ -12168,6 +12183,24 @@ async function cargarAbastecimiento() {
     return;
   }
   renderAbastecimiento();
+  abPendCargar();
+}
+async function abPendCargar() {
+  const c = $('abPend'); if (!c) return;
+  let d; try { d = await api('obtenerRecepcionesDanadosWeb'); } catch (e) { c.innerHTML = ''; return; }
+  const l = (d.recepciones || []).filter(x => x.estado === 'PENDIENTE').sort((a, b) => a.fecha < b.fecha ? -1 : 1);
+  if (!l.length) { c.innerHTML = ''; return; }
+  const dias = f => { const m = String(f).match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? Math.floor((Date.now() - new Date(+m[1], +m[2] - 1, +m[3]).getTime()) / 86400000) : 0; };
+  c.innerHTML = '<div class="panel" style="margin-bottom:12px;border-left:4px solid #e65100"><div class="panelHead"><div><h2>⏳ Pendiente de recibir en bodega (' + l.length + ')</h2>' +
+    '<div style="font-size:12px;color:#777;margin-top:3px">Equipos o material dañado que un compañero recibió en despacho y aún no entra a bodega. Cuando bodega lo tenga en la mano, acéptalo; si no llega, ya sabes quién lo recibió.</div></div></div>' +
+    '<div class="tableWrap"><table class="table"><thead><tr><th>Fecha</th><th>Móvil</th><th class="left">Material</th><th class="left">Lo recibió</th><th class="left">Entrega</th><th>Sin llegar</th><th></th></tr></thead><tbody>' +
+    l.map(x => { const n = dias(x.fecha); return '<tr><td>' + esc(notifHora(x.fecha)) + '</td><td><b>M' + esc(x.movil) + '</b></td><td class="left">' + esc(x.resumen) + '</td><td class="left"><b>' + esc(x.recibe) + '</b></td><td class="left">' + esc(x.entrega) + '</td>' +
+      '<td style="' + (n >= 1 ? 'color:#b71c1c;font-weight:700' : '') + '">' + (n < 1 ? 'hoy' : n + (n === 1 ? ' día' : ' días')) + '</td><td>' + (puedeEditar() ? '<button class="btn primary" style="padding:4px 12px" onclick="abPendAceptar(\'' + escJs(x.grupo) + '\')">Aceptar en bodega</button>' : '') + '</td></tr>'; }).join('') + '</tbody></table></div></div>';
+}
+async function abPendAceptar(g) {
+  if (!confirm('¿Confirmas que el material ya llegó a bodega y lo estás recibiendo?')) return;
+  try { await api('revisarDanadosDespachoWeb', g); toast('Recibido en bodega.'); abPendCargar(); notifCargar(); }
+  catch (e) { mostrarError(e, 'No se pudo aceptar en bodega.'); }
 }
 
 function renderAbastecimiento() {
@@ -13306,7 +13339,7 @@ function notifGuardarLeidas(l) { try { localStorage.setItem('srd_notif_' + (sesi
 
 function notifSinLeer() { const r = notifLeidas(); return (notifDatos.eventos || []).filter(e => e.dgrupo || r.indexOf(e.id) === -1); }
 async function notifDanRevisar(g) {
-  try { await api('revisarDanadosDespachoWeb', g); toast('Material dañado marcado como revisado y recepcionado.'); bodSucio = true; await notifCargar(); }
+  try { await api('revisarDanadosDespachoWeb', g); toast('Recibido en bodega.'); bodSucio = true; await notifCargar(); }
   catch (e) { mostrarError(e, 'No se pudo marcar como revisado.'); }
 }
 
@@ -13365,7 +13398,7 @@ function notifRender() {
     const leida = !e.dgrupo && leidas.indexOf(e.id) !== -1;
     return '<div class="nfItem" style="' + (leida ? 'opacity:.55' : (e.tipo === 'seguimiento' ? 'background:#fff6ee' : 'background:#f3f7ff')) + ';cursor:pointer" onclick="notifAbrir(\'' + escJs(e.id) + '\',\'' + escJs(e.vista) + '\')"><span style="font-size:18px">' + e.icono + '</span>' +
       '<div style="flex:1"><b style="font-size:13px">' + esc(e.titulo) + '</b><div style="font-size:12px;color:#666">' + esc(e.detalle) + '</div><div style="font-size:11px;color:#999">' + esc(notifHora(e.fecha)) + '</div></div>' +
-      (e.dgrupo && puedeEditar() ? '<button class="btnMini" onclick="event.stopPropagation();notifDanRevisar(\'' + escJs(e.dgrupo) + '\')">Revisado</button>' : (leida ? '' : '<span style="width:8px;height:8px;border-radius:50%;background:#1f6feb;flex:0 0 auto"></span>')) + '</div>';
+      (e.dgrupo && puedeEditar() ? '<button class="btnMini" onclick="event.stopPropagation();notifDanRevisar(\'' + escJs(e.dgrupo) + '\')">Recibido</button>' : (leida ? '' : '<span style="width:8px;height:8px;border-radius:50%;background:#1f6feb;flex:0 0 auto"></span>')) + '</div>';
   };
   let h = '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid #eee"><b>🔔 Notificaciones</b>' +
     (evTodos.some(e => !e.dgrupo && leidas.indexOf(e.id) === -1) ? '<a style="font-size:12px;cursor:pointer;color:#1f6feb" onclick="notifMarcarTodo()">Marcar todo como leído</a>' : '') + '</div>';
@@ -16314,6 +16347,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 178 · 28-oct 14:45</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 179 · 28-oct 14:50</div>
 </body>
 </html>
