@@ -627,6 +627,18 @@
     .panel.colapsado > .panelHead > div > div:not(.colBadgeBox) { display: none; }
     .colBadge { display: inline-block; margin-left: 10px; padding: 1px 9px; border-radius: 10px; font-size: 12px; font-weight: 700; background: #e3e7ed; color: #374151; vertical-align: middle; }
     .colBadge.mal { background: #fbe9e9; color: #a31616; } .colBadge.ok { background: #e8f3ea; color: #2c6b3c; }
+    /* Seguimiento: tablas compactas y sobrias (mismo formato en todas las hojas) */
+    #segPanelDia .table { min-width: 0 !important; font-size: 12px; }
+    #segPanelDia .table th { background: #eef1f6 !important; color: #334155 !important; border: 1px solid #dde2ea !important; padding: 4px 6px !important; font-size: 11.5px !important; font-weight: 700; letter-spacing: 0; white-space: nowrap; }
+    #segPanelDia .table td { padding: 2px 6px !important; font-size: 12px !important; line-height: 1.25; border: 1px solid #e8ebf0 !important; }
+    #segPanelDia .table tbody tr:nth-child(even) td { background: #fbfcfd; }
+    #segPanelDia .table .btn, #segPanelDia .table .btnMini { padding: 2px 8px !important; font-size: 11.5px !important; min-height: 0 !important; line-height: 1.3; white-space: nowrap; }
+    #segPanelDia .table input, #segPanelDia .table select { min-height: 24px !important; height: 24px; padding: 0 6px !important; font-size: 12px !important; }
+    #segPanelDia .table td b { font-weight: 700; }
+    #segPanelDia .panelHead { padding: 8px 14px; }
+    #segDiaContenido .table td, #segDiaContenido .table th { white-space: nowrap; }
+    #segDiaContenido .table td input { min-width: 150px; }
+    #segPanelDia .tableWrap { max-height: calc(100vh - 250px); }
     #segColBar { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; }
     #segColBar button { display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px !important; border: 0 !important; border-radius: 8px !important; background: #e3e7ed !important; color: #374151 !important; font-weight: 600; font-size: 13.5px !important; }
     #segColBar button:hover { background: #d6dce5 !important; }
@@ -9410,7 +9422,7 @@ function estadoAhoraHtml(r, d) {
   else if (r.sinIniciarMin !== null && r.sinIniciarMin > 0)
     h = '<b class="' + (r.sinIniciarMin > d.minAlerta ? 'segNeg' : '') + '">' + r.sinIniciarMin + ' min sin iniciar</b>';
   else h = '<span class="segSinCarga">—</span>';
-  if (r.ultimaFin) h += '<div style="color:#888">última fin ' + esc(r.ultimaFin) + '</div>';
+  if (r.ultimaFin) h = (h.indexOf('segSinCarga') >= 0 ? '' : h + ' · ') + '<span style="color:#7a8494">fin ' + esc(r.ultimaFin) + '</span>';
   return h;
 }
 
@@ -16130,6 +16142,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 170 · 27-oct 21:25</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 171 · 27-oct 21:33</div>
 </body>
 </html>
