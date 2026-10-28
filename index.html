@@ -656,7 +656,9 @@
 .calSemIt.hoy:not(.sel){color:#a31616;font-weight:600}
 
 .calBarra{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 16px}
-.calOpc{display:flex;flex-direction:column;gap:6px;padding-bottom:4px}
+.calOpc{display:flex;flex-direction:column;gap:6px;padding-bottom:0}
+.calBarra .calMenu,.calBarra .calMenu>summary.btn{margin:0}
+.calBarra .calMenu>summary.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px}
 .calBtns{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;margin-left:auto}
 .calBtns .btn{white-space:nowrap}
 .calMenu>summary.btn{height:44px;box-sizing:border-box;padding:0 16px;font-weight:600;color:#334;background:#fff;border:1px solid #cfd6df;box-shadow:none}
@@ -664,7 +666,8 @@
 .calMenu .pmDDm{padding:6px;gap:2px;min-width:210px}
 .calMenu .pmDDm .btn{border:0;background:transparent;box-shadow:none;color:#223;font-weight:500;padding:9px 12px;border-radius:6px;width:100%}
 .calMenu .pmDDm .btn:hover{background:#f1f3f7}
-.calMenu .pmDDm .chkInline{padding:8px 10px;border-radius:6px;cursor:pointer;font-size:13.5px;color:#223}
+.calMenu .pmDDm label.chkInline{display:flex;flex-direction:row;align-items:center;gap:8px;white-space:nowrap;line-height:1.2;padding:8px 10px;border-radius:6px;cursor:pointer;font-size:13.5px;color:#223}
+.calMenu .pmDDm label.chkInline input{width:16px;height:16px;margin:0;flex:none}
 .calMenu .pmDDm .chkInline:hover{background:#f1f3f7}
 #calPanelHis .panelHead{padding:10px 14px}
 #calPanelHis .panelHead h2{font-size:15px;font-weight:600;color:#334}
@@ -4060,8 +4063,14 @@ function cerrarModal() { $('modalBg').classList.remove('show'); }
 function cargarInicio() {
   api('obtenerInicioWeb').then(r => {
     if (!r || !$('inicioTarjetas')) return;
-    $('inicioTarjetas').innerHTML = (r.tarjetas || []).map(t => '<div onclick="mostrarVista(\'' + t.vista + '\')" style="cursor:pointer;background:var(--panel,#fff);border:1px solid ' + (t.alerta ? '#e0a030' : '#d8dee8') + ';border-left:4px solid ' + (t.alerta ? '#e65100' : '#1e40af') + ';border-radius:10px;padding:12px 14px"><div style="font-size:12px;color:#667">' + t.icono + ' ' + esc(t.titulo) + '</div><div style="font-size:22px;font-weight:700;margin:2px 0">' + esc(String(t.principal)) + '</div><div style="font-size:12px;color:#667">' + esc(t.detalle) + '</div></div>').join('');
+    $('inicioTarjetas').innerHTML = (r.tarjetas || []).map(t => '<div onclick="mostrarVista(\'' + t.vista + '\')" style="cursor:pointer;background:var(--panel,#fff);border:1px solid ' + (t.alerta ? '#e0a030' : '#d8dee8') + ';border-left:4px solid ' + (t.alerta ? '#e65100' : '#1e40af') + ';border-radius:10px;padding:12px 14px"><div style="font-size:12px;color:#667">' + t.icono + ' ' + esc(t.titulo) + '</div><div style="font-size:22px;font-weight:700;margin:2px 0">' + esc(String(t.principal)) + '</div><div style="font-size:12px;color:#667">' + esc(t.detalle) + '</div>' + (t.accion ? '<button class="btn secondary" style="margin-top:8px;padding:5px 10px;font-size:12px" onclick="event.stopPropagation();cronEnvMarcar(' + (t.accion.valor ? 'true' : 'false') + ')">' + esc(t.accion.texto) + '</button>' : '') + '</div>').join('');
   }).catch(() => { });
+}
+
+async function cronEnvMarcar(v) {
+  if (!v && !confirm('¿Desmarcar el cronograma como enviado?')) return;
+  try { await api('marcarCronogramaEnviadoWeb', v); toast(v ? 'Cronograma marcado como enviado.' : 'Cronograma desmarcado.'); cargarInicio(); if (typeof notifCargar === 'function') notifCargar(); }
+  catch (e) { mostrarError(e, 'No se pudo guardar.'); }
 }
 
 function cargarResumen() {
@@ -16094,6 +16103,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 165 · 27-oct 21:03</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 168 · 27-oct 21:11</div>
 </body>
 </html>
