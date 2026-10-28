@@ -11344,7 +11344,17 @@ async function cargarCambiosBodega(ambito) {
 
 /* ---------- Despacho (tablet de bodega) ---------- */
 const DESP_MODO = new URLSearchParams(location.search).has('despacho');
-if (DESP_MODO) { const f = document.querySelector('.lzq .foto'); if (f) f.style.backgroundImage = 'url(login-despacho.jpg)'; }
+if (DESP_MODO) {
+  const f = document.querySelector('.lzq .foto'); if (f) f.style.backgroundImage = 'url(login-despacho.jpg)';
+  const h = document.querySelector('.lzq h1'); if (h) h.innerHTML = 'Despacho<br>de Materiales';
+  const t = document.querySelector('.lzq .txt p'); if (t) t.innerHTML = 'Alisto, entrega y recepción<br>de material y equipos.';
+  const ic = document.querySelectorAll('.lzq .ico div');
+  const ET = ['Alisto<br>de pedidos','Entrega<br>a móviles','Equipos<br>dañados'];
+  ic.forEach((d, i) => { if (ET[i]) d.lastChild.nodeValue = ''; if (ET[i]) { const sp = d.querySelector('span'); d.innerHTML = ''; d.appendChild(sp); d.insertAdjacentHTML('beforeend', ET[i]); } });
+  const hh = document.querySelector('.loginCard h2'); if (hh) hh.textContent = 'Despacho de materiales';
+  const ss = document.querySelector('.loginCard .sub'); if (ss) ss.textContent = 'Ingresa con tu usuario y contraseña para despachar';
+  document.title = 'Despacho de materiales · SRD';
+}
 let desDatos = null, desAct = null, desDibujo = false, desTrazos = 0, desTimer = null;
 function despArrancar() {
   $('loginBg').classList.add('hide'); $('app').style.display = 'none';
@@ -16296,6 +16306,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 174 · 28-oct 13:21</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 175 · 28-oct 13:25</div>
 </body>
 </html>
