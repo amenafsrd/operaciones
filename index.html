@@ -11501,8 +11501,9 @@ async function desConfirmar() {
     const img = $('desCanvas').toDataURL('image/png');
     if (desModo === 'dan') {
       await api('firmarMovimientoInvWeb', desDanGrupo, nombre, img);
+      try { await api('avisarDanadosDespachoWeb', desDanGrupo, nombre); } catch (e) { toast('Se firmó, pero no se pudo avisar a bodega: ' + (e.message || e), 6000); }
       $('modalDesp').classList.remove('show');
-      toast('Recepción de dañados firmada por ' + nombre + '.', 5000);
+      toast('Recepción firmada por ' + nombre + '. Se avisó a bodega para que la revise.', 5000);
       bodSucio = true; desDanForm(); await desPdf(desDanGrupo);
     } else {
       const r = await api('despachoEntregaWeb', desAct.alisto, nombre, img);
@@ -11524,8 +11525,7 @@ async function desDanForm() {
   $('desDan').innerHTML = '<div class="desDanBox">' +
     '<div class="grid2" style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div class="field"><label>Móvil que devuelve *</label><select id="ddMovil" style="font-size:16px"><option value="">Elige la móvil…</option>' + movs.map(m => '<option value="' + esc(m.idMovil) + '">M' + esc(m.movil) + ' · ' + esc(m.tecnico || '') + '</option>').join('') + '</select></div>' +
     '<div class="field"><label>Categoría del daño *</label><select id="ddCat" style="font-size:16px">' + desCats.map(c => '<option>' + esc(c) + '</option>').join('') + '</select></div></div>' +
-    '<datalist id="ddDL">' + desMats.map(m => '<option value="' + esc(m.material) + '"></option>').join('') + '</datalist>' +
-    '<div style="font-weight:700;margin:12px 0 4px">Material dañado que entrega</div><div id="ddLineas"></div>' +
+        '<div style="font-weight:700;margin:12px 0 4px">Material dañado que entrega</div><div id="ddLineas"></div>' +
     '<button class="btn secondary" type="button" onclick="desDanLinea()" style="margin-top:6px">+ Agregar otra línea</button>' +
     '<div class="field" style="margin-top:10px"><label>Observación</label><input id="ddObs" maxlength="200" autocomplete="off" placeholder="ej. no enciende, cable cortado" style="font-size:16px"></div>' +
     '<div style="text-align:right;margin-top:12px"><button id="ddOk" class="btn primary" style="font-size:16px;padding:10px 22px" onclick="desDanGuardar()">Registrar y firmar</button></div></div>';
@@ -11533,7 +11533,7 @@ async function desDanForm() {
 }
 function desDanLinea() {
   const d = document.createElement('div'); d.className = 'ddLin'; d.dataset.n = ++desDanN;
-  d.innerHTML = '<input class="ddMat" list="ddDL" placeholder="Material o equipo…" autocomplete="off" style="flex:1;font-size:16px"><input class="ddCant" type="number" min="0" step="any" placeholder="Cant." style="width:90px;font-size:16px"><button class="btnMini" type="button" onclick="this.parentNode.remove()" title="Quitar">✕</button>';
+  d.innerHTML = '<select class="ddMat" style="flex:1;font-size:16px"><option value="">Elige el material o equipo…</option>' + desMats.slice().sort((a, b) => a.material.localeCompare(b.material, 'es')).map(m => '<option value="' + esc(m.material) + '">' + esc(m.material) + '</option>').join('') + '</select><input class="ddCant" type="number" min="0" step="any" placeholder="Cant." style="width:90px;font-size:16px"><button class="btnMini" type="button" onclick="this.parentNode.remove()" title="Quitar">✕</button>';
   $('ddLineas').appendChild(d);
 }
 async function desDanGuardar() {
@@ -11543,7 +11543,7 @@ async function desDanGuardar() {
   filas.forEach(f => {
     if (!f.t && !f.q) return;
     const m = desMats.find(x => x.material.toLowerCase() === f.t.toLowerCase());
-    if (!m) mal = 'No reconozco el material «' + f.t + '». Elígelo de la lista.'; else if (!(Number(f.q) > 0)) mal = 'Pon una cantidad mayor que cero en ' + f.t + '.';
+    if (!f.t) mal = 'Elige el material de la lista en cada línea con cantidad.'; else if (!m) mal = 'No reconozco el material «' + f.t + '». Elígelo de la lista.'; else if (!(Number(f.q) > 0)) mal = 'Pon una cantidad mayor que cero en ' + f.t + '.';
     else lineas.push({ clave: m.clave, cantidad: f.q, danados: f.q, linea: lineas.length + 1, material: m.material });
   });
   if (mal) { toast(mal); return; }
@@ -13300,7 +13300,11 @@ let notifDatos = { alertas: [], eventos: [] }, notifTimer = null;
 function notifLeidas() { try { return JSON.parse(localStorage.getItem('srd_notif_' + (sesion ? sesion.usuario : '')) || '[]'); } catch (e) { return []; } }
 function notifGuardarLeidas(l) { try { localStorage.setItem('srd_notif_' + (sesion ? sesion.usuario : ''), JSON.stringify(l.slice(-300))); } catch (e) { /* sin almacenamiento */ } }
 
-function notifSinLeer() { const r = notifLeidas(); return (notifDatos.eventos || []).filter(e => r.indexOf(e.id) === -1); }
+function notifSinLeer() { const r = notifLeidas(); return (notifDatos.eventos || []).filter(e => e.dgrupo || r.indexOf(e.id) === -1); }
+async function notifDanRevisar(g) {
+  try { await api('revisarDanadosDespachoWeb', g); toast('Material dañado marcado como revisado y recepcionado.'); bodSucio = true; await notifCargar(); }
+  catch (e) { mostrarError(e, 'No se pudo marcar como revisado.'); }
+}
 
 async function notifCargar() {
   if (!sesion) return;
@@ -13351,16 +13355,16 @@ function notifRender() {
   const leidas = notifLeidas();
   const al = bodDatos ? bodAlertasLista(true).map(x => ({ clave: x.m.clave, material: x.m.material, unidad: x.m.unidad, disponible: x.disp, pct: x.pct, completo: x.m.completo, minimo: x.m.minimo })) : (notifDatos.alertas || []);
   const evTodos = notifDatos.eventos || [];
-  const pend = evTodos.filter(e => e.tipo === 'seguimiento');
-  const ev = evTodos.filter(e => e.tipo !== 'seguimiento');
+  const pend = evTodos.filter(e => e.tipo === 'seguimiento' || e.dgrupo);
+  const ev = evTodos.filter(e => e.tipo !== 'seguimiento' && !e.dgrupo);
   const item = e => {
-    const leida = leidas.indexOf(e.id) !== -1;
+    const leida = !e.dgrupo && leidas.indexOf(e.id) !== -1;
     return '<div class="nfItem" style="' + (leida ? 'opacity:.55' : (e.tipo === 'seguimiento' ? 'background:#fff6ee' : 'background:#f3f7ff')) + ';cursor:pointer" onclick="notifAbrir(\'' + escJs(e.id) + '\',\'' + escJs(e.vista) + '\')"><span style="font-size:18px">' + e.icono + '</span>' +
       '<div style="flex:1"><b style="font-size:13px">' + esc(e.titulo) + '</b><div style="font-size:12px;color:#666">' + esc(e.detalle) + '</div><div style="font-size:11px;color:#999">' + esc(notifHora(e.fecha)) + '</div></div>' +
-      (leida ? '' : '<span style="width:8px;height:8px;border-radius:50%;background:#1f6feb;flex:0 0 auto"></span>') + '</div>';
+      (e.dgrupo && puedeEditar() ? '<button class="btnMini" onclick="event.stopPropagation();notifDanRevisar(\'' + escJs(e.dgrupo) + '\')">Revisado</button>' : (leida ? '' : '<span style="width:8px;height:8px;border-radius:50%;background:#1f6feb;flex:0 0 auto"></span>')) + '</div>';
   };
   let h = '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid #eee"><b>🔔 Notificaciones</b>' +
-    (evTodos.some(e => leidas.indexOf(e.id) === -1) ? '<a style="font-size:12px;cursor:pointer;color:#1f6feb" onclick="notifMarcarTodo()">Marcar todo como leído</a>' : '') + '</div>';
+    (evTodos.some(e => !e.dgrupo && leidas.indexOf(e.id) === -1) ? '<a style="font-size:12px;cursor:pointer;color:#1f6feb" onclick="notifMarcarTodo()">Marcar todo como leído</a>' : '') + '</div>';
   if (!al.length && !evTodos.length) h += '<div style="padding:22px 14px;text-align:center;color:#888;font-size:13px">No hay notificaciones nuevas.</div>';
   if (pend.length) {
     h += '<div style="padding:8px 14px 2px;font-size:12px;font-weight:700;color:#b45309">⏰ PENDIENTE</div>' + pend.map(item).join('');
@@ -16306,6 +16310,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 175 · 28-oct 13:25</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 176 · 28-oct 14:26</div>
 </body>
 </html>
