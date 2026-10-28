@@ -627,7 +627,14 @@
     .panel.colapsado > .panelHead > div > div:not(.colBadgeBox) { display: none; }
     .colBadge { display: inline-block; margin-left: 10px; padding: 1px 9px; border-radius: 10px; font-size: 12px; font-weight: 700; background: #e3e7ed; color: #374151; vertical-align: middle; }
     .colBadge.mal { background: #fbe9e9; color: #a31616; } .colBadge.ok { background: #e8f3ea; color: #2c6b3c; }
-    #segColBar { display: flex; gap: 8px; justify-content: flex-end; margin: 0 0 8px; }
+    #segColBar { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; }
+    #segColBar button { display: flex; flex-direction: column; align-items: flex-start; min-width: 118px; padding: 8px 14px !important; border: 1px solid #d5dbe4 !important; border-radius: 8px !important; background: #fff !important; }
+    #segColBar button .n { font-size: 19px; font-weight: 700; color: #1d2433; line-height: 1.2; }
+    #segColBar button .t { font-size: 12px; color: #667; }
+    #segColBar button.mal .n { color: #a31616; } #segColBar button.ok .n { color: #6b7a90; }
+    #segColBar button.act { border-color: #1d2433 !important; box-shadow: inset 0 -3px 0 #1d2433; }
+    .panel.colapsable > .panelHead { padding-left: 16px !important; } .panel.colapsable > .panelHead::before { display: none; }
+    .panel.colapsable > .panelHead { cursor: default; } .panel.colapsable > .panelHead:hover { background: transparent; }
     #segColBar button { background: transparent; border: 1px solid #c8ced8; color: #4b5563; border-radius: 4px; padding: 4px 11px; font-size: 12px; cursor: pointer; font-family: inherit; }
     #segColBar button:hover { background: #fff; color: #14263f; }
       /* ---- Usuarios: todo alineado a la izquierda ---- */
@@ -1466,16 +1473,16 @@
             <label>Corte</label>
             <select id="segCorte"></select>
           </div>
-          <button id="segBtnImportar" class="btn primary" onclick="$('segArchivo').click()">📥 Importar Reporte de Seguimiento</button>
+          <button id="segBtnImportar" class="btn primary" onclick="$('segArchivo').click()">Importar reporte de seguimiento</button>
           <input type="file" id="segArchivo" accept=".xlsx,.xls,.csv" style="display:none" onchange="segImportarArchivo(this)">
-          <button class="btn secondary" onclick="cargarSeg()">↻ Actualizar</button>
-          <button id="segBtnGuardar" class="btn success" onclick="segGuardar()" style="display:none">💾 Guardar datos del día</button>
+          <button class="btn secondary" onclick="cargarSeg()">Actualizar</button>
+          <button id="segBtnGuardar" class="btn success" onclick="segGuardar()" style="display:none">Guardar datos del día</button>
         </div>
 
         <div class="subtabs">
-          <button id="stSegDia" class="active" onclick="segSubtab('dia')">📋 Seguimiento del día</button>
-          <button id="stSegGraf" onclick="segSubtab('graf')">📊 Gráficas para el cliente</button>
-          <button id="stSegAus" onclick="segSubtab('aus')">🚫 Incidencias</button>
+          <button id="stSegDia" class="active" onclick="segSubtab('dia')">Seguimiento del día</button>
+          <button id="stSegGraf" onclick="segSubtab('graf')">Gráficas para el cliente</button>
+          <button id="stSegAus" onclick="segSubtab('aus')">Incidencias</button>
         </div>
 
         <div id="segResultado"></div>
@@ -1497,7 +1504,7 @@
           <div class="panel" style="margin-bottom:15px" id="segPanelEstOt">
             <div class="panelHead">
               <div>
-                <h2>🔧 Estado de las OT <span id="segEstOtResumen" style="font-size:13px;font-weight:600;margin-left:8px"></span></h2>
+                <h2>Estado de las OT <span id="segEstOtResumen" style="font-size:13px;font-weight:600;margin-left:8px"></span></h2>
                 <div style="font-size:12px;color:#777;margin-top:3px">Las finalizadas solo vienen de la plataforma (OT realmente instaladas). Las pendientes y las reasignadas que siguen en el corte cuentan como por ejecutar; aquí marca como suspendida o reasignada las que ya se resolvieron. Si después se rescata y la plataforma la reporta iniciada o finalizada, se actualiza sola. Al cierre del día no deben quedar pendientes.</div>
               </div>
               <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
@@ -1520,7 +1527,7 @@
           <div class="panel" style="margin-bottom:15px">
             <div class="panelHead">
               <div>
-                <h2>👻 OT que ya no aparecen en la plataforma</h2>
+                <h2>OT que ya no aparecen en la plataforma</h2>
                 <div style="font-size:12px;color:#777;margin-top:3px">Selecciona las que quedaron suspendidas y elige el motivo. Si una OT vuelve a aparecer en el reporte, se cuenta de nuevo sola.</div>
               </div>
             </div>
@@ -1530,7 +1537,7 @@
           <div class="panel" style="margin-bottom:15px">
             <div class="panelHead">
               <div>
-                <h2>⏱️ Tiempos excedidos</h2>
+                <h2>Tiempos excedidos</h2>
                 <div id="segTiemposInfo" style="font-size:12px;color:#777;margin-top:3px"></div>
               </div>
             </div>
@@ -9102,7 +9109,7 @@ function segColapsables() {
 
   if (!$('segColBar')) {
     const b = document.createElement('div'); b.id = 'segColBar';
-    b.innerHTML = '<button onclick="segColTodo(false)">Expandir todo</button><button onclick="segColTodo(true)">Contraer todo</button>';
+    b.innerHTML = '';
     const ref = $('segAlertas'); if (ref) ref.parentNode.insertBefore(b, ref);
   }
 
@@ -9130,6 +9137,7 @@ function segColapsables() {
       p.classList.add('colapsable');
       p.classList.toggle('colapsado', clave in g ? !!g[clave] : !!SEG_COL_DEF[clave]);
       head.addEventListener('click', e => {
+        if (SEG_UNICO) return;
         if (e.target.closest('select,input,button,a,textarea,label')) return;
         const c = !p.classList.contains('colapsado');
         p.classList.toggle('colapsado', c);
@@ -9142,6 +9150,25 @@ function segColapsables() {
     const c = cuenta[clave];
     if (c) { bd.className = 'colBadge ' + c[1]; bd.textContent = c[0] + (etiqueta[clave] || ''); }
   });
+
+  /* Selector de vista: una sola sección a la vez */
+  const NAV = [['moviles', 'Móviles del día'], ['estot', 'Estado de las OT'], ['desap', 'Ya no aparecen'], ['tiempos', 'Tiempos excedidos'], ['susp', 'Suspendidas'], ['log', 'Cortes de hoy']];
+  if (cuenta.alertas[0] > 0) NAV.unshift(['alertas', 'Alertas']);
+  let vista = ''; try { vista = localStorage.getItem('segVista') || ''; } catch (e) { }
+  if (!NAV.some(n => n[0] === vista)) vista = 'moviles';
+  $('segColBar').innerHTML = NAV.map(n => { const c = cuenta[n[0]]; return '<button data-v="' + n[0] + '" class="' + (c && c[1] ? c[1] : '') + (n[0] === vista ? ' act' : '') + '" onclick="segVer(\'' + n[0] + '\')"><span class="n">' + c[0] + '</span><span class="t">' + n[1] + '</span></button>'; }).join('');
+  segVer(vista, true);
+}
+
+const SEG_UNICO = true;
+function segVer(clave, sinGuardar) {
+  document.querySelectorAll('#segPanelDia .panel[data-col]').forEach(p => {
+    const ver = p.dataset.col === clave;
+    p.style.display = ver ? '' : 'none';
+    if (ver) p.classList.remove('colapsado');
+  });
+  document.querySelectorAll('#segColBar button').forEach(b => b.classList.toggle('act', b.dataset.v === clave));
+  if (!sinGuardar) { try { localStorage.setItem('segVista', clave); } catch (e) { } }
 }
 
 function segColTodo(cerrar) {
@@ -16103,6 +16130,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 168 · 27-oct 21:11</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 169 · 27-oct 21:18</div>
 </body>
 </html>
