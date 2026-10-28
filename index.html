@@ -701,6 +701,14 @@
 .pmDDm .btn{justify-content:flex-start;text-align:left;white-space:nowrap}
 #selAno,.calSemBtn{height:44px;box-sizing:border-box;font-size:15px}
 .calSemBtn{padding:0 12px}
+.desTabs{display:flex;gap:8px;flex-wrap:wrap}
+.desTabs button{display:inline-flex;align-items:center;gap:8px;border:0;background:#dfe4ec;color:#334;font:inherit;font-weight:600;font-size:15px;padding:10px 18px;border-radius:10px;cursor:pointer}
+.desTabs button .n{min-width:22px;text-align:center;padding:1px 7px;border-radius:10px;background:#fff;font-size:13px}
+.desTabs button.act{background:#1d2433;color:#fff}.desTabs button.act .n{background:#ffffff30;color:#fff}
+.desbFila{display:flex;gap:12px;align-items:center;padding:12px 8px;border-bottom:1px solid #eee;font-size:16px;cursor:pointer}
+.desbFila input{width:24px;height:24px;flex:none}.desbFila.on{background:#f1f8e9;color:#2e7d32}
+.desDanBox{background:#fff;border:1px solid #d8dee8;border-radius:12px;padding:16px;margin-top:12px}
+.ddLin{display:flex;gap:8px;margin-top:6px;align-items:center}
 .desGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;margin-top:12px}
 .desCard{background:#fff;border:2px solid #c5e1a5;border-radius:14px;padding:18px;text-align:left;cursor:pointer;font:inherit;box-shadow:0 2px 6px rgba(0,0,0,.08)}
 .desCard:active{background:#f1f8e9}
@@ -1731,8 +1739,23 @@
       <button class="btn secondary" onclick="salir()">Salir</button>
     </div>
     <div style="padding:16px;max-width:1100px;margin:0 auto">
-      <div style="font-size:14px;color:#555">Material listo para entregar. Toca una móvil, quien recibe firma y confirma. La entrega queda a tu nombre.</div>
+      <div id="desTabs" class="desTabs"></div>
+      <div id="desAyuda" style="font-size:14px;color:#555;margin:6px 0 2px"></div>
       <div id="desLista" class="desGrid"></div>
+      <div id="desDan" style="display:none"></div>
+    </div>
+  </div>
+
+  <div id="modalDesB" class="modalBg">
+    <div class="modal" style="width:min(640px,100%)">
+      <h3 id="desbTitulo">Alistar material</h3>
+      <div id="desbProg" style="font-size:13px;color:#555;margin-bottom:6px"></div>
+      <div id="desbLineas" style="max-height:50vh;overflow:auto"></div>
+      <div class="modalActions">
+        <button class="btn secondary" onclick="desbTodo()" style="margin-right:auto">Marcar todo</button>
+        <button class="btn secondary" onclick="$('modalDesB').classList.remove('show')">Cerrar</button>
+        <button id="desbOk" class="btn primary" onclick="desbListo()">Ya está alistado</button>
+      </div>
     </div>
   </div>
 
@@ -1740,14 +1763,15 @@
     <div class="modal" style="width:min(640px,100%)">
       <h3 id="desTitulo">Entrega de material</h3>
       <div id="desResumen" style="font-size:14px;margin-bottom:8px;max-height:30vh;overflow:auto"></div>
-      <div class="field"><label>Nombre de quien recibe *</label><input id="desNombre" autocomplete="off" style="font-size:16px"></div>
-      <div style="font-size:12px;color:#777;margin:8px 0 4px">Quien recibe firma con el dedo:</div>
+      <div class="field"><label id="desNombreEt">Nombre de quien recibe *</label><input id="desNombre" autocomplete="off" style="font-size:16px"></div>
+      <div id="desFirmaEt" style="font-size:12px;color:#777;margin:8px 0 4px">Quien recibe firma con el dedo:</div>
       <canvas id="desCanvas" width="400" height="170" style="width:100%;max-width:560px;border:2px solid #999;border-radius:8px;background:#fff;touch-action:none"></canvas>
       <div id="desQuien" style="margin-top:10px;padding:8px 10px;background:#fff8e1;border:1px solid #ffe082;border-radius:8px;font-size:14px"></div>
       <div class="modalActions">
         <button class="btn secondary" onclick="desBorrar()">🧹 Borrar firma</button>
+        <button id="desVolver" class="btn secondary" onclick="desVolverBorrador()" style="margin-right:auto">Volver a borrador</button>
         <button class="btn secondary" onclick="$('modalDesp').classList.remove('show')">Cancelar</button>
-        <button id="desGuardar" class="btn primary" onclick="desConfirmar()">✅ Confirmar entrega</button>
+        <button id="desGuardar" class="btn primary" onclick="desConfirmar()">Confirmar entrega</button>
       </div>
     </div>
   </div>
@@ -11332,30 +11356,88 @@ function despArrancar() {
   if (!window._desInact) { window._desInact = true; ['pointerdown', 'keydown', 'touchstart'].forEach(n => document.addEventListener(n, () => { if (token) rearmar(); }, true)); }
   rearmar();
 }
+let desTab = 'alistar', desMats = [], desCats = [];
+function desMovTxt(a) {
+  const mv = (bodDatos && bodDatos.moviles || []).find(m => m.idMovil === a.idMovil) || {};
+  return { tec: mv.tecnico || '' };
+}
+function desChkGet(id) { try { return JSON.parse(localStorage.getItem('srd_des_chk_' + id) || '[]'); } catch (e) { return []; } }
+function desChkSet(id, v) { try { if (v && v.length) localStorage.setItem('srd_des_chk_' + id, JSON.stringify(v)); else localStorage.removeItem('srd_des_chk_' + id); } catch (e) { } }
+function desTabSel(t) { desTab = t; desPintar(); if (t === 'dan') desDanForm(); }
 async function desCargar() {
+  if (sesion.rol === 'consulta') { $('desLista').innerHTML = '<div class="empty">Tu usuario es de solo consulta y no puede despachar. Entra con un usuario que tenga permiso para trabajar en Bodega.</div>'; $('desTabs').innerHTML = ''; return; }
   $('desLista').innerHTML = '<div class="loading">Cargando...</div>';
-  if (sesion.rol === 'consulta') { $('desLista').innerHTML = '<div class="empty">Tu usuario es de solo consulta y no puede despachar. Entra con un usuario que tenga permiso para trabajar en Bodega.</div>'; return; }
-  try { desDatos = await api('obtenerAlistosWeb'); if (!bodDatos) bodDatos = await api('obtenerBodegaWeb'); } catch (e) { mostrarError(e, 'No se pudo cargar el material listo.'); return; }
-  const l = desDatos.alistos.filter(a => a.estado === 'ALISTADO').sort((a, b) => String(a.movil).localeCompare(String(b.movil), 'es', { numeric: true }));
-  $('desLista').innerHTML = !l.length ? '<div class="empty">No hay material listo para despachar. Cuando un alisto pase a «Alistado» aparecerá aquí.</div>' :
-    l.map(a => {
-      const mv = (bodDatos && bodDatos.moviles || []).find(m => m.idMovil === a.idMovil) || {};
-      const tot = a.lineas.reduce((t, x) => t + (Number(x.cantidad) || 0), 0);
-      return '<button class="desCard" onclick="desAbrir(\'' + esc(a.alisto) + '\')"><div class="desMov">Móvil ' + esc(a.movil) + '</div><div class="desTec">' + esc(mv.tecnico || '') + '</div><div class="desInfo">' + a.lineas.length + ' materiales · ' + fmtN(tot) + ' unidades</div><div class="desInfo">' + esc(a.alisto) + '</div></button>';
+  try { desDatos = await api('obtenerAlistosWeb'); if (!bodDatos) bodDatos = await api('obtenerBodegaWeb'); } catch (e) { mostrarError(e, 'No se pudo cargar el material.'); return; }
+  desMats = desDatos.materiales || [];
+  desPintar();
+}
+function desPintar() {
+  if (!desDatos) return;
+  const ord = (a, b) => String(a.movil).localeCompare(String(b.movil), 'es', { numeric: true });
+  const bor = desDatos.alistos.filter(a => a.estado === 'BORRADOR').sort(ord), lis = desDatos.alistos.filter(a => a.estado === 'ALISTADO').sort(ord);
+  $('desTabs').innerHTML = [['alistar', 'Por alistar', bor.length], ['entregar', 'Listos para entregar', lis.length], ['dan', 'Recibir dañados', null]].map(t =>
+    '<button class="' + (desTab === t[0] ? 'act' : '') + '" onclick="desTabSel(\'' + t[0] + '\')">' + t[1] + (t[2] === null ? '' : '<span class="n">' + t[2] + '</span>') + '</button>').join('');
+  $('desDan').style.display = desTab === 'dan' ? '' : 'none';
+  $('desLista').style.display = desTab === 'dan' ? 'none' : '';
+  $('desAyuda').textContent = desTab === 'alistar' ? 'Borradores de alisto. Toca una móvil, marca lo que ya alistaste y confírmalo para pasarlo a «Listos para entregar».' :
+    desTab === 'entregar' ? 'Material alistado. Toca una móvil, quien recibe firma y confirma. La entrega queda a tu nombre.' : 'Recepción de equipos o material dañado que devuelve una móvil. Queda registrado a tu nombre.';
+  if (desTab === 'dan') return;
+  const lista = desTab === 'alistar' ? bor : lis;
+  $('desLista').innerHTML = !lista.length ? '<div class="empty">' + (desTab === 'alistar' ? 'No hay borradores de alisto por preparar.' : 'No hay material listo para entregar. Cuando alistes un borrador aparecerá aquí.') + '</div>' :
+    lista.map(a => {
+      const tot = a.lineas.reduce((t, x) => t + (Number(x.cantidad) || 0), 0), mv = desMovTxt(a);
+      let info = a.lineas.length + ' materiales · ' + fmtN(tot) + ' unidades';
+      if (desTab === 'alistar') { const c = desChkGet(a.alisto).length; info += '<div style="margin-top:4px;color:' + (c ? '#2e7d32' : '#888') + '">' + c + ' de ' + a.lineas.length + ' alistados</div>'; }
+      return '<button class="desCard" onclick="' + (desTab === 'alistar' ? 'desbAbrir' : 'desAbrir') + '(\'' + esc(a.alisto) + '\')"><div class="desMov">Móvil ' + esc(a.movil) + '</div><div class="desTec">' + esc(mv.tec) + '</div><div class="desInfo">' + info + '</div><div class="desInfo">' + esc(a.alisto) + '</div></button>';
     }).join('');
 }
-function desAbrir(id) {
-  const a = desDatos && desDatos.alistos.find(x => x.alisto === id);
-  if (!a) return;
-  desAct = a;
-  const mv = (bodDatos && bodDatos.moviles || []).find(m => m.idMovil === a.idMovil) || {};
-  $('desTitulo').textContent = '🚚 Entrega a móvil ' + a.movil;
-  $('desNombre').value = mv.tecnico || '';
-  $('desQuien').innerHTML = '<b>Entrega:</b> ' + esc(sesion.nombre) + ' <span style="color:#777">(queda registrado en el documento)</span>';
-  $('desResumen').innerHTML = a.lineas.slice().sort((x, y) => (x.linea || 0) - (y.linea || 0)).map((y, i) => {
-    const m = (desDatos.materiales || []).find(z => z.clave === y.clave) || {};
-    return '<div style="display:flex;gap:10px;align-items:center;padding:6px 4px;border-bottom:1px solid #eee"><span style="color:#888;width:22px">' + (y.linea || i + 1) + '</span><b style="flex:1">' + esc(y.material) + '</b><span style="white-space:nowrap"><b>' + fmtN(y.cantidad) + '</b> ' + esc(m.unidad || '') + '</span></div>';
+
+/* ---- Por alistar: marcar lo que ya se preparó ---- */
+let desbAct = null;
+function desbAbrir(id) {
+  const a = desDatos && desDatos.alistos.find(x => x.alisto === id); if (!a) return;
+  desbAct = a;
+  $('desbTitulo').textContent = 'Alistar · Móvil ' + a.movil + ' · ' + a.alisto;
+  desbPintar();
+  $('modalDesB').classList.add('show');
+}
+function desbPintar() {
+  const a = desbAct, ch = desChkGet(a.alisto);
+  const L = a.lineas.slice().sort((x, y) => (x.linea || 0) - (y.linea || 0));
+  $('desbLineas').innerHTML = L.map((y, i) => {
+    const m = desMats.find(z => z.clave === y.clave) || {}, on = ch.indexOf(y.clave) >= 0;
+    return '<label class="desbFila' + (on ? ' on' : '') + '"><input type="checkbox" ' + (on ? 'checked' : '') + ' onchange="desbMarca(\'' + escJs(y.clave) + '\',this.checked)"><span style="flex:1"><b>' + esc(y.material) + '</b></span><span style="white-space:nowrap"><b>' + fmtN(y.cantidad) + '</b> ' + esc(m.unidad || '') + '</span></label>';
   }).join('');
+  $('desbProg').textContent = ch.length + ' de ' + a.lineas.length + ' materiales alistados' + (a.obs ? ' · ' + a.obs : '');
+}
+function desbMarca(clave, on) {
+  const id = desbAct.alisto; let ch = desChkGet(id).filter(c => c !== clave); if (on) ch.push(clave);
+  desChkSet(id, ch); desbPintar(); desPintar();
+}
+function desbTodo() { desChkSet(desbAct.alisto, desbAct.lineas.map(l => l.clave)); desbPintar(); desPintar(); }
+async function desbListo() {
+  const a = desbAct, c = desChkGet(a.alisto).length;
+  if (c < a.lineas.length && !confirm('Faltan ' + (a.lineas.length - c) + ' material(es) por marcar. ¿Pasarlo a «Listos para entregar» de todos modos?')) return;
+  const b = $('desbOk'); b.disabled = true;
+  try {
+    await api('cambiarEstadoAlistoWeb', a.alisto, 'ALISTAR');
+    desChkSet(a.alisto, []);
+    $('modalDesB').classList.remove('show');
+    toast('Alisto de la móvil ' + a.movil + ' listo para entregar.');
+    desTab = 'entregar'; await desCargar();
+  } catch (e) { mostrarError(e, 'No se pudo marcar como alistado.'); } finally { b.disabled = false; }
+}
+
+/* ---- Entrega a la móvil (firma de quien recibe) ---- */
+function desPrepararFirma(titulo, resumenHtml, nombre, etNombre, etFirma, quienHtml, btnTxt, modo) {
+  $('desTitulo').textContent = titulo;
+  $('desNombre').value = nombre || '';
+  $('desNombreEt').textContent = etNombre; $('desFirmaEt').textContent = etFirma;
+  $('desQuien').innerHTML = quienHtml;
+  $('desGuardar').textContent = btnTxt;
+  $('desVolver').style.display = modo === 'entrega' ? '' : 'none';
+  $('desResumen').innerHTML = resumenHtml;
+  desModo = modo;
   $('modalDesp').classList.add('show');
   desBorrar();
   const c = $('desCanvas');
@@ -11368,31 +11450,102 @@ function desAbrir(id) {
     ['pointerup', 'pointercancel', 'pointerleave'].forEach(n => c.addEventListener(n, () => { desDibujo = false; }));
   }
 }
+let desModo = 'entrega';
+function desLineasHtml(L) {
+  return L.slice().sort((x, y) => (x.linea || 0) - (y.linea || 0)).map((y, i) => {
+    const m = desMats.find(z => z.clave === y.clave) || {};
+    return '<div style="display:flex;gap:10px;align-items:center;padding:6px 4px;border-bottom:1px solid #eee"><span style="color:#888;width:22px">' + (y.linea || i + 1) + '</span><b style="flex:1">' + esc(y.material || m.material || y.clave) + '</b><span style="white-space:nowrap"><b>' + fmtN(y.cantidad) + '</b> ' + esc(m.unidad || '') + '</span></div>';
+  }).join('');
+}
+function desAbrir(id) {
+  const a = desDatos && desDatos.alistos.find(x => x.alisto === id); if (!a) return;
+  desAct = a;
+  desPrepararFirma('Entrega a móvil ' + a.movil, desLineasHtml(a.lineas), desMovTxt(a).tec, 'Nombre de quien recibe *', 'Quien recibe firma con el dedo:',
+    '<b>Entrega:</b> ' + esc(sesion.nombre) + ' <span style="color:#777">(queda registrado en el documento)</span>', 'Confirmar entrega', 'entrega');
+}
+async function desVolverBorrador() {
+  if (!desAct || !confirm('¿Devolver este alisto a borrador?')) return;
+  try { await api('cambiarEstadoAlistoWeb', desAct.alisto, 'REABRIR'); $('modalDesp').classList.remove('show'); toast('Volvió a borrador.'); desTab = 'alistar'; await desCargar(); }
+  catch (e) { mostrarError(e, 'No se pudo devolver a borrador.'); }
+}
 function desBorrar() {
   const c = $('desCanvas'), g = c.getContext('2d');
   g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
   g.strokeStyle = '#111'; g.lineWidth = 2.5; g.lineCap = 'round'; g.lineJoin = 'round';
   desTrazos = 0;
 }
+async function desPdf(grupo) {
+  try {
+    abDatos = await api('obtenerMovimientosInvWeb', '2020-01-01', '2099-12-31');
+    const dx = docPorGrupo(grupo);
+    if (dx) compartirDoc(dx);
+  } catch (e) { }
+}
 async function desConfirmar() {
   const nombre = $('desNombre').value.trim();
-  if (!nombre) { toast('Escribe el nombre de quien recibe.'); return; }
-  if (desTrazos < 5) { toast('Falta la firma de quien recibe.'); return; }
+  if (!nombre) { toast(desModo === 'dan' ? 'Escribe el nombre de quien entrega.' : 'Escribe el nombre de quien recibe.'); return; }
+  if (desTrazos < 5) { toast(desModo === 'dan' ? 'Falta la firma de quien entrega.' : 'Falta la firma de quien recibe.'); return; }
   const btn = $('desGuardar'); btn.disabled = true;
   try {
-    const r = await api('despachoEntregaWeb', desAct.alisto, nombre, $('desCanvas').toDataURL('image/png'));
-    $('modalDesp').classList.remove('show');
-    toast('Entrega registrada. Entrega ' + r.entrega + ', recibe ' + nombre + '.', 5000);
-    bodSucio = true;
-    desCargar();
-    try {
-      abDatos = await api('obtenerMovimientosInvWeb', '2020-01-01', '2099-12-31');
-      const dx = docPorGrupo(r.grupo);
-      if (dx) compartirDoc(dx);
-    } catch (e) { }
+    const img = $('desCanvas').toDataURL('image/png');
+    if (desModo === 'dan') {
+      await api('firmarMovimientoInvWeb', desDanGrupo, nombre, img);
+      $('modalDesp').classList.remove('show');
+      toast('Recepción de dañados firmada por ' + nombre + '.', 5000);
+      bodSucio = true; desDanForm(); await desPdf(desDanGrupo);
+    } else {
+      const r = await api('despachoEntregaWeb', desAct.alisto, nombre, img);
+      $('modalDesp').classList.remove('show');
+      toast('Entrega registrada. Entrega ' + r.entrega + ', recibe ' + nombre + '.', 5000);
+      bodSucio = true; desCargar(); await desPdf(r.grupo);
+    }
   } catch (e) {
-    mostrarError(e, 'No se pudo registrar la entrega.');
+    mostrarError(e, desModo === 'dan' ? 'No se pudo guardar la firma.' : 'No se pudo registrar la entrega.');
   } finally { btn.disabled = false; }
+}
+
+/* ---- Recibir equipos o material dañado de una móvil ---- */
+let desDanGrupo = '', desDanN = 0;
+async function desDanForm() {
+  if (!desCats.length) { try { const d = await api('obtenerDanadosInvWeb'); desCats = d.categorias || []; } catch (e) { desCats = ['Sin especificar']; } }
+  const movs = (bodDatos && bodDatos.moviles || []).slice().sort((a, b) => (Number(a.movil) || 0) - (Number(b.movil) || 0));
+  desDanN = 0;
+  $('desDan').innerHTML = '<div class="desDanBox">' +
+    '<div class="grid2" style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div class="field"><label>Móvil que devuelve *</label><select id="ddMovil" style="font-size:16px"><option value="">Elige la móvil…</option>' + movs.map(m => '<option value="' + esc(m.idMovil) + '">M' + esc(m.movil) + ' · ' + esc(m.tecnico || '') + '</option>').join('') + '</select></div>' +
+    '<div class="field"><label>Categoría del daño *</label><select id="ddCat" style="font-size:16px">' + desCats.map(c => '<option>' + esc(c) + '</option>').join('') + '</select></div></div>' +
+    '<datalist id="ddDL">' + desMats.map(m => '<option value="' + esc(m.material) + '"></option>').join('') + '</datalist>' +
+    '<div style="font-weight:700;margin:12px 0 4px">Material dañado que entrega</div><div id="ddLineas"></div>' +
+    '<button class="btn secondary" type="button" onclick="desDanLinea()" style="margin-top:6px">+ Agregar otra línea</button>' +
+    '<div class="field" style="margin-top:10px"><label>Observación</label><input id="ddObs" maxlength="200" autocomplete="off" placeholder="ej. no enciende, cable cortado" style="font-size:16px"></div>' +
+    '<div style="text-align:right;margin-top:12px"><button id="ddOk" class="btn primary" style="font-size:16px;padding:10px 22px" onclick="desDanGuardar()">Registrar y firmar</button></div></div>';
+  desDanLinea();
+}
+function desDanLinea() {
+  const d = document.createElement('div'); d.className = 'ddLin'; d.dataset.n = ++desDanN;
+  d.innerHTML = '<input class="ddMat" list="ddDL" placeholder="Material o equipo…" autocomplete="off" style="flex:1;font-size:16px"><input class="ddCant" type="number" min="0" step="any" placeholder="Cant." style="width:90px;font-size:16px"><button class="btnMini" type="button" onclick="this.parentNode.remove()" title="Quitar">✕</button>';
+  $('ddLineas').appendChild(d);
+}
+async function desDanGuardar() {
+  const movil = $('ddMovil').value; if (!movil) { toast('Elige la móvil que devuelve.'); return; }
+  const filas = Array.from(document.querySelectorAll('#ddLineas .ddLin')).map(d => ({ t: d.querySelector('.ddMat').value.trim(), q: d.querySelector('.ddCant').value }));
+  const lineas = []; let mal = '';
+  filas.forEach(f => {
+    if (!f.t && !f.q) return;
+    const m = desMats.find(x => x.material.toLowerCase() === f.t.toLowerCase());
+    if (!m) mal = 'No reconozco el material «' + f.t + '». Elígelo de la lista.'; else if (!(Number(f.q) > 0)) mal = 'Pon una cantidad mayor que cero en ' + f.t + '.';
+    else lineas.push({ clave: m.clave, cantidad: f.q, danados: f.q, linea: lineas.length + 1, material: m.material });
+  });
+  if (mal) { toast(mal); return; }
+  if (!lineas.length) { toast('Agrega al menos un material con cantidad.'); return; }
+  const b = $('ddOk'); b.disabled = true;
+  try {
+    const obs = 'Material dañado' + ($('ddObs').value.trim() ? ' · ' + $('ddObs').value.trim() : '');
+    const r = await api('guardarMovimientoInvWeb', { tipo: 'DEV_MOVIL', fecha: hoyISO(), idMovil: movil, categoriaDano: $('ddCat').value, referencia: '', obs: obs, lineas: lineas.map(l => ({ clave: l.clave, cantidad: l.cantidad, danados: l.danados, linea: l.linea })) });
+    desDanGrupo = r.grupo; bodSucio = true;
+    const mv = (bodDatos.moviles || []).find(m => m.idMovil === movil) || {};
+    desPrepararFirma('Recepción de dañados · móvil ' + (mv.movil || ''), desLineasHtml(lineas), mv.tecnico || '', 'Nombre de quien entrega *', 'Quien entrega firma con el dedo:',
+      '<b>Recibe:</b> ' + esc(sesion.nombre) + ' <span style="color:#777">(queda registrado en el documento)</span>', 'Confirmar recepción', 'dan');
+  } catch (e) { mostrarError(e, 'No se pudo registrar la recepción.'); } finally { b.disabled = false; }
 }
 
 function bodSubtab(s) {
@@ -16142,6 +16295,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 172 · 27-oct 21:37</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 173 · 28-oct 13:18</div>
 </body>
 </html>
