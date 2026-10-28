@@ -11446,7 +11446,7 @@ function desPrepararFirma(titulo, resumenHtml, nombre, etNombre, etFirma, quienH
   $('desNombreEt').textContent = etNombre; $('desFirmaEt').textContent = etFirma;
   $('desQuien').innerHTML = quienHtml;
   $('desGuardar').textContent = btnTxt;
-  $('desVolver').style.display = modo === 'entrega' ? '' : 'none';
+  $('desVolver').style.display = modo === 'entrega' && esAdmin() ? '' : 'none';
   $('desResumen').innerHTML = resumenHtml;
   desModo = modo;
   $('modalDesp').classList.add('show');
@@ -11462,16 +11462,16 @@ function desPrepararFirma(titulo, resumenHtml, nombre, etNombre, etFirma, quienH
   }
 }
 let desModo = 'entrega';
-function desLineasHtml(L) {
+function desLineasHtml(L, conCheck) {
   return L.slice().sort((x, y) => (x.linea || 0) - (y.linea || 0)).map((y, i) => {
     const m = desMats.find(z => z.clave === y.clave) || {};
-    return '<div style="display:flex;gap:10px;align-items:center;padding:6px 4px;border-bottom:1px solid #eee"><span style="color:#888;width:22px">' + (y.linea || i + 1) + '</span><b style="flex:1">' + esc(y.material || m.material || y.clave) + '</b><span style="white-space:nowrap"><b>' + fmtN(y.cantidad) + '</b> ' + esc(m.unidad || '') + '</span></div>';
+    return '<div style="display:flex;gap:10px;align-items:center;padding:6px 4px;border-bottom:1px solid #eee">' + (conCheck ? '<input type="checkbox" class="desEntChk" style="width:26px;height:26px;flex:0 0 auto">' : '') + '<span style="color:#888;width:22px">' + (y.linea || i + 1) + '</span><b style="flex:1">' + esc(y.material || m.material || y.clave) + '</b><span style="white-space:nowrap"><b>' + fmtN(y.cantidad) + '</b> ' + esc(m.unidad || '') + '</span></div>';
   }).join('');
 }
 function desAbrir(id) {
   const a = desDatos && desDatos.alistos.find(x => x.alisto === id); if (!a) return;
   desAct = a;
-  desPrepararFirma('Entrega a móvil ' + a.movil, desLineasHtml(a.lineas), desMovTxt(a).tec, 'Nombre de quien recibe *', 'Quien recibe firma con el dedo:',
+  desPrepararFirma('Entrega a móvil ' + a.movil, '<div style="font-size:13px;color:#666;margin-bottom:4px">Marca cada material a medida que lo entregas.</div>' + desLineasHtml(a.lineas, true), desMovTxt(a).tec, 'Nombre de quien recibe *', 'Quien recibe firma con el dedo:',
     '<b>Entrega:</b> ' + esc(sesion.nombre) + ' <span style="color:#777">(queda registrado en el documento)</span>', 'Confirmar entrega', 'entrega');
 }
 async function desVolverBorrador() {
@@ -11496,6 +11496,10 @@ async function desConfirmar() {
   const nombre = $('desNombre').value.trim();
   if (!nombre) { toast(desModo === 'dan' ? 'Escribe el nombre de quien entrega.' : 'Escribe el nombre de quien recibe.'); return; }
   if (desTrazos < 5) { toast(desModo === 'dan' ? 'Falta la firma de quien entrega.' : 'Falta la firma de quien recibe.'); return; }
+  if (desModo === 'entrega') {
+    const ch = document.querySelectorAll('#desResumen .desEntChk'), f = Array.from(ch).filter(c => !c.checked).length;
+    if (f && !confirm('Faltan ' + f + ' material(es) por marcar como entregados. ¿Confirmar la entrega de todos modos?')) return;
+  }
   const btn = $('desGuardar'); btn.disabled = true;
   try {
     const img = $('desCanvas').toDataURL('image/png');
@@ -16310,6 +16314,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 176 · 28-oct 14:26</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 177 · 28-oct 14:38</div>
 </body>
 </html>
