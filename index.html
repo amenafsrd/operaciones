@@ -628,11 +628,13 @@
     .colBadge { display: inline-block; margin-left: 10px; padding: 1px 9px; border-radius: 10px; font-size: 12px; font-weight: 700; background: #e3e7ed; color: #374151; vertical-align: middle; }
     .colBadge.mal { background: #fbe9e9; color: #a31616; } .colBadge.ok { background: #e8f3ea; color: #2c6b3c; }
     #segColBar { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; }
-    #segColBar button { display: flex; flex-direction: column; align-items: flex-start; min-width: 118px; padding: 8px 14px !important; border: 1px solid #d5dbe4 !important; border-radius: 8px !important; background: #fff !important; }
-    #segColBar button .n { font-size: 19px; font-weight: 700; color: #1d2433; line-height: 1.2; }
-    #segColBar button .t { font-size: 12px; color: #667; }
-    #segColBar button.mal .n { color: #a31616; } #segColBar button.ok .n { color: #6b7a90; }
-    #segColBar button.act { border-color: #1d2433 !important; box-shadow: inset 0 -3px 0 #1d2433; }
+    #segColBar button { display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px !important; border: 0 !important; border-radius: 8px !important; background: #e3e7ed !important; color: #374151 !important; font-weight: 600; font-size: 13.5px !important; }
+    #segColBar button:hover { background: #d6dce5 !important; }
+    #segPanelDia .colBadge { display: none; }
+    #segColBar button .n { min-width: 20px; text-align: center; padding: 1px 7px; border-radius: 10px; background: #fff; color: #374151; font-size: 12px; font-weight: 700; }
+    #segColBar button.mal .n { background: #fbe9e9; color: #a31616; }
+    #segColBar button.act { background: var(--navy2, #14263f) !important; color: #fff !important; box-shadow: 0 2px 6px #0b162644; }
+    #segColBar button.act .n { background: #ffffff26; color: #fff; }
     .panel.colapsable > .panelHead { padding-left: 16px !important; } .panel.colapsable > .panelHead::before { display: none; }
     .panel.colapsable > .panelHead { cursor: default; } .panel.colapsable > .panelHead:hover { background: transparent; }
     #segColBar button { background: transparent; border: 1px solid #c8ced8; color: #4b5563; border-radius: 4px; padding: 4px 11px; font-size: 12px; cursor: pointer; font-family: inherit; }
@@ -9029,10 +9031,8 @@ function segRecalcular() {
     '<div class="card"><div class="n">' + (t.asignadas + t.relleno) + '</div><div class="t">Carga del día (asignadas + relleno)</div></div>' +
     '<div class="card f"><div class="n">' + t.instaladas + '</div><div class="t">Finalizadas</div></div>' +
     '<div class="card i"><div class="n">' + t.iniciadas + '</div><div class="t">Iniciadas</div></div>' +
-    '<div class="card s"><div class="n">' + t.suspendidas + '</div><div class="t">Suspendidas</div></div>' +
     '<div class="card"><div class="n">' + t.reasignadas + '</div><div class="t">Reasignadas</div></div>' +
     '<div class="card p"><div class="n">' + t.pendientes + '</div><div class="t" title="Incluye las reasignadas que siguen en el corte">Pendientes (con reasignadas)</div></div>' +
-    '<div class="card"><div class="n">' + d.desaparecidas.length + '</div><div class="t">Ya no aparecen (por marcar)</div></div>' +
     ((d.retiradas || []).length ? '<div class="card"><div class="n">' + d.retiradas.length + '</div><div class="t" title="Las quitó el cliente de la ruta: cuentan en la carga del día, pero no como pendientes">Retiradas de la ruta</div></div>' : '') +
     '<div class="card"><div class="n">' + d.movidas.length + '</div><div class="t">Movidas de móvil</div></div>';
 }
@@ -9156,7 +9156,7 @@ function segColapsables() {
   if (cuenta.alertas[0] > 0) NAV.unshift(['alertas', 'Alertas']);
   let vista = ''; try { vista = localStorage.getItem('segVista') || ''; } catch (e) { }
   if (!NAV.some(n => n[0] === vista)) vista = 'moviles';
-  $('segColBar').innerHTML = NAV.map(n => { const c = cuenta[n[0]]; return '<button data-v="' + n[0] + '" class="' + (c && c[1] ? c[1] : '') + (n[0] === vista ? ' act' : '') + '" onclick="segVer(\'' + n[0] + '\')"><span class="n">' + c[0] + '</span><span class="t">' + n[1] + '</span></button>'; }).join('');
+  $('segColBar').innerHTML = NAV.map(n => { const c = cuenta[n[0]]; return '<button data-v="' + n[0] + '" class="' + (c && c[1] ? c[1] : '') + (n[0] === vista ? ' act' : '') + '" onclick="segVer(\'' + n[0] + '\')">' + n[1] + '<span class="n">' + c[0] + '</span></button>'; }).join('');
   segVer(vista, true);
 }
 
@@ -16130,6 +16130,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 169 · 27-oct 21:18</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 170 · 27-oct 21:25</div>
 </body>
 </html>
