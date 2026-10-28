@@ -6786,8 +6786,7 @@ function obtenerRecepcionesDanadosWeb(token) {
 
 /* El encargado de bodega da por revisado y recepcionado el material dañado que avisó el despacho */
 function revisarDanadosDespachoWeb(token, grupo) {
-  const ses = requerirSesion_(token, 'operador');
-  if ((ses.modulos || []).indexOf('bodega') === -1) throw new Error('No tienes acceso al módulo de Bodega.');
+  const ses = requerirSesion_(token, 'admin');
   grupo = txt_(grupo);
   return conBloqueo_(() => {
     const sh = invHoja_('REV');

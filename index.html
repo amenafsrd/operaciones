@@ -11545,18 +11545,13 @@ async function desDanRecCargar() {
   const l = d.recepciones || [], pend = l.filter(x => x.estado === 'PENDIENTE').length;
   const fila = x => '<div style="display:flex;gap:10px;align-items:center;padding:8px 6px;border-bottom:1px solid #eee"><div style="flex:1"><b>Móvil ' + esc(x.movil) + '</b> · ' + esc(x.resumen) +
     '<div style="font-size:12.5px;color:#666">Recibió y aplicó: <b>' + esc(x.recibe) + '</b>' + (x.entrega ? ' · entrega ' + esc(x.entrega) : '') + ' · ' + esc(notifHora(x.fecha)) + (x.estado === 'RECIBIDO' ? ' · recibido en bodega por <b>' + esc(x.recibidoPor) + '</b>' : '') + '</div></div>' +
-    (x.estado === 'PENDIENTE' ? '<span style="background:#fff3e0;color:#b45309;border-radius:10px;padding:2px 10px;font-size:12px;white-space:nowrap">⏳ Pendiente de recepción</span>' + (puedeEditar() ? '<button class="btn primary" style="padding:6px 12px;font-size:14px" onclick="desDanAceptar(\'' + escJs(x.grupo) + '\')">Recibir en bodega</button>' : '') :
+    (x.estado === 'PENDIENTE' ? '<span style="background:#fff3e0;color:#b45309;border-radius:10px;padding:2px 10px;font-size:12px;white-space:nowrap">⏳ Pendiente de recepción</span>' :
       '<span style="background:#e8f5e9;color:#2e7d32;border-radius:10px;padding:2px 10px;font-size:12px;white-space:nowrap">✔ Recibido en bodega</span>') + '</div>';
   const P = l.filter(x => x.estado === 'PENDIENTE'), R = l.filter(x => x.estado !== 'PENDIENTE');
   c.innerHTML = '<div style="font-weight:700;margin-bottom:6px;color:#b45309">⏳ Pendientes de recepción en bodega (' + P.length + ')</div>' +
     (P.length ? P.map(fila).join('') : '<div class="empty">No hay equipos pendientes de recibir en bodega.</div>') +
     '<div style="font-weight:700;margin:16px 0 6px">Ya recibidos en bodega (últimos 30 días)</div>' +
     (R.length ? R.map(fila).join('') : '<div class="empty">Todavía no hay equipos recibidos.</div>');
-}
-async function desDanAceptar(g) {
-  if (!confirm('¿Confirmas que el material ya llegó a bodega y lo estás recibiendo?')) return;
-  try { await api('revisarDanadosDespachoWeb', g); toast('Recibido en bodega.'); bodSucio = true; desDanRecCargar(); }
-  catch (e) { mostrarError(e, 'No se pudo recibir en bodega.'); }
 }
 function desDanLinea() {
   const d = document.createElement('div'); d.className = 'ddLin'; d.dataset.n = ++desDanN;
@@ -12204,7 +12199,7 @@ async function abPendCargar() {
     '<div style="font-size:12px;color:#777;margin-top:3px">Equipos o material dañado que un compañero recibió en despacho y aún no entra a bodega. Cuando bodega lo tenga en la mano, acéptalo; si no llega, ya sabes quién lo recibió.</div></div></div>' +
     '<div class="tableWrap"><table class="table"><thead><tr><th>Fecha</th><th>Móvil</th><th class="left">Material</th><th class="left">Lo recibió</th><th class="left">Entrega</th><th>Sin llegar</th><th></th></tr></thead><tbody>' +
     l.map(x => { const n = dias(x.fecha); return '<tr><td>' + esc(notifHora(x.fecha)) + '</td><td><b>M' + esc(x.movil) + '</b></td><td class="left">' + esc(x.resumen) + '</td><td class="left"><b>' + esc(x.recibe) + '</b></td><td class="left">' + esc(x.entrega) + '</td>' +
-      '<td style="' + (n >= 1 ? 'color:#b71c1c;font-weight:700' : '') + '">' + (n < 1 ? 'hoy' : n + (n === 1 ? ' día' : ' días')) + '</td><td>' + (puedeEditar() ? '<button class="btn primary" style="padding:4px 12px" onclick="abPendAceptar(\'' + escJs(x.grupo) + '\')">Aceptar en bodega</button>' : '') + '</td></tr>'; }).join('') + '</tbody></table></div></div>';
+      '<td style="' + (n >= 1 ? 'color:#b71c1c;font-weight:700' : '') + '">' + (n < 1 ? 'hoy' : n + (n === 1 ? ' día' : ' días')) + '</td><td>' + (esAdmin() ? '<button class="btn primary" style="padding:4px 12px" onclick="abPendAceptar(\'' + escJs(x.grupo) + '\')">Aceptar en bodega</button>' : '') + '</td></tr>'; }).join('') + '</tbody></table></div></div>';
 }
 async function abPendAceptar(g) {
   if (!confirm('¿Confirmas que el material ya llegó a bodega y lo estás recibiendo?')) return;
@@ -13407,7 +13402,7 @@ function notifRender() {
     const leida = !e.dgrupo && leidas.indexOf(e.id) !== -1;
     return '<div class="nfItem" style="' + (leida ? 'opacity:.55' : (e.tipo === 'seguimiento' ? 'background:#fff6ee' : 'background:#f3f7ff')) + ';cursor:pointer" onclick="notifAbrir(\'' + escJs(e.id) + '\',\'' + escJs(e.vista) + '\')"><span style="font-size:18px">' + e.icono + '</span>' +
       '<div style="flex:1"><b style="font-size:13px">' + esc(e.titulo) + '</b><div style="font-size:12px;color:#666">' + esc(e.detalle) + '</div><div style="font-size:11px;color:#999">' + esc(notifHora(e.fecha)) + '</div></div>' +
-      (e.dgrupo && puedeEditar() ? '<button class="btnMini" onclick="event.stopPropagation();notifDanRevisar(\'' + escJs(e.dgrupo) + '\')">Recibido</button>' : (leida ? '' : '<span style="width:8px;height:8px;border-radius:50%;background:#1f6feb;flex:0 0 auto"></span>')) + '</div>';
+      (e.dgrupo && esAdmin() ? '<button class="btnMini" onclick="event.stopPropagation();notifDanRevisar(\'' + escJs(e.dgrupo) + '\')">Recibido</button>' : (leida ? '' : '<span style="width:8px;height:8px;border-radius:50%;background:#1f6feb;flex:0 0 auto"></span>')) + '</div>';
   };
   let h = '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid #eee"><b>🔔 Notificaciones</b>' +
     (evTodos.some(e => !e.dgrupo && leidas.indexOf(e.id) === -1) ? '<a style="font-size:12px;cursor:pointer;color:#1f6feb" onclick="notifMarcarTodo()">Marcar todo como leído</a>' : '') + '</div>';
@@ -16356,6 +16351,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 180 · 28-oct 14:58</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 181 · 28-oct 15:06</div>
 </body>
 </html>
