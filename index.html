@@ -11344,6 +11344,7 @@ async function cargarCambiosBodega(ambito) {
 
 /* ---------- Despacho (tablet de bodega) ---------- */
 const DESP_MODO = new URLSearchParams(location.search).has('despacho');
+if (DESP_MODO) { const f = document.querySelector('.lzq .foto'); if (f) f.style.backgroundImage = 'url(login-despacho.jpg)'; }
 let desDatos = null, desAct = null, desDibujo = false, desTrazos = 0, desTimer = null;
 function despArrancar() {
   $('loginBg').classList.add('hide'); $('app').style.display = 'none';
@@ -16295,6 +16296,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 173 · 28-oct 13:18</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 174 · 28-oct 13:21</div>
 </body>
 </html>
