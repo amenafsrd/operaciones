@@ -6657,6 +6657,7 @@ function cambiarEstadoAlistoWeb(token, alisto, accion) {
   const ses = requerirSesion_(token, 'operador');
   alisto = txt_(alisto);
   accion = txt_(accion);
+  if (accion === 'REABRIR') requerirSesion_(token, 'admin');
 
   return conBloqueo_(() => {
     const sh = invHoja_('ALI');

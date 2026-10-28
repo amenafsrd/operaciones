@@ -12581,7 +12581,7 @@ function verAlisto(id) {
   const b = [];
   b.push('<button class="btn secondary" onclick="aliImprimir(\'' + escJs(a.alisto) + '\')">🖨️ Hoja de alisto</button>');
   if (ed && a.estado === 'BORRADOR') b.push('<button class="btn secondary" onclick="aliEditar()">✏️ Editar</button><button class="btn secondary" onclick="aliAccion(\'ALISTAR\')">📦 Marcar alistado</button>');
-  if (ed && a.estado === 'ALISTADO') b.push('<button class="btn secondary" onclick="aliAccion(\'REABRIR\')">↩️ Volver a borrador</button>');
+  if (esAdmin() && a.estado === 'ALISTADO') b.push('<button class="btn secondary" onclick="aliAccion(\'REABRIR\')">↩️ Volver a borrador</button>');
   if (ed && a.estado !== 'APLICADO') b.push('<button class="btn primary" onclick="aliAplicar()">🚚 Aplicar entrega (llegó la móvil)</button><button class="btn secondary" onclick="aliAccion(\'ANULAR\')">🗑️ Anular</button>');
   b.push('<button class="btn secondary" onclick="$(\'modalAli\').classList.remove(\'show\')">Cerrar</button>');
   $('aliAcciones').innerHTML = b.join('');
@@ -16314,6 +16314,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 177 · 28-oct 14:38</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 178 · 28-oct 14:45</div>
 </body>
 </html>
