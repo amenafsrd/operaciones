@@ -6765,7 +6765,7 @@ function avisarDanadosDespachoWeb(token, grupo, recibe, entrega) {
     const sh = invHoja_('REV');
     if (leerObjetos_(sh).some(r => txt_(r.Grupo) === grupo)) return { ok: true, repetido: true };
     const resumen = filas.map(r => invRedondear_(invNum_(r.Cantidad)) + ' × ' + txt_(r.Material)).join(', ').slice(0, 300);
-    invAgregar_(sh, 'REV', [{ Grupo: grupo, Fecha_Hora: segAhora_(), Movil: txt_(filas[0].Movil), Entrega: txt_(entrega).slice(0, 80), Recibe: txt_(recibe).slice(0, 80) || ses.nombre || ses.usuario,
+    invAgregar_(sh, 'REV', [{ Grupo: grupo, Fecha_Hora: segAhora_(), Movil: txt_(filas[0].Movil), Entrega: txt_(entrega).slice(0, 80), Recibe: ses.nombre || ses.usuario,
       Resumen: resumen, Estado: 'PENDIENTE', Revisado_Por: '', Revisado: '' }]);
     try { invLog_(ses, 'Dañados recibidos en despacho', 'Móvil ' + txt_(filas[0].Movil) + ' · ' + resumen, grupo); } catch (e) { }
     return { ok: true };
