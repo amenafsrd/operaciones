@@ -1744,6 +1744,7 @@
       <div id="desAyuda" style="font-size:14px;color:#555;margin:6px 0 2px"></div>
       <div id="desLista" class="desGrid"></div>
       <div id="desDan" style="display:none"></div>
+      <div id="desNuevo" style="display:none"></div>
     </div>
   </div>
 
@@ -1754,6 +1755,7 @@
       <div id="desbLineas" style="max-height:50vh;overflow:auto"></div>
       <div class="modalActions">
         <button class="btn secondary" onclick="desbTodo()" style="margin-right:auto">Marcar todo</button>
+        <button class="btn secondary" onclick="desbHoja()">🖨️ Hoja de alisto</button>
         <button class="btn secondary" onclick="$('modalDesB').classList.remove('show')">Cerrar</button>
         <button id="desbOk" class="btn primary" onclick="desbListo()">Ya está alistado</button>
       </div>
@@ -11375,7 +11377,7 @@ function desMovTxt(a) {
 }
 function desChkGet(id) { try { return JSON.parse(localStorage.getItem('srd_des_chk_' + id) || '[]'); } catch (e) { return []; } }
 function desChkSet(id, v) { try { if (v && v.length) localStorage.setItem('srd_des_chk_' + id, JSON.stringify(v)); else localStorage.removeItem('srd_des_chk_' + id); } catch (e) { } }
-function desTabSel(t) { desTab = t; desPintar(); if (t === 'dan') desDanForm(); }
+function desTabSel(t) { desTab = t; desPintar(); if (t === 'dan') desDanForm(); if (t === 'nuevo') desNuevoForm(); }
 async function desCargar() {
   if (sesion.rol === 'consulta') { $('desLista').innerHTML = '<div class="empty">Tu usuario es de solo consulta y no puede despachar. Entra con un usuario que tenga permiso para trabajar en Bodega.</div>'; $('desTabs').innerHTML = ''; return; }
   $('desLista').innerHTML = '<div class="loading">Cargando...</div>';
@@ -11387,13 +11389,14 @@ function desPintar() {
   if (!desDatos) return;
   const ord = (a, b) => String(a.movil).localeCompare(String(b.movil), 'es', { numeric: true });
   const bor = desDatos.alistos.filter(a => a.estado === 'BORRADOR').sort(ord), lis = desDatos.alistos.filter(a => a.estado === 'ALISTADO').sort(ord);
-  $('desTabs').innerHTML = [['alistar', 'Por alistar', bor.length], ['entregar', 'Listos para entregar', lis.length], ['dan', 'Recibir dañados', null]].map(t =>
+  $('desTabs').innerHTML = [['alistar', 'Por alistar', bor.length], ['entregar', 'Listos para entregar', lis.length], ['nuevo', 'Nuevo abastecimiento', null], ['dan', 'Recibir dañados', null]].map(t =>
     '<button class="' + (desTab === t[0] ? 'act' : '') + '" onclick="desTabSel(\'' + t[0] + '\')">' + t[1] + (t[2] === null ? '' : '<span class="n">' + t[2] + '</span>') + '</button>').join('');
   $('desDan').style.display = desTab === 'dan' ? '' : 'none';
-  $('desLista').style.display = desTab === 'dan' ? 'none' : '';
+  $('desNuevo').style.display = desTab === 'nuevo' ? '' : 'none';
+  $('desLista').style.display = (desTab === 'dan' || desTab === 'nuevo') ? 'none' : '';
   $('desAyuda').textContent = desTab === 'alistar' ? 'Borradores de alisto. Toca una móvil, marca lo que ya alistaste y confírmalo para pasarlo a «Listos para entregar».' :
-    desTab === 'entregar' ? 'Material alistado. Toca una móvil, quien recibe firma y confirma. La entrega queda a tu nombre.' : 'Recepción de equipos o material dañado que devuelve una móvil. Queda registrado a tu nombre.';
-  if (desTab === 'dan') return;
+    desTab === 'entregar' ? 'Material alistado. Toca una móvil, quien recibe firma y confirma. La entrega queda a tu nombre.' : desTab === 'nuevo' ? 'Crea un abastecimiento para una móvil: elige la móvil y agrega solo las líneas que necesites. Verás lo que hay disponible en bodega.' : 'Recepción de equipos o material dañado que devuelve una móvil. Queda registrado a tu nombre.';
+  if (desTab === 'dan' || desTab === 'nuevo') return;
   const lista = desTab === 'alistar' ? bor : lis;
   $('desLista').innerHTML = !lista.length ? '<div class="empty">' + (desTab === 'alistar' ? 'No hay borradores de alisto por preparar.' : 'No hay material listo para entregar. Cuando alistes un borrador aparecerá aquí.') + '</div>' :
     lista.map(a => {
@@ -11403,6 +11406,67 @@ function desPintar() {
       return '<button class="desCard" onclick="' + (desTab === 'alistar' ? 'desbAbrir' : 'desAbrir') + '(\'' + esc(a.alisto) + '\')"><div class="desMov">Móvil ' + esc(a.movil) + '</div><div class="desTec">' + esc(mv.tec) + '</div><div class="desInfo">' + info + '</div><div class="desInfo">' + esc(a.alisto) + '</div></button>';
     }).join('');
 }
+
+/* ---- Nuevo abastecimiento desde la tablet ---- */
+let desNN = 0;
+async function desNuevoForm() {
+  const c = $('desNuevo');
+  c.innerHTML = '<div class="loading">Cargando disponibilidad de bodega...</div>';
+  try { bodDatos = await api('obtenerBodegaWeb'); if (!desMats.length && desDatos) desMats = desDatos.materiales || []; } catch (e) { mostrarError(e, 'No se pudo cargar la bodega.'); return; }
+  const movs = (bodDatos.moviles || []).slice().sort((a, b) => (Number(a.movil) || 0) - (Number(b.movil) || 0));
+  desNN = 0;
+  c.innerHTML = '<div class="desDanBox"><div class="field"><label>Móvil que se abastece *</label><select id="dnMovil" style="font-size:16px" onchange="desNuevoRefrescar()"><option value="">Elige la móvil…</option>' +
+    movs.map(m => '<option value="' + esc(m.idMovil) + '">M' + esc(m.movil) + ' · ' + esc(m.tecnico || '') + '</option>').join('') + '</select></div>' +
+    '<div style="font-weight:700;margin:12px 0 4px">Material a entregar</div><div id="dnLineas"></div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"><button class="btn secondary" type="button" onclick="desNuevoLinea()">+ Agregar línea</button>' +
+    '<button class="btn secondary" type="button" onclick="desNuevoFaltas()">Sugerir lo que le falta a la móvil</button></div>' +
+    '<div class="field" style="margin-top:10px"><label>Observación</label><input id="dnObs" maxlength="200" autocomplete="off" style="font-size:16px"></div>' +
+    '<div style="text-align:right;margin-top:12px"><button id="dnOk" class="btn primary" style="font-size:16px;padding:10px 22px" onclick="desNuevoGuardar()">Crear y empezar a alistar</button></div></div>';
+  desNuevoLinea();
+}
+function desNuevoOpciones() {
+  const B = bodDatos.bodega || {};
+  return '<option value="">Elige el material…</option>' + (bodDatos.materiales || []).filter(m => m.activo).slice().sort((a, b) => a.material.localeCompare(b.material, 'es'))
+    .map(m => '<option value="' + esc(m.clave) + '">' + esc(m.material) + ' — bodega: ' + fmtN((B[m.clave] || {}).disponible || 0) + ' ' + esc(m.unidad || '') + '</option>').join('');
+}
+function desNuevoLinea(clave, cant) {
+  const d = document.createElement('div'); d.className = 'ddLin'; d.style.flexWrap = 'wrap';
+  d.innerHTML = '<select class="dnMat" style="flex:1;min-width:260px;font-size:16px" onchange="desNuevoInfo(this.parentNode)">' + desNuevoOpciones() + '</select><input class="dnCant" type="number" min="0" step="any" placeholder="Cant." style="width:100px;font-size:16px" oninput="desNuevoInfo(this.parentNode)">' +
+    '<button class="btnMini" type="button" onclick="this.parentNode.remove()" title="Quitar">✕</button><div class="dnInfo" style="flex:1 0 100%;font-size:13px;color:#666"></div>';
+  $('dnLineas').appendChild(d);
+  if (clave) { d.querySelector('.dnMat').value = clave; d.querySelector('.dnCant').value = cant; desNuevoInfo(d); }
+}
+function desNuevoInfo(d) {
+  const clave = d.querySelector('.dnMat').value, inf = d.querySelector('.dnInfo');
+  if (!clave) { inf.innerHTML = ''; return; }
+  const mv = $('dnMovil').value, B = (bodDatos.bodega || {})[clave] || {}, disp = B.disponible || 0;
+  const m = (bodDatos.materiales || []).find(x => x.clave === clave) || {}, q = Number(d.querySelector('.dnCant').value) || 0;
+  const tiene = mv ? ((bodDatos.stockMovil[mv] || {})[clave] || {}).actual || 0 : null, obj = mv ? ((bodDatos.objetivos[mv] || {})[clave] || 0) : null;
+  inf.innerHTML = '<b style="color:' + (q > disp ? '#b71c1c' : '#2e7d32') + '">Disponible en bodega: ' + fmtN(disp) + ' ' + esc(m.unidad || '') + (q > disp ? ' · no alcanza para ' + fmtN(q) : '') + '</b>' +
+    (mv ? ' · La móvil tiene <b>' + fmtN(tiene) + '</b>' + (obj ? ' · objetivo <b>' + fmtN(obj) + '</b> · falta <b>' + fmtN(Math.max(0, obj - tiene)) + '</b>' : '') : ' · elige la móvil para ver lo que tiene');
+}
+function desNuevoRefrescar() { document.querySelectorAll('#dnLineas .ddLin').forEach(desNuevoInfo); }
+function desNuevoFaltas() {
+  const mv = $('dnMovil').value; if (!mv) { toast('Elige primero la móvil.'); return; }
+  const f = bodFaltas(mv); if (!f.length) { toast('Esta móvil no tiene faltantes frente a su objetivo.'); return; }
+  $('dnLineas').innerHTML = ''; f.forEach(x => desNuevoLinea(x.clave, x.falta));
+}
+async function desNuevoGuardar() {
+  const mv = $('dnMovil').value; if (!mv) { toast('Elige la móvil que se abastece.'); return; }
+  const filas = Array.from(document.querySelectorAll('#dnLineas .ddLin')).map(d => ({ c: d.querySelector('.dnMat').value, q: d.querySelector('.dnCant').value }));
+  if (filas.some(f => (f.c && !(Number(f.q) > 0)) || (!f.c && f.q !== ''))) { toast('Completa el material y una cantidad mayor que cero en cada línea.'); return; }
+  const lineas = filas.filter(f => f.c).map(f => ({ clave: f.c, cantidad: f.q }));
+  if (!lineas.length) { toast('Agrega al menos un material con cantidad.'); return; }
+  const falta = lineas.filter(l => Number(l.cantidad) > (((bodDatos.bodega || {})[l.clave] || {}).disponible || 0) + 1e-9);
+  if (falta.length && !confirm('En bodega no alcanza: ' + falta.map(l => bodMatNombre(l.clave)).join(', ') + '. ¿Crear el abastecimiento de todos modos?')) return;
+  const b = $('dnOk'); b.disabled = true;
+  try {
+    const r = await api('guardarAlistosWeb', [{ alisto: '', fecha: hoyISO(), idMovil: mv, obs: $('dnObs').value, lineas: lineas }]);
+    toast('Abastecimiento ' + r.alistos[0] + ' creado. Marca lo que vas alistando.', 5000);
+    desTab = 'alistar'; await desCargar(); desbAbrir(r.alistos[0]);
+  } catch (e) { mostrarError(e, 'No se pudo crear el abastecimiento.'); } finally { b.disabled = false; }
+}
+function desbHoja() { if (!desbAct) return; aliDatos = desDatos; aliImprimir(desbAct.alisto); }
 
 /* ---- Por alistar: marcar lo que ya se preparó ---- */
 let desbAct = null;
@@ -11550,8 +11614,7 @@ async function desDanRecCargar() {
   const P = l.filter(x => x.estado === 'PENDIENTE'), R = l.filter(x => x.estado !== 'PENDIENTE');
   c.innerHTML = '<div style="font-weight:700;margin-bottom:6px;color:#b45309">⏳ Pendientes de recepción en bodega (' + P.length + ')</div>' +
     (P.length ? P.map(fila).join('') : '<div class="empty">No hay equipos pendientes de recibir en bodega.</div>') +
-    '<div style="font-weight:700;margin:16px 0 6px">Ya recibidos en bodega (últimos 30 días)</div>' +
-    (R.length ? R.map(fila).join('') : '<div class="empty">Todavía no hay equipos recibidos.</div>');
+    '';
 }
 function desDanLinea() {
   const d = document.createElement('div'); d.className = 'ddLin'; d.dataset.n = ++desDanN;
@@ -16351,6 +16414,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 181 · 28-oct 15:06</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 183 · 01-nov 22:10</div>
 </body>
 </html>
