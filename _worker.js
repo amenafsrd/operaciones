@@ -565,7 +565,7 @@ const ROLES = ['consulta', 'operador', 'admin'];
 const NIVEL_ROL = { consulta: 1, operador: 2, admin: 3 };
 /* Módulos a los que puede entrar cada usuario. El administrador entra a todos.
    Un usuario sin lista guardada conserva el acceso de siempre, salvo Cotizaciones, que hay que darlo expresamente. */
-const MODULOS = { cronograma: 'Cronograma', moviles: 'Móviles', seguimiento: 'Seguimiento', bodega: 'Bodega', cotizaciones: 'Cotizaciones', resumen: 'Resumen' };
+const MODULOS = { cronograma: 'Cronograma', moviles: 'Móviles', seguimiento: 'Seguimiento', bodega: 'Bodega', cotizaciones: 'Cotizaciones', resumen: 'Resumen', invtablet: 'Inventario en tablet' };
 
 function modulosDe_(rol, texto) {
   const todos = Object.keys(MODULOS);
