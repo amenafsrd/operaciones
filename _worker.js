@@ -7684,11 +7684,28 @@ function recibirLineasDevolucionWeb(token, lineas, fecha, boleta) {
 
 /* Boleta de devolución: cantidades por equipo que se entregaron a Telecable en una boleta. Se aplican a las líneas pendientes de la semana
    (de la más antigua a la más nueva; opcionalmente solo de una móvil). Una boleta no se puede registrar dos veces ni exceder lo pendiente. */
-function registrarBoletaDevolucionWeb(token, periodo, fecha, boleta, cantidades, idMovil) {
+function registrarBoletaDevolucionWeb(token, periodo, fecha, boleta, cantidades, idMovil, soloMapear) {
 
   const ses = devSesion_(token, 'operador');
   boleta = txt_(boleta); periodo = txt_(periodo); idMovil = txt_(idMovil);
   if (!boleta) throw new Error('Escribe el número de boleta.');
+  if (soloMapear === true || txt_(soloMapear) === 'true') {
+    /* La semana ya se entregó con esta boleta, pero no se detalla por equipo: queda anotada en las líneas y los pendientes NO se descuentan */
+    return conBloqueo_(() => {
+      if (leerObjetos_(invHoja_('DEVE')).some(e => txt_(e.Boleta).toLowerCase() === boleta.toLowerCase()))
+        throw new Error('La boleta ' + boleta + ' ya fue registrada. No se puede duplicar la entrega.');
+      const sh = invHoja_('DEVL');
+      const todas = leerObjetos_(sh).map(devFila_);
+      const dia = segFecha_(fecha) || segFecha_(new Date());
+      const base = todas.filter(o => o.Debe > 0 && txt_(o.Periodo) === periodo && (!idMovil || o.ID_Movil === idMovil));
+      if (!base.length) throw new Error('No hay líneas en esa semana' + (idMovil ? ' para esa móvil' : '') + '.');
+      base.forEach(o => { devAgregarBoleta_(o, boleta); });
+      devEscribir_(sh, todas);
+      invAgregar_(invHoja_('DEVE'), 'DEVE', [{ Entrega: 'B' + Date.now(), Fecha: dia, ID_Movil: idMovil, Movil: '', Boleta: boleta, Equipo: 'Semana entregada (sin descontar pendientes)', Cantidad: 0, Linea: '', Usuario: ses.usuario, Creado: segAhora_() }]);
+      try { invLog_(ses, 'Boleta de devolución (solo mapeo)', 'Boleta ' + boleta + ' · período ' + periodo + ' · ' + base.length + ' línea(s) marcadas, pendientes sin cambio', boleta); } catch (e) { }
+      return { ok: true, lineas: base.length, unidades: 0, soloMapear: true };
+    });
+  }
   cantidades = cantidades || {};
   const pedidos = Object.keys(cantidades).map(e => ({ equipo: e, q: invRedondear_(invNum_(cantidades[e])) })).filter(x => x.q > 0);
   if (!pedidos.length) throw new Error('Escribe al menos una cantidad entregada.');
@@ -7766,6 +7783,7 @@ function anularBoletaDevolucionWeb(token, clave) {
       o.Fecha_Devolucion = ult; o.Recibido_Por = ult ? rec : '';
       devHist_(ses, o.Linea, 'ANULAR_BOLETA', x.q + ' ' + o.Equipo + ' vuelven a pendiente · se anuló ' + (boleta ? 'la boleta ' + boleta : 'una entrega') + ' (registrada por error)');
     });
+    if (boleta) todas.forEach(o => { if (o.Boletas.split(',').some(z => z.trim().toLowerCase() === boleta.toLowerCase())) o.Boletas = o.Boletas.split(',').map(z => z.trim()).filter(z => z && z.toLowerCase() !== boleta.toLowerCase()).join(', '); });
     devEscribir_(sh, todas);
     for (let k = quitar.length - 1; k >= 0; k--) shE.deleteRow(quitar[k].fila + 1);
     try { invLog_(ses, 'Boleta de devolución anulada', (boleta ? 'Boleta ' + boleta : 'Entrega ' + clave) + ' · ' + und + ' unidad(es) vuelven a pendiente', boleta || clave); } catch (e) { }

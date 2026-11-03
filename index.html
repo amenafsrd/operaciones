@@ -11078,18 +11078,20 @@ function devRecibirSemana(k) {
     '<div class="grid2"><div class="field"><label>Boleta #</label><input id="dvBol"></div><div class="field"><label>Fecha</label><input id="dvFecha" type="date" value="' + hoyISO() + '"></div></div>' +
     '<div class="field"><label>Aplicar a</label><select id="dvMovSel" onchange="devBoletaCalc()"><option value="">Cualquier móvil de la semana (las órdenes más antiguas primero)</option>' +
     Object.keys(mv).sort((a, b) => String(mv[a]).localeCompare(String(mv[b]), 'es', { numeric: true })).map(x => '<option value="' + esc(x) + '">Solo ' + esc(mv[x]) + '</option>').join('') + '</select></div>' +
-    '<div style="font-size:12px;color:#777;margin-bottom:6px">Anota cuántos equipos de cada tipo trae esta boleta. Pueden ser equipos sobrantes que se usan para completar lo pendiente de otras móviles: esas líneas quedan devueltas y no se vuelven a pedir. La boleta no se puede registrar dos veces.</div>' +
-    '<table class="table" style="min-width:0"><thead><tr><th class="left">Equipo</th><th>Pendiente</th><th>Entrega en boleta</th></tr></thead><tbody id="dvTabla"></tbody></table>' +
+    '<label class="chkInline" style="margin:4px 0 8px;background:#fff8e1;border-radius:8px;padding:8px 10px"><input type="checkbox" id="dvMapear" onchange="$(\'dvDetalle\').style.display = this.checked ? \'none\' : \'\'"> <span><b>Solo marcar la semana como entregada</b> (queda anotada la boleta, pero <u>no descuenta</u> los pendientes aunque falten equipos)</span></label>' +
+    '<div id="dvDetalle"><div style="font-size:12px;color:#777;margin-bottom:6px">Anota cuántos equipos de cada tipo trae esta boleta. Pueden ser equipos sobrantes que se usan para completar lo pendiente de otras móviles: esas líneas quedan devueltas y no se vuelven a pedir. La boleta no se puede registrar dos veces.</div>' +
+    '<table class="table" style="min-width:0"><thead><tr><th class="left">Equipo</th><th>Pendiente</th><th>Entrega en boleta</th></tr></thead><tbody id="dvTabla"></tbody></table></div>' +
     '<div class="modalActions"><button class="btn" onclick="devBoletaTodo()" style="margin-right:auto">Llenar con todo lo pendiente</button><button class="btn" onclick="devCerrar()">Cancelar</button><button class="btn primary" onclick="devGuardarBoleta()">Registrar boleta</button></div>');
   devBoletaCalc();
 }
 function devGuardarBoleta() {
   if (!$('dvBol').value.trim()) { toast('Escribe el número de boleta.'); return; }
   const c = {}; let t = 0;
+  const mapear = $('dvMapear') && $('dvMapear').checked;
   document.querySelectorAll('#devModal .dvQ').forEach(x => { const q = +x.value || 0; if (q > 0) { c[x.dataset.eq] = q; t += q; } });
-  if (!t) { toast('Indica al menos una cantidad.'); return; }
+  if (!t && !mapear) { toast('Indica al menos una cantidad, o marca «Solo marcar la semana como entregada».'); return; }
   const k = window._devSemK;
-  devLlamar('registrarBoletaDevolucionWeb', [k === '(sin periodo)' ? '' : k, $('dvFecha').value, $('dvBol').value.trim(), c, $('dvMovSel').value && (devDatos.lineas.find(o => (o.idMovil || o.movil) === $('dvMovSel').value) || {}).idMovil || ''], 'Boleta registrada (' + t + ' equipos).');
+  devLlamar('registrarBoletaDevolucionWeb', [k === '(sin periodo)' ? '' : k, $('dvFecha').value, $('dvBol').value.trim(), mapear ? {} : c, $('dvMovSel').value && (devDatos.lineas.find(o => (o.idMovil || o.movil) === $('dvMovSel').value) || {}).idMovil || '', mapear], mapear ? 'Semana marcada como entregada con la boleta (pendientes sin descontar).' : 'Boleta registrada (' + t + ' equipos).');
 }
 
 function devEntregaMovil(i) {
@@ -16463,6 +16465,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 184 · 03-nov 09:05</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 185 · 03-nov 12:46</div>
 </body>
 </html>
