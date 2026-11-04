@@ -10840,6 +10840,7 @@ function devRender() {
           '<td><span class="segBadge" style="background:' + devColor(e) + ';white-space:nowrap">' + e + '</span></td><td style="white-space:nowrap">';
         if (puedeEditar() && o.pendiente > 0) h += '<button class="btnMini" title="Marcar devuelto" onclick="devAccion(\'dev\',' + i + ')">✔</button> <button class="btnMini" title="Cambiar equipo" onclick="devAccion(\'cambio\',' + i + ')">🔄</button> ';
         if (esAdmin() && o.pendiente > 0) h += '<button class="btnMini" title="Justificar (no debe devolver)" onclick="devAccion(\'just\',' + i + ')">✍️</button> ';
+        if (esAdmin() && o.justificado > 0) h += '<button class="btnMini" title="Editar el comentario de la justificación" onclick="devAccion(\'editjust\',' + i + ')">📝</button> ';
         if (esAdmin() && (o.devuelto > 0 || o.justificado > 0 || o.equipoOriginal)) h += '<button class="btnMini" title="Revertir" onclick="devAccion(\'rev\',' + i + ')">↩</button> ';
         h += '<button class="btnMini" title="Historial" onclick="devAccion(\'hist\',' + i + ')">🕘</button></td></tr>';
       });
@@ -11031,6 +11032,12 @@ async function devAccion(tipo, i) {
     devModal('<h3>✍️ Justificar: no debe devolver</h3>' + devCab(o) +
       '<div class="field"><label>Cantidad a justificar</label><input id="dvCant" type="number" min="1" max="' + o.pendiente + '" value="' + o.pendiente + '"></div>' +
       '<div class="field"><label>Motivo</label><textarea id="dvMot" rows="3" placeholder="Ej. el cliente conservó el equipo, equipo dañado por el cliente…"></textarea></div>' + devPie('devGuardarJust()', 'Justificar'));
+  } else if (tipo === 'editjust') {
+    devModal('<h3>📝 Editar justificación</h3>' + devCab(o) +
+      '<div style="font-size:12px;color:#777;margin-bottom:8px">Cambia el comentario. Las cantidades justificadas no se tocan. Queda registrado en el historial.</div>' +
+      '<div class="field"><label>Motivo / comentario</label><textarea id="dvMot" rows="4" maxlength="300"></textarea></div>' +
+      '<div class="modalActions"><button class="btn" onclick="devQuitarJust()" style="margin-right:auto">Quitar justificación</button><button class="btn" onclick="devCerrar()">Cancelar</button><button class="btn primary" onclick="devGuardarEditJust()">Guardar</button></div>');
+    $('dvMot').value = o.motivo || '';
   } else if (tipo === 'cambio') {
     /* Opciones: solo los equipos que traen los Excel cargados (los mismos del filtro «Todos los equipos»), en desplegable y sin escribir */
     const eq = Array.from(new Set(devDatos.lineas.map(x => x.equipo))).filter(x => x && x !== o.equipo).sort((x, y) => x.localeCompare(y, 'es'));
@@ -11041,7 +11048,7 @@ async function devAccion(tipo, i) {
       '<div class="field"><label>Motivo</label><textarea id="dvMot" rows="2"></textarea></div>' + devPie('devGuardarCambio()', 'Cambiar'));
   } else if (tipo === 'rev') {
     if (!confirm('¿Revertir devoluciones/justificaciones/cambio de esta línea?')) return;
-    try { await api('revertirDevolucionWeb', o.linea); toast('Línea revertida.'); await cargarDevoluciones(); }
+    try { const rv = await api('revertirDevolucionWeb', o.linea); toast(rv && rv.quitoJustificacion ? 'Justificación quitada.' : 'Línea revertida.'); await cargarDevoluciones(); }
     catch (e) { mostrarError(e, 'No se pudo revertir.'); }
   } else if (tipo === 'hist') {
     let H = [];
@@ -11060,6 +11067,14 @@ function devGuardarDev() { devLlamar('registrarDevolucionLineaWeb', [window._dev
 function devGuardarJust() {
   if (!$('dvMot').value.trim()) { toast('Escribe el motivo.'); return; }
   devLlamar('justificarDevolucionWeb', [window._devO.linea, +$('dvCant').value, $('dvMot').value, false], 'Justificación registrada.');
+}
+function devGuardarEditJust() {
+  if (!$('dvMot').value.trim()) { toast('Escribe el comentario.'); return; }
+  devLlamar('editarJustificacionDevolucionWeb', [window._devO.linea, $('dvMot').value.trim()], 'Justificación actualizada.');
+}
+function devQuitarJust() {
+  if (!confirm('¿Quitar la justificación de esta línea? Volverá a quedar pendiente.')) return;
+  devLlamar('justificarDevolucionWeb', [window._devO.linea, '', '', true], 'Justificación quitada.');
 }
 function devGuardarCambio() {
   if (!$('dvEq').value.trim()) { toast('Indica el equipo correcto.'); return; }
@@ -16503,6 +16518,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 188 · 03-nov 21:02</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 189 · 04-nov 08:15</div>
 </body>
 </html>
