@@ -13108,15 +13108,18 @@ function bodVistaCons(v) {
 async function bodConsExcel() {
   const l = bodConsDetFiltrado();
   if (!l.length) { toast('No hay datos para exportar.'); return; }
+  try { await cargarLib('xlsx', SEG_URL_XLSX); } catch (e) { mostrarError(e, 'No se pudo cargar la librería de Excel. Revisa tu conexión a internet.'); return; }
   const filas = [];
   if (bodVista === 'col') {
     const d = bodConsColumnas(l);
     d.filas.forEach(f => { const r = { Fecha: f.o.fecha, OT: f.o.orden, Contrato: f.o.contrato || '', Móvil: 'M' + f.o.movil }; d.mats.forEach(m => { r[m.material] = f.q[m.clave] || ''; }); r['Cambio en el último corte'] = f.o.cambio || ''; filas.push(r); });
   } else
   l.forEach(o => o.items.forEach(i => filas.push({ Fecha: o.fecha, OT: o.orden, Contrato: o.contrato || '', Móvil: 'M' + o.movil, Material: i.material, Cantidad: i.cantidad, Archivo: o.archivo, 'Cambio en el último corte': o.cambio || '' })));
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(filas), 'Consumo');
-  await xlsxMarca(wb, 'Consumo_por_OT_' + $('bodConsDesde').value + '_' + $('bodConsHasta').value + '.xlsx', 'Consumo de materiales por OT');
+  try {
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(filas), 'Consumo');
+    await xlsxMarca(wb, 'Consumo_por_OT_' + $('bodConsDesde').value + '_' + $('bodConsHasta').value + '.xlsx', 'Consumo de materiales por OT');
+  } catch (e) { mostrarError(e, 'No se pudo generar el Excel.'); }
 }
 
 /* Exporta a Excel lo que quedó guardado de un archivo importado: una fila por OT y un material por columna */
@@ -16465,6 +16468,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 186 · 03-nov 12:53</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 187 · 03-nov 20:39</div>
 </body>
 </html>
