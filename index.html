@@ -1287,6 +1287,7 @@
               <div class="field" style="min-width:200px"><label>Buscar OT, contrato o material</label><input id="bodDetBuscar" oninput="renderBodConsDet()" placeholder="OT, contrato o material"></div>
               <div class="field" style="min-width:140px"><label>Móvil</label><select id="bodDetMovil" onchange="renderBodConsDet()"></select></div>
               <div class="field" style="min-width:170px"><label>Cambios al subir cortes</label><select id="bodDetCamb" onchange="renderBodConsDet()"><option value="">Todas las OT</option><option value="si">🔄 Solo OT con cambios</option></select></div>
+              <div class="field" style="min-width:200px"><label>Observaciones / sin material</label><select id="bodDetNota" onchange="renderBodConsDet()"><option value="">Todas las OT</option><option value="sin">⚪ Solo OT sin material</option><option value="obs">📝 Solo marcadas o con observación</option></select></div>
               <div id="bodDetCuenta" class="muted" style="font-size:12.5px;align-self:center"></div>
             </div>
             <div id="bodTablaDet" class="tableWrap"></div>
@@ -1749,6 +1750,15 @@
     </div>
   </div>
 
+  <div id="modalOtNota" class="modalBg">
+    <div class="modal" style="width:min(520px,100%)">
+      <h3 id="otnTitulo">OT</h3>
+      <div id="otnInfo" style="font-size:13px;color:#555;margin-bottom:10px"></div>
+      <label class="chkInline" style="margin-bottom:8px"><input type="checkbox" id="otnMarca"> <b>Marcar esta OT</b> (para filtrarla después)</label>
+      <div class="field"><label>Observación / justificación</label><textarea id="otnObs" rows="4" maxlength="500" placeholder="ej. sin material: cambio de caja · corrección que pidió el compañero · se ajusta a fin de mes" style="width:100%;font:inherit"></textarea></div>
+      <div class="modalActions"><button class="btn secondary" onclick="$('modalOtNota').classList.remove('show')">Cancelar</button><button id="otnOk" class="btn primary" onclick="bodOtNotaGuardar()">Guardar</button></div>
+    </div>
+  </div>
   <div id="modalDesB" class="modalBg">
     <div class="modal" style="width:min(640px,100%)">
       <h3 id="desbTitulo">Alistar material</h3>
@@ -13026,7 +13036,8 @@ function bodConsDetFiltrado() {
   const q = ($('bodDetBuscar').value || '').trim().toLowerCase();
   const mv = $('bodDetMovil').value;
   const camb = $('bodDetCamb') ? $('bodDetCamb').value : '';
-  return bodConsDet.filter(o => (!mv || o.idMovil === mv) && (!camb || o.cambio) &&
+  const nota = $('bodDetNota') ? $('bodDetNota').value : '';
+  return bodConsDet.filter(o => (!mv || o.idMovil === mv) && (!camb || o.cambio) && (!nota || (nota === 'sin' ? o.sinMaterial : (o.marcada || o.obs))) &&
     (!q || o.orden.toLowerCase().indexOf(q) !== -1 || String(o.contrato || '').toLowerCase().indexOf(q) !== -1 || o.items.some(i => String(i.material).toLowerCase().indexOf(q) !== -1)));
 }
 
@@ -13044,39 +13055,63 @@ function renderBodConsDet() {
   const coincide = (o, i) => !q || o.orden.toLowerCase().indexOf(q) !== -1 || String(o.contrato || '').toLowerCase().indexOf(q) !== -1 || String(i.material).toLowerCase().indexOf(q) !== -1;
   const filas = [];
   l.forEach(o => o.items.forEach(i => { if (coincide(o, i)) filas.push({ o: o, i: i }); }));
-  $('bodDetCuenta').textContent = filas.length + ' líneas · ' + l.length + ' OT' + (l.some(o => o.cambio) ? ' · ' + l.filter(o => o.cambio).length + ' con cambios' : '');
+  $('bodDetCuenta').textContent = filas.length + ' líneas · ' + l.length + ' OT' + (l.some(o => o.cambio) ? ' · ' + l.filter(o => o.cambio).length + ' con cambios' : '') + (l.some(o => o.sinMaterial) ? ' · ' + l.filter(o => o.sinMaterial).length + ' sin material' : '') + (l.some(o => o.marcada || o.obs) ? ' · ' + l.filter(o => o.marcada || o.obs).length + ' con observación' : '');
 
-  if (!filas.length) { $('bodTablaDet').innerHTML = '<div class="empty">No hay consumo para mostrar en ese rango o filtro.</div>'; return; }
+  if (!filas.length && !l.length) { $('bodTablaDet').innerHTML = '<div class="empty">No hay consumo para mostrar en ese rango o filtro.</div>'; return; }
 
   if (bodVista === 'col') {
     const d = bodConsColumnas(l);
     $('bodTablaDet').innerHTML = '<table class="table" style="font-size:12px;min-width:' + (620 + d.mats.length * 95) + 'px"><thead><tr><th style="position:sticky;left:0;z-index:2">OT</th><th>Fecha</th><th>Contrato</th><th>Móvil</th>' +
-      d.mats.map(m => '<th style="min-width:88px;white-space:normal;line-height:1.2;font-size:11px">' + esc(m.material) + '</th>').join('') + '<th class="left" style="min-width:200px">Cambio en el último corte</th></tr></thead><tbody>' +
-      d.filas.map(f => '<tr><td style="position:sticky;left:0;background:#fff"><b>' + esc(f.o.orden) + '</b>' + bodCambioMarca(f.o) + '</td><td>' + esc(fmtFechaSeg(f.o.fecha)) + '</td><td>' + esc(f.o.contrato || '—') + '</td><td>M' + esc(f.o.movil) + '</td>' +
-        d.mats.map(m => '<td>' + (f.q[m.clave] ? '<b>' + fmtN(f.q[m.clave]) + '</b>' : '<span class="segSinCarga">—</span>') + '</td>').join('') + '<td class="left" style="font-size:11.5px">' + bodCambioTxt(f.o) + '</td></tr>').join('') +
-      '<tr style="background:#f4f6fa;font-weight:700"><td style="position:sticky;left:0;background:#f4f6fa">Total</td><td></td><td></td><td></td>' + d.mats.map(m => '<td>' + fmtN(d.tot[m.clave]) + '</td>').join('') + '<td></td></tr></tbody></table>';
+      d.mats.map(m => '<th style="min-width:88px;white-space:normal;line-height:1.2;font-size:11px">' + esc(m.material) + '</th>').join('') + '<th class="left" style="min-width:200px">Cambio en el último corte</th><th class="left" style="min-width:220px">Observación / justificación</th></tr></thead><tbody>' +
+      d.filas.map(f => '<tr' + (f.o.marcada ? ' style="background:#fffbe6"' : '') + '><td style="position:sticky;left:0;background:' + (f.o.marcada ? '#fffbe6' : '#fff') + '"><b>' + esc(f.o.orden) + '</b>' + bodCambioMarca(f.o) + bodOtBadge(f.o) + '</td><td>' + esc(fmtFechaSeg(f.o.fecha)) + '</td><td>' + esc(f.o.contrato || '—') + '</td><td>M' + esc(f.o.movil) + '</td>' +
+        d.mats.map(m => '<td>' + (f.q[m.clave] ? '<b>' + fmtN(f.q[m.clave]) + '</b>' : '<span class="segSinCarga">—</span>') + '</td>').join('') + '<td class="left" style="font-size:11.5px">' + bodCambioTxt(f.o) + '</td><td class="left">' + bodOtNotaCelda(f.o) + '</td></tr>').join('') +
+      '<tr style="background:#f4f6fa;font-weight:700"><td style="position:sticky;left:0;background:#f4f6fa">Total</td><td></td><td></td><td></td>' + d.mats.map(m => '<td>' + fmtN(d.tot[m.clave]) + '</td>').join('') + '<td></td><td></td></tr></tbody></table>';
     return;
   }
 
   if (bodVista === 'ot') {
     /* Agrupado: una cabecera por OT y debajo sus materiales */
-    let h = '<table class="table" style="font-size:12px;min-width:620px"><thead><tr><th class="left">OT / Material</th><th>Contrato</th><th>Móvil</th><th>Fecha</th><th>Cantidad</th><th class="left">Archivo</th></tr></thead><tbody>';
+    let h = '<table class="table" style="font-size:12px;min-width:620px"><thead><tr><th class="left">OT / Material</th><th>Contrato</th><th>Móvil</th><th>Fecha</th><th>Cantidad</th><th class="left">Archivo</th><th class="left">Observación / justificación</th></tr></thead><tbody>';
     l.forEach(o => {
       const its = o.items.filter(i => coincide(o, i));
-      if (!its.length) return;
-      h += '<tr style="background:#eef3fa;font-weight:700"><td class="left">🧾 OT ' + esc(o.orden) + bodCambioMarca(o) + '</td><td>' + esc(o.contrato || '—') + '</td><td>M' + esc(o.movil) + '</td><td>' + esc(fmtFechaSeg(o.fecha)) +
-        '</td><td>' + its.length + ' mat.</td><td class="left" style="color:#777;font-weight:400">' + esc(o.archivo) + '</td></tr>';
-      its.forEach(i => { h += '<tr><td class="left" style="padding-left:28px">' + esc(i.material) + '</td><td></td><td></td><td></td><td><b>' + fmtN(i.cantidad) + '</b></td><td></td></tr>'; });
+      if (!its.length && !(o.sinMaterial && !q)) return;
+      h += '<tr style="background:#eef3fa;font-weight:700"><td class="left">🧾 OT ' + esc(o.orden) + bodCambioMarca(o) + bodOtBadge(o) + '</td><td>' + esc(o.contrato || '—') + '</td><td>M' + esc(o.movil) + '</td><td>' + esc(fmtFechaSeg(o.fecha)) +
+        '</td><td>' + (o.sinMaterial ? 'sin mat.' : its.length + ' mat.') + '</td><td class="left" style="color:#777;font-weight:400">' + esc(o.archivo) + '</td><td class="left" style="font-weight:400">' + bodOtNotaCelda(o) + '</td></tr>';
+      its.forEach(i => { h += '<tr><td class="left" style="padding-left:28px">' + esc(i.material) + '</td><td></td><td></td><td></td><td><b>' + fmtN(i.cantidad) + '</b></td><td></td><td></td></tr>'; });
     });
     $('bodTablaDet').innerHTML = h + '</tbody></table>';
     return;
   }
 
   $('bodTablaDet').innerHTML =
-    '<table class="table" style="font-size:12px;min-width:700px"><thead><tr><th>Fecha</th><th>OT</th><th>Contrato</th><th>Móvil</th><th class="left">Material</th><th>Cantidad</th><th class="left">Archivo</th><th class="left">Cambio en el último corte</th></tr></thead><tbody>' +
-    filas.map(f => '<tr><td>' + esc(fmtFechaSeg(f.o.fecha)) + '</td><td><b>' + esc(f.o.orden) + '</b>' + bodCambioMarca(f.o) + '</td><td>' + esc(f.o.contrato || '—') + '</td><td>M' + esc(f.o.movil) + '</td>' +
-      '<td class="left">' + esc(f.i.material) + '</td><td><b>' + fmtN(f.i.cantidad) + '</b></td>' +
-      '<td class="left" style="color:#777">' + esc(f.o.archivo) + '</td><td class="left" style="font-size:11.5px">' + bodCambioTxt(f.o) + '</td></tr>').join('') + '</tbody></table>';
+    '<table class="table" style="font-size:12px;min-width:700px"><thead><tr><th>Fecha</th><th>OT</th><th>Contrato</th><th>Móvil</th><th class="left">Material</th><th>Cantidad</th><th class="left">Archivo</th><th class="left">Cambio en el último corte</th><th class="left">Observación / justificación</th></tr></thead><tbody>' +
+    l.reduce((r, o) => r.concat(o.items.length ? o.items.filter(i => coincide(o, i)).map(i => ({ o: o, i: i })) : (o.sinMaterial && !q ? [{ o: o, i: null }] : [])), []).map(f => '<tr' + (f.o.marcada ? ' style="background:#fffbe6"' : '') + '><td>' + esc(fmtFechaSeg(f.o.fecha)) + '</td><td><b>' + esc(f.o.orden) + '</b>' + bodCambioMarca(f.o) + bodOtBadge(f.o) + '</td><td>' + esc(f.o.contrato || '—') + '</td><td>M' + esc(f.o.movil) + '</td>' +
+      '<td class="left">' + (f.i ? esc(f.i.material) : '<i style="color:#888">(sin material)</i>') + '</td><td>' + (f.i ? '<b>' + fmtN(f.i.cantidad) + '</b>' : '—') + '</td>' +
+      '<td class="left" style="color:#777">' + esc(f.o.archivo) + '</td><td class="left" style="font-size:11.5px">' + bodCambioTxt(f.o) + '</td><td class="left">' + bodOtNotaCelda(f.o) + '</td></tr>').join('') + '</tbody></table>';
+}
+
+
+/* Etiquetas y observación por OT (sin material, marcada, justificación) */
+function bodOtBadge(o) { return (o.sinMaterial ? ' <span class="segBadge t" style="background:#e9edf3;color:#445" title="El reporte trae esta OT sin ningún material">⚪ sin material</span>' : '') + (o.marcada ? ' <span class="segBadge t" style="background:#fff3cd;color:#8a6d00">🚩 marcada</span>' : ''); }
+function bodOtNotaCelda(o) {
+  const i = bodConsDet.indexOf(o);
+  return (o.obs ? '<div style="font-size:12px;white-space:normal;max-width:300px">' + esc(o.obs) + '</div><div style="color:#999;font-size:11px">' + esc(o.obsPor || '') + ' · ' + esc((o.obsFecha || '').slice(0, 16)) + '</div>' : '') +
+    (puedeEditar() ? '<button class="btnMini" onclick="bodOtNotaAbrir(' + i + ')">' + (o.obs || o.marcada ? '✏️ Editar' : '📝 Observación') + '</button>' : '');
+}
+let bodOtNotaAct = null;
+function bodOtNotaAbrir(i) {
+  const o = bodConsDet[i]; if (!o) return; bodOtNotaAct = o;
+  $('otnTitulo').textContent = 'OT ' + o.orden + ' · M' + o.movil;
+  $('otnInfo').textContent = (o.sinMaterial ? 'El reporte trae esta OT sin material. ' : '') + 'Contrato ' + (o.contrato || '—') + ' · ' + fmtFechaSeg(o.fecha);
+  $('otnMarca').checked = !!o.marcada || (!o.marcada && !o.obs && o.sinMaterial);
+  $('otnObs').value = o.obs || '';
+  $('modalOtNota').classList.add('show');
+}
+async function bodOtNotaGuardar() {
+  const o = bodOtNotaAct; if (!o) return;
+  const b = $('otnOk'); b.disabled = true;
+  try { await api('marcarOtConsumoWeb', o.orden, $('otnMarca').checked, $('otnObs').value.trim()); $('modalOtNota').classList.remove('show'); toast('OT ' + o.orden + ' actualizada.'); await cargarBodCons(); }
+  catch (e) { mostrarError(e, 'No se pudo guardar la observación.'); } finally { b.disabled = false; }
 }
 
 /* Marca de OT que cambió al subir un corte (detalle y hora de la carga que la cambió) */
@@ -13112,9 +13147,9 @@ async function bodConsExcel() {
   const filas = [];
   if (bodVista === 'col') {
     const d = bodConsColumnas(l);
-    d.filas.forEach(f => { const r = { Fecha: f.o.fecha, OT: f.o.orden, Contrato: f.o.contrato || '', Móvil: 'M' + f.o.movil }; d.mats.forEach(m => { r[m.material] = f.q[m.clave] || ''; }); r['Cambio en el último corte'] = f.o.cambio || ''; filas.push(r); });
+    d.filas.forEach(f => { const r = { Fecha: f.o.fecha, OT: f.o.orden, Contrato: f.o.contrato || '', Móvil: 'M' + f.o.movil }; d.mats.forEach(m => { r[m.material] = f.q[m.clave] || ''; }); r['Cambio en el último corte'] = f.o.cambio || ''; r['Sin material'] = f.o.sinMaterial ? 'SI' : ''; r['Marcada'] = f.o.marcada ? 'SI' : ''; r['Observación / justificación'] = f.o.obs || ''; filas.push(r); });
   } else
-  l.forEach(o => o.items.forEach(i => filas.push({ Fecha: o.fecha, OT: o.orden, Contrato: o.contrato || '', Móvil: 'M' + o.movil, Material: i.material, Cantidad: i.cantidad, Archivo: o.archivo, 'Cambio en el último corte': o.cambio || '' })));
+  l.forEach(o => (o.items.length ? o.items : [{ material: '(sin material)', cantidad: '' }]).forEach(i => filas.push({ Fecha: o.fecha, OT: o.orden, Contrato: o.contrato || '', Móvil: 'M' + o.movil, Material: i.material, Cantidad: i.cantidad, Archivo: o.archivo, 'Cambio en el último corte': o.cambio || '', 'Sin material': o.sinMaterial ? 'SI' : '', Marcada: o.marcada ? 'SI' : '', 'Observación / justificación': o.obs || '' })));
   try {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(filas), 'Consumo');
@@ -16468,6 +16503,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 187 · 03-nov 20:39</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 188 · 03-nov 21:02</div>
 </body>
 </html>
