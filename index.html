@@ -11278,8 +11278,10 @@ function devRepCalcular(filas, lineas) {
     const noRet = L.filter(o => (+o.justificado || 0) > 0);
     noRet.forEach(o => nota.push('No se retiró ' + o.equipo + (o.justificado !== 1 ? ' ×' + devRd(o.justificado) : '') + ': ' + (o.motivo || '(sin motivo)')));
     L.forEach(o => {
-      const r = R(devNorm(o.equipo), o.equipo); r.entregado += +o.devuelto || 0; r.justificado += +o.justificado || 0;
-      T.entregado += +o.devuelto || 0; mv.entregado += +o.devuelto || 0;
+      /* «Entregado» = lo que se le da a Telecable (lo que debía − lo justificado). Lo que la móvil aún no trae es control interno y no cuenta */
+      const ent = (+o.debe || 0) - (+o.justificado || 0);
+      const r = R(devNorm(o.equipo), o.equipo); r.entregado += ent; r.justificado += +o.justificado || 0;
+      T.entregado += ent; mv.entregado += ent;
       String(o.boletas || '').split(/[\s,;]+/).filter(Boolean).forEach(b => { if (T.boletas.indexOf(b) === -1) T.boletas.push(b); });
       if ((+o.pendiente || 0) < -0.0001) demas.push({ o: o, cant: devRd(-o.pendiente) });
     });
@@ -11348,11 +11350,11 @@ function devRepLibro(r) {
   const A = (nom, rows) => XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), nom);
   /* 1. Resumen: por tipo (como el de la hoja «Datos de Devolución») y por equipo */
   const tt = ['Total general', 0, 0, 0, '']; r.tipos.forEach(x => { tt[1] = rd(tt[1] + x.pidio); tt[2] = rd(tt[2] + x.entregado); tt[3] = rd(tt[3] + x.pidio - x.entregado); });
-  const te = ['TOTAL', 0, 0, 0, 0, 0]; r.resumen.forEach(x => { te[1] += x.pidio; te[2] += x.quedo; te[3] += x.entregado; te[4] += x.justificado; te[5] += x.quedo - x.entregado - x.justificado; });
+  const te = ['TOTAL', 0, 0, 0, 0]; r.resumen.forEach(x => { te[1] += x.pidio; te[2] += x.quedo; te[3] += x.justificado; te[4] += x.entregado; });
   A('Resumen', cab('Resumen de devolución').concat(
     [['Tipo', 'Suma de total (pidió Telecable)', 'Entregado', 'Diferencia', 'Boleta #']], r.tipos.map(x => [x.tipo, rd(x.pidio), rd(x.entregado), rd(x.pidio - x.entregado), x.boletas.join(', ')]), [tt], [], [],
-    [['Equipo', 'Pidió Telecable', 'Quedó (tras cambios de equipo)', 'Entregado', 'No retirado (justificado)', 'Pendiente de entregar']],
-    r.resumen.map(x => [x.equipo, rd(x.pidio), rd(x.quedo), rd(x.entregado), rd(x.justificado), rd(x.quedo - x.entregado - x.justificado)]), [te.map((v, i) => i ? rd(v) : v)]));
+    [['Equipo', 'Pidió Telecable', 'Quedó (tras cambios de equipo)', 'No retirado (justificado)', 'Entregado a Telecable']],
+    r.resumen.map(x => [x.equipo, rd(x.pidio), rd(x.quedo), rd(x.justificado), rd(x.entregado)]), [te.map((v, i) => i ? rd(v) : v)]));
   /* 2. Por móvil */
   A('Resumen por móvil', cab('Resumen por móvil').concat([['Móvil', 'Suma de total (pidió Telecable)', 'Entrega', 'Diferencia']], r.moviles.map(m => ['M' + m.movil, rd(m.pidio), rd(m.entregado), rd(m.pidio - m.entregado)])));
   /* 3. Justificaciones: la fila de Telecable tal cual la enviaron + lo que se entregó + la justificación */
@@ -16799,6 +16801,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 197 · 05-nov 12:56</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 198 · 05-nov 13:01</div>
 </body>
 </html>
