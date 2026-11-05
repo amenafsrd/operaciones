@@ -1759,6 +1759,18 @@
     </div>
   </div>
 
+  <div id="modalOtCorr" class="modalBg">
+    <div class="modal" style="width:min(640px,100%);max-height:92vh;overflow:auto">
+      <h3 id="otcTitulo">Corregir materiales</h3>
+      <div id="otcInfo" style="font-size:13px;color:#555;margin-bottom:10px"></div>
+      <div id="otcTabla"></div>
+      <div style="display:flex;gap:8px;margin:10px 0;align-items:center"><select id="otcAgregar" style="flex:1"></select><button class="btn secondary" onclick="bodOtCorrAgregar()">+ Agregar material</button></div>
+      <div class="field"><label>Motivo de la corrección <b style="color:#c0392b">*</b></label><textarea id="otcMotivo" rows="3" maxlength="300" placeholder="ej. el técnico anotó 2 conectores pero se usaron 4 · error de digitación en el reporte" style="width:100%;font:inherit"></textarea></div>
+      <div id="otcHist" style="font-size:12px;margin-top:6px"></div>
+      <div class="modalActions"><button class="btn secondary" onclick="$('modalOtCorr').classList.remove('show')">Cancelar</button><button id="otcOk" class="btn primary" onclick="bodOtCorrGuardar()">Guardar corrección</button></div>
+    </div>
+  </div>
+
   <div id="modalOtNota" class="modalBg">
     <div class="modal" style="width:min(520px,100%)">
       <h3 id="otnTitulo">OT</h3>
@@ -13120,7 +13132,7 @@ function bodOtBadge(o) { return (o.sinMaterial ? ' <span class="segBadge t" styl
 function bodOtNotaCelda(o) {
   const i = bodConsDet.indexOf(o);
   return (o.obs ? '<div style="font-size:12px;white-space:normal;max-width:300px">' + esc(o.obs) + '</div><div style="color:#999;font-size:11px">' + esc(o.obsPor || '') + ' · ' + esc((o.obsFecha || '').slice(0, 16)) + '</div>' : '') +
-    (puedeEditar() ? '<button class="btnMini" onclick="bodOtNotaAbrir(' + i + ')">' + (o.obs || o.marcada ? '✏️ Editar' : '📝 Observación') + '</button>' : '');
+    (puedeEditar() ? '<button class="btnMini" onclick="bodOtNotaAbrir(' + i + ')">' + (o.obs || o.marcada ? '✏️ Editar' : '📝 Observación') + '</button> <button class="btnMini" title="Corregir los materiales de esta OT y dejar el motivo" onclick="bodOtCorrAbrir(' + i + ')">🛠️ Corregir materiales</button>' : '');
 }
 /* Puntas del carrete (carrucha): inicio, fin y metros usados */
 function bodPuntaTd(o) {
@@ -13128,6 +13140,44 @@ function bodPuntaTd(o) {
   return '<td>' + f(o.puntaInicio) + '</td><td>' + f(o.puntaFin) + '</td><td>' + (o.metros == null ? '<span class="segSinCarga">—</span>' : '<b>' + fmtN(o.metros) + '</b>') + '</td>';
 }
 const BOD_PUNTA_TH = '<th title="Lectura inicial del carrete (carrucha)">Punta inicio</th><th title="Lectura final del carrete (carrucha)">Punta fin</th><th title="Punta inicio − punta fin">Metros</th>';
+/* Corregir materiales de una OT (queda el antes/después y el motivo) */
+let bodOtCorr = null;
+function bodOtCorrPintar() {
+  const c = bodOtCorr;
+  $('otcTabla').innerHTML = '<table class="table" style="font-size:12.5px"><thead><tr><th class="left">Material</th><th>Reporte / actual</th><th>Cantidad correcta</th><th></th></tr></thead><tbody>' +
+    (c.items.length ? c.items.map((x, k) => '<tr' + (x.nuevo !== x.antes ? ' style="background:#fffbe6"' : '') + '><td class="left">' + esc(x.material) + '</td><td>' + (x.antes ? fmtN(x.antes) : '<span class="segSinCarga">nuevo</span>') +
+      '</td><td><input type="number" min="0" step="any" value="' + x.nuevo + '" style="width:90px" oninput="bodOtCorr.items[' + k + '].nuevo = Number(this.value) || 0; this.closest(\'tr\').style.background = bodOtCorr.items[' + k + '].nuevo !== bodOtCorr.items[' + k + '].antes ? \'#fffbe6\' : \'\'"></td>' +
+      '<td><button class="btnMini" title="Quitar este material (cantidad 0)" onclick="bodOtCorr.items[' + k + '].nuevo = 0; bodOtCorrPintar()">✖</button></td></tr>').join('') : '<tr><td colspan="4" class="empty">Esta OT no tiene materiales. Agrega los correctos abajo.</td></tr>') + '</tbody></table>';
+  const usados = {}; c.items.forEach(x => { usados[x.clave] = 1; });
+  $('otcAgregar').innerHTML = '<option value="">Material que faltó…</option>' + bodMats(false).filter(m => !usados[m.clave]).map(m => '<option value="' + esc(m.clave) + '">' + esc(m.material) + '</option>').join('');
+}
+function bodOtCorrAgregar() {
+  const k = $('otcAgregar').value; if (!k) return;
+  bodOtCorr.items.push({ clave: k, material: bodMatNombre(k), antes: 0, nuevo: 1 }); bodOtCorrPintar();
+}
+async function bodOtCorrAbrir(i) {
+  const o = bodConsDet[i]; if (!o) return;
+  if (!bodDatos) await cargarBodega();
+  bodOtCorr = { orden: o.orden, items: o.items.map(x => ({ clave: x.clave, material: x.material, antes: x.cantidad, nuevo: x.cantidad })) };
+  $('otcTitulo').textContent = 'Corregir materiales · OT ' + o.orden + ' · M' + o.movil;
+  $('otcInfo').textContent = 'Contrato ' + (o.contrato || '—') + ' · ' + fmtFechaSeg(o.fecha) + '. Cambia la cantidad correcta de cada material; el sistema guarda lo que decía antes, lo nuevo y tu motivo.';
+  $('otcMotivo').value = ''; $('otcHist').innerHTML = '';
+  bodOtCorrPintar(); $('modalOtCorr').classList.add('show');
+  try {
+    const h = await api('obtenerCorreccionesConsumoWeb', o.orden);
+    if (h.length) $('otcHist').innerHTML = '<b>Correcciones anteriores</b>' + h.map(x => '<div style="padding:5px 0;border-bottom:1px solid #eee"><b>' + esc(x.material) + '</b>: ' + fmtN(x.antes) + ' → ' + fmtN(x.despues) + '<div style="color:#666">' + esc(x.motivo) + ' · ' + esc(x.usuario) + ' · ' + esc(x.fecha.slice(0, 16)) + '</div></div>').join('');
+  } catch (e) { }
+}
+async function bodOtCorrGuardar() {
+  const c = bodOtCorr; if (!c) return;
+  const cambios = c.items.filter(x => x.nuevo !== x.antes).map(x => ({ clave: x.clave, cantidad: x.nuevo }));
+  if (!cambios.length) { toast('No cambiaste ninguna cantidad.'); return; }
+  const motivo = $('otcMotivo').value.trim();
+  if (!motivo) { toast('Escribe el motivo de la corrección.'); $('otcMotivo').focus(); return; }
+  const b = $('otcOk'); b.disabled = true;
+  try { await api('corregirConsumoOtWeb', c.orden, cambios, motivo); $('modalOtCorr').classList.remove('show'); toast('OT ' + c.orden + ' corregida (' + cambios.length + ' material' + (cambios.length === 1 ? '' : 'es') + ').'); await cargarBodega(); await cargarBodCons(); }
+  catch (e) { mostrarError(e, 'No se pudo guardar la corrección.'); } finally { b.disabled = false; }
+}
 let bodOtNotaAct = null;
 function bodOtNotaAbrir(i) {
   const o = bodConsDet[i]; if (!o) return; bodOtNotaAct = o;
@@ -13216,7 +13266,7 @@ async function bodCmpExcel() {
 
 /* Marca de OT que cambió al subir un corte (detalle y hora de la carga que la cambió) */
 function bodCambioMarca(o) { return o.cambio ? ' <span class="segBadge t" style="background:#fff3cd;color:#8a6d00" title="' + esc(o.cambio + ' · corte subido ' + (o.carga || '')) + '">🔄 cambió</span>' : ''; }
-function bodCambioTxt(o) { return o.cambio ? '<span style="color:#8a6d00">' + esc(o.cambio) + '</span><div style="color:#999;font-size:11px">corte ' + esc((o.carga || '').slice(0, 16)) + '</div>' : '<span class="segSinCarga">—</span>'; }
+function bodCambioTxt(o) { return o.cambio ? '<span style="color:#8a6d00">' + esc(o.cambio) + '</span>' + (String(o.cambio).indexOf('Corrección manual') === 0 ? '' : '<div style="color:#999;font-size:11px">corte ' + esc((o.carga || '').slice(0, 16)) + '</div>') : '<span class="segSinCarga">—</span>'; }
 
 /* Una fila por OT y un material por columna (solo los materiales usados en el filtro) */
 function bodConsColumnas(l) {
@@ -13500,7 +13550,7 @@ async function consEjecutar(mapa) {
 
     let h = '<div class="segAviso ok" style="margin-bottom:15px"><b>✅ Reporte de materiales importado</b><ul style="margin:6px 0 0 18px">' +
       '<li><b>' + r.ordenes + '</b> OT en el archivo · cierres: ' + esc(r.fechas.map(fmtFechaSeg).join(', ')) + '</li>' +
-      '<li>🆕 <b>' + r.nuevas + '</b> nuevas (se descontaron) · ✔️ <b>' + r.sinCambios + '</b> ya estaban y no cambiaron (no se duplican) · 🔄 <b>' + r.cambiadas + '</b> con cambios (actualizadas)</li>';
+      '<li>🆕 <b>' + r.nuevas + '</b> nuevas (se descontaron) · ✔️ <b>' + r.sinCambios + '</b> ya estaban y no cambiaron (no se duplican) · 🔄 <b>' + r.cambiadas + '</b> con cambios (actualizadas)' + (r.conservadas ? ' · 🛠️ <b>' + r.conservadas + '</b> corregidas a mano (se conservan tal como las corregiste)' : '') + '</li>';
     if (r.materialesNuevos.length) h += '<li>🆕 Materiales nuevos agregados al catálogo (revisa su unidad): ' + esc(r.materialesNuevos.join(', ')) + '</li>';
     if (r.ignorados && r.ignorados.length) h += '<li>⛔ Ignorados (no descontaron): ' + esc(r.ignorados.join(', ')) + '</li>';
     if (r.sinMovil) h += '<li>⚠️ ' + r.sinMovil + ' OT no se pudieron ligar a una móvil y no descontaron stock.</li>';
@@ -16613,6 +16663,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 194 · 05-nov 12:05</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 195 · 05-nov 12:22</div>
 </body>
 </html>
