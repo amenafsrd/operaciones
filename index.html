@@ -11311,9 +11311,53 @@ async function devRepArchivo(inp) {
     }
     if (!filas.length) throw new Error('No encontré OT con equipos en ese archivo. Debe ser el mismo formato que subes en «Cargar archivo» (con la columna de OT y una columna por equipo).');
     if (!devDatos.lineas.length) devDatos = await api('obtenerDevolucionesWeb');
-    devRep = devRepCalcular(filas, devDatos.lineas); devRep.archivo = file.name;
+    devRep = devRepCalcular(filas, devDatos.lineas); devRep.archivo = file.name; devRep.bol = { num: '', cant: {}, extra: [] };
     devRepMostrar();
   } catch (e) { mostrarError(e, 'No se pudo preparar el reporte.'); }
+}
+/* Boleta de entrega: se digita lo que realmente se entregó por equipo y el sistema dice si cuadra, si faltó o si fue de más */
+function devRepBolFilas() {
+  const r = devRep, filas = r.resumen.filter(x => x.entregado > 0 || x.pidio > 0).map(x => ({ k: devNorm(x.equipo), equipo: x.equipo, debe: devRd(x.entregado) }));
+  r.bol.extra.forEach(n => { if (!filas.some(f => f.k === devNorm(n))) filas.push({ k: devNorm(n), equipo: n, debe: 0 }); });
+  return filas;
+}
+function devRepBolRes(debe, ent) {
+  if (ent === '' || ent == null || isNaN(ent)) return { t: '', c: '#999', x: '' };
+  const d = devRd(ent - debe);
+  return d === 0 ? { t: '✔ Cuadra', c: '#2e7d32', x: 'Cuadra' } : (d > 0 ? { t: '⚠ Se entregó de más: +' + d, c: '#c0392b', x: 'De más: +' + d } : { t: 'Faltaron ' + (-d), c: '#b26a00', x: 'Faltaron ' + (-d) });
+}
+function devRepBolPintar() {
+  const r = devRep, F = devRepBolFilas();
+  const ya = {}; F.forEach(f => { ya[f.k] = 1; });
+  const otros = []; const vistos = {};
+  (devDatos.lineas || []).forEach(o => { const k = devNorm(o.equipo); if (!ya[k] && !vistos[k]) { vistos[k] = 1; otros.push(o.equipo); } });
+  r.eqCols.forEach(n => { const k = devNorm(n); if (!ya[k] && !vistos[k]) { vistos[k] = 1; otros.push(n); } });
+  $('devRepBol').innerHTML =
+    '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><b>Boleta de entrega a Telecable</b><input id="devRepBolNum" placeholder="Boleta #" value="' + esc(r.bol.num) + '" style="width:110px" oninput="devRep.bol.num = this.value"></div>' +
+    '<table class="table" style="font-size:12.5px"><thead><tr><th class="left">Equipo</th><th>Debe entregarse</th><th>Entregado en la boleta</th><th class="left">Resultado</th></tr></thead><tbody>' +
+    F.map((f, i) => { const v = r.bol.cant[f.k], res = devRepBolRes(f.debe, v);
+      return '<tr><td class="left">' + esc(f.equipo) + '</td><td>' + fmtN(f.debe) + '</td><td><input type="number" min="0" step="any" style="width:80px" value="' + (v === undefined || v === '' ? '' : v) + '" oninput="devRepBolSet(\'' + esc(f.k).replace(/'/g, '') + '\', this.value, ' + f.debe + ', ' + i + ')"></td><td class="left" id="devRepBolR' + i + '" style="color:' + res.c + ';font-weight:600">' + res.t + '</td></tr>'; }).join('') +
+    '<tr style="background:#f4f6fa;font-weight:700"><td class="left">Total</td><td>' + fmtN(F.reduce((a, f) => a + f.debe, 0)) + '</td><td id="devRepBolTot"></td><td class="left" id="devRepBolTotR"></td></tr></tbody></table>' +
+    '<div style="display:flex;gap:8px;margin-top:6px"><select id="devRepBolOtro" style="flex:1"><option value="">Otro equipo que se entregó…</option>' + otros.map(n => '<option>' + esc(n) + '</option>').join('') + '</select><button class="btn secondary" onclick="devRepBolAgregar()">+ Agregar</button></div>';
+  devRepBolTotal();
+}
+function devRepBolSet(k, v, debe, i) {
+  const r = devRep; r.bol.cant[k] = v === '' ? '' : Number(v);
+  const res = devRepBolRes(debe, r.bol.cant[k]), c = $('devRepBolR' + i);
+  if (c) { c.textContent = res.t; c.style.color = res.c; }
+  devRepBolTotal();
+}
+function devRepBolTotal() {
+  const r = devRep, F = devRepBolFilas();
+  const hay = F.some(f => r.bol.cant[f.k] !== undefined && r.bol.cant[f.k] !== '');
+  const ent = F.reduce((a, f) => a + (Number(r.bol.cant[f.k]) || 0), 0), debe = F.reduce((a, f) => a + f.debe, 0);
+  $('devRepBolTot').innerHTML = hay ? '<b>' + fmtN(devRd(ent)) + '</b>' : '';
+  const res = hay ? devRepBolRes(debe, ent) : { t: '', c: '#999' };
+  $('devRepBolTotR').textContent = res.t; $('devRepBolTotR').style.color = res.c;
+}
+function devRepBolAgregar() {
+  const n = $('devRepBolOtro').value; if (!n) return;
+  devRep.bol.extra.push(n); devRepBolPintar();
 }
 function devRepMostrar() {
   const r = devRep, n = x => fmtN(devRd(x));
@@ -11327,12 +11371,14 @@ function devRepMostrar() {
     (r.noEnSistema.length ? '<span class="chip" style="background:#fde8e8;color:#a33">' + r.noEnSistema.length + ' OT no están en el sistema</span>' : '') + '</div>' +
     '<div style="max-height:320px;overflow:auto"><table class="table" style="font-size:12.5px"><thead><tr><th class="left">Tipo</th><th>Pidió Telecable</th><th>Entregado</th><th>Diferencia</th><th class="left">Boleta #</th></tr></thead><tbody>' +
     r.tipos.map(x => '<tr><td class="left">' + esc(x.tipo) + '</td><td>' + n(x.pidio) + '</td><td>' + n(x.entregado) + '</td><td' + (x.pidio !== x.entregado ? ' style="color:#b26a00"' : '') + '><b>' + n(x.pidio - x.entregado) + '</b></td><td class="left">' + esc(x.boletas.join(', ') || '—') + '</td></tr>').join('') + '</tbody></table>' +
-    '<div style="font-size:12px;color:#556;margin:8px 0 4px">Vista previa de las justificaciones (' + r.justRows.length + ' OT):</div>' +
+    '<div id="devRepBol" style="margin-top:12px;padding-top:10px;border-top:1px solid #e3e6ea"></div>' +
+    '<div style="font-size:12px;color:#556;margin:12px 0 4px">Vista previa de las justificaciones (' + r.justRows.length + ' OT):</div>' +
     '<table class="table" style="font-size:12px"><thead><tr><th>Móvil</th><th>OT</th><th class="left">Justificación</th></tr></thead><tbody>' +
     r.justRows.slice(0, 8).map(x => '<tr><td>M' + esc(x.movil) + '</td><td>' + esc(x.orden) + '</td><td class="left" style="white-space:normal">' + esc(x.nota) + '</td></tr>').join('') +
     (r.justRows.length > 8 ? '<tr><td colspan="3" class="empty">… y ' + (r.justRows.length - 8) + ' más en el Excel</td></tr>' : '') + '</tbody></table></div>' +
     (r.justRows.some(d => /sin motivo registrado/.test(d.nota)) ? '<div style="font-size:12px;color:#a33;margin-top:8px">⚠️ Hay cambios sin motivo registrado (anteriores a que se guardara el motivo). Salen marcados en el Excel.</div>' : '') +
     '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn secondary" onclick="devCerrar()">Cancelar</button><button class="btn primary" id="devRepBtn" onclick="devRepExportar()">Exportar Excel</button></div>');
+  devRepBolPintar();
 }
 async function devRepExportar() {
   const r = devRep; if (!r) return;
@@ -11351,10 +11397,17 @@ function devRepLibro(r) {
   /* 1. Resumen: por tipo (como el de la hoja «Datos de Devolución») y por equipo */
   const tt = ['Total general', 0, 0, 0, '']; r.tipos.forEach(x => { tt[1] = rd(tt[1] + x.pidio); tt[2] = rd(tt[2] + x.entregado); tt[3] = rd(tt[3] + x.pidio - x.entregado); });
   const te = ['TOTAL', 0, 0, 0, 0]; r.resumen.forEach(x => { te[1] += x.pidio; te[2] += x.quedo; te[3] += x.justificado; te[4] += x.entregado; });
+  const B = r.bol || { num: '', cant: {}, extra: [] };
+  const hayBol = Object.keys(B.cant).some(k => B.cant[k] !== '' && B.cant[k] != null);
+  const conocidos = {}; r.resumen.forEach(x => { conocidos[devNorm(x.equipo)] = 1; });
+  const extras = []; Object.keys(B.cant).forEach(k => { if (!conocidos[k] && B.cant[k] !== '' && B.cant[k] != null) { const n = (B.extra.find(e => devNorm(e) === k)) || k; if (extras.indexOf(n) === -1) extras.push(n); } });
+  const bolCols = (n, debe) => { const v = B.cant[devNorm(n)]; return (v === '' || v == null) ? ['', ''] : [rd(v), devRepBolRes(debe, v).x]; };
+  const entTot = Object.keys(B.cant).reduce((a, k) => a + (Number(B.cant[k]) || 0), 0);
   A('Resumen', cab('Resumen de devolución').concat(
-    [['Tipo', 'Suma de total (pidió Telecable)', 'Entregado', 'Diferencia', 'Boleta #']], r.tipos.map(x => [x.tipo, rd(x.pidio), rd(x.entregado), rd(x.pidio - x.entregado), x.boletas.join(', ')]), [tt], [], [],
-    [['Equipo', 'Pidió Telecable', 'Quedó (tras cambios de equipo)', 'No retirado (justificado)', 'Entregado a Telecable']],
-    r.resumen.map(x => [x.equipo, rd(x.pidio), rd(x.quedo), rd(x.justificado), rd(x.entregado)]), [te.map((v, i) => i ? rd(v) : v)]));
+    [['Tipo', 'Suma de total (pidió Telecable)', 'Entregado', 'Diferencia', 'Boleta #']], r.tipos.map(x => [x.tipo, rd(x.pidio), rd(x.entregado), rd(x.pidio - x.entregado), x.boletas.join(', ') || (B.num || '')]), [tt], [], [],
+    [['Equipo', 'Pidió Telecable', 'Quedó (tras cambios de equipo)', 'No retirado (justificado)', 'Debe entregarse a Telecable'].concat(hayBol ? ['Entregado en la boleta' + (r.bol.num ? ' #' + r.bol.num : ''), 'Resultado'] : [])],
+    r.resumen.map(x => [x.equipo, rd(x.pidio), rd(x.quedo), rd(x.justificado), rd(x.entregado)].concat(hayBol ? bolCols(x.equipo, x.entregado) : [])).concat(
+      extras.map(n => [n, 0, 0, 0, 0].concat(bolCols(n, 0)))), [te.map((v, i) => i ? rd(v) : v).concat(hayBol ? [rd(entTot), devRepBolRes(te[4], entTot).x] : [])]));
   /* 2. Por móvil */
   A('Resumen por móvil', cab('Resumen por móvil').concat([['Móvil', 'Suma de total (pidió Telecable)', 'Entrega', 'Diferencia']], r.moviles.map(m => ['M' + m.movil, rd(m.pidio), rd(m.entregado), rd(m.pidio - m.entregado)])));
   /* 3. Justificaciones: la fila de Telecable tal cual la enviaron + lo que se entregó + la justificación */
@@ -16801,6 +16854,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 198 · 05-nov 13:01</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 199 · 05-nov 13:09</div>
 </body>
 </html>
