@@ -11147,8 +11147,8 @@ function devGuardarEntrega() {
 
 function devLibro(L) {
   const wb = XLSX.utils.book_new();
-  const rows = [['Periodo', 'Fecha', 'Móvil', 'OT', 'Contrato', 'Avería', 'Equipo', 'Equipo original', 'Debe', 'Devuelto', 'Justificado', 'Pendiente', 'Estado', 'Boletas', 'Motivo justificación']]
-    .concat(L.map(o => [o.periodo, o.fecha, o.movil, o.orden, o.contrato, o.averia, o.equipo, o.equipoOriginal, o.debe, o.devuelto, o.justificado, o.pendiente, devEstado(o), o.boletas, o.motivo]));
+  const rows = [['Periodo', 'Fecha', 'Móvil', 'OT', 'Contrato', 'Avería', 'Equipo', 'Equipo original', 'Motivo del cambio', 'Debe', 'Devuelto', 'Justificado', 'Pendiente', 'Estado', 'Boletas', 'Motivo justificación']]
+    .concat(L.map(o => [o.periodo, o.fecha, o.movil, o.orden, o.contrato, o.averia, o.equipo, o.equipoOriginal, o.cambioMotivo || '', o.debe, o.devuelto, o.justificado, o.pendiente, devEstado(o), o.boletas, o.motivo]));
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Cambios de equipo');
   const pm = {}, pe = {};
   L.forEach(o => {
@@ -16613,6 +16613,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 193 · 05-nov 11:17</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 194 · 05-nov 12:05</div>
 </body>
 </html>
