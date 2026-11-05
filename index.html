@@ -1264,6 +1264,8 @@
             <button id="bodBtnImportar" class="btn primary" onclick="$('bodArchivo').click()">📥 Importar Reporte de Materiales por Móvil</button>
             <input type="file" id="bodArchivo" accept=".xlsx,.xls,.csv" style="display:none" onchange="bodImportarConsumo(this)">
             <button class="btn secondary" onclick="cargarBodCons()">↻ Actualizar</button>
+            <button class="btn secondary" onclick="$('bodCmpArchivo').click()" title="Compara un Excel contra lo que hay en el sistema en el rango de fechas, sin cambiar nada">🔍 Comparar con un archivo</button>
+            <input type="file" id="bodCmpArchivo" accept=".xlsx,.xls,.csv" style="display:none" onchange="bodCompararConsumo(this)">
           </div>
           <div id="bodConsResultado"></div>
           <div id="bodConsCards" class="cards segCards"></div>
@@ -1692,6 +1694,13 @@
     </div>
   </div>
 
+  <div id="modalConsCmp" class="modalBg">
+    <div class="modal" style="width:min(1100px,100%);max-height:92vh;display:flex;flex-direction:column">
+      <h3 id="ccTitulo">Comparación con el archivo</h3>
+      <div id="ccCuerpo" style="overflow:auto;flex:1"></div>
+      <div class="modalActions"><button class="btn secondary" onclick="$('modalConsCmp').classList.remove('show')">Cerrar</button><button class="btn primary" onclick="bodCmpExcel()">⬇ Exportar reporte a Excel</button></div>
+    </div>
+  </div>
   <div id="modalConsMap" class="modalBg">
     <div class="modal" style="width:min(900px,100%)">
       <h3>Relacionar materiales del reporte</h3>
@@ -13129,6 +13138,76 @@ async function bodOtNotaGuardar() {
   catch (e) { mostrarError(e, 'No se pudo guardar la observación.'); } finally { b.disabled = false; }
 }
 
+
+/* ---------- Comparar un archivo contra el consumo del sistema ---------- */
+let bodCmp = null;
+async function bodCompararConsumo(inp) {
+  const file = inp.files && inp.files[0]; inp.value = '';
+  if (!file) return;
+  const desde = $('bodConsDesde').value, hasta = $('bodConsHasta').value;
+  if (!desde || !hasta) { toast('Indica primero el rango de fechas (Desde / Hasta).'); return; }
+  try {
+    const filas = await segLeerExcel(file, ['n_orden', 'norden']);
+    if (!filas.length) throw new Error('El archivo no trae filas.');
+    if (!bodDatos) await cargarBodega();
+    const campos = await consResolverCampos(Object.keys(filas[0]));
+    if (!campos) return;
+    const ren = {}; Object.keys(campos).forEach(c => { ren[campos[c]] = c; });
+    const F = filas.map(f => { const g = {}; Object.keys(f).forEach(k => { g[ren[k] || k] = f[k]; }); return g; });
+    const mats = (bodDatos.materiales || []).filter(m => m.activo !== false);
+    const mapa = {}, sinRel = [];
+    Object.keys(F[0]).filter(k => CONS_INFO.indexOf(consNormCol(k)) === -1).forEach(k => {
+      let tot = 0; F.forEach(f => { const q = consCant(f[k]); if (q > 0) tot += q; });
+      if (tot <= 0) return;
+      const n = iiNorm(k);
+      let m = mats.find(x => iiNorm(x.material) === n || String(x.alias || '').split(';').some(a => a.trim() && iiNorm(a) === n));
+      if (!m && CONS_SUG[n]) m = mats.find(x => iiTieneCod(x, CONS_SUG[n]));
+      if (m) mapa[k] = m.clave; else sinRel.push({ columna: String(k).trim(), total: Math.round(tot * 100) / 100 });
+    });
+    toast('Comparando…');
+    const r = await api('compararConsumoWeb', F, desde, hasta, mapa);
+    r.archivo = file.name; r.sinRelacionar = sinRel;
+    bodCmp = r; bodCmpMostrar();
+  } catch (e) { mostrarError(e, 'No se pudo comparar el archivo.'); }
+}
+function bodCmpMostrar() {
+  const r = bodCmp, f = x => fmtFechaSeg(x);
+  const lim = 300;
+  const card = (n, t, c) => '<div style="flex:1;min-width:150px;background:#f6f7f9;border-radius:10px;padding:10px 14px"><div style="font-size:24px;font-weight:800;color:' + c + '">' + fmtN(n) + '</div><div style="font-size:12px;color:#666">' + t + '</div></div>';
+  const sec = (tit, n, color, cuerpo) => '<details ' + (n ? 'open' : '') + ' style="margin:10px 0;border:1px solid #e3e6ea;border-radius:10px"><summary style="cursor:pointer;padding:9px 14px;font-weight:700;color:' + color + '">' + tit + ' (' + n + ')</summary><div class="tableWrap" style="padding:0 6px 8px">' + (n ? cuerpo : '<div style="padding:10px;color:#2e7d32">✔ Nada que revisar.</div>') + '</div></details>';
+  const tabla = (cab, filas, total) => '<table class="table" style="font-size:12px"><thead><tr>' + cab.map(c => '<th class="left">' + c + '</th>').join('') + '</tr></thead><tbody>' + filas.slice(0, lim).join('') + '</tbody></table>' + (total > lim ? '<div style="padding:6px;color:#888;font-size:12px">Se muestran ' + lim + ' de ' + total + '. El reporte de Excel trae todas.</div>' : '');
+  const h = '<div style="font-size:13px;color:#555;margin-bottom:8px"><b>' + esc(r.archivo) + '</b> contra el sistema · del ' + f(r.desde) + ' al ' + f(r.hasta) + '</div>' +
+    '<div style="display:flex;gap:10px;flex-wrap:wrap">' + card(r.enArchivo, 'OT en el archivo (en el rango)', '#1f2a44') + card(r.enSistema, 'OT en el sistema (en el rango)', '#1f2a44') + card(r.iguales, 'Iguales', '#2e7d32') +
+    card(r.diferencias.length, 'Con diferencias', '#b3261e') + card(r.faltanEnSistema.length, 'Faltan en el sistema', '#b3261e') + card(r.sobranEnSistema.length, 'Solo en el sistema', '#8a6d00') + '</div>' +
+    (r.fueraRango ? '<div style="font-size:12px;color:#888;margin-top:6px">' + r.fueraRango + ' OT del archivo se dejaron fuera por tener fecha fuera del rango.</div>' : '') +
+    (r.sinRelacionar.length ? '<div style="font-size:12px;background:#fff8e1;border-radius:8px;padding:8px 10px;margin-top:8px">⚠️ Columnas del archivo sin material relacionado (no se compararon): ' + r.sinRelacionar.map(x => '<b>' + esc(x.columna) + '</b> (' + x.total + ')').join(', ') + '. Relaciónalas al importar para que cuenten.</div>' : '') +
+    sec('Con diferencias', r.diferencias.length, '#b3261e', tabla(['OT', 'Fecha', 'Móvil', 'Contrato', 'Qué es distinto'], r.diferencias.map(d => '<tr><td class="left"><b>' + esc(d.orden) + '</b></td><td class="left">' + esc(f(d.fecha)) + '</td><td class="left">M' + esc(d.movil) + '</td><td class="left">' + esc(d.contrato || '—') + '</td><td class="left">' +
+      d.materiales.map(m => esc(m.material) + ': archivo <b>' + fmtN(m.archivo) + '</b> · sistema <b>' + fmtN(m.sistema) + '</b> (' + (m.diferencia > 0 ? '+' : '') + fmtN(m.diferencia) + ')').concat(d.otros.map(esc)).join('<br>') + '</td></tr>'), r.diferencias.length)) +
+    sec('Están en el archivo y faltan en el sistema', r.faltanEnSistema.length, '#b3261e', tabla(['OT', 'Fecha', 'Móvil', 'Contrato', 'Materiales'], r.faltanEnSistema.map(d => '<tr><td class="left"><b>' + esc(d.orden) + '</b></td><td class="left">' + esc(f(d.fecha)) + '</td><td class="left">M' + esc(d.movil) + '</td><td class="left">' + esc(d.contrato || '—') + '</td><td class="left">' + esc(d.materiales) + '</td></tr>'), r.faltanEnSistema.length)) +
+    sec('Están en el sistema y no vienen en el archivo', r.sobranEnSistema.length, '#8a6d00', tabla(['OT', 'Fecha', 'Móvil', 'Contrato', 'Materiales'], r.sobranEnSistema.map(d => '<tr><td class="left"><b>' + esc(d.orden) + '</b></td><td class="left">' + esc(f(d.fecha)) + '</td><td class="left">M' + esc(d.movil) + '</td><td class="left">' + esc(d.contrato || '—') + '</td><td class="left">' + esc(d.materiales) + '</td></tr>'), r.sobranEnSistema.length)) +
+    sec('Totales por material (archivo contra sistema)', r.totales.length, '#1f2a44', tabla(['Material', 'Archivo', 'Sistema', 'Diferencia'], r.totales.map(t => '<tr><td class="left">' + esc(t.material) + '</td><td class="left">' + fmtN(t.archivo) + '</td><td class="left">' + fmtN(t.sistema) + '</td><td class="left" style="font-weight:700;color:' + (t.diferencia ? '#b3261e' : '#2e7d32') + '">' + (t.diferencia ? (t.diferencia > 0 ? '+' : '') + fmtN(t.diferencia) : '=') + '</td></tr>'), r.totales.length));
+  $('ccTitulo').textContent = 'Comparación con el archivo';
+  $('ccCuerpo').innerHTML = h;
+  $('modalConsCmp').classList.add('show');
+}
+async function bodCmpExcel() {
+  const r = bodCmp; if (!r) return;
+  try { await cargarLib('xlsx', SEG_URL_XLSX); } catch (e) { mostrarError(e, 'No se pudo cargar la librería de Excel. Revisa tu conexión a internet.'); return; }
+  try {
+    const wb = XLSX.utils.book_new();
+    const res = [['Archivo', r.archivo], ['Rango', r.desde + ' a ' + r.hasta], ['OT en el archivo (en el rango)', r.enArchivo], ['OT en el sistema (en el rango)', r.enSistema], ['Iguales', r.iguales], ['Con diferencias', r.diferencias.length],
+      ['Faltan en el sistema', r.faltanEnSistema.length], ['Solo en el sistema', r.sobranEnSistema.length], ['OT del archivo fuera del rango', r.fueraRango]];
+    r.sinRelacionar.forEach(x => res.push(['Columna sin material relacionado', x.columna + ' (' + x.total + ')']));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(res), 'Resumen');
+    const dif = []; r.diferencias.forEach(d => { d.materiales.forEach(m => dif.push({ OT: d.orden, Fecha: d.fecha, Móvil: 'M' + d.movil, Contrato: d.contrato, Detalle: m.material, Archivo: m.archivo, Sistema: m.sistema, Diferencia: m.diferencia })); d.otros.forEach(o => dif.push({ OT: d.orden, Fecha: d.fecha, Móvil: 'M' + d.movil, Contrato: d.contrato, Detalle: o, Archivo: '', Sistema: '', Diferencia: '' })); });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(dif.length ? dif : [{ OT: 'Sin diferencias' }]), 'Diferencias');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(r.faltanEnSistema.length ? r.faltanEnSistema.map(d => ({ OT: d.orden, Fecha: d.fecha, Móvil: 'M' + d.movil, Contrato: d.contrato, Materiales: d.materiales })) : [{ OT: 'Ninguna' }]), 'Faltan en sistema');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(r.sobranEnSistema.length ? r.sobranEnSistema.map(d => ({ OT: d.orden, Fecha: d.fecha, Móvil: 'M' + d.movil, Contrato: d.contrato, Materiales: d.materiales })) : [{ OT: 'Ninguna' }]), 'Solo en sistema');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(r.totales.map(t => ({ Material: t.material, Archivo: t.archivo, Sistema: t.sistema, Diferencia: t.diferencia }))), 'Totales por material');
+    await xlsxMarca(wb, 'Comparacion_consumo_' + r.desde + '_' + r.hasta + '.xlsx', 'Comparación de consumo por OT · ' + r.archivo);
+  } catch (e) { mostrarError(e, 'No se pudo generar el Excel.'); }
+}
+
 /* Marca de OT que cambió al subir un corte (detalle y hora de la carga que la cambió) */
 function bodCambioMarca(o) { return o.cambio ? ' <span class="segBadge t" style="background:#fff3cd;color:#8a6d00" title="' + esc(o.cambio + ' · corte subido ' + (o.carga || '')) + '">🔄 cambió</span>' : ''; }
 function bodCambioTxt(o) { return o.cambio ? '<span style="color:#8a6d00">' + esc(o.cambio) + '</span><div style="color:#999;font-size:11px">corte ' + esc((o.carga || '').slice(0, 16)) + '</div>' : '<span class="segSinCarga">—</span>'; }
@@ -16518,6 +16597,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 189 · 04-nov 08:15</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 190 · 05-nov 09:27</div>
 </body>
 </html>
