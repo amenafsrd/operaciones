@@ -1341,6 +1341,8 @@
               <div style="display:flex;gap:8px;flex-wrap:nowrap;flex:none">
                 <button class="btn primary" id="devBtnImp" style="white-space:nowrap" onclick="$('devArchivo').click()">📥 Cargar Excel</button>
                 <button class="btn" style="white-space:nowrap" onclick="devExportarModal()">📊 Exportar</button>
+                <button class="btn secondary" style="white-space:nowrap" title="Sube el archivo que te envió Telecable y genera la lista de diferencias y justificaciones" onclick="$('devRepFile').click()">📑 Reporte para Telecable</button>
+                <input type="file" id="devRepFile" accept=".xlsx,.xls" style="display:none" onchange="devRepArchivo(this)">
                 <button class="btn" style="white-space:nowrap" onclick="devBoletas()">📄 Boletas registradas</button>
               </div>
             </div>
@@ -11162,6 +11164,9 @@ function devLibro(L) {
   const rows = [['Periodo', 'Fecha', 'Móvil', 'OT', 'Contrato', 'Avería', 'Equipo', 'Equipo original', 'Motivo del cambio', 'Debe', 'Devuelto', 'Justificado', 'Pendiente', 'Estado', 'Boletas', 'Motivo justificación']]
     .concat(L.map(o => [o.periodo, o.fecha, o.movil, o.orden, o.contrato, o.averia, o.equipo, o.equipoOriginal, o.cambioMotivo || '', o.debe, o.devuelto, o.justificado, o.pendiente, devEstado(o), o.boletas, o.motivo]));
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Cambios de equipo');
+  const J = L.filter(o => (+o.justificado || 0) > 0);
+  if (J.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['Periodo', 'Móvil', 'OT', 'Contrato', 'Equipo', 'Cantidad no retirada', 'Motivo / justificación', 'Justificado por', 'Fecha', 'Boletas']]
+    .concat(J.map(o => [o.periodo, o.movil, o.orden, o.contrato, o.equipo, o.justificado, o.motivo || '', o.justPor || '', String(o.justFecha || '').slice(0, 16), o.boletas || '']))), 'Justificaciones');
   const pm = {}, pe = {};
   L.forEach(o => {
     const r = pm[o.movil] || (pm[o.movil] = { movil: o.movil, debe: 0, dev: 0, jus: 0, pen: 0 });
@@ -11228,6 +11233,111 @@ async function devExportarOk() {
     devCerrar();
     toast(modo === 'zip' ? 'ZIP exportado.' : 'Excel exportado.');
   } catch (e) { btn.disabled = false; btn.textContent = 'Exportar'; mostrarError(e, 'No se pudo exportar.'); }
+}
+
+/* ---------- Reporte para Telecable: qué cambió respecto al archivo que enviaron ---------- */
+let devRep = null;
+const devNorm = t => String(t == null ? '' : t).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+const devOrdenKey = t => String(t == null ? '' : t).trim().replace(/\.0+$/, '');
+/* filas: [{orden, contrato, movil, fecha, equipos:{nombre:cantidad}}] del archivo de Telecable; lineas: las del sistema */
+function devRepCalcular(filas, lineas) {
+  const porOt = {};
+  lineas.forEach(o => { (porOt[devOrdenKey(o.orden)] = porOt[devOrdenKey(o.orden)] || []).push(o); });
+  const rd = v => Math.round((+v || 0) * 100) / 100;
+  const dif = [], resumen = {}, justif = [], demas = [], noEnSistema = [];
+  const R = (k, n) => resumen[k] || (resumen[k] = { equipo: n, pidio: 0, quedo: 0, justificado: 0, devuelto: 0 });
+  const vistas = {};
+  filas.forEach(f => {
+    const ot = devOrdenKey(f.orden);
+    if (vistas[ot]) return; vistas[ot] = true;
+    const L = porOt[ot];
+    if (!L || !L.length) { noEnSistema.push({ orden: ot, contrato: f.contrato, movil: f.movil, equipos: Object.keys(f.equipos).map(n => n + ' ×' + f.equipos[n]).join(', ') }); return; }
+    const P = {}, D = {}, nombre = {};
+    Object.keys(f.equipos).forEach(n => { const k = devNorm(n); P[k] = (P[k] || 0) + f.equipos[n]; nombre[k] = n; });
+    L.forEach(o => { const k = devNorm(o.equipo); D[k] = (D[k] || 0) + (+o.debe || 0); if (!nombre[k]) nombre[k] = o.equipo; });
+    const motOt = []; L.forEach(o => { if (o.cambioMotivo && motOt.indexOf(o.cambioMotivo) === -1) motOt.push(o.cambioMotivo); });
+    Object.keys(Object.assign({}, P, D)).forEach(k => {
+      const p = rd(P[k]), d = rd(D[k]);
+      const r = R(k, nombre[k]); r.pidio += p; r.quedo += d;
+      if (Math.abs(p - d) < 0.0001) return;
+      const lin = L.filter(o => devNorm(o.equipo) === k);
+      const mot = lin.map(o => o.cambioMotivo).filter(Boolean).join(' | ') || motOt.join(' | ') || '(sin motivo registrado)';
+      const desde = lin.map(o => o.equipoOriginal).filter(Boolean).filter((x, i, a) => a.indexOf(x) === i).join(', ');
+      dif.push({ orden: ot, contrato: f.contrato || L[0].contrato, movil: L[0].movil, fecha: L[0].fecha, equipo: nombre[k], pidio: p, quedo: d, dif: rd(d - p),
+        tipo: p > 0 && d > 0 ? 'Cantidad distinta' : (p > 0 ? 'Ya no se registra este equipo (se cambió por otro)' : 'Equipo que no venía en el archivo'),
+        desde: desde, motivo: mot, boletas: lin.map(o => o.boletas).filter(Boolean).join(' ') });
+    });
+    L.forEach(o => {
+      const r = R(devNorm(o.equipo), o.equipo); r.justificado += +o.justificado || 0; r.devuelto += +o.devuelto || 0;
+      if ((+o.justificado || 0) > 0) justif.push(o);
+      if ((+o.pendiente || 0) < -0.0001) demas.push({ o: o, cant: rd(-o.pendiente) });
+    });
+  });
+  const res = Object.keys(resumen).sort((a, b) => resumen[a].equipo.localeCompare(resumen[b].equipo, 'es')).map(k => resumen[k]);
+  dif.sort((a, b) => String(a.movil).localeCompare(String(b.movil), 'es', { numeric: true }) || a.orden.localeCompare(b.orden));
+  return { resumen: res, dif: dif, justif: justif, demas: demas, noEnSistema: noEnSistema, totalOt: Object.keys(vistas).length };
+}
+async function devRepArchivo(inp) {
+  const file = inp.files && inp.files[0]; inp.value = '';
+  if (!file) return;
+  try {
+    toast('Leyendo el archivo de Telecable…');
+    const hojas = await devAnalizarExcel(file);
+    let filas = [];
+    for (const h of hojas) {
+      const H = h.m[h.hi].map(c => String(c).trim());
+      const a = devAutoMapa(H);
+      if (a.mapa.orden < 0 || !a.eq.length) continue;
+      if (a.mapa.movil < 0) a.mapa.movil = a.mapa.orden;
+      filas = devConstruirFilas(h, a.mapa, a.eq);
+      if (filas.length) break;
+    }
+    if (!filas.length) throw new Error('No encontré OT con equipos en ese archivo. Debe ser el mismo formato que subes en «Cargar archivo» (con la columna de OT y una columna por equipo).');
+    if (!devDatos.lineas.length) devDatos = await api('obtenerDevolucionesWeb');
+    devRep = devRepCalcular(filas, devDatos.lineas); devRep.archivo = file.name;
+    devRepMostrar();
+  } catch (e) { mostrarError(e, 'No se pudo preparar el reporte.'); }
+}
+function devRepMostrar() {
+  const r = devRep, n = x => fmtN(Math.round(x * 100) / 100);
+  devModal('<h3>📑 Reporte de diferencias para Telecable</h3>' +
+    '<div style="font-size:12px;color:#556;margin-bottom:10px">Archivo: <b>' + esc(r.archivo) + '</b> · ' + r.totalOt + ' OT en el archivo</div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">' +
+    '<span class="chip azul">' + r.dif.length + ' diferencia(s) de equipo o cantidad</span>' +
+    '<span class="chip amar">' + r.justif.length + ' línea(s) con justificación</span>' +
+    (r.demas.length ? '<span class="chip amar">' + r.demas.length + ' devuelta(s) de más</span>' : '') +
+    (r.noEnSistema.length ? '<span class="chip" style="background:#fde8e8;color:#a33">' + r.noEnSistema.length + ' OT no están en el sistema</span>' : '') + '</div>' +
+    '<div style="max-height:300px;overflow:auto"><table class="table" style="font-size:12.5px"><thead><tr><th class="left">Equipo</th><th>Pidió Telecable</th><th>Quedó</th><th>Diferencia</th><th>No retirado (justificado)</th><th>A devolver</th></tr></thead><tbody>' +
+    r.resumen.map(x => '<tr><td class="left">' + esc(x.equipo) + '</td><td>' + n(x.pidio) + '</td><td>' + n(x.quedo) + '</td><td' + (x.quedo !== x.pidio ? ' style="color:#b26a00"><b>' + (x.quedo - x.pidio > 0 ? '+' : '') + n(x.quedo - x.pidio) + '</b>' : '>0') + '</td><td>' + n(x.justificado) + '</td><td><b>' + n(x.quedo - x.justificado) + '</b></td></tr>').join('') +
+    '</tbody></table></div>' +
+    (r.dif.some(d => d.motivo === '(sin motivo registrado)') ? '<div style="font-size:12px;color:#a33;margin-top:8px">⚠️ Hay diferencias sin motivo registrado (cambios anteriores a que se guardara el motivo). Salen marcadas en el Excel.</div>' : '') +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn secondary" onclick="devCerrar()">Cancelar</button><button class="btn primary" id="devRepBtn" onclick="devRepExportar()">Exportar Excel</button></div>');
+}
+async function devRepExportar() {
+  const r = devRep; if (!r) return;
+  const b = $('devRepBtn'); b.disabled = true;
+  try {
+    await cargarLib('xlsx', SEG_URL_XLSX);
+    const wb = devRepLibro(r);
+    await xlsxMarca(wb, 'Diferencias_Telecable_' + hoyISO() + '.xlsx', 'Diferencias contra el archivo de Telecable');
+    devCerrar(); toast('Reporte exportado.');
+  } catch (e) { b.disabled = false; mostrarError(e, 'No se pudo exportar el reporte.'); }
+}
+function devRepLibro(r) {
+  const wb = XLSX.utils.book_new(), rd = v => Math.round((+v || 0) * 100) / 100;
+  const cab = t => [['Soluciones Red Dorada SRL · ' + t], ['Archivo de Telecable: ' + r.archivo + ' · ' + r.totalOt + ' OT · Generado: ' + hoyISO()], []];
+  const A = (nom, rows) => XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), nom);
+  const tot = ['TOTAL'].concat([1, 2, 3, 4, 5].map(() => 0));
+  const filasR = r.resumen.map(x => { const a = [x.equipo, rd(x.pidio), rd(x.quedo), rd(x.quedo - x.pidio), rd(x.justificado), rd(x.quedo - x.justificado), rd(x.devuelto)]; return a; });
+  const T = ['TOTAL', 0, 0, 0, 0, 0, 0]; filasR.forEach(a => { for (let i = 1; i < 7; i++) T[i] = rd(T[i] + a[i]); });
+  A('Resumen por equipo', cab('Resumen por equipo').concat([['Equipo', 'Pidió Telecable', 'Quedó (después de cambios)', 'Diferencia', 'No retirado (justificado)', 'Total a devolver', 'Ya devuelto']], filasR, [T]));
+  A('Diferencias por OT', cab('Diferencias contra el archivo').concat([['Móvil', 'OT', 'Contrato', 'Equipo', 'Pidió Telecable', 'Quedó registrado', 'Diferencia', 'Tipo', 'Cambiado desde', 'Motivo', 'Boletas']],
+    r.dif.map(d => ['M' + d.movil, d.orden, d.contrato, d.equipo, d.pidio, d.quedo, d.dif, d.tipo, d.desde, d.motivo, d.boletas])));
+  A('Justificaciones', cab('Equipos no retirados y su justificación').concat([['Móvil', 'OT', 'Contrato', 'Equipo', 'Cantidad no retirada', 'Motivo / justificación', 'Justificado por', 'Fecha', 'Boletas']],
+    r.justif.map(o => ['M' + o.movil, o.orden, o.contrato, o.equipo, o.justificado, o.motivo || '', o.justPor || '', String(o.justFecha || '').slice(0, 16), o.boletas || ''])));
+  if (r.demas.length) A('Devueltos de más', cab('Equipos entregados de más').concat([['Móvil', 'OT', 'Contrato', 'Equipo', 'Cantidad de más', 'Boletas']], r.demas.map(d => ['M' + d.o.movil, d.o.orden, d.o.contrato, d.o.equipo, d.cant, d.o.boletas || ''])));
+  if (r.noEnSistema.length) A('OT no encontradas', cab('OT del archivo que no están cargadas en el sistema').concat([['OT', 'Contrato', 'Móvil', 'Equipos pedidos']], r.noEnSistema.map(x => [x.orden, x.contrato, x.movil, x.equipos])));
+  return wb;
 }
 
 /* ---------- Equipos / material dañado (bodega general) ---------- */
@@ -16663,6 +16773,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 195 · 05-nov 12:22</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 196 · 05-nov 12:44</div>
 </body>
 </html>
