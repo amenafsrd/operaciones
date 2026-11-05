@@ -13150,7 +13150,7 @@ async function bodCompararConsumo(inp) {
     const filas = await segLeerExcel(file, ['n_orden', 'norden']);
     if (!filas.length) throw new Error('El archivo no trae filas.');
     if (!bodDatos) await cargarBodega();
-    const campos = await consResolverCampos(Object.keys(filas[0]));
+    const campos = await consResolverCampos(Object.keys(filas[0]), true);
     if (!campos) return;
     const ren = {}; Object.keys(campos).forEach(c => { ren[campos[c]] = c; });
     const F = filas.map(f => { const g = {}; Object.keys(f).forEach(k => { g[ren[k] || k] = f[k]; }); return g; });
@@ -13376,9 +13376,11 @@ function consCamposOk() {
   consCamposCerrar(m);
 }
 /* Devuelve {campo → columna del archivo} o null si la persona cancela */
-function consResolverCampos(cols) {
+function consResolverCampos(cols, soloOrden) {
   let pref = null; try { pref = JSON.parse(localStorage.getItem('consCampos') || 'null'); } catch (e) {}
   const mapa = consCamposAuto(cols, pref);
+  /* Para comparar solo hace falta el número de orden; fecha, móvil y contrato son opcionales */
+  if (soloOrden) { if (!mapa.N_Orden) return Promise.reject(new Error('No encuentro la columna con el número de orden (OT) en el archivo.')); return Promise.resolve(mapa); }
   if (!consCamposFalta(mapa).length) return Promise.resolve(mapa);
   consCamposCols = cols;
   return new Promise(res => { consCamposRes = res; consCamposPintar(mapa); $('modalConsCampos').classList.add('show'); });
@@ -16597,6 +16599,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 190 · 05-nov 09:27</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 191 · 05-nov 09:34</div>
 </body>
 </html>
