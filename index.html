@@ -11342,7 +11342,7 @@ function devRepBolPintar() {
   r.eqCols.forEach(n => { const k = devNorm(n); if (!ya[k] && !vistos[k]) { vistos[k] = 1; otros.push(n); } });
   $('devRepBol').innerHTML =
     '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><b>Boleta de entrega a Telecable</b><input id="devRepBolNum" placeholder="Boleta #" value="' + esc(r.bol.num) + '" style="width:110px" oninput="devRep.bol.num = this.value; devRepTiposPintar()"></div>' +
-    '<div style="overflow-x:auto"><table class="table" style="font-size:12px;min-width:0"><thead><tr><th class="left">Equipo</th><th>Debe entregarse</th><th>Entregado en la boleta</th><th class="left">Diferencia</th></tr></thead><tbody>' +
+    '<div style="overflow-x:auto"><table class="table" style="font-size:12px;min-width:0"><thead><tr><th class="left">Equipo</th><th>Recepción SRD</th><th>Entregado en la boleta</th><th class="left">Diferencia</th></tr></thead><tbody>' +
     F.map((f, i) => { const v = r.bol.cant[f.k], res = devRepBolRes(f.debe, v);
       return '<tr><td class="left">' + esc(f.equipo) + '</td><td>' + fmtN(f.debe) + '</td><td><input type="number" min="0" step="any" style="width:80px" value="' + (v === undefined || v === '' ? '' : v) + '" oninput="devRepBolSet(\'' + esc(f.k).replace(/'/g, '') + '\', this.value, ' + f.debe + ', ' + i + ')"></td><td class="left" id="devRepBolR' + i + '" style="color:' + res.c + ';font-weight:600">' + res.t + '</td></tr>'; }).join('') +
     '<tr style="background:#f4f6fa;font-weight:700"><td class="left">Total</td><td>' + fmtN(F.reduce((a, f) => a + f.debe, 0)) + '</td><td id="devRepBolTot"></td><td class="left" id="devRepBolTotR"></td></tr></tbody></table></div>' +
@@ -11353,28 +11353,88 @@ function devRepTiposPintar() {
   const el = $('devRepTipos'); if (!el) return;
   el.innerHTML = devRepCuadroHtml();
 }
+/* Datos del cuadro para el correo (los usan el cuadro en pantalla y la imagen) */
+function devRepCuadroDatos() {
+  const r = devRep, d = devRepBolDif(), n = x => fmtN(devRd(x));
+  const ex = d.hay ? d.extra : 0, mas = d.hay ? d.mas : 0, falta = d.hay ? d.falta : 0, bol = (r.bol && r.bol.num) || '';
+  const P = r.tipos.reduce((a, x) => a + x.pidio, 0), E = r.tipos.reduce((a, x) => a + x.entregado, 0) + ex;
+  const bien = t => String(t).replace(/^instalacion$/i, 'Instalación').replace(/^cambio$/i, 'Cambio');
+  const tipos = r.tipos.map(x => ({ c: [bien(x.tipo), n(x.pidio), n(x.entregado), n(x.pidio - x.entregado), x.boletas.join(', ') || bol || '—'], k: x.pidio !== x.entregado ? 'dif' : '' }));
+  if (mas) tipos.push({ c: ['Entregado de más', '—', '+' + n(mas), n(-mas), bol || '—'], k: 'mas' });
+  if (falta) tipos.push({ c: ['Faltante', '—', '−' + n(falta), n(falta), bol || '—'], k: 'falta' });
+  tipos.push({ c: ['Total general', n(P), n(E), n(P - E), ''], k: 'tot' });
+  const eq = devRepBolFilas().filter(f => f.debe > 0 || (r.resumen.find(q => devNorm(q.equipo) === f.k) || {}).pidio > 0 || (r.bol.cant[f.k] !== undefined && r.bol.cant[f.k] !== '')).map(f => {
+    const x = r.resumen.find(q => devNorm(q.equipo) === f.k), v = r.bol.cant[f.k], hay = !(v === undefined || v === '' || isNaN(v)), res = devRepBolRes(f.debe, hay ? v : '');
+    return { c: [f.equipo, n(x ? x.pidio : 0), n(f.debe), hay ? n(v) : '', hay ? String(res.t) : ''], color: res.c, hay: hay };
+  });
+  const sum = (i) => eq.reduce((a, f) => a + (Number(String(f.c[i]).replace(/,/g, '')) || 0), 0);
+  const todos = eq.length && eq.every(f => f.hay);   /* el total solo se compara cuando se digitaron todos los equipos */
+  const tot = eq.length ? { c: ['Total', n(sum(1)), n(sum(2)), todos ? n(d.ent) : '', todos ? String(devRepBolRes(d.debe, d.ent).t) : ''], color: todos ? devRepBolRes(d.debe, d.ent).c : '#111' } : null;
+  return { bol: bol, archivo: r.archivo, tipos: tipos, eq: eq, tot: tot, fecha: hoyISO() };
+}
 /* Cuadro compacto con estilos en línea para pegarlo tal cual en el correo */
 function devRepCuadroHtml() {
-  const r = devRep, n = x => fmtN(devRd(x)), d = devRepBolDif(), ex = d.hay ? d.extra : 0, mas = d.hay ? d.mas : 0, falta = d.hay ? d.falta : 0;
-  const P = r.tipos.reduce((a, x) => a + x.pidio, 0), E = r.tipos.reduce((a, x) => a + x.entregado, 0) + ex;
-  const bol = (r.bol && r.bol.num) || '';
+  const D = devRepCuadroDatos();
   const T = 'border-collapse:collapse;font-family:Calibri,Arial,sans-serif;font-size:13px;margin:0 0 10px 0';
   const th = 'background:#b71c1c;color:#fff;border:1px solid #888;padding:3px 9px;text-align:center;font-weight:bold';
   const thL = th.replace('text-align:center', 'text-align:left');
-  const td = (x, extra) => 'border:1px solid #888;padding:3px 9px;text-align:center;' + (extra || '');
+  const td = (extra) => 'border:1px solid #888;padding:3px 9px;text-align:center;' + (extra || '');
   const tdL = (extra) => 'border:1px solid #888;padding:3px 9px;text-align:left;' + (extra || '');
-  let h = '<table style="' + T + '"><thead><tr><th style="' + thL + '">Tipo</th><th style="' + th + '">Archivo TC</th><th style="' + th + '">Entregado</th><th style="' + th + '">Diferencia</th><th style="' + th + '">Boleta #</th></tr></thead><tbody>' +
-    r.tipos.map(x => '<tr><td style="' + tdL() + '">' + esc(x.tipo) + '</td><td style="' + td() + '">' + n(x.pidio) + '</td><td style="' + td() + '">' + n(x.entregado) + '</td><td style="' + td(x.pidio !== x.entregado ? 'color:#b26a00;font-weight:bold' : '') + '">' + n(x.pidio - x.entregado) + '</td><td style="' + td() + '">' + esc(x.boletas.join(', ') || bol || '—') + '</td></tr>').join('') +
-    (mas ? '<tr style="background:#fdecea"><td style="' + tdL('font-weight:bold') + '">Entregado de más</td><td style="' + td() + '">—</td><td style="' + td('font-weight:bold') + '">+' + n(mas) + '</td><td style="' + td('color:#c0392b;font-weight:bold') + '">' + n(-mas) + '</td><td style="' + td() + '">' + esc(bol || '—') + '</td></tr>' : '') +
-    (falta ? '<tr style="background:#fff4d6"><td style="' + tdL('font-weight:bold') + '">Faltante</td><td style="' + td() + '">—</td><td style="' + td('font-weight:bold') + '">−' + n(falta) + '</td><td style="' + td('color:#b26a00;font-weight:bold') + '">' + n(falta) + '</td><td style="' + td() + '">' + esc(bol || '—') + '</td></tr>' : '') +
-    '<tr style="background:#eee;font-weight:bold"><td style="' + tdL() + '">Total general</td><td style="' + td() + '">' + n(P) + '</td><td style="' + td() + '">' + n(E) + '</td><td style="' + td() + '">' + n(P - E) + '</td><td style="' + td() + '"></td></tr></tbody></table>';
-  if (d.hay) {
-    h += '<table style="' + T + '"><thead><tr><th style="' + thL + '">Equipo</th><th style="' + th + '">Archivo TC</th><th style="' + th + '">Debe entregarse</th><th style="' + th + '">Entregado' + (bol ? ' (boleta ' + esc(bol) + ')' : '') + '</th><th style="' + th + '">Diferencia</th></tr></thead><tbody>' +
-      devRepBolFilas().filter(f => r.bol.cant[f.k] !== undefined && r.bol.cant[f.k] !== '' && !isNaN(r.bol.cant[f.k])).map(f => {
-        const x = r.resumen.find(q => devNorm(q.equipo) === f.k), v = r.bol.cant[f.k], res = devRepBolRes(f.debe, v);
-        return '<tr><td style="' + tdL() + '">' + esc(f.equipo) + '</td><td style="' + td() + '">' + n(x ? x.pidio : 0) + '</td><td style="' + td() + '">' + n(f.debe) + '</td><td style="' + td() + '">' + n(v) + '</td><td style="' + td('color:' + res.c + ';font-weight:bold') + '">' + esc(String(res.x)) + '</td></tr>'; }).join('') + '</tbody></table>';
-  }
+  const fondo = { mas: 'background:#fdecea;', falta: 'background:#fff4d6;', tot: 'background:#eee;font-weight:bold;' };
+  let h = '<div style="font-family:Calibri,Arial,sans-serif;font-size:30px;font-weight:bold;color:#b71c1c;margin:0 0 8px 0">Boleta # ' + esc(D.bol || '—') + '</div>';
+  if (D.eq.length) h += '<table style="' + T + '"><thead><tr><th style="' + thL + '">Equipo</th><th style="' + th + '">Archivo TC</th><th style="' + th + '">Recepción SRD</th><th style="' + th + '">Entregado en la boleta</th><th style="' + th + '">Diferencia</th></tr></thead><tbody>' +
+    D.eq.concat(D.tot ? [D.tot] : []).map(f => '<tr' + (f === D.tot ? ' style="background:#eee;font-weight:bold"' : '') + '><td style="' + tdL() + '">' + esc(f.c[0]) + '</td><td style="' + td() + '">' + esc(f.c[1]) + '</td><td style="' + td() + '">' + esc(f.c[2]) + '</td><td style="' + td() + '">' + esc(f.c[3]) + '</td><td style="' + td('font-weight:bold;color:' + f.color) + '">' + esc(f.c[4]) + '</td></tr>').join('') + '</tbody></table>';
   return h;
+}
+/* Imagen (pantallazo) del cuadro, lista para pegar en el correo */
+function devRepImagen() {
+  const D = devRepCuadroDatos(), K = 2, W = 880, F = 'Calibri, Arial, sans-serif';
+  const cv = document.createElement('canvas'); const ctx = cv.getContext('2d');
+  const tablas = [];
+  if (D.eq.length) tablas.push({ cab: ['Equipo', 'Archivo TC', 'Recepción SRD', 'Entregado en la boleta', 'Diferencia'], w: [250, 120, 150, 200, 110], filas: D.eq.map(f => ({ c: f.c, k: '', color: f.color })).concat(D.tot ? [{ c: D.tot.c, k: 'tot', color: D.tot.color }] : []) });
+  const fila = 30, top = 150;
+  let H = top + tablas.reduce((a, t) => a + (t.filas.length + 1) * fila + 28, 0) + 20;
+  cv.width = W * K; cv.height = H * K; ctx.scale(K, K);
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#b71c1c'; ctx.fillRect(0, 0, W, 112);
+  ctx.fillStyle = '#fff'; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+  ctx.font = 'bold 17px ' + F; ctx.fillText('SOLUCIONES RED DORADA SRL  ·  RECEPCIÓN DE EQUIPOS', 24, 26);
+  ctx.font = 'bold 58px ' + F; ctx.fillText('Boleta # ' + (D.bol || '—'), 24, 70);
+  ctx.fillStyle = '#445'; ctx.font = '14px ' + F; ctx.fillText('Archivo TC: ' + D.archivo + '  ·  ' + D.fecha.split('-').reverse().join('/'), 24, 132);
+  let y = top;
+  tablas.forEach(t => {
+    const x0 = 24; let x = x0;
+    ctx.font = 'bold 14px ' + F;
+    t.cab.forEach((c, i) => { ctx.fillStyle = '#b71c1c'; ctx.fillRect(x, y, t.w[i], fila); ctx.strokeStyle = '#888'; ctx.strokeRect(x, y, t.w[i], fila); ctx.fillStyle = '#fff'; ctx.textAlign = i ? 'center' : 'left'; ctx.fillText(c, i ? x + t.w[i] / 2 : x + 9, y + fila / 2); x += t.w[i]; });
+    y += fila;
+    t.filas.forEach(f => {
+      x = x0;
+      const bg = f.k === 'mas' ? '#fdecea' : (f.k === 'falta' ? '#fff4d6' : (f.k === 'tot' ? '#eeeeee' : '#ffffff'));
+      t.w.forEach((w, i) => {
+        ctx.fillStyle = bg; ctx.fillRect(x, y, w, fila); ctx.strokeStyle = '#888'; ctx.strokeRect(x, y, w, fila);
+        const neg = (i === 3 && (f.k === 'mas' || f.k === 'falta')) ;
+        ctx.fillStyle = f.color && i === t.w.length - 1 ? f.color : (neg ? (f.k === 'mas' ? '#c0392b' : '#b26a00') : '#111');
+        ctx.font = (f.k === 'tot' || f.k === 'mas' || f.k === 'falta' || (f.color && i === t.w.length - 1) ? 'bold ' : '') + '14px ' + F;
+        ctx.textAlign = i ? 'center' : 'left'; ctx.fillText(String(f.c[i]), i ? x + w / 2 : x + 9, y + fila / 2); x += w;
+      });
+      y += fila;
+    });
+    y += 28;
+  });
+  return cv;
+}
+async function devRepCopiarImagen() {
+  try {
+    const cv = devRepImagen();
+    const blob = await new Promise(res => cv.toBlob(res, 'image/png'));
+    try {
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      toast('Imagen copiada. Pégala en el correo (Ctrl+V).');
+    } catch (e) {
+      pmBajar(blob, 'Boleta_' + (devRep.bol.num || 'sin_numero') + '.png');
+      toast('Tu navegador no deja copiar la imagen; se descargó para que la adjuntes.', 6000);
+    }
+  } catch (e) { mostrarError(e, 'No se pudo generar la imagen.'); }
 }
 async function devRepCopiar() {
   const el = $('devRepTipos'); if (!el) return;
@@ -11425,7 +11485,7 @@ function devRepMostrar() {
     r.justRows.slice(0, 8).map(x => '<tr><td>M' + esc(x.movil) + '</td><td>' + esc(x.orden) + '</td><td class="left" style="white-space:normal">' + esc(x.nota) + '</td></tr>').join('') +
     (r.justRows.length > 8 ? '<tr><td colspan="3" class="empty">… y ' + (r.justRows.length - 8) + ' más en el Excel</td></tr>' : '') + '</tbody></table></div>' +
     (r.justRows.some(d => /sin motivo registrado/.test(d.nota)) ? '<div style="font-size:12px;color:#a33;margin-top:8px">⚠️ Hay cambios sin motivo registrado (anteriores a que se guardara el motivo). Salen marcados en el Excel.</div>' : '') +
-    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn secondary" onclick="devCerrar()">Cancelar</button><button class="btn secondary" onclick="devRepCopiar()">📋 Copiar cuadro para correo</button><button class="btn primary" id="devRepBtn" onclick="devRepExportar()">Exportar Excel</button></div>');
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn secondary" onclick="devCerrar()">Cancelar</button><button class="btn secondary" onclick="devRepCopiarImagen()">🖼️ Copiar imagen para correo</button><button class="btn secondary" onclick="devRepCopiar()">📋 Copiar cuadro</button><button class="btn primary" id="devRepBtn" onclick="devRepExportar()">Exportar Excel</button></div>');
   devRepBolPintar();
 }
 async function devRepExportar() {
@@ -11456,7 +11516,7 @@ function devRepLibro(r) {
   A('Resumen', cab('Resumen de devolución').concat(
     [['Tipo', 'Archivo TC', 'Entregado', 'Diferencia', 'Boleta #']], r.tipos.map(x => [x.tipo, rd(x.pidio), rd(x.entregado), rd(x.pidio - x.entregado), x.boletas.join(', ') || (B.num || '')]),
     (bolD.mas ? [['Entregado de más (según boleta)', 0, bolD.mas, rd(-bolD.mas), B.num || '']] : []), (bolD.falta ? [['Faltante (según boleta)', 0, -bolD.falta, bolD.falta, B.num || '']] : []), [tt], [], [],
-    [['Equipo', 'Archivo TC', 'Quedó (tras cambios de equipo)', 'No retirado (justificado)', 'Debe entregarse a Telecable'].concat(hayBol ? ['Entregado en la boleta' + (r.bol.num ? ' #' + r.bol.num : ''), 'Diferencia'] : [])],
+    [['Equipo', 'Archivo TC', 'Quedó (tras cambios de equipo)', 'No retirado (justificado)', 'Recepción SRD'].concat(hayBol ? ['Entregado en la boleta' + (r.bol.num ? ' #' + r.bol.num : ''), 'Diferencia'] : [])],
     r.resumen.map(x => [x.equipo, rd(x.pidio), rd(x.quedo), rd(x.justificado), rd(x.entregado)].concat(hayBol ? bolCols(x.equipo, x.entregado) : [])).concat(
       extras.map(n => [n, 0, 0, 0, 0].concat(bolCols(n, 0)))), [te.map((v, i) => i ? rd(v) : v).concat(hayBol ? [rd(devRepBolDif().ent), devRepBolRes(devRepBolDif().debe, devRepBolDif().ent).x] : [])]));
   /* 2. Por móvil */
@@ -16905,6 +16965,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 202 · 05-nov 13:26</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 204 · 05-nov 13:33</div>
 </body>
 </html>
