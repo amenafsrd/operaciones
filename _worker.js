@@ -7403,7 +7403,8 @@ function importarConsumoWeb(token, filas, archivo, mapa) {
         const r = porX[o];
         if (sinMat) {
           if (!r) { filasX.push({ N_Orden: o, Fecha: x.fecha, ID_Movil: String(x.m.ID_Movil), Movil: txt_(x.m.Movil), Contrato: x.contrato, Sin_Material: 'SI', Marcada: '', Observacion: '', Usuario: '', Actualizado: horaCarga, Archivo: archivo }); cambioX = true; }
-          else if (txt_(r.Sin_Material) !== 'SI') { r.Sin_Material = 'SI'; r.Fecha = x.fecha || r.Fecha; r.ID_Movil = String(x.m.ID_Movil); r.Movil = txt_(x.m.Movil); cambioX = true; }
+          else if (txt_(r.Sin_Material) !== 'SI') { r.Sin_Material = 'SI'; r.Fecha = x.fecha || r.Fecha; r.ID_Movil = String(x.m.ID_Movil); r.Movil = txt_(x.m.Movil); r.Archivo = archivo; cambioX = true; }
+          else if (txt_(r.Archivo) !== archivo) { r.Archivo = archivo; cambioX = true; }
         } else if (r && txt_(r.Sin_Material) === 'SI') { r.Sin_Material = ''; cambioX = true; }
       });
       if (cambioX) invReescribir_(shX, 'OTX', filasX.filter(r => txt_(r.Sin_Material) === 'SI' || txt_(r.Marcada) === 'SI' || txt_(r.Observacion)).map(r => ({
@@ -7464,7 +7465,7 @@ function obtenerConsumoDetalleWeb(token, desde, hasta) {
 
   /* OT sin material, observaciones y marcas (hoja aparte) */
   try {
-    leerObjetos_(invHoja_('OTX')).forEach(r => {
+    otxVigentes_().forEach(r => {
       const o = txt_(r.N_Orden), f = invFecha_(r.Fecha);
       let x = ots[o];
       if (!x) {
@@ -7483,6 +7484,13 @@ function obtenerConsumoDetalleWeb(token, desde, hasta) {
     .sort((a, b) => b.fecha.localeCompare(a.fecha) || (Number(a.movil) || 0) - (Number(b.movil) || 0) || a.orden.localeCompare(b.orden));
 }
 
+
+/* Filas de OT sin material que siguen vigentes: su archivo importado todavía existe en las cargas (si se eliminó la carga, la OT ya no cuenta) */
+function otxVigentes_() {
+  const archivos = {};
+  leerObjetos_(invHoja_('CARGAS')).forEach(c => { archivos[txt_(c.Archivo)] = true; });
+  return leerObjetos_(invHoja_('OTX')).filter(r => archivos[txt_(r.Archivo)] || txt_(r.Sin_Material) !== 'SI');
+}
 
 /* Compara un reporte (Excel) contra el consumo que hay en el sistema en un rango de fechas. No guarda nada.
    mapaCols: { «nombre de la columna en el reporte»: clave de material } (las columnas sin clave se informan aparte) */
@@ -7527,7 +7535,7 @@ function compararConsumoWeb(token, filas, desde, hasta, mapaCols) {
     const c = txt_(r.Clave); x.cant[c] = invRedondear_((x.cant[c] || 0) + invNum_(r.Cantidad));
   });
   const sinMat = {};
-  try { leerObjetos_(invHoja_('OTX')).forEach(r => { if (txt_(r.Sin_Material) === 'SI' && !todoSis[txt_(r.N_Orden)]) todoSis[txt_(r.N_Orden)] = { orden: txt_(r.N_Orden), fecha: invFecha_(r.Fecha), movil: txt_(r.Movil), contrato: txt_(r.Contrato), cant: {}, sinMaterial: true }; }); } catch (e) { }
+  try { otxVigentes_().forEach(r => { if (txt_(r.Sin_Material) === 'SI' && !todoSis[txt_(r.N_Orden)]) todoSis[txt_(r.N_Orden)] = { orden: txt_(r.N_Orden), fecha: invFecha_(r.Fecha), movil: txt_(r.Movil), contrato: txt_(r.Contrato), cant: {}, sinMaterial: true }; }); } catch (e) { }
   Object.keys(todoSis).forEach(o => { const x = todoSis[o]; if (x.fecha >= desde && x.fecha <= hasta) enRango[o] = x; });
 
   const mat = c => nombreDe[c] || c;
@@ -7641,6 +7649,18 @@ function eliminarCargaConsumoWeb(token, hora) {
       Fecha: invFecha_(r.Fecha), N_Orden: txt_(r.N_Orden), ID_Movil: txt_(r.ID_Movil), Movil: txt_(r.Movil),
       Clave: txt_(r.Clave), Material: txt_(r.Material), Cantidad: invNum_(r.Cantidad), Archivo: txt_(r.Archivo), Carga: txt_(r.Carga), Contrato: txt_(r.Contrato), Cambio: txt_(r.Cambio)
     })));
+
+    /* OT sin material que trajo esa carga: se quitan (las que tienen nota o marca se conservan solo como nota) */
+    try {
+      const shX = invHoja_('OTX');
+      const filasX = leerObjetos_(shX);
+      const hayOtras = cargas.some(c => txt_(c.Fecha_Hora) !== hora && txt_(c.Archivo) === archivo);
+      if (!hayOtras && filasX.some(r => txt_(r.Archivo) === archivo)) {
+        invReescribir_(shX, 'OTX', filasX.filter(r => txt_(r.Archivo) !== archivo || txt_(r.Marcada) === 'SI' || txt_(r.Observacion)).map(r => ({
+          N_Orden: txt_(r.N_Orden), Fecha: invFecha_(r.Fecha), ID_Movil: txt_(r.ID_Movil), Movil: txt_(r.Movil), Contrato: txt_(r.Contrato), Sin_Material: txt_(r.Archivo) === archivo ? '' : txt_(r.Sin_Material),
+          Marcada: txt_(r.Marcada), Observacion: txt_(r.Observacion), Usuario: txt_(r.Usuario), Actualizado: txt_(r.Actualizado), Archivo: txt_(r.Archivo) })));
+      }
+    } catch (e) { /* no frena la eliminación */ }
 
     shCar.deleteRow(car._fila);
 
@@ -8197,6 +8217,18 @@ function obtenerNotificacionesWeb(token) {
         eventos.push({ id: 'dandesp|' + txt_(r.Grupo), dgrupo: txt_(r.Grupo), tipo: 'bodega', icono: '🛠️', titulo: 'Material dañado por recibir en bodega · móvil ' + txt_(r.Movil),
           detalle: txt_(r.Resumen) + ' · lo recibió ' + txt_(r.Recibe) + (txt_(r.Entrega) ? ' (entrega ' + txt_(r.Entrega) + ')' : ''), fecha: txt_(r.Fecha_Hora), vista: 'bodega', propio: false });
       });
+      /* OT del reporte sin material: avisan hasta que se les ponga una observación o se marquen */
+      try {
+        const pend = otxVigentes_().filter(r => txt_(r.Sin_Material) === 'SI' && !txt_(r.Observacion) && txt_(r.Marcada) !== 'SI');
+        if (pend.length) {
+          const fechas = pend.map(r => invFecha_(r.Fecha)).filter(Boolean).sort();
+          const ej = pend.slice(0, 3).map(r => 'OT ' + txt_(r.N_Orden) + ' (M' + txt_(r.Movil) + ')').join(', ');
+          eventos.push({ id: 'otsin|' + pend.length, fija: true, tipo: 'bodega', icono: '⚪', titulo: pend.length + (pend.length === 1 ? ' OT sin material por revisar' : ' OT sin material por revisar'),
+            detalle: ej + (pend.length > 3 ? ' y ' + (pend.length - 3) + ' más' : '') + ' · anótales una observación o márcalas para quitar el aviso',
+            fecha: pend.map(r => txt_(r.Actualizado)).sort().pop() || '', vista: 'bodega', desde: fechas[0], hasta: fechas[fechas.length - 1], propio: false });
+        }
+      } catch (e) { /* sin aviso de OT sin material */ }
+
       const d7 = desde(7), d14 = desde(14);
       leerObjetos_(invHoja_('CARGAS')).forEach(c => {
         const f = txt_(c.Fecha_Hora);

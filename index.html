@@ -13589,7 +13589,7 @@ let notifDatos = { alertas: [], eventos: [] }, notifTimer = null;
 function notifLeidas() { try { return JSON.parse(localStorage.getItem('srd_notif_' + (sesion ? sesion.usuario : '')) || '[]'); } catch (e) { return []; } }
 function notifGuardarLeidas(l) { try { localStorage.setItem('srd_notif_' + (sesion ? sesion.usuario : ''), JSON.stringify(l.slice(-300))); } catch (e) { /* sin almacenamiento */ } }
 
-function notifSinLeer() { const r = notifLeidas(); return (notifDatos.eventos || []).filter(e => e.dgrupo || r.indexOf(e.id) === -1); }
+function notifSinLeer() { const r = notifLeidas(); return (notifDatos.eventos || []).filter(e => e.dgrupo || e.fija || r.indexOf(e.id) === -1); }
 async function notifDanRevisar(g) {
   try { await api('revisarDanadosDespachoWeb', g); toast('Recibido en bodega.'); bodSucio = true; await notifCargar(); }
   catch (e) { mostrarError(e, 'No se pudo marcar como revisado.'); }
@@ -13644,16 +13644,16 @@ function notifRender() {
   const leidas = notifLeidas();
   const al = bodDatos ? bodAlertasLista(true).map(x => ({ clave: x.m.clave, material: x.m.material, unidad: x.m.unidad, disponible: x.disp, pct: x.pct, completo: x.m.completo, minimo: x.m.minimo })) : (notifDatos.alertas || []);
   const evTodos = notifDatos.eventos || [];
-  const pend = evTodos.filter(e => e.tipo === 'seguimiento' || e.dgrupo);
-  const ev = evTodos.filter(e => e.tipo !== 'seguimiento' && !e.dgrupo);
+  const pend = evTodos.filter(e => e.tipo === 'seguimiento' || e.dgrupo || e.fija);
+  const ev = evTodos.filter(e => e.tipo !== 'seguimiento' && !e.dgrupo && !e.fija);
   const item = e => {
-    const leida = !e.dgrupo && leidas.indexOf(e.id) !== -1;
+    const leida = !e.dgrupo && !e.fija && leidas.indexOf(e.id) !== -1;
     return '<div class="nfItem" style="' + (leida ? 'opacity:.55' : (e.tipo === 'seguimiento' ? 'background:#fff6ee' : 'background:#f3f7ff')) + ';cursor:pointer" onclick="notifAbrir(\'' + escJs(e.id) + '\',\'' + escJs(e.vista) + '\')"><span style="font-size:18px">' + e.icono + '</span>' +
       '<div style="flex:1"><b style="font-size:13px">' + esc(e.titulo) + '</b><div style="font-size:12px;color:#666">' + esc(e.detalle) + '</div><div style="font-size:11px;color:#999">' + esc(notifHora(e.fecha)) + '</div></div>' +
       (e.dgrupo && esAdmin() ? '<button class="btnMini" onclick="event.stopPropagation();notifDanRevisar(\'' + escJs(e.dgrupo) + '\')">Recibido</button>' : (leida ? '' : '<span style="width:8px;height:8px;border-radius:50%;background:#1f6feb;flex:0 0 auto"></span>')) + '</div>';
   };
   let h = '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid #eee"><b>🔔 Notificaciones</b>' +
-    (evTodos.some(e => !e.dgrupo && leidas.indexOf(e.id) === -1) ? '<a style="font-size:12px;cursor:pointer;color:#1f6feb" onclick="notifMarcarTodo()">Marcar todo como leído</a>' : '') + '</div>';
+    (evTodos.some(e => !e.dgrupo && !e.fija && leidas.indexOf(e.id) === -1) ? '<a style="font-size:12px;cursor:pointer;color:#1f6feb" onclick="notifMarcarTodo()">Marcar todo como leído</a>' : '') + '</div>';
   if (!al.length && !evTodos.length) h += '<div style="padding:22px 14px;text-align:center;color:#888;font-size:13px">No hay notificaciones nuevas.</div>';
   if (pend.length) {
     h += '<div style="padding:8px 14px 2px;font-size:12px;font-weight:700;color:#b45309">⏰ PENDIENTE</div>' + pend.map(item).join('');
@@ -13674,7 +13674,15 @@ function notifRender() {
 }
 
 function notifMarcarTodo() { const l = notifLeidas(); (notifDatos.eventos || []).forEach(e => { if (l.indexOf(e.id) === -1) l.push(e.id); }); notifGuardarLeidas(l); notifPintar(); notifRender(); }
-function notifAbrir(id, vista) { const l = notifLeidas(); if (l.indexOf(id) === -1) { l.push(id); notifGuardarLeidas(l); } notifIr(vista); notifPintar(); }
+async function notifIrOtSin(desde, hasta) {
+  notifIr('bodega'); bodSubtab('cons');
+  if (desde) $('bodConsDesde').value = desde; if (hasta) $('bodConsHasta').value = hasta;
+  await cargarBodCons(); bodVistaCons('col'); $('bodDetNota').value = 'sin'; renderBodConsDet();
+}
+function notifAbrir(id, vista) {
+  const ev = (notifDatos.eventos || []).find(x => x.id === id);
+  if (ev && ev.fija && String(id).indexOf('otsin|') === 0) { $('notifPanel').style.display = 'none'; notifIrOtSin(ev.desde, ev.hasta); return; }
+  const l = notifLeidas(); if (l.indexOf(id) === -1) { l.push(id); notifGuardarLeidas(l); } notifIr(vista); notifPintar(); }
 function notifIr(vista) { $('notifPanel').style.display = 'none'; if (vista && puedeModulo(MODULOS_NAV[vista] || vista)) mostrarVista(vista); }
 document.addEventListener('click', e => { const p = $('notifPanel'); if (p && p.style.display !== 'none' && !p.contains(e.target)) p.style.display = 'none'; });
 
@@ -16599,6 +16607,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 191 · 05-nov 09:34</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 192 · 05-nov 09:54</div>
 </body>
 </html>
