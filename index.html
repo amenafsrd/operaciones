@@ -11311,7 +11311,10 @@ async function devRepArchivo(inp) {
     }
     if (!filas.length) throw new Error('No encontré OT con equipos en ese archivo. Debe ser el mismo formato que subes en «Cargar archivo» (con la columna de OT y una columna por equipo).');
     if (!devDatos.lineas.length) devDatos = await api('obtenerDevolucionesWeb');
-    devRep = devRepCalcular(filas, devDatos.lineas); devRep.archivo = file.name; devRep.bol = { num: '', cant: {}, extra: [] };
+    devRep = devRepCalcular(filas, devDatos.lineas); devRep.archivo = file.name;
+    /* La boleta es la que ya tiene asignada el cambio en el sistema (la de las líneas de las OT del archivo) */
+    const bols = []; devRep.tipos.forEach(t => t.boletas.forEach(b => { if (bols.indexOf(b) === -1) bols.push(b); }));
+    devRep.bol = { num: bols.join(', '), cant: {}, extra: [], delSistema: bols.length > 0 };
     devRepMostrar();
   } catch (e) { mostrarError(e, 'No se pudo preparar el reporte.'); }
 }
@@ -11341,7 +11344,8 @@ function devRepBolPintar() {
   (devDatos.lineas || []).forEach(o => { const k = devNorm(o.equipo); if (!ya[k] && !vistos[k]) { vistos[k] = 1; otros.push(o.equipo); } });
   r.eqCols.forEach(n => { const k = devNorm(n); if (!ya[k] && !vistos[k]) { vistos[k] = 1; otros.push(n); } });
   $('devRepBol').innerHTML =
-    '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><b>Boleta de entrega a Telecable</b><input id="devRepBolNum" placeholder="Boleta #" value="' + esc(r.bol.num) + '" style="width:110px" oninput="devRep.bol.num = this.value; devRepTiposPintar()"></div>' +
+    '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap"><b>' + (String(r.bol.num).indexOf(',') !== -1 ? 'Boletas' : 'Boleta') + ' de entrega a Telecable</b><input id="devRepBolNum" placeholder="Boleta #" value="' + esc(r.bol.num) + '" style="width:200px" oninput="devRep.bol.num = this.value; devRepTiposPintar()">' +
+    '<span style="font-size:11.5px;color:#667">' + (r.bol.delSistema ? 'Tomada del sistema (la que tienen asignada los cambios de este archivo).' : 'Los cambios de este archivo no tienen boleta asignada en el sistema; digítala.') + '</span></div>' +
     '<div style="overflow-x:auto"><table class="table" style="font-size:12px;min-width:0"><thead><tr><th class="left">Equipo</th><th>Recepción SRD</th><th>Entregado en la boleta</th><th class="left">Diferencia</th></tr></thead><tbody>' +
     F.map((f, i) => { const v = r.bol.cant[f.k], res = devRepBolRes(f.debe, v);
       return '<tr><td class="left">' + esc(f.equipo) + '</td><td>' + fmtN(f.debe) + '</td><td><input type="number" min="0" step="any" style="width:80px" value="' + (v === undefined || v === '' ? '' : v) + '" oninput="devRepBolSet(\'' + esc(f.k).replace(/'/g, '') + '\', this.value, ' + f.debe + ', ' + i + ')"></td><td class="left" id="devRepBolR' + i + '" style="color:' + res.c + ';font-weight:600">' + res.t + '</td></tr>'; }).join('') +
@@ -11381,7 +11385,7 @@ function devRepCuadroHtml() {
   const td = (extra) => 'border:1px solid #888;padding:3px 9px;text-align:center;' + (extra || '');
   const tdL = (extra) => 'border:1px solid #888;padding:3px 9px;text-align:left;' + (extra || '');
   const fondo = { mas: 'background:#fdecea;', falta: 'background:#fff4d6;', tot: 'background:#eee;font-weight:bold;' };
-  let h = '<div style="font-family:Calibri,Arial,sans-serif;font-size:30px;font-weight:bold;color:#b71c1c;margin:0 0 8px 0">Boleta # ' + esc(D.bol || '—') + '</div>';
+  let h = '<div style="font-family:Calibri,Arial,sans-serif;font-size:30px;font-weight:bold;color:#b71c1c;margin:0 0 8px 0">' + (String(D.bol).indexOf(',') !== -1 ? 'Boletas # ' : 'Boleta # ') + esc(D.bol || '—') + '</div>';
   if (D.eq.length) h += '<table style="' + T + '"><thead><tr><th style="' + thL + '">Equipo</th><th style="' + th + '">Archivo TC</th><th style="' + th + '">Recepción SRD</th><th style="' + th + '">Entregado en la boleta</th><th style="' + th + '">Diferencia</th></tr></thead><tbody>' +
     D.eq.concat(D.tot ? [D.tot] : []).map(f => '<tr' + (f === D.tot ? ' style="background:#eee;font-weight:bold"' : '') + '><td style="' + tdL() + '">' + esc(f.c[0]) + '</td><td style="' + td() + '">' + esc(f.c[1]) + '</td><td style="' + td() + '">' + esc(f.c[2]) + '</td><td style="' + td() + '">' + esc(f.c[3]) + '</td><td style="' + td('font-weight:bold;color:' + f.color) + '">' + esc(f.c[4]) + '</td></tr>').join('') + '</tbody></table>';
   return h;
@@ -11399,7 +11403,9 @@ function devRepImagen() {
   ctx.fillStyle = '#b71c1c'; ctx.fillRect(0, 0, W, 112);
   ctx.fillStyle = '#fff'; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
   ctx.font = 'bold 17px ' + F; ctx.fillText('SOLUCIONES RED DORADA SRL  ·  RECEPCIÓN DE EQUIPOS', 24, 26);
-  ctx.font = 'bold 58px ' + F; ctx.fillText('Boleta # ' + (D.bol || '—'), 24, 70);
+  const tituloB = (String(D.bol).indexOf(',') !== -1 ? 'Boletas # ' : 'Boleta # ') + (D.bol || '—');
+  let tam = 58; ctx.font = 'bold ' + tam + 'px ' + F; while (ctx.measureText(tituloB).width > W - 48 && tam > 26) { tam -= 2; ctx.font = 'bold ' + tam + 'px ' + F; }
+  ctx.fillText(tituloB, 24, 70);
   ctx.fillStyle = '#445'; ctx.font = '14px ' + F; ctx.fillText('Archivo TC: ' + D.archivo + '  ·  ' + D.fecha.split('-').reverse().join('/'), 24, 132);
   let y = top;
   tablas.forEach(t => {
@@ -16965,6 +16971,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 204 · 05-nov 13:33</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 205 · 05-nov 13:38</div>
 </body>
 </html>
