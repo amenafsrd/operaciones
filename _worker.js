@@ -5978,7 +5978,7 @@ const INV = {
     DEVH: ['Fecha_Hora', 'Usuario', 'Linea', 'Accion', 'Detalle'],
     HIS: ['Fecha_Hora', 'Usuario', 'Accion', 'Detalle', 'Referencia'],
     REV: ['Grupo', 'Fecha_Hora', 'Movil', 'Entrega', 'Recibe', 'Resumen', 'Estado', 'Revisado_Por', 'Revisado'],
-    OTX: ['N_Orden', 'Fecha', 'ID_Movil', 'Movil', 'Contrato', 'Sin_Material', 'Marcada', 'Observacion', 'Usuario', 'Actualizado', 'Archivo'],
+    OTX: ['N_Orden', 'Fecha', 'ID_Movil', 'Movil', 'Contrato', 'Sin_Material', 'Marcada', 'Observacion', 'Usuario', 'Actualizado', 'Archivo', 'Punta_Inicio', 'Punta_Fin'],
     DEVE: ['Entrega', 'Fecha', 'ID_Movil', 'Movil', 'Boleta', 'Equipo', 'Cantidad', 'Linea', 'Usuario', 'Creado'],
     CORTES: ['Corte', 'Fecha', 'Estado', 'Obs', 'Usuario', 'Creado', 'Cerrado_Por', 'Cerrado', 'Tipo', 'Ubicacion'],
     CONTEO: ['Corte', 'Ubicacion', 'Clave', 'Teorico', 'Fisico', 'Justificada', 'Motivo', 'Justif_Por', 'Justif_Fecha'],
@@ -7340,7 +7340,16 @@ function importarConsumoWeb(token, filas, archivo, mapa) {
         if (q > 0) cant[colClave[k]] = invRedondear_((cant[colClave[k]] || 0) + q);
       });
 
-      porOrden[nOrden] = { fecha: fecha, m: m, cant: cant, contrato: kt ? txt_(f[kt]).replace(/\.0+$/, '') : '' };
+      /* Puntas del carrete (carrucha): lectura inicial y final; los metros usados = inicio - fin */
+      let pI = '', pF = '';
+      Object.keys(f).forEach(k => {
+        const kk = String(k).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '_');
+        if (/^carrucha_punta_inicio/.test(kk) && txt_(f[k]) !== '') pI = invNum_(f[k]);
+        else if (/^carrucha_punta_fin/.test(kk) && txt_(f[k]) !== '') pF = invNum_(f[k]);
+      });
+      if (!(pI > 0 || pF > 0)) { pI = ''; pF = ''; }
+
+      porOrden[nOrden] = { fecha: fecha, m: m, cant: cant, contrato: kt ? txt_(f[kt]).replace(/\.0+$/, '') : '', pI: pI, pF: pF };
       if (fecha) fechas[fecha] = true;
       if (!m) sinMovil++;
     });
@@ -7407,9 +7416,18 @@ function importarConsumoWeb(token, filas, archivo, mapa) {
           else if (txt_(r.Archivo) !== archivo) { r.Archivo = archivo; cambioX = true; }
         } else if (r && txt_(r.Sin_Material) === 'SI') { r.Sin_Material = ''; cambioX = true; }
       });
-      if (cambioX) invReescribir_(shX, 'OTX', filasX.filter(r => txt_(r.Sin_Material) === 'SI' || txt_(r.Marcada) === 'SI' || txt_(r.Observacion)).map(r => ({
-        N_Orden: txt_(r.N_Orden), Fecha: invFecha_(r.Fecha), ID_Movil: txt_(r.ID_Movil), Movil: txt_(r.Movil), Contrato: txt_(r.Contrato), Sin_Material: txt_(r.Sin_Material),
-        Marcada: txt_(r.Marcada), Observacion: txt_(r.Observacion), Usuario: txt_(r.Usuario), Actualizado: txt_(r.Actualizado), Archivo: txt_(r.Archivo) })));
+      ordenes.forEach(o => {
+        const x = porOrden[o];
+        if (!x.m) return;
+        let rr = null;
+        for (let i = filasX.length - 1; i >= 0; i--) if (txt_(filasX[i].N_Orden) === o) { rr = filasX[i]; break; }
+        const tiene = x.pI !== '' || x.pF !== '';
+        if (tiene) {
+          if (!rr) { filasX.push({ N_Orden: o, Fecha: x.fecha, ID_Movil: String(x.m.ID_Movil), Movil: txt_(x.m.Movil), Contrato: x.contrato, Sin_Material: '', Marcada: '', Observacion: '', Usuario: '', Actualizado: horaCarga, Archivo: archivo, Punta_Inicio: x.pI, Punta_Fin: x.pF }); cambioX = true; }
+          else if (txt_(rr.Punta_Inicio) !== txt_(x.pI) || txt_(rr.Punta_Fin) !== txt_(x.pF)) { rr.Punta_Inicio = x.pI; rr.Punta_Fin = x.pF; cambioX = true; }
+        } else if (rr && (txt_(rr.Punta_Inicio) !== '' || txt_(rr.Punta_Fin) !== '')) { rr.Punta_Inicio = ''; rr.Punta_Fin = ''; cambioX = true; }
+      });
+      if (cambioX) invReescribir_(shX, 'OTX', filasX.filter(r => otxConserva_(r)).map(otxFila_));
     } catch (e) { /* si falla esta parte, el consumo ya se guardó igual */ }
 
     /* Las OT sin cambios conservan sus filas (y la carga original que las trajo) */
@@ -7477,6 +7495,11 @@ function obtenerConsumoDetalleWeb(token, desde, hasta) {
       x.obs = txt_(r.Observacion);
       x.obsPor = txt_(r.Usuario);
       x.obsFecha = txt_(r.Actualizado);
+      if (txt_(r.Punta_Inicio) !== '' || txt_(r.Punta_Fin) !== '') {
+        x.puntaInicio = txt_(r.Punta_Inicio) === '' ? null : invNum_(r.Punta_Inicio);
+        x.puntaFin = txt_(r.Punta_Fin) === '' ? null : invNum_(r.Punta_Fin);
+        if (x.puntaInicio != null && x.puntaFin != null) x.metros = invRedondear_(x.puntaInicio - x.puntaFin);
+      }
     });
   } catch (e) { /* sin notas */ }
 
@@ -7484,6 +7507,14 @@ function obtenerConsumoDetalleWeb(token, desde, hasta) {
     .sort((a, b) => b.fecha.localeCompare(a.fecha) || (Number(a.movil) || 0) - (Number(b.movil) || 0) || a.orden.localeCompare(b.orden));
 }
 
+
+/* Fila de la hoja OTX con todos sus campos (así ningún guardado pierde las puntas) y regla de cuáles se conservan */
+function otxFila_(r) {
+  return { N_Orden: txt_(r.N_Orden), Fecha: invFecha_(r.Fecha), ID_Movil: txt_(r.ID_Movil), Movil: txt_(r.Movil), Contrato: txt_(r.Contrato), Sin_Material: txt_(r.Sin_Material),
+    Marcada: txt_(r.Marcada), Observacion: txt_(r.Observacion), Usuario: txt_(r.Usuario), Actualizado: txt_(r.Actualizado), Archivo: txt_(r.Archivo),
+    Punta_Inicio: (r.Punta_Inicio === '' || r.Punta_Inicio == null) ? '' : invNum_(r.Punta_Inicio), Punta_Fin: (r.Punta_Fin === '' || r.Punta_Fin == null) ? '' : invNum_(r.Punta_Fin) };
+}
+function otxConserva_(r) { return txt_(r.Sin_Material) === 'SI' || txt_(r.Marcada) === 'SI' || !!txt_(r.Observacion) || txt_(r.Punta_Inicio) !== '' || txt_(r.Punta_Fin) !== ''; }
 
 /* Filas de OT sin material que siguen vigentes: su archivo importado todavía existe en las cargas (si se eliminó la carga, la OT ya no cuenta) */
 function otxVigentes_() {
@@ -7583,8 +7614,7 @@ function marcarOtConsumoWeb(token, orden, marcada, observacion) {
   const marca = (marcada === true || txt_(marcada) === 'true' || txt_(marcada) === 'SI') ? 'SI' : '';
   return conBloqueo_(() => {
     const sh = invHoja_('OTX');
-    const filas = leerObjetos_(sh).map(r => ({ N_Orden: txt_(r.N_Orden), Fecha: invFecha_(r.Fecha), ID_Movil: txt_(r.ID_Movil), Movil: txt_(r.Movil), Contrato: txt_(r.Contrato), Sin_Material: txt_(r.Sin_Material),
-      Marcada: txt_(r.Marcada), Observacion: txt_(r.Observacion), Usuario: txt_(r.Usuario), Actualizado: txt_(r.Actualizado), Archivo: txt_(r.Archivo) }));
+    const filas = leerObjetos_(sh).map(otxFila_);
     let fila = filas.find(r => r.N_Orden === orden);
     if (!fila) {
       const c = leerObjetos_(invHoja_('CON')).find(r => txt_(r.N_Orden) === orden);
@@ -7593,7 +7623,7 @@ function marcarOtConsumoWeb(token, orden, marcada, observacion) {
       filas.push(fila);
     }
     fila.Marcada = marca; fila.Observacion = observacion; fila.Usuario = ses.nombre || ses.usuario; fila.Actualizado = segAhora_();
-    invReescribir_(sh, 'OTX', filas.filter(r => r.Sin_Material === 'SI' || r.Marcada === 'SI' || r.Observacion));
+    invReescribir_(sh, 'OTX', filas.filter(r => otxConserva_(r)).map(otxFila_));
     try { invLog_(ses, 'OT de consumo marcada', 'OT ' + orden + (marca ? ' · marcada' : '') + (observacion ? ' · ' + observacion.slice(0, 80) : ''), orden); } catch (e) { }
     return { ok: true };
   });
@@ -7656,9 +7686,7 @@ function eliminarCargaConsumoWeb(token, hora) {
       const filasX = leerObjetos_(shX);
       const hayOtras = cargas.some(c => txt_(c.Fecha_Hora) !== hora && txt_(c.Archivo) === archivo);
       if (!hayOtras && filasX.some(r => txt_(r.Archivo) === archivo)) {
-        invReescribir_(shX, 'OTX', filasX.filter(r => txt_(r.Archivo) !== archivo || txt_(r.Marcada) === 'SI' || txt_(r.Observacion)).map(r => ({
-          N_Orden: txt_(r.N_Orden), Fecha: invFecha_(r.Fecha), ID_Movil: txt_(r.ID_Movil), Movil: txt_(r.Movil), Contrato: txt_(r.Contrato), Sin_Material: txt_(r.Archivo) === archivo ? '' : txt_(r.Sin_Material),
-          Marcada: txt_(r.Marcada), Observacion: txt_(r.Observacion), Usuario: txt_(r.Usuario), Actualizado: txt_(r.Actualizado), Archivo: txt_(r.Archivo) })));
+        invReescribir_(shX, 'OTX', filasX.filter(r => txt_(r.Archivo) !== archivo || txt_(r.Marcada) === 'SI' || txt_(r.Observacion)).map(r => { const q = otxFila_(r); if (txt_(r.Archivo) === archivo) q.Sin_Material = ''; return q; }));
       }
     } catch (e) { /* no frena la eliminación */ }
 
