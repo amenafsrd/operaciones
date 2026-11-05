@@ -11239,43 +11239,58 @@ async function devExportarOk() {
 let devRep = null;
 const devNorm = t => String(t == null ? '' : t).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
 const devOrdenKey = t => String(t == null ? '' : t).trim().replace(/\.0+$/, '');
-/* filas: [{orden, contrato, movil, fecha, equipos:{nombre:cantidad}}] del archivo de Telecable; lineas: las del sistema */
+const devRd = v => Math.round((+v || 0) * 100) / 100;
+/* filas: las del archivo de Telecable [{orden, contrato, movil, tipo, fecha, averia, servicio, contrata, equipos:{nombre:cantidad}}]; lineas: las del sistema.
+   Cada OT que cambió o tiene equipos sin retirar sale en UNA fila con su justificación, como la hoja «Justificaciones» que se le envía a Telecable. */
 function devRepCalcular(filas, lineas) {
   const porOt = {};
   lineas.forEach(o => { (porOt[devOrdenKey(o.orden)] = porOt[devOrdenKey(o.orden)] || []).push(o); });
-  const rd = v => Math.round((+v || 0) * 100) / 100;
-  const dif = [], resumen = {}, justif = [], demas = [], noEnSistema = [];
-  const R = (k, n) => resumen[k] || (resumen[k] = { equipo: n, pidio: 0, quedo: 0, justificado: 0, devuelto: 0 });
-  const vistas = {};
+  const resumen = {}, tipos = {}, moviles = {}, justRows = [], demas = [], noEnSistema = [], eqCols = [], vistas = {};
+  const R = (k, n) => resumen[k] || (resumen[k] = { equipo: n, pidio: 0, quedo: 0, entregado: 0, justificado: 0 });
+  const txtEq = (arr) => arr.map(x => x.n + (x.q !== 1 ? ' ×' + devRd(x.q) : '')).join(' + ');
   filas.forEach(f => {
     const ot = devOrdenKey(f.orden);
     if (vistas[ot]) return; vistas[ot] = true;
+    Object.keys(f.equipos).forEach(n => { if (eqCols.indexOf(n) === -1) eqCols.push(n); });
     const L = porOt[ot];
     if (!L || !L.length) { noEnSistema.push({ orden: ot, contrato: f.contrato, movil: f.movil, equipos: Object.keys(f.equipos).map(n => n + ' ×' + f.equipos[n]).join(', ') }); return; }
     const P = {}, D = {}, nombre = {};
     Object.keys(f.equipos).forEach(n => { const k = devNorm(n); P[k] = (P[k] || 0) + f.equipos[n]; nombre[k] = n; });
     L.forEach(o => { const k = devNorm(o.equipo); D[k] = (D[k] || 0) + (+o.debe || 0); if (!nombre[k]) nombre[k] = o.equipo; });
-    const motOt = []; L.forEach(o => { if (o.cambioMotivo && motOt.indexOf(o.cambioMotivo) === -1) motOt.push(o.cambioMotivo); });
+    const tipo = String(f.tipo || L[0].tipo || '').trim() || '(sin tipo)';
+    const T = tipos[tipo] || (tipos[tipo] = { tipo: tipo, pidio: 0, entregado: 0, boletas: [] });
+    const mv = moviles[L[0].movil] || (moviles[L[0].movil] = { movil: L[0].movil, pidio: 0, entregado: 0 });
+    const salen = [], entran = [];
     Object.keys(Object.assign({}, P, D)).forEach(k => {
-      const p = rd(P[k]), d = rd(D[k]);
+      const p = devRd(P[k]), d = devRd(D[k]);
       const r = R(k, nombre[k]); r.pidio += p; r.quedo += d;
-      if (Math.abs(p - d) < 0.0001) return;
-      const lin = L.filter(o => devNorm(o.equipo) === k);
-      const mot = lin.map(o => o.cambioMotivo).filter(Boolean).join(' | ') || motOt.join(' | ') || '(sin motivo registrado)';
-      const desde = lin.map(o => o.equipoOriginal).filter(Boolean).filter((x, i, a) => a.indexOf(x) === i).join(', ');
-      dif.push({ orden: ot, contrato: f.contrato || L[0].contrato, movil: L[0].movil, fecha: L[0].fecha, equipo: nombre[k], pidio: p, quedo: d, dif: rd(d - p),
-        tipo: p > 0 && d > 0 ? 'Cantidad distinta' : (p > 0 ? 'Ya no se registra este equipo (se cambió por otro)' : 'Equipo que no venía en el archivo'),
-        desde: desde, motivo: mot, boletas: lin.map(o => o.boletas).filter(Boolean).join(' ') });
+      T.pidio += p; mv.pidio += p;
+      if (p > d + 0.0001) salen.push({ n: nombre[k], q: devRd(p - d) });
+      if (d > p + 0.0001) entran.push({ n: nombre[k], q: devRd(d - p) });
     });
+    const motivos = []; L.forEach(o => { if (o.cambioMotivo && motivos.indexOf(o.cambioMotivo) === -1) motivos.push(o.cambioMotivo); });
+    const nota = [];
+    if (salen.length && entran.length) nota.push('Es un cambio de ' + txtEq(salen) + ' por ' + txtEq(entran));
+    else if (entran.length) nota.push('Se entregó ' + txtEq(entran) + ' que no venía en el archivo');
+    else if (salen.length) nota.push('No se entregó ' + txtEq(salen));
+    if (motivos.length) nota.push('Motivo: ' + motivos.join(' | '));
+    else if (salen.length || entran.length) nota.push('Motivo: (sin motivo registrado)');
+    const noRet = L.filter(o => (+o.justificado || 0) > 0);
+    noRet.forEach(o => nota.push('No se retiró ' + o.equipo + (o.justificado !== 1 ? ' ×' + devRd(o.justificado) : '') + ': ' + (o.motivo || '(sin motivo)')));
     L.forEach(o => {
-      const r = R(devNorm(o.equipo), o.equipo); r.justificado += +o.justificado || 0; r.devuelto += +o.devuelto || 0;
-      if ((+o.justificado || 0) > 0) justif.push(o);
-      if ((+o.pendiente || 0) < -0.0001) demas.push({ o: o, cant: rd(-o.pendiente) });
+      const r = R(devNorm(o.equipo), o.equipo); r.entregado += +o.devuelto || 0; r.justificado += +o.justificado || 0;
+      T.entregado += +o.devuelto || 0; mv.entregado += +o.devuelto || 0;
+      String(o.boletas || '').split(/[\s,;]+/).filter(Boolean).forEach(b => { if (T.boletas.indexOf(b) === -1) T.boletas.push(b); });
+      if ((+o.pendiente || 0) < -0.0001) demas.push({ o: o, cant: devRd(-o.pendiente) });
     });
+    if (nota.length) justRows.push({ f: f, orden: ot, movil: L[0].movil, nota: nota.join(' · '), entregado: txtEq(Object.keys(D).filter(k => D[k] > 0).map(k => ({ n: nombre[k], q: D[k] }))), hayCambio: !!(salen.length || entran.length) });
   });
   const res = Object.keys(resumen).sort((a, b) => resumen[a].equipo.localeCompare(resumen[b].equipo, 'es')).map(k => resumen[k]);
-  dif.sort((a, b) => String(a.movil).localeCompare(String(b.movil), 'es', { numeric: true }) || a.orden.localeCompare(b.orden));
-  return { resumen: res, dif: dif, justif: justif, demas: demas, noEnSistema: noEnSistema, totalOt: Object.keys(vistas).length };
+  justRows.sort((a, b) => String(a.movil).localeCompare(String(b.movil), 'es', { numeric: true }) || a.orden.localeCompare(b.orden));
+  return {
+    resumen: res, tipos: Object.keys(tipos).map(k => tipos[k]), moviles: Object.keys(moviles).sort((a, b) => a.localeCompare(b, 'es', { numeric: true })).map(k => moviles[k]),
+    justRows: justRows, demas: demas, noEnSistema: noEnSistema, eqCols: eqCols, totalOt: Object.keys(vistas).length
+  };
 }
 async function devRepArchivo(inp) {
   const file = inp.files && inp.files[0]; inp.value = '';
@@ -11299,18 +11314,22 @@ async function devRepArchivo(inp) {
   } catch (e) { mostrarError(e, 'No se pudo preparar el reporte.'); }
 }
 function devRepMostrar() {
-  const r = devRep, n = x => fmtN(Math.round(x * 100) / 100);
+  const r = devRep, n = x => fmtN(devRd(x));
+  const nCamb = r.justRows.filter(x => x.hayCambio).length, nNo = r.justRows.filter(x => /No se retiró/.test(x.nota)).length;
   devModal('<h3>📑 Reporte de diferencias para Telecable</h3>' +
     '<div style="font-size:12px;color:#556;margin-bottom:10px">Archivo: <b>' + esc(r.archivo) + '</b> · ' + r.totalOt + ' OT en el archivo</div>' +
     '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">' +
-    '<span class="chip azul">' + r.dif.length + ' diferencia(s) de equipo o cantidad</span>' +
-    '<span class="chip amar">' + r.justif.length + ' línea(s) con justificación</span>' +
+    '<span class="chip azul">' + nCamb + ' OT con cambio de equipo</span>' +
+    '<span class="chip amar">' + nNo + ' OT con equipo no retirado</span>' +
     (r.demas.length ? '<span class="chip amar">' + r.demas.length + ' devuelta(s) de más</span>' : '') +
     (r.noEnSistema.length ? '<span class="chip" style="background:#fde8e8;color:#a33">' + r.noEnSistema.length + ' OT no están en el sistema</span>' : '') + '</div>' +
-    '<div style="max-height:300px;overflow:auto"><table class="table" style="font-size:12.5px"><thead><tr><th class="left">Equipo</th><th>Pidió Telecable</th><th>Quedó</th><th>Diferencia</th><th>No retirado (justificado)</th><th>A devolver</th></tr></thead><tbody>' +
-    r.resumen.map(x => '<tr><td class="left">' + esc(x.equipo) + '</td><td>' + n(x.pidio) + '</td><td>' + n(x.quedo) + '</td><td' + (x.quedo !== x.pidio ? ' style="color:#b26a00"><b>' + (x.quedo - x.pidio > 0 ? '+' : '') + n(x.quedo - x.pidio) + '</b>' : '>0') + '</td><td>' + n(x.justificado) + '</td><td><b>' + n(x.quedo - x.justificado) + '</b></td></tr>').join('') +
-    '</tbody></table></div>' +
-    (r.dif.some(d => d.motivo === '(sin motivo registrado)') ? '<div style="font-size:12px;color:#a33;margin-top:8px">⚠️ Hay diferencias sin motivo registrado (cambios anteriores a que se guardara el motivo). Salen marcadas en el Excel.</div>' : '') +
+    '<div style="max-height:320px;overflow:auto"><table class="table" style="font-size:12.5px"><thead><tr><th class="left">Tipo</th><th>Pidió Telecable</th><th>Entregado</th><th>Diferencia</th><th class="left">Boleta #</th></tr></thead><tbody>' +
+    r.tipos.map(x => '<tr><td class="left">' + esc(x.tipo) + '</td><td>' + n(x.pidio) + '</td><td>' + n(x.entregado) + '</td><td' + (x.pidio !== x.entregado ? ' style="color:#b26a00"' : '') + '><b>' + n(x.pidio - x.entregado) + '</b></td><td class="left">' + esc(x.boletas.join(', ') || '—') + '</td></tr>').join('') + '</tbody></table>' +
+    '<div style="font-size:12px;color:#556;margin:8px 0 4px">Vista previa de las justificaciones (' + r.justRows.length + ' OT):</div>' +
+    '<table class="table" style="font-size:12px"><thead><tr><th>Móvil</th><th>OT</th><th class="left">Justificación</th></tr></thead><tbody>' +
+    r.justRows.slice(0, 8).map(x => '<tr><td>M' + esc(x.movil) + '</td><td>' + esc(x.orden) + '</td><td class="left" style="white-space:normal">' + esc(x.nota) + '</td></tr>').join('') +
+    (r.justRows.length > 8 ? '<tr><td colspan="3" class="empty">… y ' + (r.justRows.length - 8) + ' más en el Excel</td></tr>' : '') + '</tbody></table></div>' +
+    (r.justRows.some(d => /sin motivo registrado/.test(d.nota)) ? '<div style="font-size:12px;color:#a33;margin-top:8px">⚠️ Hay cambios sin motivo registrado (anteriores a que se guardara el motivo). Salen marcados en el Excel.</div>' : '') +
     '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn secondary" onclick="devCerrar()">Cancelar</button><button class="btn primary" id="devRepBtn" onclick="devRepExportar()">Exportar Excel</button></div>');
 }
 async function devRepExportar() {
@@ -11324,17 +11343,24 @@ async function devRepExportar() {
   } catch (e) { b.disabled = false; mostrarError(e, 'No se pudo exportar el reporte.'); }
 }
 function devRepLibro(r) {
-  const wb = XLSX.utils.book_new(), rd = v => Math.round((+v || 0) * 100) / 100;
+  const wb = XLSX.utils.book_new(), rd = devRd;
   const cab = t => [['Soluciones Red Dorada SRL · ' + t], ['Archivo de Telecable: ' + r.archivo + ' · ' + r.totalOt + ' OT · Generado: ' + hoyISO()], []];
   const A = (nom, rows) => XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), nom);
-  const tot = ['TOTAL'].concat([1, 2, 3, 4, 5].map(() => 0));
-  const filasR = r.resumen.map(x => { const a = [x.equipo, rd(x.pidio), rd(x.quedo), rd(x.quedo - x.pidio), rd(x.justificado), rd(x.quedo - x.justificado), rd(x.devuelto)]; return a; });
-  const T = ['TOTAL', 0, 0, 0, 0, 0, 0]; filasR.forEach(a => { for (let i = 1; i < 7; i++) T[i] = rd(T[i] + a[i]); });
-  A('Resumen por equipo', cab('Resumen por equipo').concat([['Equipo', 'Pidió Telecable', 'Quedó (después de cambios)', 'Diferencia', 'No retirado (justificado)', 'Total a devolver', 'Ya devuelto']], filasR, [T]));
-  A('Diferencias por OT', cab('Diferencias contra el archivo').concat([['Móvil', 'OT', 'Contrato', 'Equipo', 'Pidió Telecable', 'Quedó registrado', 'Diferencia', 'Tipo', 'Cambiado desde', 'Motivo', 'Boletas']],
-    r.dif.map(d => ['M' + d.movil, d.orden, d.contrato, d.equipo, d.pidio, d.quedo, d.dif, d.tipo, d.desde, d.motivo, d.boletas])));
-  A('Justificaciones', cab('Equipos no retirados y su justificación').concat([['Móvil', 'OT', 'Contrato', 'Equipo', 'Cantidad no retirada', 'Motivo / justificación', 'Justificado por', 'Fecha', 'Boletas']],
-    r.justif.map(o => ['M' + o.movil, o.orden, o.contrato, o.equipo, o.justificado, o.motivo || '', o.justPor || '', String(o.justFecha || '').slice(0, 16), o.boletas || ''])));
+  /* 1. Resumen: por tipo (como el de la hoja «Datos de Devolución») y por equipo */
+  const tt = ['Total general', 0, 0, 0, '']; r.tipos.forEach(x => { tt[1] = rd(tt[1] + x.pidio); tt[2] = rd(tt[2] + x.entregado); tt[3] = rd(tt[3] + x.pidio - x.entregado); });
+  const te = ['TOTAL', 0, 0, 0, 0, 0]; r.resumen.forEach(x => { te[1] += x.pidio; te[2] += x.quedo; te[3] += x.entregado; te[4] += x.justificado; te[5] += x.quedo - x.entregado - x.justificado; });
+  A('Resumen', cab('Resumen de devolución').concat(
+    [['Tipo', 'Suma de total (pidió Telecable)', 'Entregado', 'Diferencia', 'Boleta #']], r.tipos.map(x => [x.tipo, rd(x.pidio), rd(x.entregado), rd(x.pidio - x.entregado), x.boletas.join(', ')]), [tt], [], [],
+    [['Equipo', 'Pidió Telecable', 'Quedó (tras cambios de equipo)', 'Entregado', 'No retirado (justificado)', 'Pendiente de entregar']],
+    r.resumen.map(x => [x.equipo, rd(x.pidio), rd(x.quedo), rd(x.entregado), rd(x.justificado), rd(x.quedo - x.entregado - x.justificado)]), [te.map((v, i) => i ? rd(v) : v)]));
+  /* 2. Por móvil */
+  A('Resumen por móvil', cab('Resumen por móvil').concat([['Móvil', 'Suma de total (pidió Telecable)', 'Entrega', 'Diferencia']], r.moviles.map(m => ['M' + m.movil, rd(m.pidio), rd(m.entregado), rd(m.pidio - m.entregado)])));
+  /* 3. Justificaciones: la fila de Telecable tal cual la enviaron + lo que se entregó + la justificación */
+  const H = ['NOMBRE_MOVIL', 'Contrata', 'AVERIA', 'Tipo', 'FECHA_CIERRE', 'SERVICIOS', 'CONTRATO_B', 'CODIGO'].concat(r.eqCols, ['TOTAL', 'Lo que se entregó', 'Justificación']);
+  A('Justificaciones', cab('Justificaciones: por qué cambió el archivo que enviaron').concat([H], r.justRows.map(x => {
+    const f = x.f, tot = r.eqCols.reduce((a, n) => a + (f.equipos[n] || 0), 0);
+    return ['SRD - M' + x.movil, f.contrata || '', f.averia || '', f.tipo || '', f.fecha || '', f.servicio || '', f.contrato || '', x.orden].concat(r.eqCols.map(n => f.equipos[n] || 0), [tot, x.entregado, x.nota]);
+  })));
   if (r.demas.length) A('Devueltos de más', cab('Equipos entregados de más').concat([['Móvil', 'OT', 'Contrato', 'Equipo', 'Cantidad de más', 'Boletas']], r.demas.map(d => ['M' + d.o.movil, d.o.orden, d.o.contrato, d.o.equipo, d.cant, d.o.boletas || ''])));
   if (r.noEnSistema.length) A('OT no encontradas', cab('OT del archivo que no están cargadas en el sistema').concat([['OT', 'Contrato', 'Móvil', 'Equipos pedidos']], r.noEnSistema.map(x => [x.orden, x.contrato, x.movil, x.equipos])));
   return wb;
@@ -16773,6 +16799,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 196 · 05-nov 12:44</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 197 · 05-nov 12:56</div>
 </body>
 </html>
