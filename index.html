@@ -11326,6 +11326,14 @@ function devRepBolRes(debe, ent) {
   const d = devRd(ent - debe);
   return d === 0 ? { t: '✔ Cuadra', c: '#2e7d32', x: 'Cuadra' } : (d > 0 ? { t: '⚠ Se entregó de más: +' + d, c: '#c0392b', x: 'De más: +' + d } : { t: 'Faltaron ' + (-d), c: '#b26a00', x: 'Faltaron ' + (-d) });
 }
+/* Diferencia contra la boleta: solo cuenta los equipos donde se digitó cantidad. (+) de más, (−) faltante */
+function devRepBolDif() {
+  const r = devRep, B = r.bol; if (!B) return { hay: false, extra: 0, ent: 0, debe: 0 };
+  let hay = false, ent = 0, debe = 0, mas = 0, falta = 0;
+  devRepBolFilas().forEach(f => { const v = B.cant[f.k]; if (v === undefined || v === '' || v == null || isNaN(v)) return; hay = true; ent += Number(v); debe += f.debe;
+    const d = devRd(Number(v) - f.debe); if (d > 0) mas += d; else falta -= d; });
+  return { hay: hay, extra: devRd(ent - debe), mas: devRd(mas), falta: devRd(falta), ent: devRd(ent), debe: devRd(debe) };
+}
 function devRepBolPintar() {
   const r = devRep, F = devRepBolFilas();
   const ya = {}; F.forEach(f => { ya[f.k] = 1; });
@@ -11341,6 +11349,16 @@ function devRepBolPintar() {
     '<div style="display:flex;gap:8px;margin-top:6px"><select id="devRepBolOtro" style="flex:1"><option value="">Otro equipo que se entregó…</option>' + otros.map(n => '<option>' + esc(n) + '</option>').join('') + '</select><button class="btn secondary" onclick="devRepBolAgregar()">+ Agregar</button></div>';
   devRepBolTotal();
 }
+function devRepTiposPintar() {
+  const r = devRep, n = x => fmtN(devRd(x)), d = devRepBolDif(), ex = d.hay ? d.extra : 0, mas = d.hay ? d.mas : 0, falta = d.hay ? d.falta : 0;
+  const P = r.tipos.reduce((a, x) => a + x.pidio, 0), E = r.tipos.reduce((a, x) => a + x.entregado, 0) + ex;
+  const el = $('devRepTipos'); if (!el) return;
+  el.innerHTML = '<table class="table" style="font-size:12.5px"><thead><tr><th class="left">Tipo</th><th>Pidió Telecable</th><th>Entregado</th><th>Diferencia</th><th class="left">Boleta #</th></tr></thead><tbody>' +
+    r.tipos.map(x => '<tr><td class="left">' + esc(x.tipo) + '</td><td>' + n(x.pidio) + '</td><td>' + n(x.entregado) + '</td><td' + (x.pidio !== x.entregado ? ' style="color:#b26a00"' : '') + '><b>' + n(x.pidio - x.entregado) + '</b></td><td class="left">' + esc(x.boletas.join(', ') || (r.bol && r.bol.num) || '—') + '</td></tr>').join('') +
+    (mas ? '<tr style="background:#fff3f0"><td class="left"><b>Entregado de más (según boleta)</b></td><td>0</td><td><b>+' + n(mas) + '</b></td><td style="color:#c0392b"><b>' + n(-mas) + '</b></td><td class="left">' + esc((r.bol && r.bol.num) || '—') + '</td></tr>' : '') +
+    (falta ? '<tr style="background:#fff8e1"><td class="left"><b>Faltante (según boleta)</b></td><td>0</td><td><b>−' + n(falta) + '</b></td><td style="color:#b26a00"><b>' + n(falta) + '</b></td><td class="left">' + esc((r.bol && r.bol.num) || '—') + '</td></tr>' : '') +
+    '<tr style="background:#f4f6fa;font-weight:700"><td class="left">Total general</td><td>' + n(P) + '</td><td>' + n(E) + '</td><td>' + n(P - E) + '</td><td></td></tr></tbody></table>';
+}
 function devRepBolSet(k, v, debe, i) {
   const r = devRep; r.bol.cant[k] = v === '' ? '' : Number(v);
   const res = devRepBolRes(debe, r.bol.cant[k]), c = $('devRepBolR' + i);
@@ -11349,10 +11367,10 @@ function devRepBolSet(k, v, debe, i) {
 }
 function devRepBolTotal() {
   const r = devRep, F = devRepBolFilas();
-  const hay = F.some(f => r.bol.cant[f.k] !== undefined && r.bol.cant[f.k] !== '');
-  const ent = F.reduce((a, f) => a + (Number(r.bol.cant[f.k]) || 0), 0), debe = F.reduce((a, f) => a + f.debe, 0);
-  $('devRepBolTot').innerHTML = hay ? '<b>' + fmtN(devRd(ent)) + '</b>' : '';
+  const d = devRepBolDif(), hay = d.hay, ent = d.ent, debe = d.debe;
+  $('devRepBolTot').innerHTML = hay ? '<b>' + fmtN(ent) + '</b>' : '';
   const res = hay ? devRepBolRes(debe, ent) : { t: '', c: '#999' };
+  devRepTiposPintar();
   $('devRepBolTotR').textContent = res.t; $('devRepBolTotR').style.color = res.c;
 }
 function devRepBolAgregar() {
@@ -11369,8 +11387,7 @@ function devRepMostrar() {
     '<span class="chip amar">' + nNo + ' OT con equipo no retirado</span>' +
     (r.demas.length ? '<span class="chip amar">' + r.demas.length + ' devuelta(s) de más</span>' : '') +
     (r.noEnSistema.length ? '<span class="chip" style="background:#fde8e8;color:#a33">' + r.noEnSistema.length + ' OT no están en el sistema</span>' : '') + '</div>' +
-    '<div style="max-height:320px;overflow:auto"><table class="table" style="font-size:12.5px"><thead><tr><th class="left">Tipo</th><th>Pidió Telecable</th><th>Entregado</th><th>Diferencia</th><th class="left">Boleta #</th></tr></thead><tbody>' +
-    r.tipos.map(x => '<tr><td class="left">' + esc(x.tipo) + '</td><td>' + n(x.pidio) + '</td><td>' + n(x.entregado) + '</td><td' + (x.pidio !== x.entregado ? ' style="color:#b26a00"' : '') + '><b>' + n(x.pidio - x.entregado) + '</b></td><td class="left">' + esc(x.boletas.join(', ') || '—') + '</td></tr>').join('') + '</tbody></table>' +
+    '<div style="max-height:320px;overflow:auto"><div id="devRepTipos"></div>' +
     '<div id="devRepBol" style="margin-top:12px;padding-top:10px;border-top:1px solid #e3e6ea"></div>' +
     '<div style="font-size:12px;color:#556;margin:12px 0 4px">Vista previa de las justificaciones (' + r.justRows.length + ' OT):</div>' +
     '<table class="table" style="font-size:12px"><thead><tr><th>Móvil</th><th>OT</th><th class="left">Justificación</th></tr></thead><tbody>' +
@@ -11395,7 +11412,9 @@ function devRepLibro(r) {
   const cab = t => [['Soluciones Red Dorada SRL · ' + t], ['Archivo de Telecable: ' + r.archivo + ' · ' + r.totalOt + ' OT · Generado: ' + hoyISO()], []];
   const A = (nom, rows) => XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), nom);
   /* 1. Resumen: por tipo (como el de la hoja «Datos de Devolución») y por equipo */
+  const bolD = devRepBolDif(), exBol = (bolD.hay ? bolD.extra : 0);
   const tt = ['Total general', 0, 0, 0, '']; r.tipos.forEach(x => { tt[1] = rd(tt[1] + x.pidio); tt[2] = rd(tt[2] + x.entregado); tt[3] = rd(tt[3] + x.pidio - x.entregado); });
+  tt[2] = rd(tt[2] + exBol); tt[3] = rd(tt[1] - tt[2]);
   const te = ['TOTAL', 0, 0, 0, 0]; r.resumen.forEach(x => { te[1] += x.pidio; te[2] += x.quedo; te[3] += x.justificado; te[4] += x.entregado; });
   const B = r.bol || { num: '', cant: {}, extra: [] };
   const hayBol = Object.keys(B.cant).some(k => B.cant[k] !== '' && B.cant[k] != null);
@@ -11404,10 +11423,11 @@ function devRepLibro(r) {
   const bolCols = (n, debe) => { const v = B.cant[devNorm(n)]; return (v === '' || v == null) ? ['', ''] : [rd(v), devRepBolRes(debe, v).x]; };
   const entTot = Object.keys(B.cant).reduce((a, k) => a + (Number(B.cant[k]) || 0), 0);
   A('Resumen', cab('Resumen de devolución').concat(
-    [['Tipo', 'Suma de total (pidió Telecable)', 'Entregado', 'Diferencia', 'Boleta #']], r.tipos.map(x => [x.tipo, rd(x.pidio), rd(x.entregado), rd(x.pidio - x.entregado), x.boletas.join(', ') || (B.num || '')]), [tt], [], [],
+    [['Tipo', 'Suma de total (pidió Telecable)', 'Entregado', 'Diferencia', 'Boleta #']], r.tipos.map(x => [x.tipo, rd(x.pidio), rd(x.entregado), rd(x.pidio - x.entregado), x.boletas.join(', ') || (B.num || '')]),
+    (bolD.mas ? [['Entregado de más (según boleta)', 0, bolD.mas, rd(-bolD.mas), B.num || '']] : []), (bolD.falta ? [['Faltante (según boleta)', 0, -bolD.falta, bolD.falta, B.num || '']] : []), [tt], [], [],
     [['Equipo', 'Pidió Telecable', 'Quedó (tras cambios de equipo)', 'No retirado (justificado)', 'Debe entregarse a Telecable'].concat(hayBol ? ['Entregado en la boleta' + (r.bol.num ? ' #' + r.bol.num : ''), 'Resultado'] : [])],
     r.resumen.map(x => [x.equipo, rd(x.pidio), rd(x.quedo), rd(x.justificado), rd(x.entregado)].concat(hayBol ? bolCols(x.equipo, x.entregado) : [])).concat(
-      extras.map(n => [n, 0, 0, 0, 0].concat(bolCols(n, 0)))), [te.map((v, i) => i ? rd(v) : v).concat(hayBol ? [rd(entTot), devRepBolRes(te[4], entTot).x] : [])]));
+      extras.map(n => [n, 0, 0, 0, 0].concat(bolCols(n, 0)))), [te.map((v, i) => i ? rd(v) : v).concat(hayBol ? [rd(devRepBolDif().ent), devRepBolRes(devRepBolDif().debe, devRepBolDif().ent).x] : [])]));
   /* 2. Por móvil */
   A('Resumen por móvil', cab('Resumen por móvil').concat([['Móvil', 'Suma de total (pidió Telecable)', 'Entrega', 'Diferencia']], r.moviles.map(m => ['M' + m.movil, rd(m.pidio), rd(m.entregado), rd(m.pidio - m.entregado)])));
   /* 3. Justificaciones: la fila de Telecable tal cual la enviaron + lo que se entregó + la justificación */
@@ -16854,6 +16874,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 199 · 05-nov 13:09</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 200 · 05-nov 13:13</div>
 </body>
 </html>
