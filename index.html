@@ -11324,7 +11324,7 @@ function devRepBolFilas() {
 function devRepBolRes(debe, ent) {
   if (ent === '' || ent == null || isNaN(ent)) return { t: '', c: '#999', x: '' };
   const d = devRd(ent - debe);
-  return d === 0 ? { t: '✔ Cuadra', c: '#2e7d32', x: 'Cuadra' } : (d > 0 ? { t: '⚠ Se entregó de más: +' + d, c: '#c0392b', x: 'De más: +' + d } : { t: 'Faltaron ' + (-d), c: '#b26a00', x: 'Faltaron ' + (-d) });
+  return d === 0 ? { t: '✔ Cuadra', c: '#2e7d32', x: 'Cuadra' } : (d > 0 ? { t: '⚠ De más: +' + d, c: '#c0392b', x: 'De más: +' + d } : { t: 'Faltaron ' + (-d), c: '#b26a00', x: 'Faltaron ' + (-d) });
 }
 /* Diferencia contra la boleta: solo cuenta los equipos donde se digitó cantidad. (+) de más, (−) faltante */
 function devRepBolDif() {
@@ -11341,23 +11341,54 @@ function devRepBolPintar() {
   (devDatos.lineas || []).forEach(o => { const k = devNorm(o.equipo); if (!ya[k] && !vistos[k]) { vistos[k] = 1; otros.push(o.equipo); } });
   r.eqCols.forEach(n => { const k = devNorm(n); if (!ya[k] && !vistos[k]) { vistos[k] = 1; otros.push(n); } });
   $('devRepBol').innerHTML =
-    '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><b>Boleta de entrega a Telecable</b><input id="devRepBolNum" placeholder="Boleta #" value="' + esc(r.bol.num) + '" style="width:110px" oninput="devRep.bol.num = this.value"></div>' +
-    '<table class="table" style="font-size:12.5px"><thead><tr><th class="left">Equipo</th><th>Debe entregarse</th><th>Entregado en la boleta</th><th class="left">Resultado</th></tr></thead><tbody>' +
+    '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><b>Boleta de entrega a Telecable</b><input id="devRepBolNum" placeholder="Boleta #" value="' + esc(r.bol.num) + '" style="width:110px" oninput="devRep.bol.num = this.value; devRepTiposPintar()"></div>' +
+    '<div style="overflow-x:auto"><table class="table" style="font-size:12px;min-width:0"><thead><tr><th class="left">Equipo</th><th>Debe entregarse</th><th>Entregado en la boleta</th><th class="left">Resultado</th></tr></thead><tbody>' +
     F.map((f, i) => { const v = r.bol.cant[f.k], res = devRepBolRes(f.debe, v);
       return '<tr><td class="left">' + esc(f.equipo) + '</td><td>' + fmtN(f.debe) + '</td><td><input type="number" min="0" step="any" style="width:80px" value="' + (v === undefined || v === '' ? '' : v) + '" oninput="devRepBolSet(\'' + esc(f.k).replace(/'/g, '') + '\', this.value, ' + f.debe + ', ' + i + ')"></td><td class="left" id="devRepBolR' + i + '" style="color:' + res.c + ';font-weight:600">' + res.t + '</td></tr>'; }).join('') +
-    '<tr style="background:#f4f6fa;font-weight:700"><td class="left">Total</td><td>' + fmtN(F.reduce((a, f) => a + f.debe, 0)) + '</td><td id="devRepBolTot"></td><td class="left" id="devRepBolTotR"></td></tr></tbody></table>' +
+    '<tr style="background:#f4f6fa;font-weight:700"><td class="left">Total</td><td>' + fmtN(F.reduce((a, f) => a + f.debe, 0)) + '</td><td id="devRepBolTot"></td><td class="left" id="devRepBolTotR"></td></tr></tbody></table></div>' +
     '<div style="display:flex;gap:8px;margin-top:6px"><select id="devRepBolOtro" style="flex:1"><option value="">Otro equipo que se entregó…</option>' + otros.map(n => '<option>' + esc(n) + '</option>').join('') + '</select><button class="btn secondary" onclick="devRepBolAgregar()">+ Agregar</button></div>';
   devRepBolTotal();
 }
 function devRepTiposPintar() {
+  const el = $('devRepTipos'); if (!el) return;
+  el.innerHTML = devRepCuadroHtml();
+}
+/* Cuadro compacto con estilos en línea para pegarlo tal cual en el correo */
+function devRepCuadroHtml() {
   const r = devRep, n = x => fmtN(devRd(x)), d = devRepBolDif(), ex = d.hay ? d.extra : 0, mas = d.hay ? d.mas : 0, falta = d.hay ? d.falta : 0;
   const P = r.tipos.reduce((a, x) => a + x.pidio, 0), E = r.tipos.reduce((a, x) => a + x.entregado, 0) + ex;
+  const bol = (r.bol && r.bol.num) || '';
+  const T = 'border-collapse:collapse;font-family:Calibri,Arial,sans-serif;font-size:13px;margin:0 0 10px 0';
+  const th = 'background:#b71c1c;color:#fff;border:1px solid #888;padding:3px 9px;text-align:center;font-weight:bold';
+  const thL = th.replace('text-align:center', 'text-align:left');
+  const td = (x, extra) => 'border:1px solid #888;padding:3px 9px;text-align:center;' + (extra || '');
+  const tdL = (extra) => 'border:1px solid #888;padding:3px 9px;text-align:left;' + (extra || '');
+  let h = '<table style="' + T + '"><thead><tr><th style="' + thL + '">Tipo</th><th style="' + th + '">Archivo TC</th><th style="' + th + '">Entregado</th><th style="' + th + '">Diferencia</th><th style="' + th + '">Boleta #</th></tr></thead><tbody>' +
+    r.tipos.map(x => '<tr><td style="' + tdL() + '">' + esc(x.tipo) + '</td><td style="' + td() + '">' + n(x.pidio) + '</td><td style="' + td() + '">' + n(x.entregado) + '</td><td style="' + td(x.pidio !== x.entregado ? 'color:#b26a00;font-weight:bold' : '') + '">' + n(x.pidio - x.entregado) + '</td><td style="' + td() + '">' + esc(x.boletas.join(', ') || bol || '—') + '</td></tr>').join('') +
+    (mas ? '<tr style="background:#fdecea"><td style="' + tdL('font-weight:bold') + '">Entregado de más</td><td style="' + td() + '">—</td><td style="' + td('font-weight:bold') + '">+' + n(mas) + '</td><td style="' + td('color:#c0392b;font-weight:bold') + '">' + n(-mas) + '</td><td style="' + td() + '">' + esc(bol || '—') + '</td></tr>' : '') +
+    (falta ? '<tr style="background:#fff4d6"><td style="' + tdL('font-weight:bold') + '">Faltante</td><td style="' + td() + '">—</td><td style="' + td('font-weight:bold') + '">−' + n(falta) + '</td><td style="' + td('color:#b26a00;font-weight:bold') + '">' + n(falta) + '</td><td style="' + td() + '">' + esc(bol || '—') + '</td></tr>' : '') +
+    '<tr style="background:#eee;font-weight:bold"><td style="' + tdL() + '">Total general</td><td style="' + td() + '">' + n(P) + '</td><td style="' + td() + '">' + n(E) + '</td><td style="' + td() + '">' + n(P - E) + '</td><td style="' + td() + '"></td></tr></tbody></table>';
+  if (d.hay) {
+    h += '<table style="' + T + '"><thead><tr><th style="' + thL + '">Equipo</th><th style="' + th + '">Archivo TC</th><th style="' + th + '">Debe entregarse</th><th style="' + th + '">Entregado' + (bol ? ' (boleta ' + esc(bol) + ')' : '') + '</th><th style="' + th + '">Resultado</th></tr></thead><tbody>' +
+      devRepBolFilas().filter(f => r.bol.cant[f.k] !== undefined && r.bol.cant[f.k] !== '' && !isNaN(r.bol.cant[f.k])).map(f => {
+        const x = r.resumen.find(q => devNorm(q.equipo) === f.k), v = r.bol.cant[f.k], res = devRepBolRes(f.debe, v);
+        return '<tr><td style="' + tdL() + '">' + esc(f.equipo) + '</td><td style="' + td() + '">' + n(x ? x.pidio : 0) + '</td><td style="' + td() + '">' + n(f.debe) + '</td><td style="' + td() + '">' + n(v) + '</td><td style="' + td('color:' + res.c + ';font-weight:bold') + '">' + esc(res.x) + '</td></tr>'; }).join('') + '</tbody></table>';
+  }
+  return h;
+}
+async function devRepCopiar() {
   const el = $('devRepTipos'); if (!el) return;
-  el.innerHTML = '<table class="table" style="font-size:12.5px"><thead><tr><th class="left">Tipo</th><th>Pidió Telecable</th><th>Entregado</th><th>Diferencia</th><th class="left">Boleta #</th></tr></thead><tbody>' +
-    r.tipos.map(x => '<tr><td class="left">' + esc(x.tipo) + '</td><td>' + n(x.pidio) + '</td><td>' + n(x.entregado) + '</td><td' + (x.pidio !== x.entregado ? ' style="color:#b26a00"' : '') + '><b>' + n(x.pidio - x.entregado) + '</b></td><td class="left">' + esc(x.boletas.join(', ') || (r.bol && r.bol.num) || '—') + '</td></tr>').join('') +
-    (mas ? '<tr style="background:#fff3f0"><td class="left"><b>Entregado de más (según boleta)</b></td><td>0</td><td><b>+' + n(mas) + '</b></td><td style="color:#c0392b"><b>' + n(-mas) + '</b></td><td class="left">' + esc((r.bol && r.bol.num) || '—') + '</td></tr>' : '') +
-    (falta ? '<tr style="background:#fff8e1"><td class="left"><b>Faltante (según boleta)</b></td><td>0</td><td><b>−' + n(falta) + '</b></td><td style="color:#b26a00"><b>' + n(falta) + '</b></td><td class="left">' + esc((r.bol && r.bol.num) || '—') + '</td></tr>' : '') +
-    '<tr style="background:#f4f6fa;font-weight:700"><td class="left">Total general</td><td>' + n(P) + '</td><td>' + n(E) + '</td><td>' + n(P - E) + '</td><td></td></tr></tbody></table>';
+  const html = el.innerHTML, txt = el.innerText;
+  try {
+    await navigator.clipboard.write([new ClipboardItem({ 'text/html': new Blob([html], { type: 'text/html' }), 'text/plain': new Blob([txt], { type: 'text/plain' }) })]);
+    toast('Cuadro copiado. Pégalo en el correo (Ctrl+V).');
+  } catch (e) {
+    try {
+      const rg = document.createRange(); rg.selectNodeContents(el); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(rg);
+      const ok = document.execCommand('copy'); sel.removeAllRanges();
+      toast(ok ? 'Cuadro copiado. Pégalo en el correo (Ctrl+V).' : 'No se pudo copiar; selecciónalo con el mouse y usa Ctrl+C.', 5000);
+    } catch (e2) { toast('No se pudo copiar; selecciónalo con el mouse y usa Ctrl+C.', 5000); }
+  }
 }
 function devRepBolSet(k, v, debe, i) {
   const r = devRep; r.bol.cant[k] = v === '' ? '' : Number(v);
@@ -11387,14 +11418,14 @@ function devRepMostrar() {
     '<span class="chip amar">' + nNo + ' OT con equipo no retirado</span>' +
     (r.demas.length ? '<span class="chip amar">' + r.demas.length + ' devuelta(s) de más</span>' : '') +
     (r.noEnSistema.length ? '<span class="chip" style="background:#fde8e8;color:#a33">' + r.noEnSistema.length + ' OT no están en el sistema</span>' : '') + '</div>' +
-    '<div style="max-height:320px;overflow:auto"><div id="devRepTipos"></div>' +
+    '<div style="max-height:62vh;overflow:auto"><div id="devRepTipos"></div>' +
     '<div id="devRepBol" style="margin-top:12px;padding-top:10px;border-top:1px solid #e3e6ea"></div>' +
     '<div style="font-size:12px;color:#556;margin:12px 0 4px">Vista previa de las justificaciones (' + r.justRows.length + ' OT):</div>' +
     '<table class="table" style="font-size:12px"><thead><tr><th>Móvil</th><th>OT</th><th class="left">Justificación</th></tr></thead><tbody>' +
     r.justRows.slice(0, 8).map(x => '<tr><td>M' + esc(x.movil) + '</td><td>' + esc(x.orden) + '</td><td class="left" style="white-space:normal">' + esc(x.nota) + '</td></tr>').join('') +
     (r.justRows.length > 8 ? '<tr><td colspan="3" class="empty">… y ' + (r.justRows.length - 8) + ' más en el Excel</td></tr>' : '') + '</tbody></table></div>' +
     (r.justRows.some(d => /sin motivo registrado/.test(d.nota)) ? '<div style="font-size:12px;color:#a33;margin-top:8px">⚠️ Hay cambios sin motivo registrado (anteriores a que se guardara el motivo). Salen marcados en el Excel.</div>' : '') +
-    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn secondary" onclick="devCerrar()">Cancelar</button><button class="btn primary" id="devRepBtn" onclick="devRepExportar()">Exportar Excel</button></div>');
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn secondary" onclick="devCerrar()">Cancelar</button><button class="btn secondary" onclick="devRepCopiar()">📋 Copiar cuadro para correo</button><button class="btn primary" id="devRepBtn" onclick="devRepExportar()">Exportar Excel</button></div>');
   devRepBolPintar();
 }
 async function devRepExportar() {
@@ -11423,13 +11454,13 @@ function devRepLibro(r) {
   const bolCols = (n, debe) => { const v = B.cant[devNorm(n)]; return (v === '' || v == null) ? ['', ''] : [rd(v), devRepBolRes(debe, v).x]; };
   const entTot = Object.keys(B.cant).reduce((a, k) => a + (Number(B.cant[k]) || 0), 0);
   A('Resumen', cab('Resumen de devolución').concat(
-    [['Tipo', 'Suma de total (pidió Telecable)', 'Entregado', 'Diferencia', 'Boleta #']], r.tipos.map(x => [x.tipo, rd(x.pidio), rd(x.entregado), rd(x.pidio - x.entregado), x.boletas.join(', ') || (B.num || '')]),
+    [['Tipo', 'Archivo TC', 'Entregado', 'Diferencia', 'Boleta #']], r.tipos.map(x => [x.tipo, rd(x.pidio), rd(x.entregado), rd(x.pidio - x.entregado), x.boletas.join(', ') || (B.num || '')]),
     (bolD.mas ? [['Entregado de más (según boleta)', 0, bolD.mas, rd(-bolD.mas), B.num || '']] : []), (bolD.falta ? [['Faltante (según boleta)', 0, -bolD.falta, bolD.falta, B.num || '']] : []), [tt], [], [],
-    [['Equipo', 'Pidió Telecable', 'Quedó (tras cambios de equipo)', 'No retirado (justificado)', 'Debe entregarse a Telecable'].concat(hayBol ? ['Entregado en la boleta' + (r.bol.num ? ' #' + r.bol.num : ''), 'Resultado'] : [])],
+    [['Equipo', 'Archivo TC', 'Quedó (tras cambios de equipo)', 'No retirado (justificado)', 'Debe entregarse a Telecable'].concat(hayBol ? ['Entregado en la boleta' + (r.bol.num ? ' #' + r.bol.num : ''), 'Resultado'] : [])],
     r.resumen.map(x => [x.equipo, rd(x.pidio), rd(x.quedo), rd(x.justificado), rd(x.entregado)].concat(hayBol ? bolCols(x.equipo, x.entregado) : [])).concat(
       extras.map(n => [n, 0, 0, 0, 0].concat(bolCols(n, 0)))), [te.map((v, i) => i ? rd(v) : v).concat(hayBol ? [rd(devRepBolDif().ent), devRepBolRes(devRepBolDif().debe, devRepBolDif().ent).x] : [])]));
   /* 2. Por móvil */
-  A('Resumen por móvil', cab('Resumen por móvil').concat([['Móvil', 'Suma de total (pidió Telecable)', 'Entrega', 'Diferencia']], r.moviles.map(m => ['M' + m.movil, rd(m.pidio), rd(m.entregado), rd(m.pidio - m.entregado)])));
+  A('Resumen por móvil', cab('Resumen por móvil').concat([['Móvil', 'Archivo TC', 'Entrega', 'Diferencia']], r.moviles.map(m => ['M' + m.movil, rd(m.pidio), rd(m.entregado), rd(m.pidio - m.entregado)])));
   /* 3. Justificaciones: la fila de Telecable tal cual la enviaron + lo que se entregó + la justificación */
   const H = ['NOMBRE_MOVIL', 'Contrata', 'AVERIA', 'Tipo', 'FECHA_CIERRE', 'SERVICIOS', 'CONTRATO_B', 'CODIGO'].concat(r.eqCols, ['TOTAL', 'Lo que se entregó', 'Justificación']);
   A('Justificaciones', cab('Justificaciones: por qué cambió el archivo que enviaron').concat([H], r.justRows.map(x => {
@@ -16874,6 +16905,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 200 · 05-nov 13:13</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 201 · 05-nov 13:21</div>
 </body>
 </html>
