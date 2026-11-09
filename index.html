@@ -1758,6 +1758,7 @@
       <div id="desDan" style="display:none"></div>
       <div id="desNuevo" style="display:none"></div>
       <div id="desInv" style="display:none"></div>
+      <div id="desRev" style="display:none"></div>
     </div>
   </div>
 
@@ -1796,7 +1797,11 @@
     </div>
   </div>
 
-  <div id="modalDesp" class="modalBg">
+  <div id="modalRevInv" class="modalBg" style="z-index:95">
+    <div class="modal" style="width:min(780px,100%);max-height:92vh;overflow:auto"><div id="revInvCuerpo"></div></div>
+  </div>
+
+  <div id="modalDesp" class="modalBg" style="z-index:90">
     <div class="modal" style="width:min(640px,100%)">
       <h3 id="desTitulo">Entrega de material</h3>
       <div id="desResumen" style="font-size:14px;margin-bottom:8px;max-height:30vh;overflow:auto"></div>
@@ -11735,7 +11740,7 @@ function desMovTxt(a) {
 }
 function desChkGet(id) { try { return JSON.parse(localStorage.getItem('srd_des_chk_' + id) || '[]'); } catch (e) { return []; } }
 function desChkSet(id, v) { try { if (v && v.length) localStorage.setItem('srd_des_chk_' + id, JSON.stringify(v)); else localStorage.removeItem('srd_des_chk_' + id); } catch (e) { } }
-function desTabSel(t) { desTab = t; desPintar(); if (t === 'dan') desDanForm(); if (t === 'nuevo') desNuevoForm(); if (t === 'inv') desInvCargar(); }
+function desTabSel(t) { desTab = t; desPintar(); if (t === 'dan') desDanForm(); if (t === 'nuevo') desNuevoForm(); if (t === 'inv') desInvCargar(); if (t === 'rev') desRevCargar(); }
 async function desCargar() {
   if (sesion.rol === 'consulta') { $('desLista').innerHTML = '<div class="empty">Tu usuario es de solo consulta y no puede despachar. Entra con un usuario que tenga permiso para trabajar en Bodega.</div>'; $('desTabs').innerHTML = ''; return; }
   $('desLista').innerHTML = '<div class="loading">Cargando...</div>';
@@ -11747,15 +11752,16 @@ function desPintar() {
   if (!desDatos) return;
   const ord = (a, b) => String(a.movil).localeCompare(String(b.movil), 'es', { numeric: true });
   const bor = desDatos.alistos.filter(a => a.estado === 'BORRADOR').sort(ord), lis = desDatos.alistos.filter(a => a.estado === 'ALISTADO').sort(ord);
-  $('desTabs').innerHTML = [['alistar', 'Por alistar', bor.length], ['entregar', 'Listos para entregar', lis.length], ['nuevo', 'Nuevo abastecimiento', null], ['dan', 'Recibir dañados', null]].concat(desInvPermiso() ? [['inv', 'Inventario', null]] : []).map(t =>
+  $('desTabs').innerHTML = [['alistar', 'Por alistar', bor.length], ['entregar', 'Listos para entregar', lis.length], ['nuevo', 'Nuevo abastecimiento', null], ['dan', 'Recibir dañados', null]].concat(desInvPermiso() ? [['inv', 'Inventario', null], ['rev', 'Revisión de inventario', null]] : []).map(t =>
     '<button class="' + (desTab === t[0] ? 'act' : '') + '" onclick="desTabSel(\'' + t[0] + '\')">' + t[1] + (t[2] === null ? '' : '<span class="n">' + t[2] + '</span>') + '</button>').join('');
   $('desDan').style.display = desTab === 'dan' ? '' : 'none';
   $('desNuevo').style.display = desTab === 'nuevo' ? '' : 'none';
   $('desInv').style.display = desTab === 'inv' ? '' : 'none';
-  $('desLista').style.display = (desTab === 'dan' || desTab === 'nuevo' || desTab === 'inv') ? 'none' : '';
+  $('desRev').style.display = desTab === 'rev' ? '' : 'none';
+  $('desLista').style.display = (desTab === 'dan' || desTab === 'nuevo' || desTab === 'inv' || desTab === 'rev') ? 'none' : '';
   $('desAyuda').textContent = desTab === 'alistar' ? 'Borradores de alisto. Toca una móvil, marca lo que ya alistaste y confírmalo para pasarlo a «Listos para entregar».' :
-    desTab === 'entregar' ? 'Material alistado. Toca una móvil, quien recibe firma y confirma. La entrega queda a tu nombre.' : desTab === 'inv' ? 'Inventario general: elige ver la bodega o el stock de una móvil.' : desTab === 'nuevo' ? 'Crea un abastecimiento para una móvil: elige la móvil y agrega solo las líneas que necesites. Verás lo que hay disponible en bodega.' : 'Recepción de equipos o material dañado que devuelve una móvil. Queda registrado a tu nombre.';
-  if (desTab === 'dan' || desTab === 'nuevo' || desTab === 'inv') return;
+    desTab === 'entregar' ? 'Material alistado. Toca una móvil, quien recibe firma y confirma. La entrega queda a tu nombre.' : desTab === 'inv' ? 'Inventario general: elige ver la bodega o el stock de una móvil.' : desTab === 'rev' ? 'Revisión de inventario: cuenta la bodega o una móvil, firma y envía. Es solo para revisar: no cambia ninguna cantidad del sistema.' : desTab === 'nuevo' ? 'Crea un abastecimiento para una móvil: elige la móvil y agrega solo las líneas que necesites. Verás lo que hay disponible en bodega.' : 'Recepción de equipos o material dañado que devuelve una móvil. Queda registrado a tu nombre.';
+  if (desTab === 'dan' || desTab === 'nuevo' || desTab === 'inv' || desTab === 'rev') return;
   const lista = desTab === 'alistar' ? bor : lis;
   $('desLista').innerHTML = !lista.length ? '<div class="empty">' + (desTab === 'alistar' ? 'No hay borradores de alisto por preparar.' : 'No hay material listo para entregar. Cuando alistes un borrador aparecerá aquí.') + '</div>' :
     lista.map(a => {
@@ -11810,6 +11816,198 @@ function desInvPintar() {
       filas.map(f => '<tr><td class="left"><b>' + esc(f.m.material) + '</b></td><td ' + td + '">' + fmtN(f.tiene) + ' <span style="font-weight:400;color:#888">' + esc(f.m.unidad || '') + '</span></td><td ' + th + '>' + (f.obj ? fmtN(f.obj) : '') + '</td><td ' + td + (f.falta > 1e-9 ? ';color:#b71c1c' : '') + '">' + (f.falta > 1e-9 ? fmtN(f.falta) : '') + '</td></tr>').join('') + '</tbody></table>';
   }
   $('diTabla').innerHTML = n ? h : '<div class="empty">No hay materiales para mostrar con ese filtro.</div>';
+}
+
+/* ---- Revisión de inventario en la tablet: conteo de la bodega o de una móvil solo para revisar (no cambia cantidades), con firma y envío ---- */
+let desRevU = 'BODEGA', desRevMats = [], desRevVal = {}, desRevUltimo = null;
+async function desRevCargar() {
+  if (!desInvPermiso()) { $('desRev').innerHTML = '<div class="empty">No tienes permiso para hacer revisiones de inventario.</div>'; return; }
+  $('desRev').innerHTML = '<div class="loading">Cargando inventario...</div>';
+  try { bodDatos = await api('obtenerBodegaWeb'); } catch (e) { mostrarError(e, 'No se pudo cargar el inventario.'); return; }
+  desRevVal = {}; desRevUltimo = null;
+  desRevForm();
+}
+function desRevForm() {
+  const movs = (bodDatos.moviles || []).slice().sort((a, b) => (Number(a.movil) || 0) - (Number(b.movil) || 0));
+  $('desRev').innerHTML = '<div class="desDanBox"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">' +
+    '<div class="field" style="min-width:260px;margin:0"><label>¿Qué se revisa? *</label><select id="drU" style="font-size:16px" onchange="desRevCambiar()"><option value="BODEGA">📦 Bodega general</option>' +
+    movs.map(m => '<option value="' + esc(m.idMovil) + '">🚐 Móvil ' + esc(m.movil) + ' · ' + esc(m.tecnico || '') + '</option>').join('') + '</select></div>' +
+    '<div class="field" style="flex:1;min-width:200px;margin:0"><label>Buscar material</label><input id="drBuscar" oninput="desRevPintar()" autocomplete="off" style="font-size:16px" placeholder="Nombre o código"></div>' +
+    '<label class="chkInline" style="padding-bottom:8px"><input type="checkbox" id="drSolo" onchange="desRevPintar()"> Solo con diferencia</label></div>' +
+    '<div style="margin:8px 0;padding:8px 10px;background:#e8f1fb;border:1px solid #b6d4f2;border-radius:8px;font-size:13.5px">ℹ️ Escribe lo que cuentas físicamente. <b>Solo es una revisión:</b> no cambia ninguna cantidad del sistema.</div>' +
+    '<div id="drTabla"></div>' +
+    '<div style="display:flex;gap:8px;margin-top:8px"><select id="drOtro" style="flex:1;font-size:15px"></select><button class="btn secondary" type="button" onclick="desRevAgregar()">+ Agregar material</button></div>' +
+    '<div class="field" style="margin-top:10px"><label>Observación</label><input id="drObs" maxlength="300" autocomplete="off" style="font-size:16px" placeholder="ej. faltan 2 cajas, se encontró material sin registrar"></div>' +
+    '<div id="drResumen" style="margin-top:8px;font-weight:600"></div>' +
+    '<div style="text-align:right;margin-top:10px"><button class="btn primary" style="font-size:16px;padding:10px 22px" onclick="desRevFirmar()">✍️ Firmar y enviar</button></div></div>' +
+    '<div id="desRevHist" style="margin-top:18px"></div>';
+  desRevCambiar();
+  desRevHistCargar();
+}
+function desRevCambiar() {
+  desRevU = $('drU').value; desRevVal = {};
+  const mats = (bodDatos.materiales || []).filter(m => m.activo).slice().sort((a, b) => a.material.localeCompare(b.material, 'es'));
+  const sis = m => desRevU === 'BODEGA' ? ((bodDatos.bodega[m.clave] || {}).disponible || 0) : (((bodDatos.stockMovil[desRevU] || {})[m.clave] || {}).actual || 0);
+  const obj = m => desRevU === 'BODEGA' ? 0 : (((bodDatos.objetivos || {})[desRevU] || {})[m.clave] || 0);
+  desRevMats = mats.filter(m => desRevU === 'BODEGA' || sis(m) || obj(m)).map(m => ({ clave: m.clave, material: m.material, unidad: m.unidad || '', codigo: m.codigo || '', sistema: sis(m) }));
+  desRevOtros();
+  desRevPintar();
+}
+function desRevOtros() {
+  const en = {}; desRevMats.forEach(x => { en[x.clave] = 1; });
+  $('drOtro').innerHTML = '<option value="">Material que no está en la lista…</option>' + (bodDatos.materiales || []).filter(m => m.activo && !en[m.clave]).slice().sort((a, b) => a.material.localeCompare(b.material, 'es'))
+    .map(m => '<option value="' + esc(m.clave) + '">' + esc(m.material) + '</option>').join('');
+}
+function desRevAgregar() {
+  const k = $('drOtro').value; if (!k) return;
+  const m = (bodDatos.materiales || []).find(x => x.clave === k); if (!m) return;
+  const sis = desRevU === 'BODEGA' ? ((bodDatos.bodega[k] || {}).disponible || 0) : (((bodDatos.stockMovil[desRevU] || {})[k] || {}).actual || 0);
+  desRevMats.push({ clave: k, material: m.material, unidad: m.unidad || '', codigo: m.codigo || '', sistema: sis });
+  desRevOtros(); desRevPintar();
+}
+function desRevDif(x) { const v = desRevVal[x.clave]; return (v === undefined || v === '' || isNaN(v)) ? null : Math.round((Number(v) - x.sistema) * 100) / 100; }
+function desRevDifHtml(d) { return d === null ? '' : (d === 0 ? '<span style="color:#2e7d32">✔ 0</span>' : '<span style="color:' + (d > 0 ? '#c0392b' : '#b26a00') + '">' + (d > 0 ? '+' : '−') + fmtN(Math.abs(d)) + '</span>'); }
+function desRevPintar() {
+  const q = ($('drBuscar').value || '').trim().toLowerCase(), solo = $('drSolo').checked;
+  const L = desRevMats.filter(x => (!q || (x.material + ' ' + x.codigo).toLowerCase().indexOf(q) >= 0) && (!solo || (desRevDif(x) || 0) !== 0));
+  $('drTabla').innerHTML = L.length ? '<table class="table" style="font-size:15px"><thead><tr><th class="left">Material</th><th style="text-align:right">Sistema</th><th style="text-align:center">Contado</th><th style="text-align:right">Diferencia</th></tr></thead><tbody>' +
+    L.map(x => '<tr><td class="left"><b>' + esc(x.material) + '</b></td><td style="text-align:right;white-space:nowrap">' + fmtN(x.sistema) + ' <span style="color:#888">' + esc(x.unidad) + '</span></td>' +
+      '<td style="text-align:center"><input type="number" inputmode="decimal" min="0" step="any" style="width:100px;font-size:17px;text-align:center" value="' + (desRevVal[x.clave] === undefined ? '' : desRevVal[x.clave]) + '" oninput="desRevSet(\'' + esc(x.clave).replace(/'/g, '') + '\', this.value)"></td>' +
+      '<td id="drD_' + esc(x.clave) + '" style="text-align:right;font-weight:700;white-space:nowrap">' + desRevDifHtml(desRevDif(x)) + '</td></tr>').join('') + '</tbody></table>' :
+    '<div class="empty">No hay materiales para mostrar con ese filtro.</div>';
+  desRevResumen();
+}
+function desRevSet(clave, v) {
+  desRevVal[clave] = v === '' ? '' : Number(v);
+  const x = desRevMats.find(m => m.clave === clave), c = document.getElementById('drD_' + clave);
+  if (x && c) c.innerHTML = desRevDifHtml(desRevDif(x));
+  desRevResumen();
+}
+function desRevResumen() {
+  const cont = desRevMats.filter(x => desRevDif(x) !== null), dif = cont.filter(x => desRevDif(x) !== 0);
+  $('drResumen').innerHTML = 'Contados: ' + cont.length + ' de ' + desRevMats.length + ' · <span style="color:' + (dif.length ? '#c0392b' : '#2e7d32') + '">con diferencia: ' + dif.length + '</span>';
+}
+function desRevFirmar() {
+  const cont = desRevMats.filter(x => desRevDif(x) !== null);
+  if (!cont.length) { toast('Cuenta al menos un material antes de firmar.'); return; }
+  const dif = cont.filter(x => desRevDif(x) !== 0), nom = $('drU').selectedOptions[0].textContent.replace(/^[^\wÁ-ú]+/, '').trim();
+  desPrepararFirma('Revisión de inventario · ' + nom, '<div style="font-size:13px;color:#666;margin-bottom:4px">' + cont.length + ' material(es) contados · ' + dif.length + ' con diferencia</div>' +
+    (dif.length ? dif.map(x => '<div style="display:flex;gap:10px;padding:5px 4px;border-bottom:1px solid #eee"><span style="flex:1">' + esc(x.material) + '</span><span style="color:#666">Sistema ' + fmtN(x.sistema) + ' · Contado ' + fmtN(desRevVal[x.clave]) + '</span><b>' + desRevDifHtml(desRevDif(x)) + '</b></div>').join('') : '<div style="color:#2e7d32;padding:6px 4px">✔ Todo lo contado coincide con el sistema.</div>'),
+    sesion.nombre || '', 'Nombre de quien revisa *', 'Quien revisa firma con el dedo:', '<b>Solo revisión:</b> no modifica las cantidades del sistema. Se envía al administrador.', 'Firmar y enviar', 'rev');
+}
+async function desRevEnviar(nombre, img) {
+  const cont = desRevMats.filter(x => desRevDif(x) !== null);
+  const r = await api('guardarRevisionInvWeb', desRevU, cont.map(x => ({ clave: x.clave, sistema: x.sistema, contado: desRevVal[x.clave] })), $('drObs').value.trim(), nombre, img);
+  $('modalDesp').classList.remove('show');
+  toast('Revisión enviada: ' + r.contados + ' contados, ' + r.diferencias + ' con diferencia.', 5000);
+  desRevUltimo = r.revision;
+  $('desRev').innerHTML = '<div class="desDanBox" style="text-align:center"><div style="font-size:42px">✅</div><div style="font-size:19px;font-weight:700;margin:6px 0">Revisión enviada a administración</div>' +
+    '<div style="color:#555;margin-bottom:12px">' + esc(r.nombre) + ' · ' + r.contados + ' contados · ' + r.diferencias + ' con diferencia</div>' +
+    '<div style="text-align:left;max-width:640px;margin:0 auto">' + revInvDocsHtml(r.revision, r.diferencias) + '</div>' +
+    '<div style="margin-top:14px"><button class="btn secondary" style="font-size:16px" onclick="desRevCargar()">Nueva revisión</button></div></div><div id="desRevHist" style="margin-top:18px"></div>';
+  desRevHistCargar();
+}
+async function desRevHistCargar() {
+  const c = $('desRevHist'); if (!c) return;
+  let l; try { l = await api('obtenerRevisionesInvWeb'); } catch (e) { c.innerHTML = ''; return; }
+  c.innerHTML = '<div style="font-weight:700;margin-bottom:6px">Últimas revisiones enviadas</div>' + (l.length ? l.slice(0, 10).map(revInvFilaHtml).join('') : '<div class="empty">Aún no se ha enviado ninguna revisión.</div>');
+}
+
+/* Los dos documentos de una revisión: la constancia firmada (todo lo contado) y el de solo diferencias */
+function revInvDocsHtml(id, nDif) {
+  const i = esc(id), b = 'style="font-size:15px;padding:8px 14px"';
+  const fila = (tit, desc, modo, prim) => '<div style="border:1px solid #dde2ea;border-radius:10px;padding:10px 12px;margin-bottom:8px"><div style="font-weight:700">' + tit + '</div><div style="font-size:13px;color:#666;margin:2px 0 8px">' + desc + '</div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ' + (prim ? 'primary' : 'secondary') + '" ' + b + ' onclick="revInvCompartir(\'' + i + '\', \'' + modo + '\')">📤 Enviar (WhatsApp o correo)</button>' +
+    '<button class="btn secondary" ' + b + ' onclick="revInvDescargar(\'' + i + '\', \'' + modo + '\')">⬇️ Descargar imagen</button></div></div>';
+  return fila('📄 Constancia firmada de lo recibido', 'Todo el material contado, con lo que decía el sistema, la diferencia y la firma de quien revisa.', 'todo', true) +
+    fila('⚠️ Solo diferencias', nDif ? 'Únicamente los ' + nDif + ' material(es) que no coinciden, con la firma de quien revisa.' : 'No hubo diferencias: el documento lo indica así.', 'dif', false);
+}
+
+/* ---- Lista y detalle de revisiones (tablet y escritorio) ---- */
+let revInvAct = null;
+function revInvFecha(f) { const m = String(f || '').match(/^(\d{4})-(\d\d)-(\d\d)[ T](\d\d:\d\d)/); return m ? m[3] + '/' + m[2] + '/' + m[1] + ' ' + m[4] : String(f || ''); }
+function revInvFilaHtml(x) {
+  const pend = x.estado !== 'REVISADA';
+  return '<div style="display:flex;gap:10px;align-items:center;padding:8px 6px;border-bottom:1px solid #eee;flex-wrap:wrap"><div style="flex:1;min-width:220px"><b>' + esc(x.nombre) + '</b> · ' + x.contados + ' contados · ' +
+    (x.diferencias ? '<span style="color:#c0392b">' + x.diferencias + ' con diferencia</span>' : '<span style="color:#2e7d32">sin diferencias</span>') +
+    '<div style="font-size:12.5px;color:#666">Revisó: <b>' + esc(x.revisor) + '</b> · ' + esc(revInvFecha(x.fecha)) + (x.estado === 'REVISADA' ? ' · revisada por <b>' + esc(x.revisadoPor) + '</b>' : '') + '</div></div>' +
+    '<span style="background:' + (pend ? '#fff3e0' : '#e8f5e9') + ';color:' + (pend ? '#b45309' : '#2e7d32') + ';border-radius:10px;padding:2px 10px;font-size:12px;white-space:nowrap">' + (pend ? '⏳ Por revisar' : '✔ Revisada') + '</span>' +
+    '<button class="btn secondary" onclick="revInvVer(\'' + esc(x.revision) + '\')">Ver</button></div>';
+}
+async function revInvLista() {
+  $('revInvCuerpo').innerHTML = '<div class="loading">Cargando...</div>'; $('modalRevInv').classList.add('show');
+  try {
+    const l = await api('obtenerRevisionesInvWeb');
+    $('revInvCuerpo').innerHTML = '<h3>📋 Revisiones de inventario</h3>' + (l.length ? l.map(revInvFilaHtml).join('') : '<div class="empty">Aún no se ha enviado ninguna revisión.</div>') +
+      '<div class="modalActions"><button class="btn secondary" onclick="$(\'modalRevInv\').classList.remove(\'show\')">Cerrar</button></div>';
+  } catch (e) { $('modalRevInv').classList.remove('show'); mostrarError(e, 'No se pudieron cargar las revisiones.'); }
+}
+async function revInvVer(id) {
+  $('revInvCuerpo').innerHTML = '<div class="loading">Cargando...</div>'; $('modalRevInv').classList.add('show');
+  try {
+    const d = revInvAct = await api('obtenerRevisionInvWeb', id);
+    const dif = d.lineas.filter(x => x.d !== 0);
+    $('revInvCuerpo').innerHTML = '<h3>📋 ' + esc(d.nombre) + '</h3><div style="font-size:13px;color:#555;margin-bottom:8px">Revisó <b>' + esc(d.revisor) + '</b> · ' + esc(revInvFecha(d.fecha)) + ' · ' + d.contados + ' contados · ' +
+      (d.diferencias ? '<b style="color:#c0392b">' + d.diferencias + ' con diferencia</b>' : '<b style="color:#2e7d32">sin diferencias</b>') + (d.obs ? '<br>Observación: ' + esc(d.obs) : '') + '</div>' +
+      '<div style="max-height:46vh;overflow:auto"><table class="table" style="font-size:13.5px"><thead><tr><th class="left">Material</th><th>Sistema</th><th>Contado</th><th>Diferencia</th></tr></thead><tbody>' +
+      d.lineas.slice().sort((a, b) => (b.d !== 0) - (a.d !== 0) || a.m.localeCompare(b.m, 'es')).map(x => '<tr' + (x.d !== 0 ? ' style="background:#fff8f0"' : '') + '><td class="left">' + esc(x.m) + '</td><td>' + fmtN(x.s) + '</td><td>' + fmtN(x.f) + '</td><td><b>' +
+        (x.d === 0 ? '<span style="color:#2e7d32">0</span>' : '<span style="color:' + (x.d > 0 ? '#c0392b' : '#b26a00') + '">' + (x.d > 0 ? '+' : '−') + fmtN(Math.abs(x.d)) + '</span>') + '</b></td></tr>').join('') + '</tbody></table></div>' +
+      (d.firma ? '<div style="margin-top:8px;font-size:12px;color:#777">Firma de ' + esc(d.revisor) + ':</div><img src="' + d.firma + '" alt="Firma" style="max-width:260px;border:1px solid #ccc;border-radius:6px;background:#fff">' : '') +
+      (d.estado === 'REVISADA' ? '<div style="margin-top:8px;color:#2e7d32">✔ Revisada por <b>' + esc(d.revisadoPor) + '</b> · ' + esc(revInvFecha(d.revisado)) + '</div>' : '') +
+      '<div style="margin-top:10px">' + revInvDocsHtml(d.revision, d.diferencias) + '</div>' +
+      '<div class="modalActions"><button class="btn secondary" onclick="revInvLista()">← Lista</button>' +
+      (esAdmin() && d.estado !== 'REVISADA' ? '<button class="btn primary" onclick="revInvMarcar(\'' + esc(d.revision) + '\')">Marcar como revisada</button>' : '') +
+      '<button class="btn secondary" onclick="$(\'modalRevInv\').classList.remove(\'show\')">Cerrar</button></div>';
+  } catch (e) { $('modalRevInv').classList.remove('show'); mostrarError(e, 'No se pudo abrir la revisión.'); }
+}
+async function revInvMarcar(id) {
+  try { await api('marcarRevisionInvWeb', id); toast('Revisión marcada como revisada.'); await revInvVer(id); if (typeof notifCargar === 'function') notifCargar(); if ($('desRevHist')) desRevHistCargar(); }
+  catch (e) { mostrarError(e, 'No se pudo marcar la revisión.'); }
+}
+/* Imagen del documento firmado (para compartir o descargar) */
+async function revInvCanvas(d, modo) {
+  const soloDif = modo === 'dif';
+  const W = 900, K = 2, F = 'Calibri, Arial, sans-serif', fila = 28, L = d.lineas.filter(x => !soloDif || x.d !== 0).sort((a, b) => (b.d !== 0) - (a.d !== 0) || a.m.localeCompare(b.m, 'es'));
+  const firma = d.firma ? await new Promise(res => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = d.firma; }) : null;
+  const H = 150 + 30 + (L.length + 1) * fila + (L.length ? 0 : fila) + 30 + (firma ? 170 : 40) + 20;
+  const cv = document.createElement('canvas'); cv.width = W * K; cv.height = H * K; const g = cv.getContext('2d'); g.scale(K, K);
+  g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
+  g.fillStyle = '#b71c1c'; g.fillRect(0, 0, W, 110); g.fillStyle = '#fff'; g.textBaseline = 'middle'; g.textAlign = 'left';
+  g.font = 'bold 16px ' + F; g.fillText('SOLUCIONES RED DORADA SRL  ·  ' + (soloDif ? 'DIFERENCIAS DE INVENTARIO' : 'CONSTANCIA DE MATERIAL CONTADO Y RECIBIDO'), 24, 24);
+  let t = d.nombre, tam = 40; g.font = 'bold ' + tam + 'px ' + F; while (g.measureText(t).width > W - 48 && tam > 20) { tam -= 2; g.font = 'bold ' + tam + 'px ' + F; }
+  g.fillText(t, 24, 64);
+  g.font = '15px ' + F; g.fillText('Revisó: ' + d.revisor + '  ·  ' + revInvFecha(d.fecha) + '  ·  ' + d.contados + ' contados  ·  ' + d.diferencias + ' con diferencia', 24, 94);
+  g.fillStyle = '#445'; g.font = '13px ' + F;
+  g.fillText((soloDif ? 'Solo se listan los materiales con diferencia.' : 'Solo revisión: no modifica las cantidades del sistema.') + (d.obs ? '  Observación: ' + d.obs : ''), 24, 132);
+  const w = [420, 140, 140, 150]; let y = 150, x = 24;
+  ['Material', 'Sistema', 'Contado', 'Diferencia'].forEach((c, i) => { g.fillStyle = '#b71c1c'; g.fillRect(x, y, w[i], fila); g.strokeStyle = '#888'; g.strokeRect(x, y, w[i], fila); g.fillStyle = '#fff'; g.font = 'bold 14px ' + F; g.textAlign = i ? 'center' : 'left'; g.fillText(c, i ? x + w[i] / 2 : x + 8, y + fila / 2); x += w[i]; });
+  y += fila;
+  if (!L.length) { g.fillStyle = '#2e7d32'; g.font = 'bold 15px ' + F; g.textAlign = 'left'; g.fillText('✔ Todo lo contado coincide con el sistema: no hay diferencias.', 32, y + fila / 2); y += fila; }
+  L.forEach(r => {
+    x = 24; const c = [r.m, String(r.s), String(r.f), r.d === 0 ? '0' : (r.d > 0 ? '+' : '−') + Math.abs(r.d)];
+    w.forEach((ww, i) => { g.fillStyle = r.d !== 0 ? '#fff4ec' : '#fff'; g.fillRect(x, y, ww, fila); g.strokeStyle = '#888'; g.strokeRect(x, y, ww, fila);
+      g.fillStyle = i === 3 ? (r.d === 0 ? '#2e7d32' : (r.d > 0 ? '#c0392b' : '#b26a00')) : '#111'; g.font = (i === 3 ? 'bold ' : '') + '14px ' + F; g.textAlign = i ? 'center' : 'left'; g.fillText(c[i], i ? x + ww / 2 : x + 8, y + fila / 2); x += ww; });
+    y += fila;
+  });
+  y += 24; g.textAlign = 'left'; g.fillStyle = '#445'; g.font = '14px ' + F;
+  if (firma) { g.fillText('Firma de ' + d.revisor + ':', 24, y); g.drawImage(firma, 24, y + 10, 260, 110); } else g.fillText('Sin firma', 24, y);
+  return cv;
+}
+async function revInvArchivo(id, modo) {
+  const d = (revInvAct && revInvAct.revision === id) ? revInvAct : (revInvAct = await api('obtenerRevisionInvWeb', id));
+  const cv = await revInvCanvas(d, modo);
+  const blob = await new Promise(res => cv.toBlob(res, 'image/png'));
+  return { blob: blob, nombre: (modo === 'dif' ? 'Diferencias_inventario_' : 'Constancia_inventario_') + String(d.nombre).split(' · ')[0].replace(/[^\w\-]+/g, '_') + '_' + String(d.fecha).slice(0, 10) + '.png', d: d };
+}
+async function revInvDescargar(id, modo) {
+  try { const a = await revInvArchivo(id, modo); pmBajar(a.blob, a.nombre); } catch (e) { mostrarError(e, 'No se pudo generar la imagen.'); }
+}
+async function revInvCompartir(id, modo) {
+  try {
+    const a = await revInvArchivo(id, modo), f = new File([a.blob], a.nombre, { type: 'image/png' });
+    if (navigator.canShare && navigator.canShare({ files: [f] })) { await navigator.share({ files: [f], title: (modo === 'dif' ? 'Diferencias de inventario · ' : 'Constancia de inventario · ') + a.d.nombre }); return; }
+    pmBajar(a.blob, a.nombre); toast('Este dispositivo no permite compartir directo; se descargó la imagen para que la adjuntes.', 6000);
+  } catch (e) { if (e && e.name === 'AbortError') return; mostrarError(e, 'No se pudo compartir la revisión.'); }
 }
 
 /* ---- Nuevo abastecimiento desde la tablet ---- */
@@ -11965,8 +12163,8 @@ async function desPdf(grupo) {
 }
 async function desConfirmar() {
   const nombre = $('desNombre').value.trim();
-  if (!nombre) { toast('Escribe el nombre de quien recibe.'); return; }
-  if (desTrazos < 5) { toast('Falta la firma de quien recibe.'); return; }
+  if (!nombre) { toast(desModo === 'rev' ? 'Escribe el nombre de quien revisa.' : 'Escribe el nombre de quien recibe.'); return; }
+  if (desTrazos < 5) { toast(desModo === 'rev' ? 'Falta la firma de quien revisa.' : 'Falta la firma de quien recibe.'); return; }
   if (desModo === 'entrega') {
     const ch = document.querySelectorAll('#desResumen .desEntChk'), f = Array.from(ch).filter(c => !c.checked).length;
     if (f && !confirm('Faltan ' + f + ' material(es) por marcar como entregados. ¿Confirmar la entrega de todos modos?')) return;
@@ -11974,7 +12172,9 @@ async function desConfirmar() {
   const btn = $('desGuardar'); btn.disabled = true;
   try {
     const img = $('desCanvas').toDataURL('image/png');
-    if (desModo === 'dan') {
+    if (desModo === 'rev') {
+      await desRevEnviar(nombre, img);
+    } else if (desModo === 'dan') {
       await api('firmarMovimientoInvWeb', desDanGrupo, nombre, img);
       try { await api('avisarDanadosDespachoWeb', desDanGrupo, nombre, desDanTec); } catch (e) { toast('Se firmó, pero no se pudo avisar a bodega: ' + (e.message || e), 6000); }
       $('modalDesp').classList.remove('show');
@@ -11987,7 +12187,7 @@ async function desConfirmar() {
       bodSucio = true; desCargar(); await desPdf(r.grupo);
     }
   } catch (e) {
-    mostrarError(e, desModo === 'dan' ? 'No se pudo guardar la firma.' : 'No se pudo registrar la entrega.');
+    mostrarError(e, desModo === 'rev' ? 'No se pudo enviar la revisión.' : (desModo === 'dan' ? 'No se pudo guardar la firma.' : 'No se pudo registrar la entrega.'));
   } finally { btn.disabled = false; }
 }
 
@@ -14045,6 +14245,7 @@ async function notifIrOtSin(desde, hasta) {
 }
 function notifAbrir(id, vista) {
   const ev = (notifDatos.eventos || []).find(x => x.id === id);
+  if (ev && ev.fija && String(id).indexOf('revinv|') === 0) { $('notifPanel').style.display = 'none'; revInvLista(); return; }
   if (ev && ev.fija && String(id).indexOf('otsin|') === 0) { $('notifPanel').style.display = 'none'; notifIrOtSin(ev.desde, ev.hasta); return; }
   const l = notifLeidas(); if (l.indexOf(id) === -1) { l.push(id); notifGuardarLeidas(l); } notifIr(vista); notifPintar(); }
 function notifIr(vista) { $('notifPanel').style.display = 'none'; if (vista && puedeModulo(MODULOS_NAV[vista] || vista)) mostrarVista(vista); }
@@ -16971,6 +17172,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 205 · 05-nov 13:38</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 207 · 09-nov 09:38</div>
 </body>
 </html>
