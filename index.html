@@ -804,6 +804,7 @@
         <button id="navBodega" onclick="mostrarVista('bodega')"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 7.5 12 3.5l8.5 4v9L12 20.5l-8.5-4z"/><path d="M3.5 7.5 12 11.5l8.5-4M12 11.5v9"/></svg></span><span class="nt"> Bodega</span></button>
         <button id="navCotizaciones" onclick="mostrarVista('cotizaciones')"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="7.5" width="17" height="12" rx="1.5"/><path d="M9 7.5v-2a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M3.5 12.5h17"/></svg></span><span class="nt"> Cotizaciones</span></button>
         <button id="navColaboradores" onclick="mostrarVista('colaboradores')" style="display:none"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="1.8"/><circle cx="9" cy="11" r="2.2"/><path d="M5.5 16c.4-1.6 1.8-2.5 3.5-2.5s3.1.9 3.5 2.5M14.5 10h4M14.5 13.5h3"/></svg></span><span class="nt"> Colaboradores</span></button>
+        <button id="navReclutamiento" onclick="mostrarVista('reclutamiento')" style="display:none"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3.5 19c.5-3 2.8-4.5 5.5-4.5s5 1.5 5.5 4.5M16 11l2 2 3.5-3.5"/></svg></span><span class="nt"> Reclutamiento</span></button>
         <button id="navPagomov" onclick="mostrarVista('pagomov')" style="display:none"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v.01M18 14.5v.01"/></svg></span><span class="nt"> Planillas y proveedores</span></button>
         <button id="navUsuarios" onclick="mostrarVista('usuarios')" style="display:none"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8.5" r="3.2"/><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5M16 5.6a3.2 3.2 0 0 1 0 5.8M18 14.8c1.8.6 3 2.3 3 5.2"/></svg></span><span class="nt"> Usuarios</span></button>
       </div>
@@ -1452,6 +1453,16 @@
       </section>
 
       
+      <section id="vistaRecl" style="display:none">
+        <div id="rcModalBg" class="modalBg" style="z-index:90"><div class="modal" id="rcModal" style="max-width:640px"></div></div>
+        <div class="subtabs" id="rcTabs">
+          <button id="rcTAg" onclick="rcTab('ag')">Agenda de citas</button>
+          <button id="rcTCa" onclick="rcTab('ca')">Candidatos</button>
+        </div>
+        <div id="rcPAg"></div>
+        <div id="rcPCa" style="display:none"></div>
+      </section>
+
       <section id="vistaPagoMov" style="display:none">
         <div class="subtabs" id="pmTabs">
           <button id="pmTSem" onclick="pmTab('sem')">Semanas</button>
@@ -3071,6 +3082,7 @@ function mostrarApp() {
   const primera = Object.keys(MODULOS_NAV).find(v => puedeModulo(MODULOS_NAV[v]));
   $('navColaboradores').style.display = esAdmin() ? '' : 'none';
   $('navPagomov').style.display = esAdmin() ? '' : 'none';
+  $('navReclutamiento').style.display = esAdmin() ? '' : 'none';
   empresaCargar();
   if (!primera) {
     if (esAdmin()) toast('Todavía no tienes módulos asignados. Pídele al administrador que te los active.');
@@ -6125,13 +6137,13 @@ function sideRefrescar() {
   try {
     const bn = $('nav' + vistaActual.charAt(0).toUpperCase() + vistaActual.slice(1));
     const mod = bn ? ((bn.querySelector('.nt') || {}).textContent || '').trim() : '';
-    const sec0 = { calendario: 'vistaCalendario', moviles: 'vistaFichas', seguimiento: 'vistaSeguimiento', bodega: 'vistaBodega', cotizaciones: 'vistaCotiz', colaboradores: 'vistaColab', pagomov: 'vistaPagoMov' }[vistaActual];
+    const sec0 = { calendario: 'vistaCalendario', moviles: 'vistaFichas', seguimiento: 'vistaSeguimiento', bodega: 'vistaBodega', cotizaciones: 'vistaCotiz', colaboradores: 'vistaColab', reclutamiento: 'vistaRecl', pagomov: 'vistaPagoMov' }[vistaActual];
     const act = sec0 && $(sec0) ? $(sec0).querySelector(':scope > .subtabs button.active') : null;
     $('crumb').innerHTML = esc(mod) + (act ? ' › <b>' + esc(sinEmoji(act.textContent)) + '</b>' : '');
   } catch (e) { }
   nav.querySelectorAll('.subnav').forEach(n => n.remove());
   nav.querySelectorAll('.car').forEach(n => n.remove());
-  const mapa = { calendario: 'vistaCalendario', moviles: 'vistaFichas', seguimiento: 'vistaSeguimiento', bodega: 'vistaBodega', cotizaciones: 'vistaCotiz', colaboradores: 'vistaColab', pagomov: 'vistaPagoMov' };
+  const mapa = { calendario: 'vistaCalendario', moviles: 'vistaFichas', seguimiento: 'vistaSeguimiento', bodega: 'vistaBodega', cotizaciones: 'vistaCotiz', colaboradores: 'vistaColab', reclutamiento: 'vistaRecl', pagomov: 'vistaPagoMov' };
   const sec = $(mapa[vistaActual]); const btn = $('nav' + vistaActual.charAt(0).toUpperCase() + vistaActual.slice(1));
   if (!sec || !btn) return;
   const tabs = Array.from(sec.querySelectorAll(':scope > .subtabs button')).filter(b => b.style.display !== 'none' && !b.hidden);
@@ -7106,11 +7118,347 @@ function rhImprimir() {
   f.srcdoc = rhReporteHtml();
 }
 
+/* =========================================================
+   RECLUTAMIENTO: agenda de citas, fichas de candidatos y comprobante de cita (solo administración)
+   ========================================================= */
+let rcPend = [], rcD = null, rcTabAct = 'ag', rcFiltro = 'prox', rcQ = '', rcQC = '', rcFC = '', rcComp = null;
+const RC_DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+const RC_MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+function rcFechaLarga(iso) { const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/); if (!m) return ''; const d = new Date(+m[1], +m[2] - 1, +m[3]); return RC_DIAS[d.getDay()] + ' ' + (+m[3]) + ' de ' + RC_MESES[+m[2] - 1] + ' de ' + m[1]; }
+function rcFechaCorta(iso) { const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[3] + '/' + m[2] + '/' + m[1] : ''; }
+function rcH12(hhmm) { const m = String(hhmm || '').match(/^(\d{1,2}):(\d{2})/); if (!m) return ''; let h = +m[1]; const ap = h >= 12 ? 'p. m.' : 'a. m.'; h = h % 12 || 12; return h + ':' + m[2] + ' ' + ap; }
+function rcHoraFin(hhmm, dur) { const m = String(hhmm || '').match(/^(\d{1,2}):(\d{2})/); if (!m) return ''; const t = (+m[1]) * 60 + (+m[2]) + (Number(dur) || 30); return ('0' + (Math.floor(t / 60) % 24)).slice(-2) + ':' + ('0' + (t % 60)).slice(-2); }
+function rcRango(c) { return rcH12(c.hora) + ' – ' + rcH12(rcHoraFin(c.hora, c.duracion)) + ' (' + c.duracion + ' min)'; }
+function rcModal(h, w) { $('rcModal').innerHTML = h; $('rcModal').style.maxWidth = (w || 640) + 'px'; $('rcModalBg').classList.add('show'); }
+function rcCerrar() { $('rcModalBg').classList.remove('show'); }
+
+async function abrirReclutamiento() {
+  if ($('rcPAg') && !rcD) $('rcPAg').innerHTML = '<div class="loading">Cargando...</div>';
+  try { rcD = await api('obtenerReclutamientoWeb'); rcTab(rcTabAct); }
+  catch (e) { $('rcPAg').innerHTML = ''; mostrarError(e, 'No se pudo cargar Reclutamiento.'); }
+}
+function rcTab(t) {
+  rcTabAct = t;
+  $('rcTAg').classList.toggle('active', t === 'ag'); $('rcTCa').classList.toggle('active', t === 'ca');
+  $('rcPAg').style.display = t === 'ag' ? '' : 'none'; $('rcPCa').style.display = t === 'ca' ? '' : 'none';
+  if (!rcD) return;
+  if (t === 'ag') rcAgendaPintar(); else rcCandPintar();
+  if (typeof sideRefrescar === 'function') sideRefrescar();
+}
+function rcBadge(txt, bg, fg) { return '<span style="display:inline-block;padding:2px 9px;border-radius:12px;font-size:12px;font-weight:700;background:' + bg + ';color:' + fg + '">' + esc(txt) + '</span>'; }
+function rcEstadoCita(e) { return ({ Programada: ['#e8f1ff', '#1a4f9c'], Realizada: ['#e6f4ea', '#2e7d32'], Cancelada: ['#fdecea', '#b71c1c'], 'No asistió': ['#fff3e0', '#b26a00'] })[e] || ['#eee', '#333']; }
+function rcEstadoCand(e) { return ({ Nuevo: ['#e8f1ff', '#1a4f9c'], Citado: ['#f3e8ff', '#6a1b9a'], Entrevistado: ['#fff3e0', '#b26a00'], 'En evaluación': ['#fff8d6', '#7a6200'], Contratado: ['#e6f4ea', '#2e7d32'], Descartado: ['#eee', '#666'] })[e] || ['#eee', '#333']; }
+
+/* ---------- Agenda ---------- */
+function rcAgendaPintar() {
+  const hoy = rcD.hoy, citas = rcD.citas, q = rcQ.toLowerCase().trim();
+  const prog = citas.filter(c => c.estado === 'Programada');
+  const nProx = prog.filter(c => c.fecha >= hoy).length, nHoy = prog.filter(c => c.fecha === hoy).length, nVenc = prog.filter(c => c.fecha < hoy).length;
+  let l = citas.filter(c => {
+    if (rcFiltro === 'prox') return c.estado === 'Programada' && c.fecha >= hoy;
+    if (rcFiltro === 'hoy') return c.fecha === hoy && c.estado === 'Programada';
+    if (rcFiltro === 'venc') return c.estado === 'Programada' && c.fecha < hoy;
+    if (rcFiltro === 'hechas') return c.estado === 'Realizada';
+    if (rcFiltro === 'canc') return c.estado === 'Cancelada' || c.estado === 'No asistió';
+    return true;
+  }).filter(c => !q || (c.nombre + ' ' + c.lugar + ' ' + c.motivo + ' ' + c.id + ' ' + c.asistentes).toLowerCase().indexOf(q) >= 0);
+  if (rcFiltro === 'hechas' || rcFiltro === 'canc' || rcFiltro === 'todas') l = l.slice().reverse();
+  let h = '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px">' +
+    '<button class="btn primary" onclick="rcCitaForm()">+ Nueva cita o reunión</button>' +
+    '<select onchange="rcFiltro=this.value;rcAgendaPintar()" style="padding:8px 10px;border-radius:8px">' +
+    [['prox', 'Próximas (' + nProx + ')'], ['hoy', 'Hoy (' + nHoy + ')'], ['venc', 'Vencidas sin cerrar (' + nVenc + ')'], ['hechas', 'Realizadas'], ['canc', 'Canceladas y no asistió'], ['todas', 'Todas']].map(o => '<option value="' + o[0] + '"' + (rcFiltro === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select>' +
+    '<input type="text" placeholder="Buscar persona, lugar o N° de cita" value="' + esc(rcQ) + '" oninput="rcQ=this.value;rcAgendaPintar()" style="flex:1;min-width:200px;padding:8px 10px"></div>';
+  if (nVenc && rcFiltro !== 'venc') h += '<div style="margin:0 0 10px;padding:9px 12px;border-radius:8px;background:#fff8e1;border:1px solid #f0d27a;color:#6b5200;font-size:13.5px">Hay <b>' + nVenc + '</b> cita(s) de fechas pasadas sin cerrar. <a href="#" onclick="rcFiltro=\'venc\';rcAgendaPintar();return false">Revisarlas</a> y marcarlas como realizadas, canceladas o no asistió.</div>';
+  if (!l.length) h += '<div class="empty">No hay citas en esta vista.</div>';
+  let fAnt = '';
+  l.forEach(c => {
+    if (c.fecha !== fAnt) {
+      fAnt = c.fecha;
+      const man = (() => { const d = new Date(rcD.hoy + 'T00:00:00'); d.setDate(d.getDate() + 1); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); })();
+      h += '<div style="margin:14px 0 4px;font-weight:800;color:#444">' + esc(rcFechaLarga(c.fecha).replace(/^./, ch => ch.toUpperCase())) + (c.fecha === rcD.hoy ? ' <span style="color:#b71c1c">· hoy</span>' : (c.fecha === man ? ' <span style="color:#b26a00">· mañana</span>' : '')) + '</div>';
+    }
+    const ec = rcEstadoCita(c.estado), prog1 = c.estado === 'Programada';
+    h += '<div style="border:1px solid #ddd;border-left:5px solid ' + ec[1] + ';border-radius:10px;padding:10px 12px;margin:6px 0;background:#fff;display:flex;gap:12px;flex-wrap:wrap;align-items:center">' +
+      '<div style="min-width:92px;font-size:19px;font-weight:800;line-height:1.1">' + esc(rcH12(c.hora)) + '<div style="font-size:11.5px;font-weight:400;color:#777">' + c.duracion + ' min</div></div>' +
+      '<div style="flex:1;min-width:210px"><b>' + esc(c.nombre) + '</b> ' + rcBadge(c.tipo, '#eee', '#333') + (c.reprog ? ' ' + rcBadge('Reprogramada ' + c.reprog + 'x', '#fff3e0', '#b26a00') : '') +
+      '<div style="color:#555;font-size:13px;margin-top:2px">' + esc([c.modalidad, c.lugar, c.motivo].filter(Boolean).join(' · ')) + '</div>' +
+      '<div style="color:#888;font-size:12px">' + esc(c.id) + (c.asistentes ? ' · Atiende: ' + esc(c.asistentes) : '') + '</div></div>' +
+      rcBadge(c.estado, ec[0], ec[1]) +
+      '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
+      '<button class="btnMini" onclick="rcCompAbrir(\'' + esc(c.id) + '\')">🧾 Comprobante</button>' +
+      '<button class="btnMini" onclick="rcCitaForm(\'' + esc(c.id) + '\')">✏️ Editar</button>' +
+      (prog1 ? '<button class="btnMini" onclick="rcCitaEstado(\'' + esc(c.id) + '\',\'Realizada\')">✔ Realizada</button><button class="btnMini" onclick="rcCitaEstado(\'' + esc(c.id) + '\',\'Cancelada\')">✖ Cancelar</button><button class="btnMini" onclick="rcCitaEstado(\'' + esc(c.id) + '\',\'No asistió\')">No asistió</button>'
+        : '<button class="btnMini" onclick="rcCitaEstado(\'' + esc(c.id) + '\',\'Programada\')">↩ Reabrir</button>') +
+      '<button class="btnMini" onclick="rcCitaDel(\'' + esc(c.id) + '\')">🗑</button></div></div>';
+  });
+  $('rcPAg').innerHTML = h;
+}
+function rcCitaForm(id, candId) {
+  const c = id ? rcD.citas.find(x => x.id === id) : null;
+  const v = c || { tipo: 'Entrevista', candidato: candId || '', nombre: '', telefono: '', correo: '', fecha: '', hora: '', duracion: 30, modalidad: 'Presencial', lugar: (rcD.empresa && rcD.empresa.direccion) || '', motivo: '', asistentes: '', obs: '' };
+  const cand = rcD.candidatos.find(x => x.id === v.candidato);
+  if (!c && cand) { v.telefono = cand.telefono; v.correo = cand.correo; v.motivo = cand.puesto ? 'Entrevista para ' + cand.puesto : ''; }
+  const sel = (arr, val) => arr.map(o => '<option' + (o === val ? ' selected' : '') + '>' + esc(o) + '</option>').join('');
+  rcModal('<h3>' + (c ? '✏️ Editar cita ' + esc(c.id) : '📅 Nueva cita o reunión') + '</h3>' +
+    '<div class="grid2">' +
+    '<div class="field"><label>Tipo</label><select id="rcCTipo">' + sel(rcD.tipos, v.tipo) + '</select></div>' +
+    '<div class="field"><label>Candidato</label><select id="rcCCand" onchange="rcCitaCandCambio()"><option value="">— Otra persona o reunión —</option>' +
+    rcD.candidatos.map(x => '<option value="' + esc(x.id) + '"' + (x.id === v.candidato ? ' selected' : '') + '>' + esc(x.nombre) + (x.puesto ? ' · ' + esc(x.puesto) : '') + '</option>').join('') + '</select></div>' +
+    '<div class="field" id="rcCNomBox"' + (v.candidato ? ' style="display:none"' : '') + '><label>Nombre de la persona *</label><input type="text" id="rcCNom" value="' + esc(v.nombre) + '" maxlength="100"></div>' +
+    '<div class="field"><label>Teléfono</label><input type="text" id="rcCTel" value="' + esc(v.telefono) + '" maxlength="30"></div>' +
+    '<div class="field"><label>Correo</label><input type="text" id="rcCCor" value="' + esc(v.correo) + '" maxlength="80"></div>' +
+    '<div class="field"><label>Fecha *</label><input type="date" id="rcCFec" value="' + esc(v.fecha) + '"></div>' +
+    '<div class="field"><label>Hora *</label><input type="time" id="rcCHor" value="' + esc(v.hora) + '"></div>' +
+    '<div class="field"><label>Duración</label><select id="rcCDur">' + [15, 30, 45, 60, 90, 120, 180].map(n => '<option value="' + n + '"' + (n === Number(v.duracion) ? ' selected' : '') + '>' + n + ' min</option>').join('') + '</select></div>' +
+    '<div class="field"><label>Modalidad</label><select id="rcCMod">' + sel(rcD.modalidades, v.modalidad) + '</select></div>' +
+    '<div class="field"><label>Lugar o enlace</label><input type="text" id="rcCLug" value="' + esc(v.lugar) + '" maxlength="160"></div>' +
+    '<div class="field"><label>Quién atiende</label><input type="text" id="rcCAsi" value="' + esc(v.asistentes) + '" maxlength="200"></div></div>' +
+    '<div class="field" style="margin-top:8px"><label>Motivo o asunto</label><input type="text" id="rcCMot" value="' + esc(v.motivo) + '" maxlength="200"></div>' +
+    '<div class="field" style="margin-top:8px"><label>Indicaciones para la persona citada (salen en el comprobante)</label><textarea id="rcCObs" rows="2" maxlength="400" style="width:100%;padding:8px">' + esc(v.obs) + '</textarea></div>' +
+    '<div class="modalActions"><button class="btn secondary" onclick="rcCerrar()">Cancelar</button><button class="btn primary" id="rcCBtn" onclick="rcCitaGuardar(\'' + esc(id || '') + '\')">Guardar y ver comprobante</button></div>');
+}
+function rcCitaCandCambio() {
+  const id = $('rcCCand').value, c = rcD.candidatos.find(x => x.id === id);
+  $('rcCNomBox').style.display = id ? 'none' : '';
+  if (c) { $('rcCTel').value = c.telefono || ''; $('rcCCor').value = c.correo || ''; if (!$('rcCMot').value) $('rcCMot').value = c.puesto ? 'Entrevista para ' + c.puesto : ''; }
+}
+async function rcCitaGuardar(id) {
+  const d = { id: id, tipo: $('rcCTipo').value, candidato: $('rcCCand').value, nombre: $('rcCNom').value, telefono: $('rcCTel').value, correo: $('rcCCor').value, fecha: $('rcCFec').value, hora: $('rcCHor').value,
+    duracion: $('rcCDur').value, modalidad: $('rcCMod').value, lugar: $('rcCLug').value, asistentes: $('rcCAsi').value, motivo: $('rcCMot').value, obs: $('rcCObs').value };
+  if (!d.fecha) { toast('Elige la fecha de la cita.'); return; }
+  if (!d.hora) { toast('Elige la hora de la cita.'); return; }
+  if (!d.candidato && !d.nombre.trim()) { toast('Elige un candidato o escribe el nombre de la persona.'); return; }
+  const b = $('rcCBtn'); b.disabled = true;
+  try {
+    const r = await api('guardarCitaWeb', d);
+    rcD = await api('obtenerReclutamientoWeb');
+    rcTab(rcTabAct);
+    if (r.choques && r.choques.length) toast('Ojo: esta cita se cruza con otra en el mismo horario (' + r.choques.join('; ') + ').', 8000);
+    else toast('Cita guardada: ' + r.cita.id + '.');
+    rcCompAbrir(r.cita.id);
+  } catch (e) { b.disabled = false; mostrarError(e, 'No se pudo guardar la cita.'); }
+}
+async function rcCitaEstado(id, estado) {
+  const c = rcD.citas.find(x => x.id === id);
+  if (estado === 'Cancelada' && !confirm('¿Cancelar la cita de ' + (c ? c.nombre : '') + '?')) return;
+  try { await api('cambiarEstadoCitaWeb', id, estado, ''); rcD = await api('obtenerReclutamientoWeb'); rcTab(rcTabAct); toast('Cita marcada como ' + estado.toLowerCase() + '.'); }
+  catch (e) { mostrarError(e, 'No se pudo cambiar el estado de la cita.'); }
+}
+async function rcCitaDel(id) {
+  const c = rcD.citas.find(x => x.id === id);
+  if (!confirm('¿Eliminar la cita ' + id + (c ? ' de ' + c.nombre : '') + '? Esto no se puede deshacer. Si solo no se realizó, mejor márcala como cancelada.')) return;
+  try { await api('eliminarCitaWeb', id); rcD = await api('obtenerReclutamientoWeb'); rcTab(rcTabAct); toast('Cita eliminada.'); }
+  catch (e) { mostrarError(e, 'No se pudo eliminar la cita.'); }
+}
+
+/* ---------- Candidatos ---------- */
+function rcCandPintar() {
+  const q = rcQC.toLowerCase().trim();
+  const l = rcD.candidatos.filter(c => (!rcFC || c.estado === rcFC) && (!q || (c.nombre + ' ' + c.cedula + ' ' + c.puesto + ' ' + c.telefono + ' ' + c.zona).toLowerCase().indexOf(q) >= 0));
+  let h = '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px">' +
+    '<button class="btn primary" onclick="rcCandForm()">+ Nuevo candidato</button>' +
+    '<select onchange="rcFC=this.value;rcCandPintar()" style="padding:8px 10px;border-radius:8px"><option value="">Todos los estados</option>' + rcD.estadosCand.map(e => '<option' + (rcFC === e ? ' selected' : '') + '>' + esc(e) + '</option>').join('') + '</select>' +
+    '<input type="text" placeholder="Buscar nombre, cédula, puesto o teléfono" value="' + esc(rcQC) + '" oninput="rcQC=this.value;rcCandPintar()" style="flex:1;min-width:200px;padding:8px 10px"></div>';
+  if (!l.length) h += '<div class="empty">' + (rcD.candidatos.length ? 'Ningún candidato coincide con el filtro.' : 'Aún no hay candidatos. Toca «+ Nuevo candidato» para cargar la primera ficha.') + '</div>';
+  else {
+    h += '<div style="overflow-x:auto"><table class="table" style="font-size:13.5px"><thead><tr><th class="left">Candidato</th><th class="left">Puesto</th><th class="left">Contacto</th><th>Estado</th><th>Expediente</th><th>Citas</th><th></th></tr></thead><tbody>';
+    l.forEach(c => {
+      const ec = rcEstadoCand(c.estado), n = rcD.citas.filter(x => x.candidato === c.id).length;
+      h += '<tr><td class="left"><b>' + esc(c.nombre) + '</b><div style="font-size:12px;color:#777">' + esc(c.cedula) + '</div></td><td class="left">' + esc(c.puesto) + (c.zona ? '<div style="font-size:12px;color:#777">' + esc(c.zona) + '</div>' : '') + '</td>' +
+        '<td class="left">' + esc(c.telefono) + (c.correo ? '<div style="font-size:12px;color:#777">' + esc(c.correo) + '</div>' : '') + '</td><td>' + rcBadge(c.estado, ec[0], ec[1]) + '</td><td style="white-space:nowrap">' + rcExpedienteHtml(c) + '</td><td>' + n + '</td>' +
+        '<td style="white-space:nowrap"><button class="btnMini" onclick="rcCandForm(\'' + esc(c.id) + '\')">📋 Ficha</button> <button class="btnMini" onclick="rcCitaForm(\'\',\'' + esc(c.id) + '\')">📅 Agendar</button></td></tr>';
+    });
+    h += '</tbody></table></div>';
+  }
+  $('rcPCa').innerHTML = h;
+}
+function rcCandForm(id) {
+  const c = id ? rcD.candidatos.find(x => x.id === id) : null;
+  const v = c || { nombre: '', cedula: '', telefono: '', correo: '', puesto: '', zona: '', domicilio: '', delincuencia: '', experiencia: '', licencia: '', vehiculo: '', pretension: '', fuente: '', notas: '', estado: 'Nuevo' };
+  rcPend = [];
+  const f = (k, lbl, max, ph) => '<div class="field"><label>' + lbl + '</label><input type="text" id="rcF' + k + '" value="' + esc(v[k.toLowerCase()]) + '" maxlength="' + max + '"' + (ph ? ' placeholder="' + ph + '"' : '') + '></div>';
+  const citas = c ? rcD.citas.filter(x => x.candidato === c.id).sort((a, b) => (b.fecha + b.hora).localeCompare(a.fecha + a.hora)) : [];
+  rcModal('<h3>' + (c ? '📋 Ficha de ' + esc(c.nombre) : '➕ Nuevo candidato') + '</h3><div style="max-height:68vh;overflow:auto;padding-right:4px">' +
+    '<div class="grid2">' + f('Nombre', 'Nombre completo *', 100) + f('Cedula', 'Cédula', 30) + f('Telefono', 'Teléfono', 30) + f('Correo', 'Correo', 80) + f('Puesto', 'Puesto al que aplica', 80, 'Ej.: Técnico instalador') + f('Zona', 'Zona o lugar de residencia', 80) +
+    f('Licencia', 'Licencia de conducir', 40, 'Ej.: B1') + f('Vehiculo', 'Vehículo propio', 40, 'Ej.: Moto, carro, no') + f('Pretension', 'Pretensión salarial', 40) + f('Fuente', 'Cómo se enteró', 80, 'Ej.: Referido, Facebook') +
+    '<div class="field"><label>Estado</label><select id="rcFEstado">' + rcD.estadosCand.map(e => '<option' + (e === v.estado ? ' selected' : '') + '>' + esc(e) + '</option>').join('') + '</select></div></div>' +
+    '<div class="field" style="margin-top:8px"><label>Domicilio (dirección exacta)</label><input type="text" id="rcFDomicilio" value="' + esc(v.domicilio) + '" maxlength="300" placeholder="Provincia, cantón, distrito y señas"></div>' +
+    '<div class="field" style="margin-top:8px"><label>Hoja de delincuencia</label><select id="rcFDelincuencia">' + (rcD.estadosDelincuencia || []).map(e => '<option value="' + esc(e) + '"' + (e === v.delincuencia ? ' selected' : '') + '>' + esc(e || '— Sin dato —') + '</option>').join('') + '</select></div>' +
+    '<div class="field" style="margin-top:8px"><label>Experiencia y formación</label><textarea id="rcFExperiencia" rows="3" maxlength="600" style="width:100%;padding:8px">' + esc(v.experiencia) + '</textarea></div>' +
+    '<div class="field" style="margin-top:8px"><label>Notas de la entrevista o seguimiento</label><textarea id="rcFNotas" rows="3" maxlength="800" style="width:100%;padding:8px">' + esc(v.notas) + '</textarea></div>' +
+    '<div style="margin-top:14px;padding:10px 12px;border:1px solid #d5d9e2;border-radius:10px;background:#fafbfc"><div style="font-weight:800;margin-bottom:6px">📎 Expediente: documentos que envió</div>' +
+    '<div id="rcDDocs">' + rcDocsHtml(c) + '</div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-top:8px"><div class="field" style="min-width:190px"><label>Tipo de documento</label><select id="rcDTipo" onchange="$(\'rcDFechaBox\').style.display=this.value===\'Hoja de delincuencia\'?\'\':\'none\'">' + (rcD.tiposDoc || []).map(t => '<option>' + esc(t) + '</option>').join('') + '</select></div>' +
+    '<div class="field" id="rcDFechaBox" style="display:none;min-width:150px"><label>Fecha de emisión</label><input type="date" id="rcDFecha"></div>' +
+    '<label class="btn secondary" style="cursor:pointer;display:inline-block">📷 Tomar foto o elegir archivo<input type="file" multiple accept="image/*,.pdf,.doc,.docx,application/pdf" style="display:none" onchange="rcDocAgregar(this)"></label></div>' +
+    '<div id="rcDPend" style="margin-top:6px"></div><div style="font-size:12px;color:#777;margin-top:4px">Fotos, PDF o Word. Los archivos se suben al tocar «Guardar ficha».</div></div>' +
+    (citas.length ? '<div style="margin-top:10px;font-weight:700">Citas de este candidato</div>' + citas.map(x => '<div style="font-size:13px;padding:4px 0;border-bottom:1px solid #eee">' + esc(rcFechaCorta(x.fecha)) + ' · ' + esc(rcH12(x.hora)) + ' · ' + rcBadge(x.estado, rcEstadoCita(x.estado)[0], rcEstadoCita(x.estado)[1]) + ' <a href="#" onclick="rcCompAbrir(\'' + esc(x.id) + '\');return false">🧾 ' + esc(x.id) + '</a></div>').join('') : '') +
+    '</div><div class="modalActions">' + (c ? '<button class="btn secondary" onclick="rcCandDel(\'' + esc(c.id) + '\')" style="margin-right:auto">🗑 Eliminar</button>' : '') +
+    '<button class="btn secondary" onclick="rcCerrar()">Cancelar</button>' + (c ? '<button class="btn secondary" onclick="rcCitaForm(\'\',\'' + esc(c.id) + '\')">📅 Agendar cita</button>' : '') +
+    '<button class="btn primary" id="rcFBtn" onclick="rcCandGuardar(\'' + esc(id || '') + '\')">Guardar ficha</button></div>');
+}
+async function rcCandGuardar(id) {
+  const g = k => $('rcF' + k).value;
+  const d = { id: id, nombre: g('Nombre'), cedula: g('Cedula'), telefono: g('Telefono'), correo: g('Correo'), puesto: g('Puesto'), zona: g('Zona'), licencia: g('Licencia'), vehiculo: g('Vehiculo'),
+    pretension: g('Pretension'), fuente: g('Fuente'), estado: g('Estado'), experiencia: g('Experiencia'), notas: g('Notas'), domicilio: g('Domicilio'), delincuencia: g('Delincuencia') };
+  if (!d.nombre.trim()) { toast('Escribe el nombre del candidato.'); return; }
+  const b = $('rcFBtn'); b.disabled = true;
+  let r;
+  try { r = await api('guardarCandidatoWeb', d); }
+  catch (e) { b.disabled = false; mostrarError(e, 'No se pudo guardar la ficha.'); return; }
+  let subidos = 0, fallos = [];
+  for (let i = 0; i < rcPend.length; i++) {
+    const x = rcPend[i]; b.textContent = 'Subiendo documento ' + (i + 1) + ' de ' + rcPend.length + '...';
+    try { await api('subirDocCandidatoWeb', r.candidato.id, x.tipo, x.nombre, x.mime, x.base64, x.fechaDoc); subidos++; }
+    catch (e) { fallos.push(x.nombre + ': ' + mensajeError(e)); }
+  }
+  rcPend = [];
+  try { rcD = await api('obtenerReclutamientoWeb'); } catch (e) { }
+  if (fallos.length) { b.disabled = false; b.textContent = 'Guardar ficha'; rcTab(rcTabAct); mostrarError(new Error(fallos.join('\n')), 'La ficha se guardó, pero no se pudieron subir ' + fallos.length + ' documento(s).'); rcCandForm(r.candidato.id); return; }
+  rcCerrar(); rcTab(rcTabAct); toast('Ficha guardada' + (subidos ? ' con ' + subidos + ' documento(s) nuevo(s).' : '.'));
+}
+async function rcCandDel(id) {
+  const c = rcD.candidatos.find(x => x.id === id);
+  if (!confirm('¿Eliminar la ficha de ' + (c ? c.nombre : '') + '? Las citas ya agendadas se conservan. Si solo no continúa en el proceso, mejor cámbiale el estado a «Descartado».')) return;
+  try { await api('eliminarCandidatoWeb', id); rcD = await api('obtenerReclutamientoWeb'); rcCerrar(); rcTab(rcTabAct); toast('Ficha eliminada.'); }
+  catch (e) { mostrarError(e, 'No se pudo eliminar la ficha.'); }
+}
+
+/* ---------- Expediente (documentos del candidato) ---------- */
+function rcDocsDe(candId) { return (rcD.docs || []).filter(d => d.candidato === candId); }
+function rcExpedienteHtml(c) {
+  const ds = rcDocsDe(c.id), t = x => ds.some(d => d.tipo.indexOf(x) === 0);
+  const chip = (ok, txt) => '<span style="display:inline-block;margin:1px 2px;padding:1px 7px;border-radius:10px;font-size:11.5px;font-weight:700;background:' + (ok ? '#e6f4ea' : '#f1f1f1') + ';color:' + (ok ? '#2e7d32' : '#999') + '">' + txt + (ok ? ' ✔' : ' —') + '</span>';
+  return chip(t('Cédula'), 'Cédula') + chip(t('Currículum'), 'CV') + chip(t('Hoja de delincuencia'), 'H. delinc.');
+}
+function rcDocsHtml(c) {
+  const ds = c ? rcDocsDe(c.id) : [];
+  if (!ds.length) return '<div style="font-size:13px;color:#888">Aún no hay documentos guardados.</div>';
+  return ds.map(d => {
+    let extra = '';
+    if (d.fechaDoc) { const dias = Math.round((new Date(rcD.hoy + 'T00:00:00') - new Date(d.fechaDoc + 'T00:00:00')) / 86400000); extra = ' · emitida el ' + rcFechaCorta(d.fechaDoc) + (dias >= 0 ? ' (hace ' + dias + ' días)' : ''); }
+    return '<div style="display:flex;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid #eee;font-size:13.5px"><span style="flex:1"><b>' + esc(d.tipo) + '</b> · ' + esc(d.nombre) + esc(extra) + '</span>' +
+      '<button class="btnMini" onclick="rcDocVer(\'' + esc(d.id) + '\')">👁 Ver</button><button class="btnMini" onclick="rcDocDel(\'' + esc(d.id) + '\')">🗑</button></div>';
+  }).join('');
+}
+function rcPendPintar() {
+  const el = $('rcDPend'); if (!el) return;
+  el.innerHTML = rcPend.map((x, i) => '<div style="display:flex;gap:8px;align-items:center;padding:3px 0;font-size:13px;color:#1a4f9c">⏳ <span style="flex:1"><b>' + esc(x.tipo) + '</b> · ' + esc(x.nombre) + (x.fechaDoc ? ' · emitida el ' + esc(rcFechaCorta(x.fechaDoc)) : '') + ' (pendiente de guardar)</span><button class="btnMini" onclick="rcPend.splice(' + i + ',1);rcPendPintar()">✖</button></div>').join('');
+}
+async function rcDocAgregar(inp) {
+  const tipo = $('rcDTipo').value, fd = tipo === 'Hoja de delincuencia' ? $('rcDFecha').value : '';
+  const fs = Array.from(inp.files || []); inp.value = '';
+  for (const f of fs) {
+    try {
+      let mime = f.type || '', nombre = f.name, base64;
+      if (!mime) mime = /\.pdf$/i.test(f.name) ? 'application/pdf' : (/\.docx$/i.test(f.name) ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' : (/\.doc$/i.test(f.name) ? 'application/msword' : ''));
+      if (/^image\//.test(mime)) { const x = await ctComprimir(f, 2000, 0.82); base64 = x.base64; mime = x.mime; nombre = x.nombre; }
+      else if (/^(application\/pdf|application\/msword|application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document)$/.test(mime)) {
+        if (f.size > 9 * 1024 * 1024) { toast('«' + f.name + '» pesa más de 9 MB.'); continue; }
+        base64 = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.onerror = rej; r.readAsDataURL(f); });
+      } else { toast('«' + f.name + '»: solo se aceptan fotos, PDF o Word.', 6000); continue; }
+      rcPend.push({ tipo: tipo, fechaDoc: fd, nombre: nombre, mime: mime, base64: base64 });
+    } catch (e) { toast(mensajeError(e), 6000); }
+  }
+  rcPendPintar();
+}
+async function rcDocVer(id) {
+  try {
+    const a = await api('obtenerDocCandidatoWeb', id);
+    const bin = atob(a.base64), bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const url = URL.createObjectURL(new Blob([bytes], { type: a.mime }));
+    const w = /^(image\/|application\/pdf)/.test(a.mime) ? window.open(url, '_blank') : null;
+    if (!w) { const l = document.createElement('a'); l.href = url; l.download = a.nombre; document.body.appendChild(l); l.click(); l.remove(); }
+    setTimeout(() => URL.revokeObjectURL(url), 120000);
+  } catch (e) { mostrarError(e, 'No se pudo abrir el documento.'); }
+}
+async function rcDocDel(id) {
+  const d = (rcD.docs || []).find(x => x.id === id);
+  if (!confirm('¿Eliminar el documento «' + (d ? d.tipo + ' · ' + d.nombre : id) + '»? Esto no se puede deshacer.')) return;
+  try {
+    await api('eliminarDocCandidatoWeb', id); rcD = await api('obtenerReclutamientoWeb');
+    const c = d && rcD.candidatos.find(x => x.id === d.candidato); if ($('rcDDocs')) $('rcDDocs').innerHTML = rcDocsHtml(c);
+    toast('Documento eliminado.');
+  } catch (e) { mostrarError(e, 'No se pudo eliminar el documento.'); }
+}
+
+/* ---------- Comprobante de cita ---------- */
+function rcTextoCita(c) {
+  const e = rcD.empresa || {};
+  return '*' + (e.nombre || 'Soluciones Red Dorada SRL') + '* · Comprobante de cita ' + c.id + '\n' +
+    'Para: ' + c.nombre + '\nFecha: ' + rcFechaLarga(c.fecha) + '\nHora: ' + rcRango(c) + '\nModalidad: ' + c.modalidad + (c.lugar ? '\nLugar: ' + c.lugar : '') +
+    (c.motivo ? '\nMotivo: ' + c.motivo : '') + (c.asistentes ? '\nLo atiende: ' + c.asistentes : '') + (c.obs ? '\nIndicaciones: ' + c.obs : '') +
+    (c.estado === 'Cancelada' ? '\n*CITA CANCELADA*' : '') + (c.reprog ? '\n(Cita reprogramada: este comprobante reemplaza los anteriores.)' : '');
+}
+async function rcCompCanvas(c) {
+  const e = rcD.empresa || {}, W = 900, K = 2, F = 'Calibri, Arial, sans-serif';
+  const mg = document.createElement('canvas').getContext('2d');
+  const wrap = (txt, font, maxW) => { mg.font = font; const out = []; String(txt || '').split('\n').forEach(par => { let ln = ''; par.split(/\s+/).forEach(w => { const t = ln ? ln + ' ' + w : w; if (mg.measureText(t).width > maxW && ln) { out.push(ln); ln = w; } else ln = t; }); out.push(ln); }); return out; };
+  const filas = [['Dirigida a', c.nombre], ['Tipo', c.tipo], ['Modalidad', c.modalidad], ['Lugar o enlace', c.lugar], ['Motivo', c.motivo], ['Lo atiende', c.asistentes],
+    ['Contacto', [c.telefono, c.correo].filter(Boolean).join('  ·  ')], ['Indicaciones', c.obs]].filter(r => r[1]);
+  const FV = '17px ' + F, VW = 640, LH = 23;
+  const medidas = filas.map(r => wrap(r[1], FV, VW));
+  const hFilas = medidas.reduce((a, m) => a + Math.max(m.length * LH, LH) + 16, 0);
+  const foot = [e.direccion, e.telefono ? 'Tel. ' + e.telefono : '', e.correo].filter(Boolean).join('  ·  ');
+  const H = 120 + 150 + hFilas + 30 + (c.reprog ? 34 : 0) + 70;
+  const cv = document.createElement('canvas'); cv.width = W * K; cv.height = H * K; const g = cv.getContext('2d'); g.scale(K, K);
+  g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
+  g.fillStyle = '#b71c1c'; g.fillRect(0, 0, W, 112); g.fillStyle = '#fff'; g.textBaseline = 'middle'; g.textAlign = 'left';
+  g.font = 'bold 16px ' + F; g.fillText(String(e.nombre || 'Soluciones Red Dorada SRL').toUpperCase() + '  ·  COMPROBANTE DE CITA', 24, 26);
+  g.font = 'bold 46px ' + F; g.fillText(c.id, 24, 68);
+  g.font = '15px ' + F; g.fillText('Emitido el ' + new Date().toLocaleDateString('es-CR') + ' a las ' + new Date().toLocaleTimeString('es-CR', { hour: '2-digit', minute: '2-digit' }), 24, 98);
+  if (c.estado !== 'Programada') { g.textAlign = 'right'; g.font = 'bold 22px ' + F; g.fillText(c.estado === 'Cancelada' ? 'CITA CANCELADA' : (c.estado === 'Realizada' ? 'CITA REALIZADA' : 'NO ASISTIÓ'), W - 24, 68); g.textAlign = 'left'; }
+  let y = 132;
+  g.fillStyle = '#f3f4f7'; g.fillRect(24, y, W - 48, 118); g.strokeStyle = '#d5d9e2'; g.strokeRect(24, y, W - 48, 118);
+  g.fillStyle = '#666'; g.font = '13px ' + F; g.fillText('FECHA', 44, y + 20); g.fillText('HORA', 44, y + 72);
+  g.fillStyle = c.estado === 'Cancelada' ? '#999' : '#111'; g.font = 'bold 29px ' + F; g.fillText(rcFechaLarga(c.fecha), 44, y + 44); g.fillText(rcRango(c), 44, y + 96);
+  y += 118 + 18;
+  filas.forEach((r, i) => {
+    const m = medidas[i], h = Math.max(m.length * LH, LH) + 16;
+    g.fillStyle = i % 2 ? '#fff' : '#fafbfc'; g.fillRect(24, y, W - 48, h);
+    g.fillStyle = '#666'; g.font = 'bold 14px ' + F; g.fillText(r[0], 44, y + 8 + LH / 2);
+    g.fillStyle = '#111'; g.font = FV; m.forEach((ln, k) => g.fillText(ln, 210, y + 8 + LH / 2 + k * LH));
+    y += h;
+  });
+  g.strokeStyle = '#d5d9e2'; g.beginPath(); g.moveTo(24, y + 6); g.lineTo(W - 24, y + 6); g.stroke();
+  y += 26;
+  if (c.reprog) { g.fillStyle = '#b26a00'; g.font = 'bold 14px ' + F; g.fillText('Cita reprogramada: este comprobante reemplaza a los anteriores.', 24, y); y += 30; }
+  g.fillStyle = '#556'; g.font = '13px ' + F; g.fillText(foot, 24, y + 8);
+  return cv;
+}
+async function rcCompAbrir(id) {
+  const c = rcD.citas.find(x => x.id === id); if (!c) { toast('No se encontró la cita.'); return; }
+  rcComp = c;
+  rcModal('<h3>🧾 Comprobante de cita ' + esc(c.id) + '</h3><div id="rcCompImg" class="loading">Generando...</div>' +
+    '<div class="modalActions" style="flex-wrap:wrap"><button class="btn primary" onclick="rcCompCompartir()">📤 Enviar (WhatsApp o correo)</button><button class="btn secondary" onclick="rcCompDescargar()">⬇️ Descargar imagen</button>' +
+    '<button class="btn secondary" onclick="rcCompCopiar()">📋 Copiar texto</button><button class="btn secondary" onclick="rcCerrar()">Cerrar</button></div>', 700);
+  try { const cv = await rcCompCanvas(c); $('rcCompImg').className = ''; $('rcCompImg').innerHTML = '<img alt="Comprobante de cita" style="width:100%;border:1px solid #ccc;border-radius:8px" src="' + cv.toDataURL('image/png') + '">'; }
+  catch (er) { $('rcCompImg').textContent = 'No se pudo generar el comprobante.'; }
+}
+async function rcCompArchivo() {
+  const c = rcComp, cv = await rcCompCanvas(c), blob = await new Promise(res => cv.toBlob(res, 'image/png'));
+  return { blob: blob, nombre: 'Comprobante_cita_' + c.id + '_' + String(c.nombre).replace(/[^\wÁÉÍÓÚÑáéíóúñ]+/g, '_') + '.png', c: c };
+}
+async function rcCompDescargar() { try { const a = await rcCompArchivo(); pmBajar(a.blob, a.nombre); } catch (e) { mostrarError(e, 'No se pudo generar la imagen.'); } }
+async function rcCompCompartir() {
+  try {
+    const a = await rcCompArchivo(), f = new File([a.blob], a.nombre, { type: 'image/png' });
+    if (navigator.canShare && navigator.canShare({ files: [f] })) { await navigator.share({ files: [f], title: 'Comprobante de cita ' + a.c.id, text: rcTextoCita(a.c) }); return; }
+    pmBajar(a.blob, a.nombre); toast('Este dispositivo no permite compartir directo; se descargó la imagen para que la adjuntes al correo o al WhatsApp.', 7000);
+  } catch (e) { if (e && e.name === 'AbortError') return; mostrarError(e, 'No se pudo compartir el comprobante.'); }
+}
+async function rcCompCopiar() {
+  const t = rcTextoCita(rcComp);
+  try { await navigator.clipboard.writeText(t); toast('Texto copiado. Pégalo en WhatsApp o en el correo.'); }
+  catch (e) { const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); toast('Texto copiado.'); } catch (e2) { toast('No se pudo copiar.'); } ta.remove(); }
+}
+
 function mostrarVista(v, forzar) {
   if (v === 'planillas') { pmTabAct = 'sem'; pmVista = 'pla'; v = 'pagomov'; }
 
   if (MODULOS_NAV[v] && !puedeModulo(MODULOS_NAV[v]) && !forzar) { toast('No tienes acceso a ese módulo.'); return; }
-  if ((v === 'pagomov' || v === 'planillas') && !esAdmin()) { toast('No tienes acceso a ese módulo.'); return; }
+  if ((v === 'pagomov' || v === 'planillas' || v === 'reclutamiento') && !esAdmin()) { toast('No tienes acceso a ese módulo.'); return; }
 
   if (!forzar && v !== 'calendario' && Object.keys(cambios).length &&
       !confirm('Hay cambios sin guardar en el cronograma. ¿Quieres cambiar de vista sin guardarlos?')) {
@@ -7138,11 +7486,12 @@ function mostrarVista(v, forzar) {
   $('vistaUsuarios').style.display = v === 'usuarios' ? 'block' : 'none';
   $('vistaColab').style.display = v === 'colaboradores' ? 'block' : 'none';
   $('vistaPagoMov').style.display = (v === 'pagomov' && admin) ? 'block' : 'none';
+  $('vistaRecl').style.display = (v === 'reclutamiento' && admin) ? 'block' : 'none';
   $('vistaSeguimiento').style.display = v === 'seguimiento' ? 'block' : 'none';
   $('vistaBodega').style.display = v === 'bodega' ? 'block' : 'none';
   $('vistaCotiz').style.display = v === 'cotizaciones' ? 'block' : 'none';
 
-  ['calendario', 'moviles', 'resumen', 'seguimiento', 'bodega', 'cotizaciones', 'colaboradores', 'pagomov', 'usuarios'].forEach(x => {
+  ['calendario', 'moviles', 'resumen', 'seguimiento', 'bodega', 'cotizaciones', 'colaboradores', 'reclutamiento', 'pagomov', 'usuarios'].forEach(x => {
     const id = 'nav' + x.charAt(0).toUpperCase() + x.slice(1);
     $(id).classList.toggle('active', x === v);
   });
@@ -7154,6 +7503,7 @@ function mostrarVista(v, forzar) {
   if (v === 'usuarios') cargarUsuarios();
   if (v === 'colaboradores') abrirColab();
   if (v === 'pagomov') abrirPagoMov();
+  if (v === 'reclutamiento') abrirReclutamiento();
   if (v === 'moviles' && admin) abrirFichas();
   if (v === 'calendario' && calendarioObsoleto && !Object.keys(cambios).length) cargarCalendario();
   if (v === 'calendario' && calendario) { $('btnExport').style.display = puedeEditar() ? '' : 'none'; renderizarCalendario(); }
@@ -17172,6 +17522,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 207 · 09-nov 09:38</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 209 · 09-nov 15:59</div>
 </body>
 </html>
