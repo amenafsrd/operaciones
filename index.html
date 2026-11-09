@@ -7165,9 +7165,11 @@ function rcAgendaPintar() {
   if (rcFiltro === 'hechas' || rcFiltro === 'canc' || rcFiltro === 'todas') l = l.slice().reverse();
   let h = '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px">' +
     '<button class="btn primary" onclick="rcCitaForm()">+ Nueva cita o reunión</button>' +
+    '<button class="btn secondary" onclick="rcBloquesForm()">⚙️ Bloques de entrevista</button>' +
     '<select onchange="rcFiltro=this.value;rcAgendaPintar()" style="padding:8px 10px;border-radius:8px">' +
     [['prox', 'Próximas (' + nProx + ')'], ['hoy', 'Hoy (' + nHoy + ')'], ['venc', 'Vencidas sin cerrar (' + nVenc + ')'], ['hechas', 'Realizadas'], ['canc', 'Canceladas y no asistió'], ['todas', 'Todas']].map(o => '<option value="' + o[0] + '"' + (rcFiltro === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select>' +
     '<input type="text" placeholder="Buscar persona, lugar o N° de cita" value="' + esc(rcQ) + '" oninput="rcQ=this.value;rcAgendaPintar()" style="flex:1;min-width:200px;padding:8px 10px"></div>';
+  h += rcDiaPanel();
   if (nVenc && rcFiltro !== 'venc') h += '<div style="margin:0 0 10px;padding:9px 12px;border-radius:8px;background:#fff8e1;border:1px solid #f0d27a;color:#6b5200;font-size:13.5px">Hay <b>' + nVenc + '</b> cita(s) de fechas pasadas sin cerrar. <a href="#" onclick="rcFiltro=\'venc\';rcAgendaPintar();return false">Revisarlas</a> y marcarlas como realizadas, canceladas o no asistió.</div>';
   if (!l.length) h += '<div class="empty">No hay citas en esta vista.</div>';
   let fAnt = '';
@@ -7193,29 +7195,34 @@ function rcAgendaPintar() {
   });
   $('rcPAg').innerHTML = h;
 }
-function rcCitaForm(id, candId) {
+let rcCitaEdit = '';
+function rcCitaForm(id, candId, fecha, hora) {
   const c = id ? rcD.citas.find(x => x.id === id) : null;
+  rcCitaEdit = id || '';
   const v = c || { tipo: 'Entrevista', candidato: candId || '', nombre: '', telefono: '', correo: '', fecha: '', hora: '', duracion: 30, modalidad: 'Presencial', lugar: (rcD.empresa && rcD.empresa.direccion) || '', motivo: '', asistentes: '', obs: '' };
+  if (!c && fecha) { v.fecha = fecha; v.hora = hora || ''; }
   const cand = rcD.candidatos.find(x => x.id === v.candidato);
   if (!c && cand) { v.telefono = cand.telefono; v.correo = cand.correo; v.motivo = cand.puesto ? 'Entrevista para ' + cand.puesto : ''; }
   const sel = (arr, val) => arr.map(o => '<option' + (o === val ? ' selected' : '') + '>' + esc(o) + '</option>').join('');
   rcModal('<h3>' + (c ? '✏️ Editar cita ' + esc(c.id) : '📅 Nueva cita o reunión') + '</h3>' +
     '<div class="grid2">' +
-    '<div class="field"><label>Tipo</label><select id="rcCTipo">' + sel(rcD.tipos, v.tipo) + '</select></div>' +
+    '<div class="field"><label>Tipo</label><select id="rcCTipo" onchange="rcCitaTipoCambio()">' + sel(rcD.tipos, v.tipo) + '</select></div>' +
     '<div class="field"><label>Candidato</label><select id="rcCCand" onchange="rcCitaCandCambio()"><option value="">— Otra persona o reunión —</option>' +
     rcD.candidatos.map(x => '<option value="' + esc(x.id) + '"' + (x.id === v.candidato ? ' selected' : '') + '>' + esc(x.nombre) + (x.puesto ? ' · ' + esc(x.puesto) : '') + '</option>').join('') + '</select></div>' +
     '<div class="field" id="rcCNomBox"' + (v.candidato ? ' style="display:none"' : '') + '><label>Nombre de la persona *</label><input type="text" id="rcCNom" value="' + esc(v.nombre) + '" maxlength="100"></div>' +
     '<div class="field"><label>Teléfono</label><input type="text" id="rcCTel" value="' + esc(v.telefono) + '" maxlength="30"></div>' +
     '<div class="field"><label>Correo</label><input type="text" id="rcCCor" value="' + esc(v.correo) + '" maxlength="80"></div>' +
-    '<div class="field"><label>Fecha *</label><input type="date" id="rcCFec" value="' + esc(v.fecha) + '"></div>' +
-    '<div class="field"><label>Hora *</label><input type="time" id="rcCHor" value="' + esc(v.hora) + '"></div>' +
-    '<div class="field"><label>Duración</label><select id="rcCDur">' + [15, 30, 45, 60, 90, 120, 180].map(n => '<option value="' + n + '"' + (n === Number(v.duracion) ? ' selected' : '') + '>' + n + ' min</option>').join('') + '</select></div>' +
+    '<div class="field"><label>Fecha *</label><input type="date" id="rcCFec" value="' + esc(v.fecha) + '" onchange="rcCitaSlots()"></div>' +
+    '<div class="field" id="rcCHorBox"><label>Hora *</label><input type="time" id="rcCHor" value="' + esc(v.hora) + '" onchange="rcCitaSlots()"></div>' +
+    '<div class="field" id="rcCDurBox"><label>Duración</label><select id="rcCDur">' + [15, 30, 45, 60, 90, 120, 180].map(n => '<option value="' + n + '"' + (n === Number(v.duracion) ? ' selected' : '') + '>' + n + ' min</option>').join('') + '</select></div>' +
+    '<div id="rcCSlots" style="grid-column:1/-1"></div>' +
     '<div class="field"><label>Modalidad</label><select id="rcCMod">' + sel(rcD.modalidades, v.modalidad) + '</select></div>' +
     '<div class="field"><label>Lugar o enlace</label><input type="text" id="rcCLug" value="' + esc(v.lugar) + '" maxlength="160"></div>' +
     '<div class="field"><label>Quién atiende</label><input type="text" id="rcCAsi" value="' + esc(v.asistentes) + '" maxlength="200"></div></div>' +
     '<div class="field" style="margin-top:8px"><label>Motivo o asunto</label><input type="text" id="rcCMot" value="' + esc(v.motivo) + '" maxlength="200"></div>' +
     '<div class="field" style="margin-top:8px"><label>Indicaciones para la persona citada (salen en el comprobante)</label><textarea id="rcCObs" rows="2" maxlength="400" style="width:100%;padding:8px">' + esc(v.obs) + '</textarea></div>' +
     '<div class="modalActions"><button class="btn secondary" onclick="rcCerrar()">Cancelar</button><button class="btn primary" id="rcCBtn" onclick="rcCitaGuardar(\'' + esc(id || '') + '\')">Guardar y ver comprobante</button></div>');
+  rcCitaTipoCambio();
 }
 function rcCitaCandCambio() {
   const id = $('rcCCand').value, c = rcD.candidatos.find(x => x.id === id);
@@ -7224,9 +7231,9 @@ function rcCitaCandCambio() {
 }
 async function rcCitaGuardar(id) {
   const d = { id: id, tipo: $('rcCTipo').value, candidato: $('rcCCand').value, nombre: $('rcCNom').value, telefono: $('rcCTel').value, correo: $('rcCCor').value, fecha: $('rcCFec').value, hora: $('rcCHor').value,
-    duracion: $('rcCDur').value, modalidad: $('rcCMod').value, lugar: $('rcCLug').value, asistentes: $('rcCAsi').value, motivo: $('rcCMot').value, obs: $('rcCObs').value };
+    duracion: $('rcCTipo').value === 'Entrevista' ? 30 : $('rcCDur').value, modalidad: $('rcCMod').value, lugar: $('rcCLug').value, asistentes: $('rcCAsi').value, motivo: $('rcCMot').value, obs: $('rcCObs').value };
   if (!d.fecha) { toast('Elige la fecha de la cita.'); return; }
-  if (!d.hora) { toast('Elige la hora de la cita.'); return; }
+  if (!d.hora) { toast($('rcCTipo').value === 'Entrevista' ? 'Elige un bloque libre de la lista.' : 'Elige la hora de la cita.'); return; }
   if (!d.candidato && !d.nombre.trim()) { toast('Elige un candidato o escribe el nombre de la persona.'); return; }
   const b = $('rcCBtn'); b.disabled = true;
   try {
@@ -7251,27 +7258,170 @@ async function rcCitaDel(id) {
   catch (e) { mostrarError(e, 'No se pudo eliminar la cita.'); }
 }
 
+/* ---------- Bloques de entrevista (30 min) ---------- */
+let rcDiaVer = '', rcBlq = null;
+const rcMin = h => { const x = String(h).split(':'); return (+x[0]) * 60 + (+x[1]); };
+const rcHM = t => ('0' + Math.floor(t / 60)).slice(-2) + ':' + ('0' + (t % 60)).slice(-2);
+function rcYmd(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+/* Lista de inicios (en minutos) de los bloques de ese día, o null si el día no se atiende */
+function rcSlotsDia(fecha) {
+  const b = rcD.bloques, dow = new Date(fecha + 'T00:00:00').getDay();
+  if (b.dias.map(Number).indexOf(dow) < 0) return null;
+  const out = [];
+  b.rangos.forEach(r => { for (let t = rcMin(r[0]); t + 30 <= rcMin(r[1]); t += 30) out.push(t); });
+  return out;
+}
+function rcOcupa(fecha, excl, ini, fin) {
+  return rcD.citas.find(c => c.estado === 'Programada' && c.id !== excl && c.fecha === fecha && rcMin(c.hora) < fin && ini < rcMin(c.hora) + (c.duracion || 30)) || null;
+}
+function rcSlotsHtml(fecha, excl, sel, fn) {
+  const sl = rcSlotsDia(fecha);
+  if (!sl) return '<div style="font-size:13px;color:#b26a00">Ese día no tiene bloques de entrevista. Cambia los días con «⚙️ Bloques de entrevista».</div>';
+  const ahora = new Date(), esHoy = fecha === rcYmd(ahora), ahoraMin = ahora.getHours() * 60 + ahora.getMinutes();
+  const base = 'border-radius:8px;padding:6px 9px;font-size:13px;font-weight:700;line-height:1.15;text-align:center;min-width:84px;';
+  return '<div style="display:flex;flex-wrap:wrap;gap:6px">' + sl.map(t => {
+    const h = rcHM(t), o = rcOcupa(fecha, excl, t, t + 30);
+    if (o) return '<button type="button" disabled title="' + esc(o.id + ' · ' + o.nombre) + '" style="' + base + 'border:1px solid #e0a9a4;background:#fdecea;color:#8a1c14;cursor:not-allowed">' + esc(rcH12(h)) + '<br><span style="font-weight:400;font-size:11px">' + esc(String(o.nombre).trim().split(' ').slice(0, 2).join(' ')) + '</span></button>';
+    if (esHoy && t + 30 <= ahoraMin) return '<button type="button" disabled style="' + base + 'border:1px solid #ddd;background:#f3f3f3;color:#aaa;cursor:not-allowed">' + esc(rcH12(h)) + '<br><span style="font-weight:400;font-size:11px">pasó</span></button>';
+    const esSel = h === sel;
+    return '<button type="button" ' + (fn ? 'onclick="' + fn + '(\'' + h + '\')"' : 'disabled') + ' style="' + base + 'cursor:pointer;border:2px solid ' + (esSel ? '#1b5e20' : '#9fd0a6') + ';background:' + (esSel ? '#2e7d32' : '#e8f6ea') + ';color:' + (esSel ? '#fff' : '#1b5e20') + '">' + esc(rcH12(h)) + '<br><span style="font-weight:400;font-size:11px">' + (esSel ? 'elegido' : 'libre') + '</span></button>';
+  }).join('') + '</div>';
+}
+function rcOcupadoHtml(fecha, excl) {
+  const l = rcD.citas.filter(c => c.estado === 'Programada' && c.fecha === fecha && c.id !== excl).sort((a, b) => a.hora.localeCompare(b.hora));
+  if (!l.length) return '<div style="font-size:13px;color:#2e7d32">No hay otras citas ese día.</div>';
+  return l.map(c => '<div style="font-size:13px;color:#8a1c14">' + esc(rcH12(c.hora)) + ' a ' + esc(rcH12(rcHoraFin(c.hora, c.duracion))) + ' · ' + esc(c.nombre) + '</div>').join('');
+}
+function rcCitaTipoCambio() {
+  const ent = $('rcCTipo').value === 'Entrevista';
+  $('rcCHorBox').style.display = ent ? 'none' : ''; $('rcCDurBox').style.display = ent ? 'none' : '';
+  if (ent && $('rcCHor').value && !rcSlotsDia($('rcCFec').value || '2000-01-03')) { /* el día no se atiende: se deja ver el aviso */ }
+  rcCitaSlots();
+}
+function rcCitaSlots() {
+  const box = $('rcCSlots'); if (!box) return;
+  const fecha = $('rcCFec').value, ent = $('rcCTipo').value === 'Entrevista';
+  if (!fecha) { box.innerHTML = '<div style="font-size:13px;color:#777">Elige la fecha para ver los bloques libres.</div>'; return; }
+  box.innerHTML = '<div style="font-weight:700;margin:2px 0 4px">' + (ent ? 'Elige un bloque de 30 min' : 'Ya ocupado ese día') + ' · ' + esc(rcFechaLarga(fecha)) + '</div>' + (ent ? rcSlotsHtml(fecha, rcCitaEdit, $('rcCHor').value, 'rcSlotElegir') : rcOcupadoHtml(fecha, rcCitaEdit));
+}
+function rcSlotElegir(h) { $('rcCHor').value = h; rcCitaSlots(); }
+function rcDiaPanel() {
+  if (!rcDiaVer) rcDiaVer = rcD.hoy;
+  return '<details open style="margin:0 0 12px;border:1px solid #d5d9e2;border-radius:10px;padding:8px 12px;background:#fff"><summary style="cursor:pointer;font-weight:800">📆 Bloques de entrevista de 30 min · verde libre, rojo ocupado</summary>' +
+    '<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin:8px 0"><div class="field" style="min-width:170px"><label>Día</label><input type="date" value="' + esc(rcDiaVer) + '" onchange="rcDiaVer=this.value||rcD.hoy;rcDiaGrid()"></div>' +
+    '<button class="btnMini" onclick="rcDiaMover(-1)">◀ Día anterior</button><button class="btnMini" onclick="rcDiaMover(1)">Día siguiente ▶</button></div>' +
+    '<div id="rcDiaGrid">' + rcDiaGridHtml() + '</div><div style="font-size:12px;color:#777;margin-top:6px">Toca un bloque libre para agendar una entrevista en ese horario.</div></details>';
+}
+function rcDiaGridHtml() { return '<div style="font-weight:700;margin-bottom:4px">' + esc(rcFechaLarga(rcDiaVer).replace(/^./, ch => ch.toUpperCase())) + '</div>' + rcSlotsHtml(rcDiaVer, '', '', 'rcSlotNueva'); }
+function rcDiaGrid() { if ($('rcDiaGrid')) $('rcDiaGrid').innerHTML = rcDiaGridHtml(); }
+function rcDiaMover(n) { const d = new Date(rcDiaVer + 'T00:00:00'); d.setDate(d.getDate() + n); rcDiaVer = rcYmd(d); rcAgendaPintar(); }
+function rcSlotNueva(h) { rcCitaForm('', '', rcDiaVer, h); }
+const RC_DIAS_ORDEN = [[1, 'Lun'], [2, 'Mar'], [3, 'Mié'], [4, 'Jue'], [5, 'Vie'], [6, 'Sáb'], [0, 'Dom']];
+function rcBloquesForm() { rcBlq = JSON.parse(JSON.stringify(rcD.bloques)); rcBlq.dias = rcBlq.dias.map(Number); rcBloquesPintar(); }
+function rcBloquesPintar() {
+  const B = rcBlq;
+  rcModal('<h3>⚙️ Bloques de entrevista</h3><div style="font-size:13px;color:#555;margin-bottom:8px">Las entrevistas duran <b>30 minutos</b> y solo se pueden agendar dentro de estas franjas. El sistema no deja agendar dos citas en el mismo horario.</div>' +
+    '<div style="font-weight:700;margin-bottom:4px">Días de atención</div><div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">' +
+    RC_DIAS_ORDEN.map(d => '<label style="display:flex;gap:4px;align-items:center"><input type="checkbox" ' + (B.dias.indexOf(d[0]) >= 0 ? 'checked' : '') + ' onchange="rcBlqDia(' + d[0] + ',this.checked)"> ' + d[1] + '</label>').join('') + '</div>' +
+    '<div style="font-weight:700;margin-bottom:4px">Franjas de horario (por ejemplo, mañana y tarde)</div>' +
+    B.rangos.map((r, i) => '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><input type="time" value="' + esc(r[0]) + '" onchange="rcBlq.rangos[' + i + '][0]=this.value"> <span>a</span> <input type="time" value="' + esc(r[1]) + '" onchange="rcBlq.rangos[' + i + '][1]=this.value"> <button class="btnMini" onclick="rcBlqDel(' + i + ')">🗑</button></div>').join('') +
+    '<button class="btnMini" onclick="rcBlqAdd()">+ Agregar franja</button>' +
+    '<div class="modalActions"><button class="btn secondary" onclick="rcCerrar()">Cancelar</button><button class="btn primary" onclick="rcBlqGuardar()">Guardar bloques</button></div>');
+}
+function rcBlqDia(n, on) { const i = rcBlq.dias.indexOf(n); if (on && i < 0) rcBlq.dias.push(n); if (!on && i >= 0) rcBlq.dias.splice(i, 1); }
+function rcBlqAdd() { rcBlq.rangos.push(['14:00', '16:00']); rcBloquesPintar(); }
+function rcBlqDel(i) { rcBlq.rangos.splice(i, 1); rcBloquesPintar(); }
+async function rcBlqGuardar() {
+  try { await api('guardarBloquesRecWeb', rcBlq); rcD = await api('obtenerReclutamientoWeb'); rcCerrar(); rcTab(rcTabAct); toast('Bloques guardados.'); }
+  catch (e) { mostrarError(e, 'No se pudieron guardar los bloques.'); }
+}
+
 /* ---------- Candidatos ---------- */
+const RC_REQ = [['licencia', 'Licencia de conducir B1 vigente', false, 'B1'], ['expPrevia', 'Experiencia previa en fibra óptica residencial', false, 'Exp. fibra'], ['dispCampo', 'Disponibilidad de campo (exterior, altura y giras)', false, 'Campo'],
+  ['escaleraPoste', 'Experiencia con escalera de 28 peldaños y poste', false, 'Escalera/poste'], ['dispJornada', 'Jornada de lunes a domingo con día libre rotativo', false, 'Jornada'],
+  ['vehiculo', 'Vehículo propio', true, 'Vehículo'], ['herramientas', 'Herramientas completas de fibra óptica', true, 'Herramientas']];
+let rcFil = {}, rcSort = { k: 'nombre', d: 1 }, rcOcultar = false, rcReq = null;
+function rcPrefCargar() {
+  try { const j = JSON.parse(localStorage.getItem('rcCandPref') || '{}'); if (Array.isArray(j.req)) rcReq = j.req; if (typeof j.ocultar === 'boolean') rcOcultar = j.ocultar; } catch (e) { }
+  if (!rcReq) rcReq = RC_REQ.map(r => r[0]);
+}
+function rcPrefGuardar() { try { localStorage.setItem('rcCandPref', JSON.stringify({ req: rcReq, ocultar: rcOcultar })); } catch (e) { } }
+function rcYN(v) { v = String(v == null ? '' : v).trim(); if (!v) return '(sin dato)'; if (/^(si|sí)(?![a-záéíóúñ])/i.test(v)) return 'Sí'; if (/^no(?![a-záéíóúñ])/i.test(v)) return 'No'; return v; }
+function rcEsOut(c) { return /outsourcing|contratista/i.test(c.modalidadAplica || ''); }
+/* Requisitos marcados que el candidato no cumple (vehículo y herramientas solo se exigen en Outsourcing) */
+function rcFaltan(c) { return RC_REQ.filter(r => rcReq.indexOf(r[0]) >= 0 && (!r[2] || rcEsOut(c)) && rcYN(c[r[0]]) !== 'Sí').map(r => r[3]); }
+function rcNDocs(c) { const ds = rcDocsDe(c.id), t = x => ds.some(d => d.tipo.indexOf(x) === 0); return (t('Cédula') ? 1 : 0) + (t('Currículum') ? 1 : 0) + (t('Hoja de delincuencia') ? 1 : 0); }
+const RC_COLS = [
+  ['cumple', 'Cumple', 'sel', c => rcFaltan(c).length ? 'No' : 'Sí'],
+  ['nombre', 'Nombre', 'txt', c => c.nombre], ['cedula', 'Cédula / DIMEX', 'txt', c => c.cedula], ['telefono', 'Teléfono', 'txt', c => c.telefono], ['correo', 'Correo', 'txt', c => c.correo],
+  ['provincia', 'Provincia', 'sel', c => String(c.provincia || '').trim() || '(sin dato)'], ['canton', 'Cantón', 'sel', c => String(c.canton || '').trim() || '(sin dato)'],
+  ['modalidad', 'Modalidad', 'sel', c => String(c.modalidadAplica || c.puesto || '').trim() || '(sin dato)'],
+  ['licencia', 'Licencia B1', 'sel', c => rcYN(c.licencia)], ['vehiculo', 'Vehículo propio', 'sel', c => rcYN(c.vehiculo)], ['herramientas', 'Herramientas', 'sel', c => rcYN(c.herramientas)],
+  ['expPrevia', 'Exp. fibra', 'sel', c => rcYN(c.expPrevia)], ['areasExp', 'Áreas de experiencia', 'txt', c => c.areasExp], ['dispCampo', 'Disp. de campo', 'sel', c => rcYN(c.dispCampo)],
+  ['escaleraPoste', 'Escalera y poste', 'sel', c => rcYN(c.escaleraPoste)], ['dispJornada', 'Jornada L-D', 'sel', c => rcYN(c.dispJornada)], ['dispInicio', 'Inicio de labores', 'sel', c => rcYN(c.dispInicio)],
+  ['estado', 'Estado', 'sel', c => c.estado], ['delincuencia', 'Hoja de delincuencia', 'sel', c => c.delincuencia || '(sin dato)'],
+  ['expediente', 'Documentos', 'sel', c => rcNDocs(c) + ' de 3'], ['citas', 'Citas', 'sel', c => String(rcD.citas.filter(x => x.candidato === c.id).length)]
+];
+function rcCandFiltrar() {
+  const q = rcNorm(rcQC);
+  let l = rcD.candidatos.map(c => ({ c: c, f: rcFaltan(c) }));
+  const nNo = l.filter(x => x.f.length).length;
+  if (rcOcultar) l = l.filter(x => !x.f.length);
+  RC_COLS.forEach(col => { const fv = rcFil[col[0]]; if (!fv) return; l = l.filter(x => { const v = String(col[3](x.c) == null ? '' : col[3](x.c)); return col[2] === 'sel' ? v === fv : rcNorm(v).indexOf(rcNorm(fv)) >= 0; }); });
+  if (q) l = l.filter(x => rcNorm(RC_COLS.map(col => col[3](x.c)).join(' ')).indexOf(q) >= 0);
+  const col = RC_COLS.find(x => x[0] === rcSort.k) || RC_COLS[1];
+  l.sort((a, b) => String(col[3](a.c) || '').localeCompare(String(col[3](b.c) || ''), 'es', { numeric: true }) * rcSort.d);
+  return { l: l, nNo: nNo };
+}
+function rcCelda(col, x) {
+  const c = x.c, k = col[0], v = String(col[3](c) == null ? '' : col[3](c));
+  if (k === 'cumple') return x.f.length ? '<span style="color:#b71c1c;font-weight:700" title="Falta: ' + esc(x.f.join(', ')) + '">✖ ' + esc(x.f.join(', ')) + '</span>' : '<span style="color:#2e7d32;font-weight:700">✔</span>';
+  if (k === 'estado') { const e = rcEstadoCand(c.estado); return rcBadge(c.estado, e[0], e[1]); }
+  if (['licencia', 'vehiculo', 'herramientas', 'expPrevia', 'dispCampo', 'escaleraPoste', 'dispJornada'].indexOf(k) >= 0) return '<span style="font-weight:700;color:' + (v === 'Sí' ? '#2e7d32' : (v === 'No' ? '#b71c1c' : '#888')) + '">' + esc(v) + '</span>';
+  if (k === 'expediente') return rcExpedienteHtml(c);
+  if (k === 'areasExp') return '<span title="' + esc(v) + '">' + esc(v.length > 40 ? v.slice(0, 40) + '…' : v) + '</span>';
+  return esc(v);
+}
+function rcCandCuerpo() {
+  const r = rcCandFiltrar();
+  $('rcCBody').innerHTML = r.l.length ? r.l.map(x => {
+    const bg = x.f.length ? '#fff5f4' : '#fff';
+    return '<tr style="background:' + bg + '">' + RC_COLS.map(col => '<td class="left" style="' + (col[0] === 'nombre' ? 'position:sticky;left:0;z-index:1;background:' + bg + ';font-weight:700;min-width:170px;' : '') + 'white-space:' + (col[0] === 'areasExp' || col[0] === 'cumple' ? 'normal' : 'nowrap') + '">' + rcCelda(col, x) + '</td>').join('') +
+      '<td style="white-space:nowrap"><button class="btnMini" onclick="rcCandForm(\'' + esc(x.c.id) + '\')">📋 Ficha</button> <button class="btnMini" onclick="rcCitaForm(\'\',\'' + esc(x.c.id) + '\')">📅 Agendar</button></td></tr>';
+  }).join('') : '<tr><td colspan="' + (RC_COLS.length + 1) + '" class="empty">Ningún candidato coincide con los filtros.</td></tr>';
+  $('rcCCuenta').innerHTML = 'Mostrando <b>' + r.l.length + '</b> de <b>' + rcD.candidatos.length + '</b> candidatos' + (r.nNo ? ' · <span style="color:#b71c1c">' + r.nNo + ' no cumplen los requisitos marcados' + (rcOcultar ? ' (ocultos)' : '') + '</span>' : '');
+}
+function rcOrdenar(k) { rcSort = { k: k, d: rcSort.k === k ? -rcSort.d : 1 }; rcCandPintar(); }
+function rcLimpiarFiltros() { rcFil = {}; rcQC = ''; rcCandPintar(); }
+function rcReqCambio(k, on) { const i = rcReq.indexOf(k); if (on && i < 0) rcReq.push(k); if (!on && i >= 0) rcReq.splice(i, 1); rcPrefGuardar(); rcCandPintar(); }
+function rcCandExportar() {
+  const r = rcCandFiltrar(), q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+  const enc = RC_COLS.map(c => c[1]).concat(['Requisitos que faltan']);
+  const filas = r.l.map(x => RC_COLS.map(col => q(col[3](x.c))).concat([q(x.f.join(', '))]).join(','));
+  pmBajar(new Blob(['\uFEFF' + enc.map(q).join(',') + '\r\n' + filas.join('\r\n')], { type: 'text/csv;charset=utf-8' }), 'Candidatos_' + rcD.hoy + '.csv');
+  toast('Se descargó la lista con ' + r.l.length + ' candidato(s). Ábrela con Excel.');
+}
 function rcCandPintar() {
-  const q = rcQC.toLowerCase().trim();
-  const l = rcD.candidatos.filter(c => (!rcFC || c.estado === rcFC) && (!q || (c.nombre + ' ' + c.cedula + ' ' + c.puesto + ' ' + c.telefono + ' ' + c.zona + ' ' + c.provincia + ' ' + c.canton + ' ' + c.modalidadAplica).toLowerCase().indexOf(q) >= 0));
-  let h = '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px">' +
+  if (!rcReq) rcPrefCargar();
+  const opciones = col => { const vs = Array.from(new Set(rcD.candidatos.map(c => String(col[3](c) == null ? '' : col[3](c))))).sort((a, b) => a.localeCompare(b, 'es', { numeric: true })); return '<option value="">Todos</option>' + vs.map(v => '<option value="' + esc(v) + '"' + (rcFil[col[0]] === v ? ' selected' : '') + '>' + esc(v || '(vacío)') + '</option>').join(''); };
+  let h = '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:8px">' +
     '<button class="btn primary" onclick="rcCandForm()">+ Nuevo candidato</button>' +
     '<label class="btn secondary" style="cursor:pointer;display:inline-block">📥 Importar respuestas del formulario<input type="file" accept=".xlsx,.xls,.csv,.tsv,.txt" style="display:none" onchange="rcImpArchivo(this)"></label>' +
-    '<select onchange="rcFC=this.value;rcCandPintar()" style="padding:8px 10px;border-radius:8px"><option value="">Todos los estados</option>' + rcD.estadosCand.map(e => '<option' + (rcFC === e ? ' selected' : '') + '>' + esc(e) + '</option>').join('') + '</select>' +
-    '<input type="text" placeholder="Buscar nombre, cédula, puesto o teléfono" value="' + esc(rcQC) + '" oninput="rcQC=this.value;rcCandPintar()" style="flex:1;min-width:200px;padding:8px 10px"></div>';
-  if (!l.length) h += '<div class="empty">' + (rcD.candidatos.length ? 'Ningún candidato coincide con el filtro.' : 'Aún no hay candidatos. Toca «+ Nuevo candidato» para cargar la primera ficha.') + '</div>';
-  else {
-    h += '<div style="overflow-x:auto"><table class="table" style="font-size:13.5px"><thead><tr><th class="left">Candidato</th><th class="left">Modalidad / puesto</th><th class="left">Contacto</th><th>Requisitos</th><th>Estado</th><th>Expediente</th><th>Citas</th><th></th></tr></thead><tbody>';
-    l.forEach(c => {
-      const ec = rcEstadoCand(c.estado), n = rcD.citas.filter(x => x.candidato === c.id).length;
-      h += '<tr><td class="left" style="min-width:150px"><b>' + esc(c.nombre) + '</b><div style="font-size:12px;color:#777">' + esc(c.cedula) + '</div></td><td class="left">' + esc(c.modalidadAplica || c.puesto) + (c.modalidadAplica && c.puesto ? '<div style="font-size:12px;color:#777">' + esc(c.puesto) + '</div>' : '') + (c.provincia || c.canton || c.zona ? '<div style="font-size:12px;color:#777">' + esc([c.provincia, c.canton].filter(Boolean).join(', ') || c.zona) + '</div>' : '') + '</td>' +
-        '<td class="left">' + esc(c.telefono) + (c.correo ? '<div style="font-size:12px;color:#777">' + esc(c.correo) + '</div>' : '') + '</td><td style="min-width:150px">' + rcRequisitosHtml(c) + '</td><td>' + rcBadge(c.estado, ec[0], ec[1]) + '</td><td style="min-width:130px">' + rcExpedienteHtml(c) + '</td><td>' + n + '</td>' +
-        '<td style="white-space:nowrap"><button class="btnMini" onclick="rcCandForm(\'' + esc(c.id) + '\')">📋 Ficha</button> <button class="btnMini" onclick="rcCitaForm(\'\',\'' + esc(c.id) + '\')">📅 Agendar</button></td></tr>';
-    });
-    h += '</tbody></table></div>';
-  }
+    '<label style="display:flex;gap:6px;align-items:center;font-weight:700;padding:8px 12px;border:1px solid #d5d9e2;border-radius:8px;background:' + (rcOcultar ? '#e6f4ea' : '#fff') + '"><input type="checkbox" ' + (rcOcultar ? 'checked' : '') + ' onchange="rcOcultar=this.checked;rcPrefGuardar();rcCandPintar()"> Ocultar los que no cumplen requisitos</label>' +
+    '<input type="text" id="rcQCi" placeholder="Buscar en toda la lista" value="' + esc(rcQC) + '" oninput="rcQC=this.value;rcCandCuerpo()" style="flex:1;min-width:180px;padding:8px 10px">' +
+    '<button class="btn secondary" onclick="rcLimpiarFiltros()">Limpiar filtros</button><button class="btn secondary" onclick="rcCandExportar()">⬇️ Exportar lista</button></div>' +
+    '<details style="margin-bottom:8px;border:1px solid #d5d9e2;border-radius:8px;padding:6px 10px;background:#fafbfc"><summary style="cursor:pointer;font-weight:700">✅ Requisitos que debe cumplir un candidato (' + RC_REQ.filter(r => rcReq.indexOf(r[0]) >= 0).length + ' marcados)</summary><div style="display:flex;flex-wrap:wrap;gap:6px 18px;margin:8px 0">' +
+    RC_REQ.map(r => '<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" ' + (rcReq.indexOf(r[0]) >= 0 ? 'checked' : '') + ' onchange="rcReqCambio(\'' + r[0] + '\',this.checked)"> ' + esc(r[1]) + (r[2] ? ' <span style="color:#777;font-size:12px">(solo Outsourcing)</span>' : '') + '</label>').join('') +
+    '</div><div style="font-size:12px;color:#777">Una respuesta vacía o distinta de «Sí» cuenta como que no cumple. Vehículo y herramientas solo se exigen a quienes aplican a Outsourcing o Contratista.</div></details>' +
+    '<div id="rcCCuenta" style="font-size:13px;margin-bottom:4px"></div>';
+  if (!rcD.candidatos.length) { $('rcPCa').innerHTML = h + '<div class="empty">Aún no hay candidatos. Toca «+ Nuevo candidato» o importa las respuestas del formulario.</div>'; $('rcCCuenta').innerHTML = ''; return; }
+  h += '<div style="overflow:auto;max-height:68vh;border:1px solid #d5d9e2;border-radius:8px"><table class="table" style="font-size:13px;min-width:max-content"><thead><tr>' +
+    RC_COLS.map(col => '<th class="left" style="position:sticky;top:0;z-index:2;' + (col[0] === 'nombre' ? 'left:0;z-index:3;' : '') + 'vertical-align:top;min-width:' + (col[0] === 'nombre' ? 170 : 96) + 'px"><div style="cursor:pointer;white-space:nowrap" onclick="rcOrdenar(\'' + col[0] + '\')">' + esc(col[1]) + (rcSort.k === col[0] ? (rcSort.d > 0 ? ' ▲' : ' ▼') : '') + '</div>' +
+      (col[2] === 'txt' ? '<input type="text" value="' + esc(rcFil[col[0]] || '') + '" oninput="rcFil[\'' + col[0] + '\']=this.value;rcCandCuerpo()" placeholder="Filtrar" style="width:100%;font-size:12px;padding:3px 5px;margin-top:3px">'
+        : '<select onchange="rcFil[\'' + col[0] + '\']=this.value;rcCandCuerpo()" style="width:100%;font-size:12px;padding:3px 3px;margin-top:3px">' + opciones(col) + '</select>') + '</th>').join('') +
+    '<th style="position:sticky;top:0;z-index:2"></th></tr></thead><tbody id="rcCBody"></tbody></table></div>';
   $('rcPCa').innerHTML = h;
+  rcCandCuerpo();
 }
 function rcCandForm(id) {
   const c = id ? rcD.candidatos.find(x => x.id === id) : null;
@@ -17657,6 +17807,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 211 · 09-nov 16:16</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 212 · 09-nov 16:31</div>
 </body>
 </html>
