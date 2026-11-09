@@ -7406,15 +7406,19 @@ const RC_REGLAS = [
   ['dispInicio', ['iniciar'], 'Inicio de labores'], ['modalidadAplica', ['modalidad'], 'Modalidad', true], ['nombre', ['nombre'], 'Nombre', true]
 ];
 function rcNorm(t) { return String(t == null ? '' : t).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim(); }
-function rcMapear(enc) {
+function rcMapear(enc, datos) {
+  /* Si varias columnas coinciden (por ejemplo dos «Correo electrónico»), se elige la que trae más datos reales */
+  const cuenta = i => datos.reduce((n, r) => { const v = String(r[i] == null ? '' : r[i]).trim().toLowerCase(); return n + (v && v !== 'anonymous' ? 1 : 0); }, 0);
   const mapa = {}, usadas = {};
-  enc.forEach((h, i) => {
-    const n = rcNorm(h); if (!n) return;
-    for (const r of RC_REGLAS) {
-      if (usadas[r[0]]) continue;
-      const ok = r[3] ? r[1].some(w => n.indexOf(w) === 0) : r[1].some(w => n.indexOf(w) >= 0);
-      if (ok) { mapa[i] = r[0]; usadas[r[0]] = true; break; }
-    }
+  RC_REGLAS.forEach(r => {
+    const cand = [];
+    enc.forEach((h, i) => {
+      if (usadas[i]) return; const n = rcNorm(h); if (!n) return;
+      if (r[3] ? r[1].some(w => n.indexOf(w) === 0) : r[1].some(w => n.indexOf(w) >= 0)) cand.push(i);
+    });
+    if (!cand.length) return;
+    cand.sort((x, y) => cuenta(y) - cuenta(x) || x - y);
+    mapa[r[0]] = cand[0]; usadas[cand[0]] = true;
   });
   return mapa;
 }
@@ -7434,49 +7438,75 @@ function rcCsv(txt) {
   fila.push(cel); if (fila.some(x => String(x).trim())) filas.push(fila);
   return filas;
 }
+let rcImp = null;
 async function rcImpArchivo(inp) {
   const f = inp.files && inp.files[0]; inp.value = ''; if (!f) return;
   try {
-    let mats = [];
-    if (/\.(csv|tsv|txt)$/i.test(f.name)) mats = [rcCsv(await f.text())];
+    let hojas = [];
+    if (/\.(csv|tsv|txt)$/i.test(f.name)) hojas = [{ nombre: 'Archivo', m: rcCsv(await f.text()) }];
     else {
       await cargarLib('xlsx', SEG_URL_XLSX);
       const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' });
-      mats = wb.SheetNames.map(n => XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: false, defval: '' }));
+      hojas = wb.SheetNames.map(n => ({ nombre: n, m: XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: false, defval: '' }) }));
     }
+    hojas = hojas.filter(h => h.m.length > 1);
+    if (!hojas.length) throw new Error('El archivo no trae filas de datos.');
     let mejor = null;
-    mats.forEach(m => { for (let hi = 0; hi < Math.min(10, m.length); hi++) { const mp = rcMapear(m[hi]), n = Object.keys(mp).length; if (!mejor || n > mejor.n) mejor = { m: m, hi: hi, mp: mp, n: n }; } });
-    if (!mejor || mejor.n < 3 || !Object.values(mejor.mp).includes('nombre')) throw new Error('No reconocí las columnas del formulario. Debe haber una columna «Nombre completo» y al menos otras dos del formulario.');
-    const limpia = (k, v) => { v = String(v == null ? '' : v).trim(); if (/^\d+\.0$/.test(v)) v = v.slice(0, -2); return v; };
-    const filas = mejor.m.slice(mejor.hi + 1).map(r => { const o = {}; Object.keys(mejor.mp).forEach(i => { o[mejor.mp[i]] = limpia(mejor.mp[i], r[i]); }); return o; }).filter(o => Object.values(o).some(Boolean));
-    if (!filas.length) throw new Error('El archivo no trae respuestas debajo de los encabezados.');
-    rcImp = { filas: filas, mapa: mejor.mp, enc: mejor.m[mejor.hi], nombre: f.name };
-    rcImpMostrar();
+    hojas.forEach((h, k) => { for (let hi = 0; hi < Math.min(10, h.m.length - 1); hi++) { const n = Object.keys(rcMapear(h.m[hi], h.m.slice(hi + 1))).length; if (!mejor || n > mejor.n) mejor = { k: k, hi: hi, n: n }; } });
+    rcImp = { nombre: f.name, hojas: hojas, k: mejor.k, hi: mejor.hi, sel: {}, abierto: mejor.n < 6 };
+    rcImpCalc(true); rcImpMostrar();
   } catch (e) { mostrarError(e, 'No se pudo leer el archivo.'); }
 }
-let rcImp = null;
-function rcImpMostrar() {
-  const solo = v => String(v || '').replace(/\D/g, ''), ex = {};
-  rcD.candidatos.forEach(c => { if (solo(c.cedula)) ex[solo(c.cedula)] = c; });
-  const vistos = {}; let nuevos = 0, act = 0, omit = 0;
-  rcImp.filas.forEach(o => {
-    if (!o.nombre) { o._a = 'Omitir (sin nombre)'; omit++; return; }
-    const k = solo(o.cedula);
-    if (k && (ex[k] || vistos[k])) { o._a = 'Actualizar'; act++; } else { o._a = 'Nuevo'; nuevos++; }
-    if (k) vistos[k] = true;
+/* Arma las filas según la hoja, la fila de encabezados y las columnas elegidas */
+function rcImpCalc(auto) {
+  const I = rcImp, m = I.hojas[I.k].m;
+  I.enc = m[I.hi] || [];
+  if (auto) I.mapa = rcMapear(I.enc, m.slice(I.hi + 1));
+  const limpia = v => { v = String(v == null ? '' : v).trim(); if (/^\d+\.0$/.test(v)) v = v.slice(0, -2); return v; };
+  I.filas = [];
+  m.slice(I.hi + 1).forEach((r, i) => {
+    const o = { _i: i }; let alguno = false;
+    Object.keys(I.mapa).forEach(k => { const c = I.mapa[k]; if (c === '' || c == null) return; let v = limpia(r[c]); if (v.toLowerCase() === 'anonymous') v = ''; o[k] = v; if (v) alguno = true; });
+    if (alguno) I.filas.push(o);
   });
-  const rec = Object.keys(rcImp.mapa).map(i => (RC_REGLAS.find(r => r[0] === rcImp.mapa[i]) || [])[2]).filter(Boolean);
-  const sin = rcImp.enc.filter((h, i) => String(h).trim() && !rcImp.mapa[i]);
-  rcModal('<h3>📥 Importar respuestas del formulario</h3><div style="font-size:13.5px;margin-bottom:8px">Archivo: <b>' + esc(rcImp.nombre) + '</b> · ' + rcImp.filas.length + ' fila(s): <b style="color:#2e7d32">' + nuevos + ' nuevo(s)</b>, <b style="color:#1a4f9c">' + act + ' por actualizar</b> (la cédula ya existe)' + (omit ? ', <b style="color:#b26a00">' + omit + ' sin nombre (se omiten)</b>' : '') + '.</div>' +
-    '<div style="font-size:12.5px;color:#555;margin-bottom:8px">Columnas reconocidas: ' + esc(rec.join(', ')) + '.' + (sin.length ? '<br>No se importan: ' + esc(sin.join(', ')) : '') + '<br>Si el candidato ya existe, solo se completan sus respuestas del formulario: no se toca su estado, notas ni documentos.</div>' +
-    '<div style="max-height:44vh;overflow:auto"><table class="table" style="font-size:12.5px"><thead><tr><th class="left">Nombre</th><th class="left">Cédula</th><th class="left">Teléfono</th><th class="left">Modalidad</th><th>Acción</th></tr></thead><tbody>' +
-    rcImp.filas.slice(0, 40).map(o => '<tr><td class="left">' + esc(o.nombre) + '</td><td class="left">' + esc(o.cedula) + '</td><td class="left">' + esc(o.telefono) + '</td><td class="left">' + esc(o.modalidadAplica) + '</td><td>' + esc(o._a) + '</td></tr>').join('') + '</tbody></table></div>' +
-    (rcImp.filas.length > 40 ? '<div style="font-size:12px;color:#777">Se muestran las primeras 40 filas.</div>' : '') +
-    '<div class="modalActions"><button class="btn secondary" onclick="rcCerrar()">Cancelar</button><button class="btn primary" id="rcImpBtn" onclick="rcImpConfirmar()"' + (nuevos + act ? '' : ' disabled') + '>Importar ' + (nuevos + act) + ' fila(s)</button></div>', 760);
 }
+function rcImpMostrar() {
+  const I = rcImp, solo = v => String(v || '').replace(/\D/g, '');
+  const ex = {}, exN = {}, exT = {};
+  rcD.candidatos.forEach(c => { if (solo(c.cedula)) ex[solo(c.cedula)] = c; if (rcNorm(c.nombre)) exN[rcNorm(c.nombre)] = c; if (solo(c.telefono)) exT[solo(c.telefono)] = c; });
+  const vistos = {}, vN = {}, vT = {}; let nuevos = 0, act = 0, omit = 0, sinCed = 0;
+  I.filas.forEach(o => {
+    o._aviso = ''; o._a = '';
+    if (!o.nombre) { o._a = 'Sin nombre'; omit++; return; }
+    const k = solo(o.cedula), n = rcNorm(o.nombre), t = solo(o.telefono);
+    if (k && (ex[k] || vistos[k])) { o._a = 'Actualizar'; }
+    else {
+      o._a = 'Nuevo';
+      const par = (n && (exN[n] || vN[n])) || (t && (exT[t] || vT[t]));
+      if (par) o._aviso = 'Parece repetido: mismo ' + ((n && (exN[n] || vN[n])) ? 'nombre' : 'teléfono') + (t && (exT[t] || vT[t]) && n && (exN[n] || vN[n]) ? ' y teléfono' : '') + ' con otra cédula' + (k ? '' : ' o sin cédula');
+      if (!k) sinCed++;
+    }
+    if (k) vistos[k] = true; if (n) vN[n] = true; if (t) vT[t] = true;
+    if (I.sel[o._i] === undefined) I.sel[o._i] = !(o._aviso && n && t && (exN[n] || vN[n]) && (exT[t] || vT[t]) && o._a === 'Nuevo' && o._dup !== false);
+  });
+  const elegidas = I.filas.filter(o => o.nombre && I.sel[o._i]);
+  nuevos = elegidas.filter(o => o._a === 'Nuevo').length; act = elegidas.filter(o => o._a === 'Actualizar').length;
+  const opts = sel => '<option value=""' + (sel === '' || sel == null ? ' selected' : '') + '>— No importar —</option>' + I.enc.map((h, i) => String(h).trim() ? '<option value="' + i + '"' + (String(sel) === String(i) ? ' selected' : '') + '>' + esc(String(h).replace(/\s+/g, ' ').trim().slice(0, 70)) + '</option>' : '').join('');
+  const hojaSel = I.hojas.length > 1 ? '<div class="field" style="min-width:160px"><label>Hoja</label><select onchange="rcImp.k=+this.value;rcImp.hi=0;rcImp.sel={};rcImpCalc(true);rcImpMostrar()">' + I.hojas.map((h, k) => '<option value="' + k + '"' + (k === I.k ? ' selected' : '') + '>' + esc(h.nombre) + '</option>').join('') + '</select></div>' : '';
+  rcModal('<h3>📥 Importar respuestas del formulario</h3><div style="font-size:13.5px;margin-bottom:6px">Archivo: <b>' + esc(I.nombre) + '</b> · ' + I.filas.length + ' fila(s) con datos. Seleccionadas: <b style="color:#2e7d32">' + nuevos + ' nuevo(s)</b> y <b style="color:#1a4f9c">' + act + ' por actualizar</b> (la cédula ya existe).' + (omit ? ' <b style="color:#b26a00">' + omit + ' sin nombre (no se pueden importar)</b>.' : '') + '</div>' +
+    '<details' + (I.abierto ? ' open' : '') + ' ontoggle="rcImp.abierto=this.open" style="margin-bottom:8px;border:1px solid #d5d9e2;border-radius:8px;padding:6px 10px;background:#fafbfc"><summary style="cursor:pointer;font-weight:700">🔧 Elegir qué columna del archivo va en cada campo' + (!I.mapa.nombre && I.mapa.nombre !== 0 ? ' <span style="color:#b71c1c">(falta indicar el nombre)</span>' : '') + '</summary>' +
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;margin:8px 0">' + hojaSel + '<div class="field" style="min-width:160px"><label>Fila de los encabezados</label><select onchange="rcImp.hi=+this.value;rcImp.sel={};rcImpCalc(true);rcImpMostrar()">' + [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].filter(n => n < I.hojas[I.k].m.length - 1).map(n => '<option value="' + n + '"' + (n === I.hi ? ' selected' : '') + '>Fila ' + (n + 1) + '</option>').join('') + '</select></div></div>' +
+    '<div class="grid2" style="gap:8px">' + RC_REGLAS.slice().sort((a, b) => (a[0] === 'nombre' ? -1 : b[0] === 'nombre' ? 1 : 0)).map(r => '<div class="field"><label>' + esc(r[2]) + (r[0] === 'nombre' ? ' *' : '') + '</label><select onchange="rcImpMap(\'' + r[0] + '\',this.value)">' + opts(I.mapa[r[0]]) + '</select></div>').join('') + '</div></details>' +
+    '<div style="max-height:40vh;overflow:auto"><table class="table" style="font-size:12.5px"><thead><tr><th><input type="checkbox" ' + (elegidas.length === I.filas.filter(o => o.nombre).length ? 'checked' : '') + ' onchange="rcImpTodas(this.checked)" title="Marcar o desmarcar todas"></th><th class="left">Nombre</th><th class="left">Cédula</th><th class="left">Teléfono</th><th class="left">Modalidad</th><th>Acción</th><th class="left">Aviso</th></tr></thead><tbody>' +
+    I.filas.map(o => '<tr' + (o._aviso ? ' style="background:#fff8e1"' : '') + '><td>' + (o.nombre ? '<input type="checkbox" ' + (I.sel[o._i] ? 'checked' : '') + ' onchange="rcImp.sel[' + o._i + ']=this.checked;rcImpMostrar()">' : '') + '</td><td class="left">' + esc(o.nombre) + '</td><td class="left">' + esc(o.cedula) + '</td><td class="left">' + esc(o.telefono) + '</td><td class="left">' + esc(o.modalidadAplica) + '</td><td>' + esc(o._a) + '</td><td class="left" style="color:#b26a00;font-size:12px">' + esc(o._aviso) + '</td></tr>').join('') + '</tbody></table></div>' +
+    '<div style="font-size:12px;color:#777;margin-top:4px">Si el candidato ya existe (misma cédula), solo se completan sus respuestas: no se toca su estado, notas ni documentos. Las filas marcadas «Parece repetido» vienen desmarcadas cuando coinciden nombre y teléfono; márcalas si quieres importarlas igual.</div>' +
+    '<div class="modalActions"><button class="btn secondary" onclick="rcCerrar()">Cancelar</button><button class="btn primary" id="rcImpBtn" onclick="rcImpConfirmar()"' + (nuevos + act ? '' : ' disabled') + '>Importar ' + (nuevos + act) + ' fila(s)</button></div>', 900);
+}
+function rcImpMap(k, v) { rcImp.mapa[k] = v === '' ? '' : +v; rcImp.sel = {}; rcImpCalc(false); rcImp.abierto = true; rcImpMostrar(); }
+function rcImpTodas(on) { rcImp.filas.forEach(o => { if (o.nombre) rcImp.sel[o._i] = on; }); rcImpMostrar(); }
 async function rcImpConfirmar() {
   const b = $('rcImpBtn'); b.disabled = true;
-  const filas = rcImp.filas.filter(o => o.nombre).map(o => { const c = Object.assign({}, o); delete c._a; return c; });
+  const filas = rcImp.filas.filter(o => o.nombre && rcImp.sel[o._i]).map(o => { const c = {}; Object.keys(o).forEach(k => { if (k[0] !== '_') c[k] = o[k]; }); return c; });
   let nuevos = 0, act = 0, omit = [];
   try {
     for (let i = 0; i < filas.length; i += 100) {
@@ -17627,6 +17657,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 210 · 09-nov 16:09</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 211 · 09-nov 16:16</div>
 </body>
 </html>
