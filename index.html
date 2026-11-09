@@ -804,9 +804,9 @@
         <button id="navBodega" onclick="mostrarVista('bodega')"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 7.5 12 3.5l8.5 4v9L12 20.5l-8.5-4z"/><path d="M3.5 7.5 12 11.5l8.5-4M12 11.5v9"/></svg></span><span class="nt"> Bodega</span></button>
         <button id="navCotizaciones" onclick="mostrarVista('cotizaciones')"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="7.5" width="17" height="12" rx="1.5"/><path d="M9 7.5v-2a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M3.5 12.5h17"/></svg></span><span class="nt"> Cotizaciones</span></button>
         <button id="navColaboradores" onclick="mostrarVista('colaboradores')" style="display:none"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="1.8"/><circle cx="9" cy="11" r="2.2"/><path d="M5.5 16c.4-1.6 1.8-2.5 3.5-2.5s3.1.9 3.5 2.5M14.5 10h4M14.5 13.5h3"/></svg></span><span class="nt"> Colaboradores</span></button>
-        <button id="navReclutamiento" onclick="mostrarVista('reclutamiento')" style="display:none"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3.5 19c.5-3 2.8-4.5 5.5-4.5s5 1.5 5.5 4.5M16 11l2 2 3.5-3.5"/></svg></span><span class="nt"> Reclutamiento</span></button>
         <button id="navPagomov" onclick="mostrarVista('pagomov')" style="display:none"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v.01M18 14.5v.01"/></svg></span><span class="nt"> Planillas y proveedores</span></button>
         <button id="navUsuarios" onclick="mostrarVista('usuarios')" style="display:none"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8.5" r="3.2"/><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5M16 5.6a3.2 3.2 0 0 1 0 5.8M18 14.8c1.8.6 3 2.3 3 5.2"/></svg></span><span class="nt"> Usuarios</span></button>
+        <button id="navReclutamiento" onclick="mostrarVista('reclutamiento')" style="display:none"><span class="ni"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3.5 19c.5-3 2.8-4.5 5.5-4.5s5 1.5 5.5 4.5M16 11l2 2 3.5-3.5"/></svg></span><span class="nt"> Reclutamiento</span></button>
       </div>
 
     </aside>
@@ -7406,6 +7406,7 @@ function rcCandPintar() {
   const opciones = col => { const vs = Array.from(new Set(rcD.candidatos.map(c => String(col[3](c) == null ? '' : col[3](c))))).sort((a, b) => a.localeCompare(b, 'es', { numeric: true })); return '<option value="">Todos</option>' + vs.map(v => '<option value="' + esc(v) + '"' + (rcFil[col[0]] === v ? ' selected' : '') + '>' + esc(v || '(vacío)') + '</option>').join(''); };
   let h = '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:8px">' +
     '<button class="btn primary" onclick="rcCandForm()">+ Nuevo candidato</button>' +
+    '<button class="btn secondary" onclick="rcFormEnlace()">🔗 Formulario en línea</button>' +
     '<label class="btn secondary" style="cursor:pointer;display:inline-block">📥 Importar respuestas del formulario<input type="file" accept=".xlsx,.xls,.csv,.tsv,.txt" style="display:none" onchange="rcImpArchivo(this)"></label>' +
     '<label style="display:flex;gap:6px;align-items:center;font-weight:700;padding:8px 12px;border:1px solid #d5d9e2;border-radius:8px;background:' + (rcOcultar ? '#e6f4ea' : '#fff') + '"><input type="checkbox" ' + (rcOcultar ? 'checked' : '') + ' onchange="rcOcultar=this.checked;rcPrefGuardar();rcCandPintar()"> Ocultar los que no cumplen requisitos</label>' +
     '<input type="text" id="rcQCi" placeholder="Buscar en toda la lista" value="' + esc(rcQC) + '" oninput="rcQC=this.value;rcCandCuerpo()" style="flex:1;min-width:180px;padding:8px 10px">' +
@@ -7423,6 +7424,84 @@ function rcCandPintar() {
   $('rcPCa').innerHTML = h;
   rcCandCuerpo();
 }
+/* ---------- Formulario de postulación en línea: administración del enlace ---------- */
+function rcFormUrl() { return location.origin + location.pathname + '?postula=' + encodeURIComponent((rcD.formulario || {}).codigo || ''); }
+function rcFormEnlace() {
+  const f = rcD.formulario || { codigo: '', abierto: true }, url = rcFormUrl();
+  rcModal('<h3>🔗 Formulario de postulación en línea</h3>' +
+    '<div style="font-size:14px;margin-bottom:8px">Cualquier persona con este enlace puede llenar el formulario, sin iniciar sesión. Cada respuesta aparece sola en <b>Candidatos</b> con estado «Nuevo» y fuente «Formulario en línea».</div>' +
+    '<div class="field"><label>Enlace para compartir</label><input type="text" id="rcFUrl" readonly value="' + esc(url) + '" onclick="this.select()"></div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0"><button class="btn primary" onclick="rcFormCopiar()">📋 Copiar enlace</button><a class="btn secondary" href="' + esc(url) + '" target="_blank" rel="noopener" style="text-decoration:none">👁️ Ver formulario</a></div>' +
+    '<div style="padding:10px 12px;border-radius:8px;background:' + (f.abierto ? '#e6f4ea' : '#fdecea') + ';margin:8px 0;font-weight:700">Estado: ' + (f.abierto ? '🟢 Abierto, recibiendo postulaciones' : '🔴 Cerrado, no recibe postulaciones') + '</div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn secondary" onclick="rcFormCfg(\'' + (f.abierto ? 'cerrar' : 'abrir') + '\')">' + (f.abierto ? '⏸️ Cerrar formulario' : '▶️ Abrir formulario') + '</button><button class="btn secondary" onclick="rcFormCfg(\'nuevo\')">🔄 Generar enlace nuevo</button></div>' +
+    '<div style="font-size:12px;color:#777;margin-top:8px">Si generas un enlace nuevo, el anterior deja de funcionar. Si alguien envía el formulario otra vez con la misma cédula, no se duplica ni se pisan sus datos: solo queda una nota en la ficha.</div>' +
+    '<div class="modal-actions" style="margin-top:10px"><button class="btn secondary" onclick="rcCerrar()">Cerrar</button></div>');
+}
+async function rcFormCopiar() {
+  const t = rcFormUrl();
+  try { await navigator.clipboard.writeText(t); toast('Enlace copiado.'); }
+  catch (e) { const i = $('rcFUrl'); i.focus(); i.select(); try { document.execCommand('copy'); toast('Enlace copiado.'); } catch (e2) { toast('Selecciona el enlace y cópialo.'); } }
+}
+async function rcFormCfg(acc) {
+  if (acc === 'nuevo' && !confirm('El enlace actual dejará de funcionar. ¿Generar uno nuevo?')) return;
+  try { rcD.formulario = await api('configurarFormRecWeb', acc); rcFormEnlace(); toast(acc === 'nuevo' ? 'Enlace nuevo generado.' : acc === 'cerrar' ? 'Formulario cerrado.' : 'Formulario abierto.'); }
+  catch (e) { mostrarError(e); }
+}
+
+/* ---------- Página pública del formulario (sin iniciar sesión) ---------- */
+const POST_ENLACE = (new URLSearchParams(location.search).get('postula') || '').trim();
+let postDoc = null, postEnv = false;
+async function postIniciar() {
+  $('postPub').style.display = 'block';
+  document.body.style.overflow = 'hidden';
+  try { postDoc = await llamarServidor('obtenerFormPostulacionWeb', [POST_ENLACE], true); if (postDoc.empresa && postDoc.empresa.nombre) EMP = postDoc.empresa; postPintar(); }
+  catch (e) { $('postCuerpo').innerHTML = '<div style="padding:18px;text-align:center"><div style="font-size:34px">⚠️</div><h3>No se puede abrir el formulario</h3><div style="color:#555">' + esc(e.message) + '</div></div>'; }
+}
+function postPintar() {
+  const d = postDoc, emp = (d.empresa && d.empresa.nombre) || 'Soluciones Red Dorada';
+  const cab = '<div style="display:flex;align-items:center;gap:12px;border-bottom:3px solid #a31616;padding-bottom:10px;margin-bottom:12px"><img src="' + CT_LOGO + '" style="height:46px" alt=""><div><div style="font-weight:800;font-size:16px">' + esc(emp) + '</div><div style="font-size:13px;color:#555">Formulario de solicitud · Instalador de Fibra Óptica Residencial</div></div></div>';
+  if (!d.abierto) { $('postCuerpo').innerHTML = cab + '<div style="padding:18px;text-align:center"><div style="font-size:34px">⏸️</div><h3>Por ahora no estamos recibiendo postulaciones</h3><div style="color:#555">Gracias por tu interés. Intenta de nuevo más adelante.</div></div>'; return; }
+  const inp = (id, lbl, tipo, extra) => '<div class="field"><label>' + lbl + ' <span style="color:#a31616">*</span></label><input type="' + (tipo || 'text') + '" id="post_' + id + '" ' + (extra || '') + ' style="width:100%;font-size:16px;padding:10px"></div>';
+  const sel = (id, lbl, ops) => '<div class="field"><label>' + lbl + ' <span style="color:#a31616">*</span></label><select id="post_' + id + '" style="width:100%;font-size:16px;padding:10px"><option value="">Selecciona…</option>' + ops.map(o => '<option>' + esc(o) + '</option>').join('') + '</select></div>';
+  const sn = (id, lbl) => '<div class="field"><label>' + lbl + ' <span style="color:#a31616">*</span></label><div style="display:flex;gap:18px;font-size:16px"><label style="display:flex;gap:6px;align-items:center"><input type="radio" style="width:auto;flex:none;margin:0" name="post_' + id + '" value="Sí"> Sí</label><label style="display:flex;gap:6px;align-items:center"><input type="radio" style="width:auto;flex:none;margin:0" name="post_' + id + '" value="No"> No</label></div></div>';
+  $('postCuerpo').innerHTML = cab + '<div style="font-size:14px;color:#444;margin-bottom:12px">Los campos con <span style="color:#a31616">*</span> son obligatorios.</div>' +
+    inp('nombre', 'Nombre completo', 'text', 'maxlength="100" autocomplete="name"') + inp('cedula', 'Número de cédula o DIMEX (solo números)', 'text', 'maxlength="14" inputmode="numeric" autocomplete="off"') +
+    inp('telefono', 'Teléfono', 'tel', 'maxlength="20" autocomplete="tel"') + inp('correo', 'Correo electrónico', 'email', 'maxlength="80" autocomplete="email"') +
+    sel('provincia', 'Provincia de residencia', d.provincias) + inp('canton', 'Cantón de residencia', 'text', 'maxlength="60"') +
+    sel('modalidad', 'Modalidad a la que desea aplicar', d.modalidades) +
+    sn('licencia', '¿Cuenta con licencia de conducir tipo B1 vigente?') +
+    sn('vehiculo', '¿Cuenta con vehículo propio? (Requerido para modalidad Outsourcing)') +
+    sn('herramientas', '¿Cuenta con herramientas completas para trabajos en fibra óptica? (Requerido para modalidad Outsourcing)') +
+    sn('expPrevia', '¿Cuenta con experiencia previa comprobada en instalaciones de fibra óptica residencial?') +
+    '<div class="field"><label>Indique en cuál(es) área(s) tiene experiencia</label><div style="display:grid;gap:6px;font-size:16px">' + d.areas.map((a, i) => '<label style="display:flex;gap:8px;align-items:center;justify-content:flex-start;text-align:left;width:auto"><input type="checkbox" name="post_area" style="width:auto;flex:none;margin:0" value="' + esc(a) + '"> ' + esc(a) + '</label>').join('') + '</div><input type="text" id="post_areaOtra" maxlength="80" placeholder="Otra (escríbela aquí)" style="width:100%;font-size:16px;padding:10px;margin-top:6px"></div>' +
+    sn('dispCampo', '¿Cuenta con disponibilidad para realizar trabajo en campo (exterior, altura y giras)?') +
+    sn('escaleraPoste', '¿Tiene experiencia en manipulación de escalera de fibra de 28 peldaños y trabajo en poste?') +
+    sn('dispJornada', 'El puesto requiere disponibilidad para laborar de lunes a domingo, con un día libre rotativo por semana. ¿Cuenta con disponibilidad para esta jornada?') +
+    sel('dispInicio', 'Disponibilidad para iniciar labores', d.inicio) +
+    '<div style="position:absolute;left:-9999px" aria-hidden="true"><input type="text" id="post_web" tabindex="-1" autocomplete="off"></div>' +
+    '<div style="margin:14px 0;padding:10px 12px;border:1px solid #d5d9e2;border-radius:8px;background:#fafbfc;font-size:13px;line-height:1.5">' + esc(d.consentimiento) + '<label style="display:flex;gap:8px;align-items:flex-start;margin-top:8px;font-weight:700;font-size:15px"><input type="checkbox" id="post_acepto" style="margin-top:4px;width:auto;flex:none"> Acepto <span style="color:#a31616">*</span></label></div>' +
+    '<div id="postErr" style="display:none;color:#b3261e;background:#fdecea;border-radius:8px;padding:10px;margin-bottom:10px;font-weight:700"></div>' +
+    '<button class="btn primary" id="postBtn" onclick="postEnviar()" style="width:100%;font-size:17px;padding:13px">Enviar postulación</button>';
+}
+async function postEnviar() {
+  if (postEnv) return;
+  const v = id => ($('post_' + id) || {}).value || '', r = id => { const x = document.querySelector('input[name="post_' + id + '"]:checked'); return x ? x.value : ''; };
+  const dat = { nombre: v('nombre').trim(), cedula: v('cedula').trim(), telefono: v('telefono').trim(), correo: v('correo').trim(), provincia: v('provincia'), canton: v('canton').trim(), modalidad: v('modalidad'),
+    licencia: r('licencia'), vehiculo: r('vehiculo'), herramientas: r('herramientas'), expPrevia: r('expPrevia'), dispCampo: r('dispCampo'), escaleraPoste: r('escaleraPoste'), dispJornada: r('dispJornada'), dispInicio: v('dispInicio'),
+    areas: Array.from(document.querySelectorAll('input[name="post_area"]:checked')).map(x => x.value), areaOtra: v('areaOtra').trim(), acepto: $('post_acepto').checked, web: v('web') };
+  const err = m => { const e = $('postErr'); e.textContent = m; e.style.display = 'block'; e.scrollIntoView({ block: 'center', behavior: 'smooth' }); };
+  $('postErr').style.display = 'none';
+  const falta = [['nombre', 'tu nombre completo'], ['cedula', 'tu cédula o DIMEX'], ['telefono', 'tu teléfono'], ['correo', 'tu correo electrónico'], ['provincia', 'tu provincia'], ['canton', 'tu cantón'], ['modalidad', 'la modalidad'], ['licencia', 'la pregunta de licencia'], ['vehiculo', 'la pregunta de vehículo'], ['herramientas', 'la pregunta de herramientas'], ['expPrevia', 'la pregunta de experiencia previa'], ['dispCampo', 'la pregunta de trabajo en campo'], ['escaleraPoste', 'la pregunta de escalera y poste'], ['dispJornada', 'la pregunta de jornada'], ['dispInicio', 'cuándo puedes iniciar']].find(x => !dat[x[0]]);
+  if (falta) return err('Falta completar ' + falta[1] + '.');
+  if (!dat.acepto) return err('Debes marcar «Acepto» para enviar tus datos.');
+  postEnv = true; $('postBtn').disabled = true; $('postBtn').textContent = 'Enviando…';
+  try {
+    await llamarServidor('enviarPostulacionWeb', [POST_ENLACE, dat], true);
+    $('postCuerpo').innerHTML = '<div style="padding:22px;text-align:center"><div style="font-size:44px">✅</div><h2 style="color:#2e7d32">¡Postulación recibida!</h2><div style="color:#444;font-size:15px;line-height:1.5">Gracias por tu interés en trabajar con ' + esc((postDoc.empresa && postDoc.empresa.nombre) || 'Soluciones Red Dorada') + '. Revisaremos tus datos y, si tu perfil cumple, nos pondremos en contacto contigo.</div></div>';
+    window.scrollTo(0, 0); $('postPub').scrollTop = 0;
+  } catch (e) { postEnv = false; $('postBtn').disabled = false; $('postBtn').textContent = 'Enviar postulación'; err(String(e.message || e)); }
+}
+if (POST_ENLACE) window.addEventListener('DOMContentLoaded', postIniciar);
 function rcCandForm(id) {
   const c = id ? rcD.candidatos.find(x => x.id === id) : null;
   const v = c || { nombre: '', cedula: '', telefono: '', correo: '', puesto: '', zona: '', domicilio: '', delincuencia: '', experiencia: '', licencia: '', vehiculo: '', pretension: '', fuente: '', notas: '', estado: 'Nuevo', provincia: '', canton: '', modalidadAplica: '', herramientas: '', expPrevia: '', areasExp: '', dispCampo: '', escaleraPoste: '', dispJornada: '', dispInicio: '' };
@@ -16312,7 +16391,7 @@ if (FP_ENLACE) window.addEventListener('DOMContentLoaded', fpIniciar);
 
 (function iniciar() {
 
-  if (FP_ENLACE || DESP_MODO) return;
+  if (FP_ENLACE || POST_ENLACE || DESP_MODO) return;
   const t = leerToken();
   if (!t) return;
 
@@ -17807,6 +17886,12 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 212 · 09-nov 16:31</div>
+<div id="postPub" style="display:none;position:fixed;inset:0;z-index:99999;background:#eef1f6;overflow:auto">
+  <div style="max-width:680px;margin:0 auto;padding:12px 12px 40px">
+    <div id="postCuerpo" style="position:relative;background:#fff;border-radius:12px;padding:16px;box-shadow:0 1px 6px rgba(0,0,0,.15)"><div class="loading">Cargando formulario...</div></div>
+  </div>
+</div>
+
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 213 · 09-nov 16:38</div>
 </body>
 </html>
