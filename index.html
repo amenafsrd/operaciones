@@ -7151,7 +7151,7 @@ function rcFechaCorta(iso) { const m = String(iso || '').match(/^(\d{4})-(\d{2})
 function rcH12(hhmm) { const m = String(hhmm || '').match(/^(\d{1,2}):(\d{2})/); if (!m) return ''; let h = +m[1]; const ap = h >= 12 ? 'p. m.' : 'a. m.'; h = h % 12 || 12; return h + ':' + m[2] + ' ' + ap; }
 function rcHoraFin(hhmm, dur) { const m = String(hhmm || '').match(/^(\d{1,2}):(\d{2})/); if (!m) return ''; const t = (+m[1]) * 60 + (+m[2]) + (Number(dur) || 30); return ('0' + (Math.floor(t / 60) % 24)).slice(-2) + ':' + ('0' + (t % 60)).slice(-2); }
 function rcRango(c) { return rcH12(c.hora) + ' – ' + rcH12(rcHoraFin(c.hora, c.duracion)) + ' (' + c.duracion + ' min)'; }
-const RC_ESCRIBE = /rc(CandGuardar|CandDel|CitaGuardar|CitaDel|CitaEstado|DocDel|BlqGuardar|BlqDel|BlqAdd|ImpConfirmar|CandForm\(\)|CitaForm\(\s*(\)|'',)|BloquesForm|FormEnlace|Pend|DocAgregar)/;
+const RC_ESCRIBE = /rc(CandGuardar|CandDel|CitaGuardar|CitaDel|CitaEstado|DocDel|BlqGuardar|BlqDel|BlqAdd|ImpConfirmar|Decidir|CandForm\(\)|CitaForm\(\s*(\)|'',)|BloquesForm|FormEnlace|Pend|DocAgregar)/;
 function rcSoloVer() { return !!sesion && sesion.rol !== 'admin' && (sesion.rol === 'consulta' || (sesion.ver || []).indexOf('reclutamiento') !== -1); }
 const RC_SOLO_ADMIN = /rc(CandDel|BloquesForm|FormEnlace|BlqGuardar|BlqDel|BlqAdd)/;
 function rcAplicarRO() {
@@ -7182,7 +7182,7 @@ function rcTab(t) {
 }
 function rcBadge(txt, bg, fg) { return '<span style="display:inline-block;padding:2px 9px;border-radius:12px;font-size:12px;font-weight:700;background:' + bg + ';color:' + fg + '">' + esc(txt) + '</span>'; }
 function rcEstadoCita(e) { return ({ Programada: ['#e8f1ff', '#1a4f9c'], Realizada: ['#e6f4ea', '#2e7d32'], Cancelada: ['#fdecea', '#b71c1c'], 'No asistió': ['#fff3e0', '#b26a00'] })[e] || ['#eee', '#333']; }
-function rcEstadoCand(e) { return ({ Nuevo: ['#e8f1ff', '#1a4f9c'], Citado: ['#f3e8ff', '#6a1b9a'], Entrevistado: ['#fff3e0', '#b26a00'], 'En evaluación': ['#fff8d6', '#7a6200'], Contratado: ['#e6f4ea', '#2e7d32'], Descartado: ['#eee', '#666'] })[e] || ['#eee', '#333']; }
+function rcEstadoCand(e) { return ({ Nuevo: ['#e8f1ff', '#1a4f9c'], Aplica: ['#e0f7ea', '#1b7a3d'], Citado: ['#f3e8ff', '#6a1b9a'], Entrevistado: ['#fff3e0', '#b26a00'], 'En evaluación': ['#fff8d6', '#7a6200'], Contratado: ['#e6f4ea', '#2e7d32'], Descartado: ['#eee', '#666'] })[e] || ['#eee', '#333']; }
 
 /* ---------- Agenda ---------- */
 function rcAgendaPintar() {
@@ -7377,10 +7377,10 @@ const RC_REQ = [['licencia', 'Licencia de conducir B1 vigente', false, 'B1'], ['
   ['vehiculo', 'Vehículo propio', true, 'Vehículo'], ['herramientas', 'Herramientas completas de fibra óptica', true, 'Herramientas']];
 let rcFil = {}, rcSort = { k: 'nombre', d: 1 }, rcOcultar = false, rcReq = null;
 function rcPrefCargar() {
-  try { const j = JSON.parse(localStorage.getItem('rcCandPref') || '{}'); if (Array.isArray(j.req)) rcReq = j.req; if (typeof j.ocultar === 'boolean') rcOcultar = j.ocultar; } catch (e) { }
+  try { const j = JSON.parse(localStorage.getItem('rcCandPref') || '{}'); if (Array.isArray(j.req)) rcReq = j.req; if (typeof j.ocultar === 'boolean') rcOcultar = j.ocultar; if (j.vista === 'simple' || j.vista === 'completa') rcVista = j.vista; if (typeof j.verDesc === 'boolean') rcVerDesc = j.verDesc; } catch (e) { }
   if (!rcReq) rcReq = RC_REQ.map(r => r[0]);
 }
-function rcPrefGuardar() { try { localStorage.setItem('rcCandPref', JSON.stringify({ req: rcReq, ocultar: rcOcultar })); } catch (e) { } }
+function rcPrefGuardar() { try { localStorage.setItem('rcCandPref', JSON.stringify({ req: rcReq, ocultar: rcOcultar, vista: rcVista, verDesc: rcVerDesc })); } catch (e) { } }
 function rcYN(v) { v = String(v == null ? '' : v).trim(); if (!v) return '(sin dato)'; if (/^(si|sí)(?![a-záéíóúñ])/i.test(v)) return 'Sí'; if (/^no(?![a-záéíóúñ])/i.test(v)) return 'No'; return v; }
 function rcEsOut(c) { return /outsourcing|contratista/i.test(c.modalidadAplica || ''); }
 /* Requisitos marcados que el candidato no cumple (vehículo y herramientas solo se exigen en Outsourcing) */
@@ -7397,34 +7397,69 @@ const RC_COLS = [
   ['estado', 'Estado', 'sel', c => c.estado], ['delincuencia', 'Hoja de delincuencia', 'sel', c => c.delincuencia || '(sin dato)'],
   ['expediente', 'Documentos', 'sel', c => rcNDocs(c) + ' de 3'], ['citas', 'Citas', 'sel', c => String(rcD.citas.filter(x => x.candidato === c.id).length)]
 ];
+let rcVista = 'simple', rcVerDesc = false, rcSel = {};
+const RC_SIMPLE = ['cumple', 'nombre', 'telefono', 'modalidad', 'estado'];
+const rcCols = () => rcVista === 'simple' ? RC_COLS.filter(c => RC_SIMPLE.indexOf(c[0]) >= 0) : RC_COLS;
 function rcCandFiltrar() {
   const q = rcNorm(rcQC);
   let l = rcD.candidatos.map(c => ({ c: c, f: rcFaltan(c) }));
   const nNo = l.filter(x => x.f.length).length;
   if (rcOcultar) l = l.filter(x => !x.f.length);
+  const nDesc = l.filter(x => x.c.estado === 'Descartado').length;
+  if (!rcVerDesc && rcFil.estado !== 'Descartado') l = l.filter(x => x.c.estado !== 'Descartado');
   RC_COLS.forEach(col => { const fv = rcFil[col[0]]; if (!fv) return; l = l.filter(x => { const v = String(col[3](x.c) == null ? '' : col[3](x.c)); return col[2] === 'sel' ? v === fv : rcNorm(v).indexOf(rcNorm(fv)) >= 0; }); });
   if (q) l = l.filter(x => rcNorm(RC_COLS.map(col => col[3](x.c)).join(' ')).indexOf(q) >= 0);
   const col = RC_COLS.find(x => x[0] === rcSort.k) || RC_COLS[1];
   l.sort((a, b) => String(col[3](a.c) || '').localeCompare(String(col[3](b.c) || ''), 'es', { numeric: true }) * rcSort.d);
-  return { l: l, nNo: nNo };
+  return { l: l, nNo: nNo, nDesc: (!rcVerDesc && rcFil.estado !== 'Descartado') ? nDesc : 0 };
 }
 function rcCelda(col, x) {
   const c = x.c, k = col[0], v = String(col[3](c) == null ? '' : col[3](c));
   if (k === 'cumple') return x.f.length ? '<span style="color:#b71c1c;font-weight:700" title="Falta: ' + esc(x.f.join(', ')) + '">✖ ' + esc(x.f.join(', ')) + '</span>' : '<span style="color:#2e7d32;font-weight:700">✔</span>';
+  if (k === 'modalidad') return '<span title="' + esc(v) + '">' + esc(/outsourcing|contratista/i.test(v) ? 'Contratista (Outsourcing)' : /incorporaci/i.test(v) ? 'Unidad de trabajo' : v) + '</span>';
   if (k === 'estado') { const e = rcEstadoCand(c.estado); return rcBadge(c.estado, e[0], e[1]); }
   if (['licencia', 'vehiculo', 'herramientas', 'expPrevia', 'dispCampo', 'escaleraPoste', 'dispJornada'].indexOf(k) >= 0) return '<span style="font-weight:700;color:' + (v === 'Sí' ? '#2e7d32' : (v === 'No' ? '#b71c1c' : '#888')) + '">' + esc(v) + '</span>';
   if (k === 'expediente') return rcExpedienteHtml(c);
   if (k === 'areasExp') return '<span title="' + esc(v) + '">' + esc(v.length > 40 ? v.slice(0, 40) + '…' : v) + '</span>';
   return esc(v);
 }
+function rcDecCelda(c) {
+  const id = esc(c.id), b = (txt, fn, bg, fg) => '<button class="btnMini" style="background:' + bg + ';color:' + fg + ';border-color:' + fg + '" onclick="rcDecidir([\'' + id + '\'],\'' + fn + '\')">' + txt + '</button> ';
+  const si = b('✔ Aplica', 'aplica', '#e0f7ea', '#1b7a3d'), no = b('✖ No aplica', 'noaplica', '#fdecea', '#b71c1c');
+  if (c.estado === 'Nuevo') return si + no;
+  if (c.estado === 'Aplica') return '<button class="btnMini" style="background:#1b7a3d;color:#fff" onclick="rcCitaForm(\'\',\'' + id + '\')">📅 Agendar entrevista</button> ' + no;
+  if (c.estado === 'Descartado') return b('↩ Reabrir', 'reabrir', '#eef2f7', '#445');
+  if (c.estado === 'Contratado') return '<span style="color:#888">—</span>';
+  return no;
+}
 function rcCandCuerpo() {
-  const r = rcCandFiltrar();
+  const r = rcCandFiltrar(), cols = rcCols(), simple = rcVista === 'simple';
   $('rcCBody').innerHTML = r.l.length ? r.l.map(x => {
-    const bg = x.f.length ? '#fff5f4' : '#fff';
-    return '<tr style="background:' + bg + '">' + RC_COLS.map(col => '<td class="left" style="' + (col[0] === 'nombre' ? 'position:sticky;left:0;z-index:1;background:' + bg + ';font-weight:700;min-width:170px;' : '') + 'white-space:' + (col[0] === 'areasExp' || col[0] === 'cumple' ? 'normal' : 'nowrap') + '">' + rcCelda(col, x) + '</td>').join('') +
-      '<td style="white-space:nowrap"><button class="btnMini" onclick="rcCandForm(\'' + esc(x.c.id) + '\')">📋 Ficha</button> <button class="btnMini" onclick="rcCitaForm(\'\',\'' + esc(x.c.id) + '\')">📅 Agendar</button></td></tr>';
-  }).join('') : '<tr><td colspan="' + (RC_COLS.length + 1) + '" class="empty">Ningún candidato coincide con los filtros.</td></tr>';
-  $('rcCCuenta').innerHTML = 'Mostrando <b>' + r.l.length + '</b> de <b>' + rcD.candidatos.length + '</b> candidatos' + (r.nNo ? ' · <span style="color:#b71c1c">' + r.nNo + ' no cumplen los requisitos marcados' + (rcOcultar ? ' (ocultos)' : '') + '</span>' : '');
+    const desc = x.c.estado === 'Descartado', bg = desc ? '#f4f4f4' : (x.f.length ? '#fff5f4' : '#fff');
+    return '<tr style="background:' + bg + ';' + (desc ? 'color:#777;' : '') + '"><td style="position:sticky;left:0;z-index:1;background:' + bg + ';width:34px;text-align:center"><input type="checkbox" ' + (rcSel[x.c.id] ? 'checked' : '') + ' onchange="rcSelUno(\'' + esc(x.c.id) + '\',this.checked)" style="width:auto;margin:0"></td>' +
+      cols.map(col => '<td class="left" style="' + (col[0] === 'nombre' ? 'position:sticky;left:34px;z-index:1;background:' + bg + ';font-weight:700;min-width:170px;' : '') + 'white-space:' + (col[0] === 'areasExp' || col[0] === 'cumple' ? 'normal' : 'nowrap') + '">' + (simple && col[0] === 'nombre' ? '<a href="javascript:void(0)" title="Abrir la ficha" onclick="rcCandForm(\'' + esc(x.c.id) + '\')" style="color:inherit;text-decoration:underline dotted">' + rcCelda(col, x) + '</a>' : rcCelda(col, x)) + '</td>').join('') +
+      '<td style="' + (simple ? '' : 'white-space:nowrap') + '">' + rcDecCelda(x.c) + '</td>' +
+      (simple ? '' : '<td style="white-space:nowrap"><button class="btnMini" onclick="rcCandForm(\'' + esc(x.c.id) + '\')">📋 Ficha</button> <button class="btnMini" onclick="rcCitaForm(\'\',\'' + esc(x.c.id) + '\')">📅 Agendar</button></td>') + '</tr>';
+  }).join('') : '<tr><td colspan="' + (cols.length + (simple ? 2 : 3)) + '" class="empty">Ningún candidato coincide con los filtros.</td></tr>';
+  $('rcCCuenta').innerHTML = 'Mostrando <b>' + r.l.length + '</b> de <b>' + rcD.candidatos.length + '</b> candidatos' + (r.nNo ? ' · <span style="color:#b71c1c">' + r.nNo + ' no cumplen los requisitos marcados' + (rcOcultar ? ' (ocultos)' : '') + '</span>' : '') + (r.nDesc ? ' · <span style="color:#666">' + r.nDesc + ' descartado(s) oculto(s)</span>' : '');
+  rcBulkPintar();
+}
+function rcSelUno(id, on) { if (on) rcSel[id] = 1; else delete rcSel[id]; rcBulkPintar(); }
+function rcSelTodos(on) { rcCandFiltrar().l.forEach(x => { if (on) rcSel[x.c.id] = 1; else delete rcSel[x.c.id]; }); rcCandCuerpo(); }
+function rcBulkPintar() {
+  const n = Object.keys(rcSel).length, b = $('rcBulk'); if (!b) return;
+  b.style.display = n ? 'flex' : 'none';
+  b.innerHTML = '<b>' + n + ' seleccionado(s)</b> <button class="btn" style="background:#1b7a3d;color:#fff" onclick="rcDecidir(Object.keys(rcSel),\'aplica\')">✔ Aplica</button><button class="btn" style="background:#b71c1c;color:#fff" onclick="rcDecidir(Object.keys(rcSel),\'noaplica\')">✖ No aplica (descartar)</button><button class="btn secondary" onclick="rcDecidir(Object.keys(rcSel),\'reabrir\')">↩ Reabrir descartados</button><button class="btn secondary" onclick="rcSel={};rcCandCuerpo()">Quitar selección</button>';
+  const h = $('rcSelAll'); if (h) h.checked = false;
+}
+async function rcDecidir(ids, dec) {
+  if (!ids.length) { toast('Marca al menos un candidato.'); return; }
+  if (dec === 'noaplica' && !confirm('¿Marcar ' + (ids.length === 1 ? 'este candidato' : ids.length + ' candidatos') + ' como «No aplica»? Quedan como Descartados y salen de la lista (los puedes ver con «Mostrar descartados»).')) return;
+  try {
+    const r = await api('decidirCandidatosWeb', ids, dec);
+    rcD = await api('obtenerReclutamientoWeb'); rcSel = {}; rcCandPintar();
+    toast(!r.cambiados ? 'No hubo cambios: ya estaban en ese estado o están contratados.' : dec === 'aplica' ? r.cambiados + ' marcado(s) como «Aplica». Toca «📅 Agendar entrevista» para asignarles horario.' : dec === 'noaplica' ? r.cambiados + ' descartado(s).' : r.cambiados + ' reabierto(s).', 5000);
+  } catch (e) { mostrarError(e, 'No se pudo guardar la decisión.'); }
 }
 function rcOrdenar(k) { rcSort = { k: k, d: rcSort.k === k ? -rcSort.d : 1 }; rcCandPintar(); }
 function rcLimpiarFiltros() { rcFil = {}; rcQC = ''; rcCandPintar(); }
@@ -7444,18 +7479,21 @@ function rcCandPintar() {
     '<button class="btn secondary" onclick="rcFormEnlace()">🔗 Formulario en línea</button>' +
     '<label class="btn secondary" style="cursor:pointer;display:inline-block">📥 Importar respuestas del formulario<input type="file" accept=".xlsx,.xls,.csv,.tsv,.txt" style="display:none" onchange="rcImpArchivo(this)"></label>' +
     '<label style="display:flex;gap:6px;align-items:center;font-weight:700;padding:8px 12px;border:1px solid #d5d9e2;border-radius:8px;background:' + (rcOcultar ? '#e6f4ea' : '#fff') + '"><input type="checkbox" ' + (rcOcultar ? 'checked' : '') + ' onchange="rcOcultar=this.checked;rcPrefGuardar();rcCandPintar()"> Ocultar los que no cumplen requisitos</label>' +
+    '<label style="display:flex;gap:6px;align-items:center;font-weight:700;padding:8px 12px;border:1px solid #d5d9e2;border-radius:8px;background:' + (rcVerDesc ? '#fff3e0' : '#fff') + '"><input type="checkbox" ' + (rcVerDesc ? 'checked' : '') + ' onchange="rcVerDesc=this.checked;rcPrefGuardar();rcCandPintar()"> Mostrar descartados</label>' +
+    '<span style="display:inline-flex;border:1px solid #d5d9e2;border-radius:8px;overflow:hidden"><button class="btn ' + (rcVista === 'simple' ? 'primary' : 'secondary') + '" style="border-radius:0" onclick="rcVista=\'simple\';rcPrefGuardar();rcCandPintar()">Vista simple</button><button class="btn ' + (rcVista === 'completa' ? 'primary' : 'secondary') + '" style="border-radius:0" onclick="rcVista=\'completa\';rcPrefGuardar();rcCandPintar()">Vista completa</button></span>' +
     '<input type="text" id="rcQCi" placeholder="Buscar en toda la lista" value="' + esc(rcQC) + '" oninput="rcQC=this.value;rcCandCuerpo()" style="flex:1;min-width:180px;padding:8px 10px">' +
     '<button class="btn secondary" onclick="rcLimpiarFiltros()">Limpiar filtros</button><button class="btn secondary" onclick="rcCandExportar()">⬇️ Exportar lista</button></div>' +
     '<details style="margin-bottom:8px;border:1px solid #d5d9e2;border-radius:8px;padding:6px 10px;background:#fafbfc"><summary style="cursor:pointer;font-weight:700">✅ Requisitos que debe cumplir un candidato (' + RC_REQ.filter(r => rcReq.indexOf(r[0]) >= 0).length + ' marcados)</summary><div style="display:flex;flex-wrap:wrap;gap:6px 18px;margin:8px 0">' +
     RC_REQ.map(r => '<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" ' + (rcReq.indexOf(r[0]) >= 0 ? 'checked' : '') + ' onchange="rcReqCambio(\'' + r[0] + '\',this.checked)"> ' + esc(r[1]) + (r[2] ? ' <span style="color:#777;font-size:12px">(solo Outsourcing)</span>' : '') + '</label>').join('') +
     '</div><div style="font-size:12px;color:#777">Una respuesta vacía o distinta de «Sí» cuenta como que no cumple. Vehículo y herramientas solo se exigen a quienes aplican a Outsourcing o Contratista.</div></details>' +
-    '<div id="rcCCuenta" style="font-size:13px;margin-bottom:4px"></div>';
+    '<div id="rcCCuenta" style="font-size:13px;margin-bottom:4px"></div><div id="rcBulk" style="display:none;gap:8px;flex-wrap:wrap;align-items:center;padding:8px 10px;margin-bottom:6px;border:1px solid #d5d9e2;border-radius:8px;background:#fffbe6"></div>';
   if (!rcD.candidatos.length) { $('rcPCa').innerHTML = h + '<div class="empty">Aún no hay candidatos. Toca «+ Nuevo candidato» o importa las respuestas del formulario.</div>'; $('rcCCuenta').innerHTML = ''; return; }
-  h += '<div style="overflow:auto;max-height:68vh;border:1px solid #d5d9e2;border-radius:8px"><table class="table" style="font-size:13px;min-width:max-content"><thead><tr>' +
-    RC_COLS.map(col => '<th class="left" style="position:sticky;top:0;z-index:2;' + (col[0] === 'nombre' ? 'left:0;z-index:3;' : '') + 'vertical-align:top;min-width:' + (col[0] === 'nombre' ? 170 : 96) + 'px"><div style="cursor:pointer;white-space:nowrap" onclick="rcOrdenar(\'' + col[0] + '\')">' + esc(col[1]) + (rcSort.k === col[0] ? (rcSort.d > 0 ? ' ▲' : ' ▼') : '') + '</div>' +
+  h += '<div style="overflow:auto;max-height:68vh;border:1px solid #d5d9e2;border-radius:8px"><table class="table" style="font-size:13px;' + (rcVista === 'simple' ? '' : 'min-width:max-content') + '"><thead><tr>' +
+    '<th style="position:sticky;top:0;left:0;z-index:4;background:#fff;width:34px"><input type="checkbox" id="rcSelAll" onchange="rcSelTodos(this.checked)" title="Marcar todos los que se ven" style="width:auto;margin:0"></th>' +
+    rcCols().map(col => '<th class="left" style="position:sticky;top:0;z-index:2;' + (col[0] === 'nombre' ? 'left:34px;z-index:3;' : '') + 'vertical-align:top;min-width:' + (col[0] === 'nombre' ? 170 : 96) + 'px"><div style="cursor:pointer;white-space:nowrap" onclick="rcOrdenar(\'' + col[0] + '\')">' + esc(col[1]) + (rcSort.k === col[0] ? (rcSort.d > 0 ? ' ▲' : ' ▼') : '') + '</div>' +
       (col[2] === 'txt' ? '<input type="text" value="' + esc(rcFil[col[0]] || '') + '" oninput="rcFil[\'' + col[0] + '\']=this.value;rcCandCuerpo()" placeholder="Filtrar" style="width:100%;font-size:12px;padding:3px 5px;margin-top:3px">'
         : '<select onchange="rcFil[\'' + col[0] + '\']=this.value;rcCandCuerpo()" style="width:100%;font-size:12px;padding:3px 3px;margin-top:3px">' + opciones(col) + '</select>') + '</th>').join('') +
-    '<th style="position:sticky;top:0;z-index:2"></th></tr></thead><tbody id="rcCBody"></tbody></table></div>';
+    '<th style="position:sticky;top:0;z-index:2;vertical-align:top">Decisión</th>' + (rcVista === 'simple' ? '' : '<th style="position:sticky;top:0;z-index:2"></th>') + '</tr></thead><tbody id="rcCBody"></tbody></table></div>';
   $('rcPCa').innerHTML = h;
   rcCandCuerpo();
 }
@@ -18014,6 +18052,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 217 · 10-nov 10:14</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 218 · 10-nov 10:35</div>
 </body>
 </html>
