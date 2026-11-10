@@ -1606,6 +1606,7 @@
           <div class="panel" style="margin-bottom:15px">
             <div class="panelHead">
               <h2>OT suspendidas</h2>
+              <button class="btn secondary" onclick="spExpAbrir()">📥 Exportar por período</button>
             </div>
             <div id="segSuspContenido" class="tableWrap"></div>
           </div>
@@ -2007,6 +2008,27 @@
     </div>
   </div>
 
+
+  <div id="modalSpExp" class="modalBg">
+    <div class="modal" style="width:min(720px,100%)">
+      <h3>📥 Exportar OT suspendidas por período</h3>
+      <div class="grid2">
+        <div class="field"><label>Desde</label><input type="date" id="spDesde" onchange="spExpCargar()"></div>
+        <div class="field"><label>Hasta</label><input type="date" id="spHasta" onchange="spExpCargar()"></div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 10px">
+        <button class="btn secondary" onclick="spExpRango('mes')">Este mes</button>
+        <button class="btn secondary" onclick="spExpRango('ant')">Mes anterior</button>
+        <button class="btn secondary" onclick="spExpRango('15')">Últimos 15 días</button>
+        <button class="btn secondary" onclick="spExpRango('sem')">Esta semana</button>
+      </div>
+      <div id="spResumen" style="max-height:44vh;overflow:auto"></div>
+      <div class="modalActions">
+        <button class="btn secondary" onclick="$('modalSpExp').classList.remove('show')">Cerrar</button>
+        <button id="spBajar" class="btn primary" onclick="spExpDescargar()" disabled>⬇️ Descargar Excel</button>
+      </div>
+    </div>
+  </div>
 
   <div id="devModalBg" class="modalBg" style="z-index:90"><div class="modal" id="devModal"></div></div>
 
@@ -10639,6 +10661,63 @@ async function eliminarAus(id) {
   }
 }
 
+/* ---------- Exportar OT suspendidas por período ---------- */
+let spDatos = null, spSeq = 0;
+const spCorto = m => String(m || 'Sin motivo').replace(/^SUSPENDIDA\s+(POR\s+)?/i, '').trim() || 'Sin motivo';
+function spExpAbrir() {
+  const f = (segDatos && segDatos.fecha) || hoyISO();
+  $('spDesde').value = f.slice(0, 8) + '01'; $('spHasta').value = f;
+  $('modalSpExp').classList.add('show'); spExpCargar();
+}
+function spIso(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+function spExpRango(t) {
+  const h = new Date(((segDatos && segDatos.fecha) || hoyISO()) + 'T12:00:00');
+  let a, b = h;
+  if (t === 'mes') a = new Date(h.getFullYear(), h.getMonth(), 1);
+  else if (t === 'ant') { a = new Date(h.getFullYear(), h.getMonth() - 1, 1); b = new Date(h.getFullYear(), h.getMonth(), 0); }
+  else if (t === '15') a = new Date(h.getTime() - 14 * 86400000);
+  else { const dw = (h.getDay() + 6) % 7; a = new Date(h.getTime() - dw * 86400000); }
+  $('spDesde').value = spIso(a); $('spHasta').value = spIso(b); spExpCargar();
+}
+async function spExpCargar() {
+  const d = $('spDesde').value, h = $('spHasta').value, n = ++spSeq;
+  spDatos = null; $('spBajar').disabled = true;
+  if (!d || !h) { $('spResumen').innerHTML = '<div class="empty">Elige las fechas.</div>'; return; }
+  $('spResumen').innerHTML = '<div class="loading">Buscando…</div>';
+  try {
+    const r = await api('obtenerSuspendidasPeriodoWeb', d, h);
+    if (n !== spSeq) return;
+    spDatos = r;
+    if (!r.filas.length) { $('spResumen').innerHTML = '<div class="empty">No hay OT suspendidas entre esas fechas.</div>'; return; }
+    const mot = {}; r.filas.forEach(x => { const k = spCorto(x.motivo); mot[k] = (mot[k] || 0) + 1; });
+    const reinc = new Set(r.filas.filter(x => x.veces > 1).map(x => x.orden)).size;
+    $('spResumen').innerHTML = '<div style="font-size:15px;margin-bottom:6px"><b>' + r.filas.length + '</b> suspensiones en ' + r.dias + ' día(s)' + (reinc ? ' · <b>' + reinc + '</b> OT suspendidas más de una vez' : '') + '</div>' +
+      '<table class="table"><thead><tr><th class="left">Motivo</th><th>Cantidad</th><th>%</th></tr></thead><tbody>' +
+      Object.keys(mot).sort((a, b) => mot[b] - mot[a]).map(k => '<tr><td class="left">' + esc(k) + '</td><td>' + mot[k] + '</td><td>' + (mot[k] * 100 / r.filas.length).toFixed(1) + '%</td></tr>').join('') + '</tbody></table>';
+    $('spBajar').disabled = false;
+  } catch (e) { if (n !== spSeq) return; $('spResumen').innerHTML = '<div class="empty">' + esc(mensajeError ? mensajeError(e) : e.message) + '</div>'; }
+}
+async function spExpDescargar() {
+  if (!spDatos || !spDatos.filas.length) return;
+  const r = spDatos, L = r.filas;
+  try { await cargarLib('xlsx', SEG_URL_XLSX); } catch (e) { mostrarError(e); return; }
+  const cuenta = (fn) => { const o = {}; L.forEach(x => { const k = fn(x) || 'Sin dato'; o[k] = (o[k] || 0) + 1; }); return o; };
+  const tabla = (o, tit) => [[tit, 'Cantidad', '% del total']].concat(Object.keys(o).sort((a, b) => o[b] - o[a] || a.localeCompare(b, 'es', { numeric: true })).map(k => [k, o[k], Math.round(o[k] * 1000 / L.length) / 10]));
+  const detalle = [['Fecha', 'N.º de OT', 'Contrato', 'Móvil', 'Técnico', 'Tipo de OT', 'Trabajo', 'Zona', 'Motivo', 'Motivo (resumido)', 'Observación', 'Origen del dato', 'Corte', 'Veces suspendida en el período']]
+    .concat(L.map(x => [x.fecha, x.orden, x.contrato, x.movil, x.tecnico, x.tipo, x.trabajo, x.zona, x.motivo, spCorto(x.motivo), x.obs, x.origen, x.corte, x.veces]));
+  const reinc = [['N.º de OT', 'Contrato', 'Móvil', 'Veces', 'Fechas', 'Motivos']];
+  const g = {}; L.filter(x => x.veces > 1).forEach(x => { (g[x.orden] = g[x.orden] || []).push(x); });
+  Object.keys(g).sort((a, b) => g[b].length - g[a].length).forEach(k => reinc.push([k, g[k][0].contrato, g[k].map(x => x.movil).filter((v, i, a) => v && a.indexOf(v) === i).join(', '), g[k].length, g[k].map(x => x.fecha).join(', '), g[k].map(x => spCorto(x.motivo)).join(' / ')]));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(detalle), 'Detalle');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(tabla(cuenta(x => spCorto(x.motivo)), 'Motivo')), 'Por motivo');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(tabla(cuenta(x => x.movil && 'Móvil ' + x.movil), 'Móvil')), 'Por móvil');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(tabla(cuenta(x => x.fecha), 'Fecha')), 'Por día');
+  if (reinc.length > 1) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(reinc), 'Reincidentes');
+  await xlsxMarca(wb, 'OT_suspendidas_' + r.desde + '_a_' + r.hasta + '.xlsx', 'OT suspendidas del ' + r.desde + ' al ' + r.hasta);
+  toast('Excel descargado (' + L.length + ' suspensiones).');
+}
+
 /* ---------- Suspendidas ---------- */
 
 function renderSuspendidas() {
@@ -17892,6 +17971,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 213 · 09-nov 16:38</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 214 · 09-nov 21:01</div>
 </body>
 </html>
