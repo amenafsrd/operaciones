@@ -7486,38 +7486,68 @@ function postPintar() {
   const inp = (id, lbl, tipo, extra) => '<div class="field"><label>' + lbl + ' <span style="color:#a31616">*</span></label><input type="' + (tipo || 'text') + '" id="post_' + id + '" ' + (extra || '') + ' style="width:100%;font-size:16px;padding:10px"></div>';
   const sel = (id, lbl, ops) => '<div class="field"><label>' + lbl + ' <span style="color:#a31616">*</span></label><select id="post_' + id + '" style="width:100%;font-size:16px;padding:10px"><option value="">Selecciona…</option>' + ops.map(o => '<option>' + esc(o) + '</option>').join('') + '</select></div>';
   const sn = (id, lbl) => '<div class="field"><label>' + lbl + ' <span style="color:#a31616">*</span></label><div style="display:flex;gap:18px;font-size:16px"><label style="display:flex;gap:6px;align-items:center"><input type="radio" style="width:auto;flex:none;margin:0" name="post_' + id + '" value="Sí"> Sí</label><label style="display:flex;gap:6px;align-items:center"><input type="radio" style="width:auto;flex:none;margin:0" name="post_' + id + '" value="No"> No</label></div></div>';
-  $('postCuerpo').innerHTML = cab + '<div style="font-size:14px;color:#444;margin-bottom:12px">Los campos con <span style="color:#a31616">*</span> son obligatorios.</div>' +
+  const li = a => '<ul style="margin:6px 0 0;padding-left:20px">' + a.map(x => '<li style="margin:3px 0">' + x + '</li>').join('') + '</ul>';
+  const intro = '<div style="font-size:14.5px;line-height:1.55;color:#333">' +
+    '<div style="background:#fafbfc;border:1px solid #e1e5ec;border-radius:10px;padding:12px 14px;margin-bottom:12px"><div style="font-weight:800;font-size:16px;color:#a31616;margin-bottom:4px">Quiénes somos</div>' +
+    '<b>' + esc(emp) + '</b> es una empresa costarricense que desde 2013 brinda servicios técnicos en campo para telecomunicaciones: instalaciones con móviles y cuadrillas, fibra óptica, cableado estructurado y CCTV para empresas y residencias, y obra civil (ductos y canalización). Vamos a donde esté el trabajo, y buscamos personas responsables y con ganas de crecer con nosotros.</div>' +
+    '<p style="margin:0 0 8px">Gracias por su interés en formar parte de nuestro equipo. Se busca personal para realizar <b>instalaciones de fibra óptica residencial dentro del Gran Área Metropolitana (GAM)</b>.</p>' +
+    '<div style="font-weight:800">Las funciones incluyen</div>' + li(['Instalación de acometidas de fibra óptica conectorizadas mecánicamente.', 'Tendido, fijación y aseguramiento de cableado tanto en poste (trabajo en alturas) como en planta interna (domicilio del cliente).', 'Instalación, aprovisionamiento y configuración de equipos como ONT, router y cajas decodificadoras.', 'Verificación de señal, pruebas de funcionamiento y activación del servicio.', 'Atención directa al cliente durante la instalación.']) +
+    '<p style="margin:10px 0">El puesto requiere trabajo en campo, desplazamientos diarios según programación, labores en exteriores y trabajo en alturas. Es indispensable experiencia en manipulación segura de escalera de fibra de 28 peldaños, así como capacidad para realizar labores físicas propias del puesto. La jornada puede comprender trabajo de lunes a domingo, con un día libre rotativo por semana.</p>' +
+    '<div style="font-weight:800;margin-bottom:6px">🔹 Modalidades disponibles</div>' +
+    '<div style="border:1px solid #f0c987;background:#fff8ec;border-radius:10px;padding:10px 12px;margin-bottom:8px"><b>1️⃣ Modalidad Outsourcing (Contratista)</b><div style="margin-top:3px">Dirigido a técnicos que cuenten con:</div>' + li(['Vehículo propio', 'Herramientas completas de fibra óptica', 'Experiencia previa comprobada en instalaciones residenciales']) + '</div>' +
+    '<div style="border:1px solid #b9d3f0;background:#eef5fd;border-radius:10px;padding:10px 12px;margin-bottom:12px"><b>2️⃣ Modalidad Incorporación a Unidad de Trabajo</b><div style="margin-top:3px">Dirigido a personas con experiencia en fibra óptica que deseen integrarse a laborar dentro de nuestras unidades operativas. Complete la información solicitada y adjunte su currículum para continuar con el proceso de reclutamiento.</div></div></div>';
+  $('postCuerpo').innerHTML = cab + intro + '<div style="font-size:14px;color:#444;margin:4px 0 12px">Los campos con <span style="color:#a31616">*</span> son obligatorios.</div>' +
     inp('nombre', 'Nombre completo', 'text', 'maxlength="100" autocomplete="name"') + inp('cedula', 'Número de cédula o DIMEX (solo números)', 'text', 'maxlength="14" inputmode="numeric" autocomplete="off"') +
     inp('telefono', 'Teléfono', 'tel', 'maxlength="20" autocomplete="tel"') + inp('correo', 'Correo electrónico', 'email', 'maxlength="80" autocomplete="email"') +
     sel('provincia', 'Provincia de residencia', d.provincias) + inp('canton', 'Cantón de residencia', 'text', 'maxlength="60"') +
-    sel('modalidad', 'Modalidad a la que desea aplicar', d.modalidades) +
+    sel('modalidad', 'Modalidad a la que desea aplicar', d.modalidades).replace('<select id="post_modalidad"', '<select id="post_modalidad" onchange="postModalidad()"') +
+    '<div id="post_info" style="display:none;margin:-4px 0 12px;padding:9px 12px;border-radius:8px;font-size:14px;line-height:1.45"></div>' +
     sn('licencia', '¿Cuenta con licencia de conducir tipo B1 vigente?') +
-    sn('vehiculo', '¿Cuenta con vehículo propio? (Requerido para modalidad Outsourcing)') +
-    sn('herramientas', '¿Cuenta con herramientas completas para trabajos en fibra óptica? (Requerido para modalidad Outsourcing)') +
+    '<div id="post_blkContr" style="display:none;border-left:4px solid #a31616;padding-left:10px;margin-bottom:6px">' +
+    sn('vehiculo', '¿Cuenta con vehículo propio?') +
+    sn('herramientas', '¿Cuenta con herramientas completas para trabajos en fibra óptica?') + '</div>' +
     sn('expPrevia', '¿Cuenta con experiencia previa comprobada en instalaciones de fibra óptica residencial?') +
     '<div class="field"><label>Indique en cuál(es) área(s) tiene experiencia</label><div style="display:grid;gap:6px;font-size:16px">' + d.areas.map((a, i) => '<label style="display:flex;gap:8px;align-items:center;justify-content:flex-start;text-align:left;width:auto"><input type="checkbox" name="post_area" style="width:auto;flex:none;margin:0" value="' + esc(a) + '"> ' + esc(a) + '</label>').join('') + '</div><input type="text" id="post_areaOtra" maxlength="80" placeholder="Otra (escríbela aquí)" style="width:100%;font-size:16px;padding:10px;margin-top:6px"></div>' +
     sn('dispCampo', '¿Cuenta con disponibilidad para realizar trabajo en campo (exterior, altura y giras)?') +
     sn('escaleraPoste', '¿Tiene experiencia en manipulación de escalera de fibra de 28 peldaños y trabajo en poste?') +
     sn('dispJornada', 'El puesto requiere disponibilidad para laborar de lunes a domingo, con un día libre rotativo por semana. ¿Cuenta con disponibilidad para esta jornada?') +
     sel('dispInicio', 'Disponibilidad para iniciar labores', d.inicio) +
+    '<div class="field"><label>Currículum (PDF, Word o foto) · recomendado</label><input type="file" id="post_cv" accept=".pdf,.doc,.docx,image/*" style="width:100%;font-size:15px;padding:8px"><div style="font-size:12px;color:#777;margin-top:3px">Máximo 5 MB.</div></div>' +
     '<div style="position:absolute;left:-9999px" aria-hidden="true"><input type="text" id="post_web" tabindex="-1" autocomplete="off"></div>' +
     '<div style="margin:14px 0;padding:10px 12px;border:1px solid #d5d9e2;border-radius:8px;background:#fafbfc;font-size:13px;line-height:1.5">' + esc(d.consentimiento) + '<label style="display:flex;gap:8px;align-items:flex-start;margin-top:8px;font-weight:700;font-size:15px"><input type="checkbox" id="post_acepto" style="margin-top:4px;width:auto;flex:none"> Acepto <span style="color:#a31616">*</span></label></div>' +
     '<div id="postErr" style="display:none;color:#b3261e;background:#fdecea;border-radius:8px;padding:10px;margin-bottom:10px;font-weight:700"></div>' +
     '<button class="btn primary" id="postBtn" onclick="postEnviar()" style="width:100%;font-size:17px;padding:13px">Enviar postulación</button>';
 }
+const postEsContr = () => /outsourcing|contratista/i.test(($('post_modalidad') || {}).value || '');
+function postModalidad() {
+  const m = ($('post_modalidad') || {}).value || '', c = postEsContr(), i = $('post_info');
+  $('post_blkContr').style.display = c ? 'block' : 'none';
+  i.style.display = m ? 'block' : 'none';
+  i.style.background = c ? '#fff4e5' : '#e8f1fb';
+  i.innerHTML = !m ? '' : c ? '<b>Modalidad contratista.</b> Trabajas por tu cuenta con tu propio vehículo y tus herramientas; por eso te hacemos dos preguntas más.' : '<b>Personal interno.</b> Te incorporas a una unidad de trabajo de la empresa, con contratación directa. La empresa pone el vehículo y las herramientas.';
+}
 async function postEnviar() {
   if (postEnv) return;
   const v = id => ($('post_' + id) || {}).value || '', r = id => { const x = document.querySelector('input[name="post_' + id + '"]:checked'); return x ? x.value : ''; };
   const dat = { nombre: v('nombre').trim(), cedula: v('cedula').trim(), telefono: v('telefono').trim(), correo: v('correo').trim(), provincia: v('provincia'), canton: v('canton').trim(), modalidad: v('modalidad'),
-    licencia: r('licencia'), vehiculo: r('vehiculo'), herramientas: r('herramientas'), expPrevia: r('expPrevia'), dispCampo: r('dispCampo'), escaleraPoste: r('escaleraPoste'), dispJornada: r('dispJornada'), dispInicio: v('dispInicio'),
+    licencia: r('licencia'), vehiculo: postEsContr() ? r('vehiculo') : '', herramientas: postEsContr() ? r('herramientas') : '', expPrevia: r('expPrevia'), dispCampo: r('dispCampo'), escaleraPoste: r('escaleraPoste'), dispJornada: r('dispJornada'), dispInicio: v('dispInicio'),
     areas: Array.from(document.querySelectorAll('input[name="post_area"]:checked')).map(x => x.value), areaOtra: v('areaOtra').trim(), acepto: $('post_acepto').checked, web: v('web') };
   const err = m => { const e = $('postErr'); e.textContent = m; e.style.display = 'block'; e.scrollIntoView({ block: 'center', behavior: 'smooth' }); };
   $('postErr').style.display = 'none';
-  const falta = [['nombre', 'tu nombre completo'], ['cedula', 'tu cédula o DIMEX'], ['telefono', 'tu teléfono'], ['correo', 'tu correo electrónico'], ['provincia', 'tu provincia'], ['canton', 'tu cantón'], ['modalidad', 'la modalidad'], ['licencia', 'la pregunta de licencia'], ['vehiculo', 'la pregunta de vehículo'], ['herramientas', 'la pregunta de herramientas'], ['expPrevia', 'la pregunta de experiencia previa'], ['dispCampo', 'la pregunta de trabajo en campo'], ['escaleraPoste', 'la pregunta de escalera y poste'], ['dispJornada', 'la pregunta de jornada'], ['dispInicio', 'cuándo puedes iniciar']].find(x => !dat[x[0]]);
+  const falta = [['nombre', 'tu nombre completo'], ['cedula', 'tu cédula o DIMEX'], ['telefono', 'tu teléfono'], ['correo', 'tu correo electrónico'], ['provincia', 'tu provincia'], ['canton', 'tu cantón'], ['modalidad', 'la modalidad'], ['licencia', 'la pregunta de licencia'], ['vehiculo', 'la pregunta de vehículo propio'], ['herramientas', 'la pregunta de herramientas'], ['expPrevia', 'la pregunta de experiencia previa'], ['dispCampo', 'la pregunta de trabajo en campo'], ['escaleraPoste', 'la pregunta de escalera y poste'], ['dispJornada', 'la pregunta de jornada'], ['dispInicio', 'cuándo puedes iniciar']].find(x => !dat[x[0]] && (postEsContr() || (x[0] !== 'vehiculo' && x[0] !== 'herramientas')));
   if (falta) return err('Falta completar ' + falta[1] + '.');
   if (!dat.acepto) return err('Debes marcar «Acepto» para enviar tus datos.');
   postEnv = true; $('postBtn').disabled = true; $('postBtn').textContent = 'Enviando…';
   try {
+    const f = ($('post_cv') || {}).files && $('post_cv').files[0];
+    if (f) {
+      let mime = f.type || (/\.pdf$/i.test(f.name) ? 'application/pdf' : /\.docx$/i.test(f.name) ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' : /\.doc$/i.test(f.name) ? 'application/msword' : '');
+      if (/^image\//.test(mime)) { const x = await ctComprimir(f, 1600, 0.8); dat.cv = { nombre: x.nombre, mime: x.mime, base64: x.base64 }; }
+      else if (/^(application\/pdf|application\/msword|application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document)$/.test(mime)) {
+        if (f.size > 5 * 1024 * 1024) throw new Error('El currículum pesa más de 5 MB. Envía una versión más liviana.');
+        dat.cv = { nombre: f.name, mime: mime, base64: await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.onerror = rej; r.readAsDataURL(f); }) };
+      } else throw new Error('El currículum debe ser PDF, Word o una foto.');
+    }
     await llamarServidor('enviarPostulacionWeb', [POST_ENLACE, dat], true);
     $('postCuerpo').innerHTML = '<div style="padding:22px;text-align:center"><div style="font-size:44px">✅</div><h2 style="color:#2e7d32">¡Postulación recibida!</h2><div style="color:#444;font-size:15px;line-height:1.5">Gracias por tu interés en trabajar con ' + esc((postDoc.empresa && postDoc.empresa.nombre) || 'Soluciones Red Dorada') + '. Revisaremos tus datos y, si tu perfil cumple, nos pondremos en contacto contigo.</div></div>';
     window.scrollTo(0, 0); $('postPub').scrollTop = 0;
@@ -17971,6 +18001,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 214 · 09-nov 21:01</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 216 · 09-nov 21:17</div>
 </body>
 </html>

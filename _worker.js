@@ -7099,7 +7099,7 @@ const REC_PROVINCIAS = ['San José', 'Alajuela', 'Cartago', 'Heredia', 'Guanacas
 const REC_MODALIDADES_APLICA = ['Incorporación a Unidad de Trabajo', 'Modalidad Outsourcing (Contratista)'];
 const REC_INICIO = ['Inmediata', '15 días', '1 mes', 'Más de 1 mes', 'Actualmente laboro, pero puedo decidir salir'];
 const REC_AREAS = ['Fibra óptica residencial', 'Electricidad', 'Redes', 'Cableado estructurado', 'CCTV', 'Trabajo en alturas'];
-const REC_CONSENTIMIENTO = 'En cumplimiento de la Ley de Protección de la Persona frente al Tratamiento de sus Datos Personales, autorizo el uso de mis datos personales exclusivamente para fines del proceso de reclutamiento y selección.';
+const REC_CONSENTIMIENTO = 'La información brindada será utilizada únicamente para fines de selección, conforme a la Ley de Protección de la Persona frente al Tratamiento de sus Datos Personales.';
 const REC_LIMITE_DIA = 400;
 function recFormCodigo_(crear) {
   let c = pmParam_('rec_form_codigo', '');
@@ -7154,8 +7154,18 @@ function enviarPostulacionWeb(codigo, d) {
   const modalidad = txt_(d.modalidad);
   if (REC_MODALIDADES_APLICA.indexOf(modalidad) < 0) throw new Error('Elige la modalidad a la que deseas aplicar.');
   const sn = v => { v = txt_(v).toLowerCase(); return (v === 'si' || v === 'sí') ? 'Sí' : (v === 'no' ? 'No' : ''); };
-  const yn = {}; ['licencia', 'vehiculo', 'herramientas', 'expPrevia', 'dispCampo', 'escaleraPoste', 'dispJornada'].forEach(k => { yn[k] = sn(d[k]); });
-  if (Object.keys(yn).some(k => !yn[k])) throw new Error('Responde con Sí o No todas las preguntas.');
+  /* Vehículo propio y herramientas solo se preguntan (y se guardan) a quien aplica como contratista */
+  const esContr = /outsourcing|contratista/i.test(modalidad);
+  const yn = {}; ['licencia', 'vehiculo', 'herramientas', 'expPrevia', 'dispCampo', 'escaleraPoste', 'dispJornada'].forEach(k => { yn[k] = ((k === 'vehiculo' || k === 'herramientas') && !esContr) ? '' : sn(d[k]); });
+  if (Object.keys(yn).some(k => !yn[k] && (esContr || (k !== 'vehiculo' && k !== 'herramientas')))) throw new Error('Responde con Sí o No todas las preguntas.');
+  /* Currículum opcional (PDF, Word o foto): se valida antes de guardar nada */
+  let cv = null;
+  if (d.cv && d.cv.base64) {
+    const mime = txt_(d.cv.mime).toLowerCase();
+    if (REC_MIMES.indexOf(mime) < 0) throw new Error('El currículum debe ser PDF, Word o una foto (JPG o PNG).');
+    if (String(d.cv.base64).length > 8 * 1024 * 1024) throw new Error('El currículum pesa demasiado (máximo 5 MB).');
+    cv = { nombre: recTxt_(d.cv.nombre, 80).replace(/[^\w.\- ()áéíóúñÁÉÍÓÚÑ]+/g, '_') || 'curriculum', mime: mime, base64: String(d.cv.base64) };
+  }
   const inicio = txt_(d.dispInicio);
   if (REC_INICIO.indexOf(inicio) < 0) throw new Error('Indica cuándo podrías iniciar labores.');
   const areas = (Array.isArray(d.areas) ? d.areas : []).map(txt_).filter(a => REC_AREAS.indexOf(a) >= 0);
@@ -7181,6 +7191,13 @@ function enviarPostulacionWeb(codigo, d) {
       todos.push(Object.assign({ Candidato: nid, Creado: ahora, Estado: 'Nuevo', Fuente: 'Formulario en línea', Acepta_Datos: ahora, Actualizado: ahora, Usuario: 'Formulario en línea' }, datos));
     }
     invReescribir_(sh, 'CAND', todos);
+    const cid = (x || todos[todos.length - 1]).Candidato;
+    if (cv) {
+      const did = 'DC-' + Utilities.formatDate(new Date(), SEG.TZ, 'yyMMddHHmmss') + ('0' + Math.floor(Math.random() * 100)).slice(-2);
+      const blob = Utilities.newBlob(Utilities.base64Decode(cv.base64), cv.mime, 'Rec_' + cid + '_' + did + '_' + cv.nombre);
+      const archivo = recCarpeta_().createFile(blob).getId();
+      invAgregar_(invHoja_('RDOC'), 'RDOC', [{ Doc: did, Candidato: cid, Tipo: 'Currículum', Archivo: archivo, Nombre: cv.nombre, Mime: cv.mime, Tamano: Math.round(cv.base64.length * 3 / 4), Fecha_Doc: '', Usuario: 'Formulario en línea', Fecha_Hora: ahora }]);
+    }
     try { invLog_({ usuario: 'formulario' }, 'Postulación recibida', nombre, ''); } catch (e) { }
     return { ok: true };
   });
