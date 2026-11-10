@@ -2127,6 +2127,7 @@
           <label style="font-weight:400">📋 Seguimiento</label><select data-m="seguimiento"><option value="">Sin acceso</option><option value="ver">Solo ver</option><option value="trab">Puede trabajar</option></select>
           <label style="font-weight:400">📦 Bodega</label><select data-m="bodega"><option value="">Sin acceso</option><option value="ver">Solo ver</option><option value="trab">Puede trabajar</option></select>
           <label style="font-weight:400">💼 Cotizaciones</label><select data-m="cotizaciones"><option value="">Sin acceso</option><option value="ver">Solo ver</option><option value="trab">Puede trabajar</option></select>
+          <label style="font-weight:400">👥 Reclutamiento</label><select data-m="reclutamiento"><option value="">Sin acceso</option><option value="ver">Solo ver</option><option value="trab">Puede trabajar</option></select>
           <label style="font-weight:400">📊 Resumen</label><select data-m="resumen"><option value="">Sin acceso</option><option value="ver">Solo ver</option><option value="trab">Puede trabajar</option></select>
           <label style="font-weight:400">🧮 Inventario en tablet (despacho)</label><select data-m="invtablet"><option value="">Sin acceso</option><option value="trab">Puede ver</option></select>
         </div>
@@ -2886,7 +2887,7 @@ function puedeEditar() {
 function esAdmin() { return !!sesion && sesion.rol === 'admin'; }
 
 /* Módulos que el administrador le asignó al usuario (el administrador entra a todos) */
-const MODULOS_NAV = { resumen: 'resumen', calendario: 'cronograma', moviles: 'moviles', seguimiento: 'seguimiento', bodega: 'bodega', cotizaciones: 'cotizaciones' };
+const MODULOS_NAV = { resumen: 'resumen', calendario: 'cronograma', moviles: 'moviles', seguimiento: 'seguimiento', bodega: 'bodega', cotizaciones: 'cotizaciones', reclutamiento: 'reclutamiento' };
 function puedeModulo(m) { return !!sesion && (sesion.rol === 'admin' || (m === 'colaboradores' ? !!sesion.rh : (sesion.modulos || []).indexOf(m) !== -1)); }
 
 
@@ -3104,7 +3105,6 @@ function mostrarApp() {
   const primera = Object.keys(MODULOS_NAV).find(v => puedeModulo(MODULOS_NAV[v]));
   $('navColaboradores').style.display = esAdmin() ? '' : 'none';
   $('navPagomov').style.display = esAdmin() ? '' : 'none';
-  $('navReclutamiento').style.display = esAdmin() ? '' : 'none';
   empresaCargar();
   if (!primera) {
     if (esAdmin()) toast('Todavía no tienes módulos asignados. Pídele al administrador que te los active.');
@@ -4262,7 +4262,7 @@ function cargarUsuarios() {
           '<td class="left">' + (u.correo ? esc(u.correo) : '<span class="muted">—</span>') + '</td>' +
           '<td class="left" style="font-size:12px">' + (u.ficha && u.ficha.ingreso ? 'Ingreso ' + esc(fmtFechaSeg(u.ficha.ingreso)) + (u.ficha.telefono ? '<br>' + esc(u.ficha.telefono) : '') : '<span class="muted">' + (u.ficha ? 'Falta fecha de ingreso' : 'Sin ficha') + '</span>') + '</td>' +
           '<td>' + esc(ETIQUETA_ROL[u.rol] || u.rol) + '</td>' +
-          '<td class="left" style="font-size:12px">' + (u.rol === 'admin' ? 'Todos' : esc((u.modulos || []).map(m => (({ cronograma: 'Cronograma', moviles: 'Móviles', seguimiento: 'Seguimiento', bodega: 'Bodega', cotizaciones: 'Cotizaciones', resumen: 'Resumen', invtablet: 'Inventario en tablet' })[m] || m) + ((u.ver || []).indexOf(m) !== -1 ? ' (ver)' : '')).join(', ') || 'Ninguno')) + '</td>' +
+          '<td class="left" style="font-size:12px">' + (u.rol === 'admin' ? 'Todos' : esc((u.modulos || []).map(m => (({ cronograma: 'Cronograma', moviles: 'Móviles', seguimiento: 'Seguimiento', bodega: 'Bodega', cotizaciones: 'Cotizaciones', resumen: 'Resumen', invtablet: 'Inventario en tablet', reclutamiento: 'Reclutamiento' })[m] || m) + ((u.ver || []).indexOf(m) !== -1 ? ' (ver)' : '')).join(', ') || 'Ninguno')) + '</td>' +
           '<td><span class="tag ' + (u.activo ? 'tag-active' : 'tag-inactive') + '">' +
             (u.activo ? 'Activo' : 'Desactivado') + '</span>' +
             (u.pendienteClave ? '<br><small>pendiente de crear su contraseña</small>' : '') + '</td>' +
@@ -7151,7 +7151,19 @@ function rcFechaCorta(iso) { const m = String(iso || '').match(/^(\d{4})-(\d{2})
 function rcH12(hhmm) { const m = String(hhmm || '').match(/^(\d{1,2}):(\d{2})/); if (!m) return ''; let h = +m[1]; const ap = h >= 12 ? 'p. m.' : 'a. m.'; h = h % 12 || 12; return h + ':' + m[2] + ' ' + ap; }
 function rcHoraFin(hhmm, dur) { const m = String(hhmm || '').match(/^(\d{1,2}):(\d{2})/); if (!m) return ''; const t = (+m[1]) * 60 + (+m[2]) + (Number(dur) || 30); return ('0' + (Math.floor(t / 60) % 24)).slice(-2) + ':' + ('0' + (t % 60)).slice(-2); }
 function rcRango(c) { return rcH12(c.hora) + ' – ' + rcH12(rcHoraFin(c.hora, c.duracion)) + ' (' + c.duracion + ' min)'; }
-function rcModal(h, w) { $('rcModal').innerHTML = h; $('rcModal').style.maxWidth = (w || 640) + 'px'; $('rcModal').style.width = w ? '96vw' : ''; $('rcModalBg').classList.add('show'); }
+const RC_ESCRIBE = /rc(CandGuardar|CandDel|CitaGuardar|CitaDel|CitaEstado|DocDel|BlqGuardar|BlqDel|BlqAdd|ImpConfirmar|CandForm\(\)|CitaForm\(\s*(\)|'',)|BloquesForm|FormEnlace|Pend|DocAgregar)/;
+function rcSoloVer() { return !!sesion && sesion.rol !== 'admin' && (sesion.rol === 'consulta' || (sesion.ver || []).indexOf('reclutamiento') !== -1); }
+const RC_SOLO_ADMIN = /rc(CandDel|BloquesForm|FormEnlace|BlqGuardar|BlqDel|BlqAdd)/;
+function rcAplicarRO() {
+  const raiz = $('vistaRecl');
+  if (!esAdmin()) raiz.querySelectorAll('[onclick]').forEach(b => { if (RC_SOLO_ADMIN.test(b.getAttribute('onclick') || '')) b.style.display = 'none'; });
+  if (!rcSoloVer()) return;
+  raiz.querySelectorAll('[onclick]').forEach(b => { if (RC_ESCRIBE.test(b.getAttribute('onclick') || '')) b.style.display = 'none'; });
+  raiz.querySelectorAll('label.btn input[type=file]').forEach(i => { i.parentNode.style.display = 'none'; });
+  $('rcModal').querySelectorAll('input,select,textarea').forEach(i => { i.disabled = true; });
+  if (!$('rcAvisoRO')) { const a = document.createElement('div'); a.id = 'rcAvisoRO'; a.style.cssText = 'margin:0 0 10px;padding:8px 12px;border-radius:8px;background:#fff4e5;border:1px solid #f0c987;font-weight:700;font-size:13px'; a.textContent = '👁️ Tienes acceso de solo lectura en Reclutamiento.'; raiz.insertBefore(a, raiz.firstChild); }
+}
+function rcModal(h, w) { $('rcModal').innerHTML = h; $('rcModal').style.maxWidth = (w || 640) + 'px'; $('rcModal').style.width = w ? '96vw' : ''; $('rcModalBg').classList.add('show'); rcAplicarRO(); }
 function rcCerrar() { $('rcModalBg').classList.remove('show'); }
 
 async function abrirReclutamiento() {
@@ -7165,6 +7177,7 @@ function rcTab(t) {
   $('rcPAg').style.display = t === 'ag' ? '' : 'none'; $('rcPCa').style.display = t === 'ca' ? '' : 'none';
   if (!rcD) return;
   if (t === 'ag') rcAgendaPintar(); else rcCandPintar();
+  rcAplicarRO();
   if (typeof sideRefrescar === 'function') sideRefrescar();
 }
 function rcBadge(txt, bg, fg) { return '<span style="display:inline-block;padding:2px 9px;border-radius:12px;font-size:12px;font-weight:700;background:' + bg + ';color:' + fg + '">' + esc(txt) + '</span>'; }
@@ -7874,7 +7887,7 @@ function mostrarVista(v, forzar) {
   if (v === 'planillas') { pmTabAct = 'sem'; pmVista = 'pla'; v = 'pagomov'; }
 
   if (MODULOS_NAV[v] && !puedeModulo(MODULOS_NAV[v]) && !forzar) { toast('No tienes acceso a ese módulo.'); return; }
-  if ((v === 'pagomov' || v === 'planillas' || v === 'reclutamiento') && !esAdmin()) { toast('No tienes acceso a ese módulo.'); return; }
+  if ((v === 'pagomov' || v === 'planillas') && !esAdmin()) { toast('No tienes acceso a ese módulo.'); return; }
 
   if (!forzar && v !== 'calendario' && Object.keys(cambios).length &&
       !confirm('Hay cambios sin guardar en el cronograma. ¿Quieres cambiar de vista sin guardarlos?')) {
@@ -7902,7 +7915,7 @@ function mostrarVista(v, forzar) {
   $('vistaUsuarios').style.display = v === 'usuarios' ? 'block' : 'none';
   $('vistaColab').style.display = v === 'colaboradores' ? 'block' : 'none';
   $('vistaPagoMov').style.display = (v === 'pagomov' && admin) ? 'block' : 'none';
-  $('vistaRecl').style.display = (v === 'reclutamiento' && admin) ? 'block' : 'none';
+  $('vistaRecl').style.display = (v === 'reclutamiento' && puedeModulo('reclutamiento')) ? 'block' : 'none';
   $('vistaSeguimiento').style.display = v === 'seguimiento' ? 'block' : 'none';
   $('vistaBodega').style.display = v === 'bodega' ? 'block' : 'none';
   $('vistaCotiz').style.display = v === 'cotizaciones' ? 'block' : 'none';
@@ -18001,6 +18014,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 216 · 09-nov 21:17</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 217 · 10-nov 10:14</div>
 </body>
 </html>

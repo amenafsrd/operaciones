@@ -565,13 +565,13 @@ const ROLES = ['consulta', 'operador', 'admin'];
 const NIVEL_ROL = { consulta: 1, operador: 2, admin: 3 };
 /* Módulos a los que puede entrar cada usuario. El administrador entra a todos.
    Un usuario sin lista guardada conserva el acceso de siempre, salvo Cotizaciones, que hay que darlo expresamente. */
-const MODULOS = { cronograma: 'Cronograma', moviles: 'Móviles', seguimiento: 'Seguimiento', bodega: 'Bodega', cotizaciones: 'Cotizaciones', resumen: 'Resumen', invtablet: 'Inventario en tablet' };
+const MODULOS = { cronograma: 'Cronograma', moviles: 'Móviles', seguimiento: 'Seguimiento', bodega: 'Bodega', cotizaciones: 'Cotizaciones', resumen: 'Resumen', invtablet: 'Inventario en tablet', reclutamiento: 'Reclutamiento' };
 
 function modulosDe_(rol, texto) {
   const todos = Object.keys(MODULOS);
   if (String(rol).toLowerCase() === 'admin') return todos;
   const t = String(texto || '').trim();
-  if (!t) return todos.filter(k => k !== 'cotizaciones');
+  if (!t) return todos.filter(k => k !== 'cotizaciones' && k !== 'reclutamiento');
   return t.split(',').map(x => x.trim().replace(/:ver$/, '')).filter(k => MODULOS[k]);
 }
 
@@ -6958,6 +6958,15 @@ const REC_MODALIDADES = ['Presencial', 'Virtual', 'Telefónica'];
 const REC_TIPOS_DOC = ['Cédula (frente)', 'Cédula (dorso)', 'Currículum', 'Hoja de delincuencia', 'Licencia de conducir', 'Título o certificado', 'Otro'];
 const REC_DELINCUENCIA = ['', 'Pendiente de entregar', 'Entregada, sin antecedentes', 'Entregada, con antecedentes'];
 const REC_MIMES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+/* Reclutamiento: el administrador entra siempre; los demás necesitan el módulo. «Solo ver» (y el rol Consulta) no pueden escribir. */
+function recSesion_(token, escribir) {
+  const ses = requerirSesion_(token, escribir ? 'operador' : 'consulta');
+  if (ses.rol !== 'admin') {
+    if ((ses.modulos || []).indexOf('reclutamiento') === -1) throw new Error('No tienes acceso al módulo de Reclutamiento.');
+    if (escribir && (ses.ver || []).indexOf('reclutamiento') !== -1) throw new Error('Tu acceso a Reclutamiento es de solo lectura.');
+  }
+  return ses;
+}
 function recCarpeta_() {
   const it = DriveApp.getFoldersByName('SRD Reclutamiento');
   return it.hasNext() ? it.next() : DriveApp.createFolder('SRD Reclutamiento');
@@ -7025,7 +7034,7 @@ function recCitaOut_(o) {
 }
 
 function obtenerReclutamientoWeb(token) {
-  requerirSesion_(token, 'admin');
+  recSesion_(token, false);
   const cands = leerObjetos_(invHoja_('CAND')).map(r => recCandOut_(recFila_('CAND', r)));
   const citas = leerObjetos_(invHoja_('CITA')).map(r => recCitaOut_(recFila_('CITA', r)));
   cands.sort((a, b) => String(b.creado).localeCompare(String(a.creado)));
@@ -7036,7 +7045,7 @@ function obtenerReclutamientoWeb(token) {
 }
 
 function guardarCandidatoWeb(token, d) {
-  const ses = requerirSesion_(token, 'admin');
+  const ses = recSesion_(token, true);
   d = d || {};
   const nombre = recTxt_(d.nombre, 100);
   if (!nombre) throw new Error('Escribe el nombre del candidato.');
@@ -7206,7 +7215,7 @@ function enviarPostulacionWeb(codigo, d) {
 /* Importa las respuestas del formulario (Excel o CSV ya leído en el navegador). Compara por cédula: no repite candidatos.
    Si el candidato ya existe, solo completa lo que traía vacío o cambió en el formulario; no toca su estado ni sus notas. */
 function importarCandidatosWeb(token, filas) {
-  const ses = requerirSesion_(token, 'admin');
+  const ses = recSesion_(token, true);
   if (!Array.isArray(filas) || !filas.length) throw new Error('No hay filas para importar.');
   if (filas.length > 500) throw new Error('Máximo 500 filas por importación.');
   const solo = v => String(v == null ? '' : v).replace(/\D/g, '');
@@ -7245,7 +7254,7 @@ function importarCandidatosWeb(token, filas) {
 
 /* Documentos del expediente del candidato (cédula, currículum, hoja de delincuencia, etc.) */
 function subirDocCandidatoWeb(token, candidato, tipo, nombre, mime, base64, fechaDoc) {
-  const ses = requerirSesion_(token, 'admin');
+  const ses = recSesion_(token, true);
   candidato = txt_(candidato); tipo = txt_(tipo); mime = txt_(mime).toLowerCase();
   if (REC_TIPOS_DOC.indexOf(tipo) < 0) throw new Error('Elige el tipo de documento.');
   if (REC_MIMES.indexOf(mime) < 0) throw new Error('Solo se aceptan fotos (JPG, PNG), PDF o Word.');
@@ -7267,7 +7276,7 @@ function subirDocCandidatoWeb(token, candidato, tipo, nombre, mime, base64, fech
 }
 
 function obtenerDocCandidatoWeb(token, doc) {
-  requerirSesion_(token, 'admin');
+  recSesion_(token, false);
   doc = txt_(doc);
   const x = leerObjetos_(invHoja_('RDOC')).map(r => recFila_('RDOC', r)).find(r => r.Doc === doc);
   if (!x) throw new Error('Documento no encontrado.');
@@ -7276,7 +7285,7 @@ function obtenerDocCandidatoWeb(token, doc) {
 }
 
 function eliminarDocCandidatoWeb(token, doc) {
-  const ses = requerirSesion_(token, 'admin');
+  const ses = recSesion_(token, true);
   doc = txt_(doc);
   return conBloqueo_(() => {
     const sh = invHoja_('RDOC');
@@ -7291,7 +7300,7 @@ function eliminarDocCandidatoWeb(token, doc) {
 }
 
 function guardarCitaWeb(token, d) {
-  const ses = requerirSesion_(token, 'admin');
+  const ses = recSesion_(token, true);
   d = d || {};
   const fecha = segFecha_(d.fecha);
   const hora = recHora_(d.hora);
@@ -7344,7 +7353,7 @@ function guardarCitaWeb(token, d) {
 }
 
 function cambiarEstadoCitaWeb(token, id, estado, obs) {
-  const ses = requerirSesion_(token, 'admin');
+  const ses = recSesion_(token, true);
   id = txt_(id); estado = txt_(estado);
   if (REC_ESTADOS_CITA.indexOf(estado) < 0) throw new Error('Estado de cita no válido.');
   return conBloqueo_(() => {
@@ -7367,7 +7376,7 @@ function cambiarEstadoCitaWeb(token, id, estado, obs) {
 }
 
 function eliminarCitaWeb(token, id) {
-  const ses = requerirSesion_(token, 'admin');
+  const ses = recSesion_(token, true);
   id = txt_(id);
   return conBloqueo_(() => {
     const sh = invHoja_('CITA');
