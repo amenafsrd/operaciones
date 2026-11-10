@@ -1458,9 +1458,12 @@
         <div class="subtabs" id="rcTabs">
           <button id="rcTAg" onclick="rcTab('ag')">Agenda de citas</button>
           <button id="rcTCa" onclick="rcTab('ca')">Candidatos</button>
+          <button id="rcTHi" onclick="rcTab('hi')">Historial</button>
         </div>
+        <div id="rcAviso" style="display:none"></div>
         <div id="rcPAg"></div>
         <div id="rcPCa" style="display:none"></div>
+        <div id="rcPHi" style="display:none"></div>
       </section>
 
       <section id="vistaPagoMov" style="display:none">
@@ -3122,6 +3125,7 @@ function mostrarApp() {
 }
 
 function cerrarSesionLocal(mensaje) {
+  try { if (rcAlertaTimer) clearInterval(rcAlertaTimer); rcAlertaTimer = null; rcAlertaUlt = null; } catch (e) { }
 
   token = null;
   sesion = null;
@@ -7167,17 +7171,18 @@ function rcModal(h, w) { $('rcModal').innerHTML = h; $('rcModal').style.maxWidth
 function rcCerrar() { $('rcModalBg').classList.remove('show'); }
 
 async function abrirReclutamiento() {
+  rcResaltaFijo = false;
   if ($('rcPAg') && !rcD) $('rcPAg').innerHTML = '<div class="loading">Cargando...</div>';
   try { rcD = await api('obtenerReclutamientoWeb'); rcTab(rcTabAct); }
   catch (e) { $('rcPAg').innerHTML = ''; mostrarError(e, 'No se pudo cargar Reclutamiento.'); }
 }
 function rcTab(t) {
   rcTabAct = t;
-  $('rcTAg').classList.toggle('active', t === 'ag'); $('rcTCa').classList.toggle('active', t === 'ca');
-  $('rcPAg').style.display = t === 'ag' ? '' : 'none'; $('rcPCa').style.display = t === 'ca' ? '' : 'none';
+  $('rcTAg').classList.toggle('active', t === 'ag'); $('rcTCa').classList.toggle('active', t === 'ca'); $('rcTHi').classList.toggle('active', t === 'hi');
+  $('rcPAg').style.display = t === 'ag' ? '' : 'none'; $('rcPCa').style.display = t === 'ca' ? '' : 'none'; $('rcPHi').style.display = t === 'hi' ? '' : 'none';
   if (!rcD) return;
-  if (t === 'ag') rcAgendaPintar(); else rcCandPintar();
-  rcAplicarRO();
+  if (t === 'ag') rcAgendaPintar(); else if (t === 'hi') rcHistPintar(); else { rcResaltarFijar(); rcCandPintar(); rcMarcarVisto(); }
+  rcAplicarRO(); rcAlertaPintar();
   if (typeof sideRefrescar === 'function') sideRefrescar();
 }
 function rcBadge(txt, bg, fg) { return '<span style="display:inline-block;padding:2px 9px;border-radius:12px;font-size:12px;font-weight:700;background:' + bg + ';color:' + fg + '">' + esc(txt) + '</span>'; }
@@ -7185,6 +7190,101 @@ function rcEstadoCita(e) { return ({ Programada: ['#e8f1ff', '#1a4f9c'], Realiza
 function rcEstadoCand(e) { return ({ Nuevo: ['#e8f1ff', '#1a4f9c'], Aplica: ['#e0f7ea', '#1b7a3d'], Citado: ['#f3e8ff', '#6a1b9a'], Entrevistado: ['#fff3e0', '#b26a00'], 'En evaluación': ['#fff8d6', '#7a6200'], Contratado: ['#e6f4ea', '#2e7d32'], Descartado: ['#eee', '#666'] })[e] || ['#eee', '#333']; }
 
 /* ---------- Agenda ---------- */
+/* ---------- Consecutivo, alerta de nuevos e historial ---------- */
+let rcResalta = 0, rcResaltaFijo = false, rcAlertaTimer = null, rcAvisadoMax = -1, rcAlertaUlt = null;
+function rcVistoKey() { return 'rcVisto_' + (sesion ? sesion.usuario : ''); }
+function rcVistoGet() { try { const v = localStorage.getItem(rcVistoKey()); return v === null ? null : (Number(v) || 0); } catch (e) { return null; } }
+function rcVistoSet(n) { try { localStorage.setItem(rcVistoKey(), String(n)); } catch (e) { } }
+function rcMaxNum() { return (rcD && rcD.candidatos || []).reduce((m, c) => Math.max(m, c.numero || 0), 0); }
+function rcResaltarFijar() { if (rcResaltaFijo) return; const v = rcVistoGet(); rcResalta = v === null ? rcMaxNum() : v; rcResaltaFijo = true; }
+function rcMarcarVisto() { if (!rcD) return; rcVistoSet(Math.max(rcMaxNum(), rcVistoGet() || 0)); rcAlertaPintar(); }
+function rcAlertaPintar() {
+  const b = $('navReclutamiento'); if (!b) return;
+  let ins = b.querySelector('.rcNuevoN');
+  const visto = rcVistoGet(), max = rcAlertaUlt ? rcAlertaUlt.max : 0;
+  const sin = (visto === null || !rcAlertaUlt) ? 0 : Math.max(0, max - visto);
+  if (!sin) { if (ins) ins.remove(); } else {
+    if (!ins) { ins = document.createElement('span'); ins.className = 'rcNuevoN'; ins.style.cssText = 'background:#d32f2f;color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:800;margin-left:6px'; b.appendChild(ins); }
+    ins.textContent = sin; ins.title = sin + ' postulante(s) nuevo(s) sin revisar';
+  }
+  /* Aviso dentro del módulo cuando la lista que se ve ya quedó atrás */
+  const av = $('rcAviso'); if (!av) return;
+  const atras = rcAlertaUlt && rcD && rcAlertaUlt.max > rcMaxNum();
+  if (atras && vistaActual === 'reclutamiento') {
+    const n = rcAlertaUlt.max - rcMaxNum();
+    av.style.cssText = 'display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#e8f1ff;border:1px solid #1a4f9c;color:#123;border-radius:8px;padding:8px 12px;margin-bottom:8px';
+    av.innerHTML = '🔔 <b>' + n + ' postulante' + (n === 1 ? '' : 's') + ' nuevo' + (n === 1 ? '' : 's') + '</b>' + (rcAlertaUlt.ultimo ? ' · el último: N° ' + rcAlertaUlt.ultimo.numero + ' ' + esc(rcAlertaUlt.ultimo.nombre) : '') + ' <button class="btn primary" onclick="rcAvisoVer()">Ver ahora</button>';
+  } else { av.style.display = 'none'; av.innerHTML = ''; }
+}
+async function rcAvisoVer() { rcTabAct = 'ca'; rcResaltaFijo = false; await abrirReclutamiento(); }
+async function rcAlertaCheck() {
+  if (!sesion || !puedeModulo('reclutamiento')) return;
+  let r; try { r = await api('contarNuevosRecWeb'); } catch (e) { return; }
+  const primera = rcAvisadoMax < 0;
+  rcAlertaUlt = r;
+  if (rcVistoGet() === null) rcVistoSet(r.max);          /* primera vez en este navegador: lo que ya había no cuenta como nuevo */
+  const visto = rcVistoGet() || 0;
+  if (r.max > visto && r.max > rcAvisadoMax && (primera || r.max > rcAvisadoMax)) {
+    const n = r.max - visto;
+    if (primera) toast('🔔 Tienes ' + n + ' postulante' + (n === 1 ? '' : 's') + ' nuevo' + (n === 1 ? '' : 's') + ' sin revisar en Reclutamiento.', 7000);
+    else toast('🔔 Nuevo postulante: N° ' + (r.ultimo ? r.ultimo.numero + ' · ' + r.ultimo.nombre : r.max), 8000);
+  }
+  rcAvisadoMax = Math.max(rcAvisadoMax, r.max);
+  rcAlertaPintar();
+}
+function rcAlertaIniciar() {
+  rcAvisadoMax = -1; rcAlertaUlt = null;
+  if (rcAlertaTimer) clearInterval(rcAlertaTimer);
+  rcAlertaCheck();
+  rcAlertaTimer = setInterval(() => { if (sesion && !document.hidden) rcAlertaCheck(); }, 60000);
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden && sesion && rcAlertaTimer) rcAlertaCheck(); });
+function rcEstadoHist(e) {
+  return ({ Recibido: ['#e8f1ff', '#1a4f9c'], Registrado: ['#e8f1ff', '#1a4f9c'], 'Volvió a postular': ['#e8f1ff', '#1a4f9c'], Aplica: ['#e0f7ea', '#1b7a3d'], Citado: ['#f3e8ff', '#6a1b9a'], 'Cita reprogramada': ['#f3e8ff', '#6a1b9a'], 'Cita reactivada': ['#f3e8ff', '#6a1b9a'],
+    Entrevistado: ['#fff3e0', '#b26a00'], 'En evaluación': ['#fff8d6', '#7a6200'], Contratado: ['#e6f4ea', '#2e7d32'], Descartado: ['#fdecea', '#b71c1c'], 'No asistió a la cita': ['#fdecea', '#b71c1c'], 'Cita cancelada': ['#fdecea', '#b71c1c'], 'Cita eliminada': ['#eee', '#555'], Reabierto: ['#e8f1ff', '#1a4f9c'] })[e] || ['#eee', '#333'];
+}
+function rcFechaHora(f) { const m = String(f || '').match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/); return m ? m[3] + '/' + m[2] + '/' + m[1] + ' ' + rcH12(m[4] + ':' + m[5]) : String(f || ''); }
+function rcHistFicha(c) {
+  const l = (rcD.historial || []).filter(h => h.candidato === c.id);
+  if (!l.length) return '';
+  return '<div style="margin-top:12px;font-weight:700">Historial de este candidato</div>' + l.map(h => { const e = rcEstadoHist(h.evento); return '<div style="font-size:13px;padding:4px 0;border-bottom:1px solid #eee"><span style="color:#666">' + esc(rcFechaHora(h.fecha)) + '</span> · ' + rcBadge(h.evento, e[0], e[1]) + ' ' + esc(h.detalle || '') + ' <span style="color:#888">— ' + esc(h.usuario || '') + '</span></div>'; }).join('');
+}
+let rcHF = { ev: '', q: '', d: '', h: '' };
+const RC_HIST_RES = [['Recibido', 'Recibidos'], ['Citado', 'Citados'], ['Entrevistado', 'Entrevistados'], ['Descartado', 'Descartados'], ['Contratado', 'Contratados']];
+function rcHistFiltrar() {
+  const q = rcNorm(rcHF.q);
+  return (rcD.historial || []).filter(h => (!rcHF.ev || h.evento === rcHF.ev) && (!rcHF.d || String(h.fecha).slice(0, 10) >= rcHF.d) && (!rcHF.h || String(h.fecha).slice(0, 10) <= rcHF.h) &&
+    (!q || rcNorm([h.numero, h.nombre, h.evento, h.detalle, h.usuario].join(' ')).indexOf(q) >= 0));
+}
+function rcHistPintar() {
+  const hist = rcD.historial || [];
+  const cuenta = ev => new Set(hist.filter(h => h.evento === ev).map(h => h.candidato)).size;
+  const evs = Array.from(new Set(hist.map(h => h.evento))).sort((a, b) => a.localeCompare(b, 'es'));
+  $('rcPHi').innerHTML = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">' + RC_HIST_RES.map(r => { const e = rcEstadoHist(r[0]); return '<button class="btn secondary" style="border-color:' + e[1] + ';color:' + e[1] + ';background:' + (rcHF.ev === r[0] ? e[0] : '#fff') + '" onclick="rcHF.ev=rcHF.ev===\'' + r[0] + '\'?\'\':\'' + r[0] + '\';rcHistPintar()"><b>' + cuenta(r[0]) + '</b> ' + r[1] + '</button>'; }).join('') + '</div>' +
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:8px">' +
+    '<div><label style="font-size:12px;font-weight:700;display:block">Evento</label><select onchange="rcHF.ev=this.value;rcHistCuerpo()" style="padding:6px"><option value="">Todos</option>' + evs.map(e => '<option' + (rcHF.ev === e ? ' selected' : '') + '>' + esc(e) + '</option>').join('') + '</select></div>' +
+    '<div><label style="font-size:12px;font-weight:700;display:block">Desde</label><input type="date" value="' + esc(rcHF.d) + '" onchange="rcHF.d=this.value;rcHistCuerpo()" style="padding:5px"></div>' +
+    '<div><label style="font-size:12px;font-weight:700;display:block">Hasta</label><input type="date" value="' + esc(rcHF.h) + '" onchange="rcHF.h=this.value;rcHistCuerpo()" style="padding:5px"></div>' +
+    '<input type="text" placeholder="Buscar por N°, nombre, quién…" value="' + esc(rcHF.q) + '" oninput="rcHF.q=this.value;rcHistCuerpo()" style="padding:7px;min-width:220px">' +
+    '<button class="btn secondary" onclick="rcHF={ev:\'\',q:\'\',d:\'\',h:\'\'};rcHistPintar()">Limpiar</button><button class="btn secondary" onclick="rcHistExportar()">⬇ Descargar lista</button></div>' +
+    '<div id="rcHCuenta" style="font-size:13px;color:#555;margin-bottom:6px"></div>' +
+    '<div style="overflow:auto;max-height:68vh;border:1px solid #d5d9e2;border-radius:8px"><table class="table" style="font-size:13px;min-width:max-content"><thead><tr><th class="left" style="position:sticky;top:0;z-index:2">Fecha y hora</th><th class="left" style="position:sticky;top:0;z-index:2">N°</th><th class="left" style="position:sticky;top:0;z-index:2">Candidato</th><th class="left" style="position:sticky;top:0;z-index:2">Evento</th><th class="left" style="position:sticky;top:0;z-index:2">Detalle</th><th class="left" style="position:sticky;top:0;z-index:2">Quién</th></tr></thead><tbody id="rcHBody"></tbody></table></div>';
+  rcHistCuerpo();
+}
+function rcHistCuerpo() {
+  const l = rcHistFiltrar();
+  $('rcHBody').innerHTML = l.length ? l.slice(0, 1000).map(h => { const e = rcEstadoHist(h.evento), c = rcD.candidatos.find(x => x.id === h.candidato);
+    return '<tr><td class="left" style="white-space:nowrap">' + esc(rcFechaHora(h.fecha)) + '</td><td class="left"><b>' + esc(h.numero || '') + '</b></td><td class="left" style="font-weight:700;white-space:nowrap">' + (c ? '<a href="javascript:void(0)" onclick="rcCandForm(\'' + esc(c.id) + '\')">' + esc(h.nombre) + '</a>' : esc(h.nombre) + ' <span style="color:#999;font-weight:400">(eliminado)</span>') + '</td><td class="left">' + rcBadge(h.evento, e[0], e[1]) + '</td><td class="left">' + esc(h.detalle || '') + '</td><td class="left" style="white-space:nowrap">' + esc(h.usuario || '') + '</td></tr>'; }).join('')
+    : '<tr><td colspan="6" class="empty">' + ((rcD.historial || []).length ? 'Nada coincide con los filtros.' : 'Aún no hay movimientos. Aquí quedará quién recibió, citó, entrevistó o descartó a cada candidato.') + '</td></tr>';
+  $('rcHCuenta').innerHTML = 'Mostrando <b>' + Math.min(l.length, 1000) + '</b> de <b>' + l.length + '</b> movimientos' + (l.length > 1000 ? ' (descarga la lista para ver todos)' : '');
+}
+function rcHistExportar() {
+  const l = rcHistFiltrar(), q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+  const filas = l.map(h => [rcFechaHora(h.fecha), h.numero, h.nombre, h.evento, h.detalle, h.usuario].map(q).join(','));
+  pmBajar(new Blob(['\uFEFF' + ['Fecha y hora', 'N°', 'Candidato', 'Evento', 'Detalle', 'Quién'].map(q).join(',') + '\r\n' + filas.join('\r\n')], { type: 'text/csv;charset=utf-8' }), 'Historial_reclutamiento_' + rcD.hoy + '.csv');
+  toast('Se descargó el historial con ' + l.length + ' movimiento(s). Ábrelo con Excel.');
+}
+
 function rcAgendaPintar() {
   const hoy = rcD.hoy, citas = rcD.citas, q = rcQ.toLowerCase().trim();
   const prog = citas.filter(c => c.estado === 'Programada');
@@ -7375,7 +7475,7 @@ async function rcBlqGuardar() {
 const RC_REQ = [['licencia', 'Licencia de conducir B1 vigente', false, 'B1'], ['expPrevia', 'Experiencia previa en fibra óptica residencial', false, 'Exp. fibra'], ['dispCampo', 'Disponibilidad de campo (exterior, altura y giras)', false, 'Campo'],
   ['escaleraPoste', 'Experiencia con escalera de 28 peldaños y poste', false, 'Escalera/poste'], ['dispJornada', 'Jornada de lunes a domingo con día libre rotativo', false, 'Jornada'],
   ['vehiculo', 'Vehículo propio', true, 'Vehículo'], ['herramientas', 'Herramientas completas de fibra óptica', true, 'Herramientas']];
-let rcFil = {}, rcSort = { k: 'nombre', d: 1 }, rcOcultar = false, rcReq = null;
+let rcFil = {}, rcSort = { k: 'numero', d: -1 }, rcOcultar = false, rcReq = null;
 function rcPrefCargar() {
   try { const j = JSON.parse(localStorage.getItem('rcCandPref') || '{}'); if (Array.isArray(j.req)) rcReq = j.req; if (typeof j.ocultar === 'boolean') rcOcultar = j.ocultar; if (j.vista === 'simple' || j.vista === 'completa') rcVista = j.vista; if (typeof j.verDesc === 'boolean') rcVerDesc = j.verDesc; } catch (e) { }
   if (!rcReq) rcReq = RC_REQ.map(r => r[0]);
@@ -7387,6 +7487,7 @@ function rcEsOut(c) { return /outsourcing|contratista/i.test(c.modalidadAplica |
 function rcFaltan(c) { return RC_REQ.filter(r => rcReq.indexOf(r[0]) >= 0 && (!r[2] || rcEsOut(c)) && rcYN(c[r[0]]) !== 'Sí').map(r => r[3]); }
 function rcNDocs(c) { const ds = rcDocsDe(c.id), t = x => ds.some(d => d.tipo.indexOf(x) === 0); return (t('Cédula') ? 1 : 0) + (t('Currículum') ? 1 : 0) + (t('Hoja de delincuencia') ? 1 : 0); }
 const RC_COLS = [
+  ['numero', 'N°', 'txt', c => c.numero ? String(c.numero) : ''],
   ['cumple', 'Cumple', 'sel', c => rcFaltan(c).length ? 'No' : 'Sí'],
   ['nombre', 'Nombre', 'txt', c => c.nombre], ['cedula', 'Cédula / DIMEX', 'txt', c => c.cedula], ['telefono', 'Teléfono', 'txt', c => c.telefono], ['correo', 'Correo', 'txt', c => c.correo],
   ['provincia', 'Provincia', 'sel', c => String(c.provincia || '').trim() || '(sin dato)'], ['canton', 'Cantón', 'sel', c => String(c.canton || '').trim() || '(sin dato)'],
@@ -7398,7 +7499,7 @@ const RC_COLS = [
   ['expediente', 'Documentos', 'sel', c => rcNDocs(c) + ' de 3'], ['citas', 'Citas', 'sel', c => String(rcD.citas.filter(x => x.candidato === c.id).length)]
 ];
 let rcVista = 'simple', rcVerDesc = false, rcSel = {};
-const RC_SIMPLE = ['nombre', 'telefono', 'modalidad', 'cumple', 'estado'];
+const RC_SIMPLE = ['numero', 'nombre', 'telefono', 'modalidad', 'cumple', 'estado'];
 const rcCols = () => rcVista === 'simple' ? RC_SIMPLE.map(k => RC_COLS.find(c => c[0] === k)) : RC_COLS;
 function rcCandFiltrar() {
   const q = rcNorm(rcQC);
@@ -7409,12 +7510,13 @@ function rcCandFiltrar() {
   if (!rcVerDesc && rcFil.estado !== 'Descartado') l = l.filter(x => x.c.estado !== 'Descartado');
   RC_COLS.forEach(col => { const fv = rcFil[col[0]]; if (!fv) return; l = l.filter(x => { const v = String(col[3](x.c) == null ? '' : col[3](x.c)); return col[2] === 'sel' ? v === fv : rcNorm(v).indexOf(rcNorm(fv)) >= 0; }); });
   if (q) l = l.filter(x => rcNorm(RC_COLS.map(col => col[3](x.c)).join(' ')).indexOf(q) >= 0);
-  const col = RC_COLS.find(x => x[0] === rcSort.k) || RC_COLS[1];
+  const col = RC_COLS.find(x => x[0] === rcSort.k) || RC_COLS[0];
   l.sort((a, b) => String(col[3](a.c) || '').localeCompare(String(col[3](b.c) || ''), 'es', { numeric: true }) * rcSort.d);
   return { l: l, nNo: nNo, nDesc: (!rcVerDesc && rcFil.estado !== 'Descartado') ? nDesc : 0 };
 }
 function rcCelda(col, x) {
   const c = x.c, k = col[0], v = String(col[3](c) == null ? '' : col[3](c));
+  if (k === 'numero') return '<b>' + esc(v) + '</b>' + (c.numero > rcResalta ? ' <span title="Llegó desde tu última visita" style="background:#1a4f9c;color:#fff;border-radius:8px;padding:1px 6px;font-size:10px;font-weight:800;vertical-align:middle">NUEVO</span>' : '');
   if (k === 'cumple') return x.f.length ? '<span style="color:#b71c1c;font-weight:700" title="Falta: ' + esc(x.f.join(', ')) + '">✖ ' + (rcVista === 'simple' ? 'Falta ' + x.f.length : esc(x.f.join(', '))) + '</span>' : '<span style="color:#2e7d32;font-weight:700">✔</span>';
   if (k === 'modalidad') return '<span title="' + esc(v) + '">' + esc(/outsourcing|contratista/i.test(v) ? 'Contratista (Outsourcing)' : /incorporaci/i.test(v) ? 'Unidad de trabajo' : v) + '</span>';
   if (k === 'estado') { const e = rcEstadoCand(c.estado); return rcBadge(c.estado, e[0], e[1]); }
@@ -7435,7 +7537,7 @@ function rcDecCelda(c) {
 function rcCandCuerpo() {
   const r = rcCandFiltrar(), cols = rcCols(), simple = rcVista === 'simple';
   $('rcCBody').innerHTML = r.l.length ? r.l.map(x => {
-    const desc = x.c.estado === 'Descartado', bg = desc ? '#f4f4f4' : (x.f.length ? '#fff5f4' : '#fff');
+    const desc = x.c.estado === 'Descartado', bg = desc ? '#f4f4f4' : (x.f.length ? '#fff5f4' : (x.c.numero > rcResalta ? '#eef5ff' : '#fff'));
     return '<tr style="background:' + bg + ';' + (desc ? 'color:#777;' : '') + '">' + (simple ? '' : '<td style="position:sticky;left:0;z-index:1;background:' + bg + ';width:34px;text-align:center"><input type="checkbox" ' + (rcSel[x.c.id] ? 'checked' : '') + ' onchange="rcSelUno(\'' + esc(x.c.id) + '\',this.checked)" style="width:auto;margin:0"></td>') +
       cols.map(col => '<td class="left" style="' + (col[0] === 'nombre' ? (simple ? '' : 'position:sticky;left:34px;z-index:1;background:' + bg + ';') + 'font-weight:700;min-width:170px;' : '') + 'white-space:' + (col[0] === 'areasExp' || col[0] === 'cumple' ? 'normal' : 'nowrap') + '">' + (simple && col[0] === 'nombre' ? '<a href="javascript:void(0)" title="Abrir la ficha" onclick="rcCandForm(\'' + esc(x.c.id) + '\')" style="color:inherit;text-decoration:underline dotted">' + rcCelda(col, x) + '</a>' : rcCelda(col, x)) + '</td>').join('') +
       '<td style="' + (simple ? '' : 'white-space:nowrap') + '">' + rcDecCelda(x.c) + '</td>' +
@@ -7495,7 +7597,7 @@ function rcCandPintar() {
   }
   h += '<div style="overflow:auto;max-height:68vh;border:1px solid #d5d9e2;border-radius:8px"><table class="table" style="font-size:13px;min-width:max-content"><thead><tr>' +
     '<th style="position:sticky;top:0;left:0;z-index:4;background:#fff;width:34px"><input type="checkbox" id="rcSelAll" onchange="rcSelTodos(this.checked)" title="Marcar todos los que se ven" style="width:auto;margin:0"></th>' +
-    rcCols().map(col => '<th class="left" style="position:sticky;top:0;z-index:2;' + (col[0] === 'nombre' ? 'left:34px;z-index:3;' : '') + 'vertical-align:top;min-width:' + (col[0] === 'nombre' ? 170 : 96) + 'px"><div style="cursor:pointer;white-space:nowrap" onclick="rcOrdenar(\'' + col[0] + '\')">' + esc(col[1]) + (rcSort.k === col[0] ? (rcSort.d > 0 ? ' ▲' : ' ▼') : '') + '</div>' +
+    rcCols().map(col => '<th class="left" style="position:sticky;top:0;z-index:2;' + (col[0] === 'nombre' ? 'left:34px;z-index:3;' : '') + 'vertical-align:top;min-width:' + (col[0] === 'nombre' ? 170 : (col[0] === 'numero' ? 80 : 96)) + 'px"><div style="cursor:pointer;white-space:nowrap" onclick="rcOrdenar(\'' + col[0] + '\')">' + esc(col[1]) + (rcSort.k === col[0] ? (rcSort.d > 0 ? ' ▲' : ' ▼') : '') + '</div>' +
       (col[2] === 'txt' ? '<input type="text" value="' + esc(rcFil[col[0]] || '') + '" oninput="rcFil[\'' + col[0] + '\']=this.value;rcCandCuerpo()" placeholder="Filtrar" style="width:100%;font-size:12px;padding:3px 5px;margin-top:3px">'
         : '<select onchange="rcFil[\'' + col[0] + '\']=this.value;rcCandCuerpo()" style="width:100%;font-size:12px;padding:3px 3px;margin-top:3px">' + opciones(col) + '</select>') + '</th>').join('') +
     '<th style="position:sticky;top:0;z-index:2;vertical-align:top">Decisión</th>' + (rcVista === 'simple' ? '' : '<th style="position:sticky;top:0;z-index:2"></th>') + '</tr></thead><tbody id="rcCBody"></tbody></table></div>';
@@ -7630,7 +7732,7 @@ function rcCandForm(id) {
   const f2 = (k, lbl, max, full) => '<div class="field"' + (full ? ' style="grid-column:1/-1"' : '') + '><label>' + lbl + '</label><input type="text" id="rcF_' + k + '" value="' + esc(v[k]) + '" maxlength="' + max + '" list="rcSiNo"></div>';
   const f = (k, lbl, max, ph) => '<div class="field"><label>' + lbl + '</label><input type="text" id="rcF' + k + '" value="' + esc(v[k.toLowerCase()]) + '" maxlength="' + max + '"' + (ph ? ' placeholder="' + ph + '"' : '') + '></div>';
   const citas = c ? rcD.citas.filter(x => x.candidato === c.id).sort((a, b) => (b.fecha + b.hora).localeCompare(a.fecha + a.hora)) : [];
-  rcModal('<h3>' + (c ? '📋 Ficha de ' + esc(c.nombre) : '➕ Nuevo candidato') + '</h3><div style="max-height:68vh;overflow:auto;padding-right:4px">' +
+  rcModal('<h3>' + (c ? '📋 Ficha de ' + esc(c.nombre) + (c.numero ? ' <span style="font-weight:600;color:#666;font-size:14px">· N° ' + c.numero + '</span>' : '') : '➕ Nuevo candidato') + '</h3><div style="max-height:68vh;overflow:auto;padding-right:4px">' +
     '<div class="grid2">' + f('Nombre', 'Nombre completo *', 100) + f('Cedula', 'Cédula o DIMEX', 30) + f('Telefono', 'Teléfono', 30) + f('Correo', 'Correo electrónico', 80) + f('Provincia', 'Provincia de residencia', 60) + f('Canton', 'Cantón de residencia', 60) + f('Puesto', 'Puesto al que aplica', 80, 'Ej.: Técnico instalador') + f('Pretension', 'Pretensión salarial', 40) + f('Fuente', 'Cómo se enteró', 80, 'Ej.: Referido, Facebook') +
     '<div class="field"><label>Estado</label><select id="rcFEstado">' + rcD.estadosCand.map(e => '<option' + (e === v.estado ? ' selected' : '') + '>' + esc(e) + '</option>').join('') + '</select></div></div>' +
     '<div class="field" style="margin-top:8px"><label>Domicilio (dirección exacta)</label><input type="text" id="rcFDomicilio" value="' + esc(v.domicilio) + '" maxlength="300" placeholder="Provincia, cantón, distrito y señas"></div>' +
@@ -7651,6 +7753,7 @@ function rcCandForm(id) {
     '<label class="btn secondary" style="cursor:pointer;display:inline-block">📷 Tomar foto o elegir archivo<input type="file" multiple accept="image/*,.pdf,.doc,.docx,application/pdf" style="display:none" onchange="rcDocAgregar(this)"></label></div>' +
     '<div id="rcDPend" style="margin-top:6px"></div><div style="font-size:12px;color:#777;margin-top:4px">Fotos, PDF o Word. Los archivos se suben al tocar «Guardar ficha».</div></div>' +
     (citas.length ? '<div style="margin-top:10px;font-weight:700">Citas de este candidato</div>' + citas.map(x => '<div style="font-size:13px;padding:4px 0;border-bottom:1px solid #eee">' + esc(rcFechaCorta(x.fecha)) + ' · ' + esc(rcH12(x.hora)) + ' · ' + rcBadge(x.estado, rcEstadoCita(x.estado)[0], rcEstadoCita(x.estado)[1]) + ' <a href="#" onclick="rcCompAbrir(\'' + esc(x.id) + '\');return false">🧾 ' + esc(x.id) + '</a></div>').join('') : '') +
+    (c ? rcHistFicha(c) : '') +
     '</div><div class="modalActions">' + (c ? '<button class="btn secondary" onclick="rcCandDel(\'' + esc(c.id) + '\')" style="margin-right:auto">🗑 Eliminar</button>' : '') +
     '<button class="btn secondary" onclick="rcCerrar()">Cancelar</button>' + (c ? '<button class="btn secondary" onclick="rcCitaForm(\'\',\'' + esc(c.id) + '\')">📅 Agendar cita</button>' : '') +
     '<button class="btn primary" id="rcFBtn" onclick="rcCandGuardar(\'' + esc(id || '') + '\')">Guardar ficha</button></div>');
@@ -15061,6 +15164,7 @@ function notifIniciar() {
   notifDatos = { alertas: [], eventos: [] };
   notifPintar();
   notifCargar();
+  try { rcAlertaIniciar(); } catch (e) { }
   if (notifTimer) clearInterval(notifTimer);
   notifTimer = setInterval(() => { if (sesion && !document.hidden) notifCargar(); }, 300000);
 }
@@ -18317,6 +18421,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 222 · 10-nov 11:33</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 223 · 10-nov 11:44</div>
 </body>
 </html>
