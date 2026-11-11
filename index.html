@@ -12580,6 +12580,11 @@ function renderDanados() {
   let pend = '';
   if (pendMats.length) pend = '<div style="font-weight:700;margin:4px 0">Pendientes por material</div><table class="table" style="font-size:13px;margin-bottom:14px"><thead><tr><th>Código</th><th class="left">Material</th><th>Existencia (inventariado)</th><th>Dañados</th><th>Sobrante destajo</th><th>Disponible</th></tr></thead><tbody>' +
     pendMats.map(m => { const b = B(m.clave); return '<tr><td>' + esc(codP(m.codigo)) + '</td><td class="left"><b>' + esc(m.material) + '</b></td><td>' + fmtN(b.existencia || 0) + '</td><td style="color:#b26a00;font-weight:700">' + fmtN(b.danado - (b.destajo || 0)) + '</td><td style="color:#8a4b00;font-weight:700">' + fmtN(b.destajo || 0) + '</td><td style="font-weight:700">' + fmtN(b.disponible || 0) + '</td>' + '</tr>'; }).join('') + '</tbody></table>';
+  const dm = danDatos.devueltosDeMas || [];
+  if (dm.length) pend = '<div style="border:1px solid #e0a800;background:#fff8e1;border-radius:8px;padding:10px 12px;margin:4px 0 12px"><div style="font-weight:800;color:#8a6200">⚠ Devueltos de más al proveedor (' + fmtN(dm.reduce((a, x) => a + x.cantidad, 0)) + ')</div>' +
+    '<div style="font-size:12.5px;color:#555;margin:3px 0 6px">En estas devoluciones se enviaron más equipos de los que estaban registrados como dañados en ese momento (por ejemplo, un equipo bueno enviado junto con los dañados). No se restan de los dañados que se registren después. Si fue un error de digitación, corrige la cantidad de la devolución con ✏️; si fue un equipo bueno, es un equipo por reclamar o reponer con el proveedor.</div>' +
+    '<table class="table" style="font-size:12.5px"><thead><tr><th>Fecha</th><th class="left">Material</th><th>Documento</th><th>Devuelto</th><th>De más</th></tr></thead><tbody>' +
+    dm.map(x => '<tr><td>' + esc(fmtFechaSeg ? fmtFechaSeg(x.fecha) : x.fecha) + '</td><td class="left"><b>' + esc(x.material) + '</b></td><td><b>' + esc(x.documento || '—') + '</b></td><td>' + fmtN(x.devuelto) + '</td><td style="color:#b26a00;font-weight:700">' + fmtN(x.cantidad) + '</td></tr>').join('') + '</tbody></table></div>' + pend;
   $('danTabla').innerHTML = pend + '<div style="font-weight:700;margin:4px 0">Registro (' + L.length + ')</div>' + (L.length ? '<table class="table" style="font-size:12.5px;min-width:900px"><thead><tr><th>Fecha</th><th class="left">Material</th><th>Cant.</th><th class="left">Movimiento</th><th class="left">Origen / quién</th><th class="left">Categoría</th><th class="left">Detalle</th><th class="left">Documento</th><th class="left">Registró</th><th></th></tr></thead><tbody>' +
     L.map(h => '<tr><td>' + esc(fmtFechaSeg ? fmtFechaSeg(h.fecha) : h.fecha) + '</td><td class="left"><b>' + esc(h.material) + '</b></td><td><b>' + fmtN(h.cantidad) + '</b></td><td class="left">' + (h.tipo === 'DANADO' && h.categoria === (danDatos.catDestajo || 'Sobrante de destajo') ? '✂️ Sobrante de destajo' : (DAN_TIPO[h.tipo] || esc(h.tipo))) + '</td>' +
       '<td class="left">' + (h.tipo !== 'DANADO' ? '—' : h.fuente === 'MOVIL' ? '🚐 Móvil <b>M' + esc(h.movil) + '</b>' : '🏭 Bodega') + '</td><td class="left">' + esc(h.categoria || '—') + '</td><td class="left">' + esc(h.motivo) + '</td><td class="left">' + (h.documento ? '<b>' + esc(h.documento) + '</b>' : '—') + '</td><td class="left">' + esc(h.usuario) + '</td>' +
@@ -18421,6 +18426,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 223 · 10-nov 11:44</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 224 · 11-nov 11:02</div>
 </body>
 </html>

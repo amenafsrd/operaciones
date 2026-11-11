@@ -6350,12 +6350,29 @@ function invSaldos_(movs, cons, hasta) {
    Siguen contando en el inventario (existencia) pero no están disponibles para entregar. Disponible = existencia − dañados.
    Libro DAN: DANADO (entra como dañado: de una móvil que devuelve, o registro manual de bodega), REPARADO (se quita, vuelve a estar disponible),
    BAJA (se devolvió al proveedor: se genera sola al hacer el documento «Devolución a proveedor» en Bodega principal). */
-function invDanadosMapa_(modo) {
-  const m = {};
+function invDanadosMapa_(modo) { return invDanadosLibro_(modo).mapa; }
+/* Libro de dañados en orden cronológico (fecha y hora de registro). Cada devolución al proveedor o reparación solo descuenta lo que había dañado en ese momento;
+   lo que sobra NO se resta de los dañados que se registren después: queda como «devuelto de más» (por ejemplo, se envió un equipo bueno junto con los dañados). */
+function invDanadosLibro_(modo) {
   /* modo 'dest' = solo el sobrante de destajo; 'dan' = solo los dañados (sin destajo); sin modo = todo lo no disponible */
-  leerObjetos_(invHoja_('DAN')).forEach(r => { const c = txt_(r.Clave); if (!c) return; const dest = txt_(r.Categoria) === INV.CAT_DESTAJO; if (modo === 'dest' && !dest) return; if (modo === 'dan' && dest) return; const q = invNum_(r.Cantidad); m[c] = (m[c] || 0) + (txt_(r.Tipo) === 'DANADO' ? q : -q); });
+  const filas = [];
+  leerObjetos_(invHoja_('DAN')).forEach((r, i) => {
+    const c = txt_(r.Clave); if (!c) return;
+    const dest = txt_(r.Categoria) === INV.CAT_DESTAJO;
+    if (modo === 'dest' && !dest) return; if (modo === 'dan' && dest) return;
+    filas.push({ c: c, q: invNum_(r.Cantidad), t: txt_(r.Tipo), f: invFecha_(r.Fecha), cr: txt_(r.Creado), i: i, doc: txt_(r.Documento), mat: txt_(r.Material) });
+  });
+  filas.sort((x, y) => (x.f < y.f ? -1 : x.f > y.f ? 1 : (x.cr < y.cr ? -1 : x.cr > y.cr ? 1 : x.i - y.i)));
+  const m = {}, exceso = {};
+  filas.forEach(r => {
+    const bal = m[r.c] || 0;
+    if (r.t === 'DANADO') { m[r.c] = invRedondear_(bal + r.q); return; }
+    const quita = Math.min(bal, r.q), sobra = invRedondear_(r.q - quita);
+    m[r.c] = invRedondear_(bal - quita);
+    if (sobra > 1e-9 && r.t === 'BAJA') { (exceso[r.c] = exceso[r.c] || []).push({ fecha: r.f, documento: r.doc, cantidad: sobra, devuelto: r.q, material: r.mat }); }
+  });
   Object.keys(m).forEach(c => { m[c] = Math.max(0, invRedondear_(m[c])); });
-  return m;
+  return { mapa: m, exceso: exceso };
 }
 /* Una sola vez: si algún dañado quedó como «devolución» en Alistos (versiones 107-108), vuelve al libro de equipos dañados */
 function invMigrarDanados_() {
@@ -6412,7 +6429,10 @@ function obtenerDanadosInvWeb(token) {
   const hist = leerObjetos_(invHoja_('DAN')).filter(r => txt_(r.Clave)).map(r => ({ id: txt_(r.ID), fecha: invFecha_(r.Fecha), tipo: txt_(r.Tipo), clave: txt_(r.Clave), material: txt_(r.Material), cantidad: invNum_(r.Cantidad),
     motivo: txt_(r.Motivo), usuario: txt_(r.Usuario), creado: txt_(r.Creado), categoria: txt_(r.Categoria), fuente: txt_(r.Fuente), idMovil: txt_(r.ID_Movil), movil: txt_(r.Movil), documento: txt_(r.Documento), origen: txt_(r.Origen) }))
     .sort((a, b) => (a.creado < b.creado ? 1 : -1)).slice(0, 1500);
-  return { danados: mapa, historial: hist, categorias: INV.CAT_DANO, catDestajo: INV.CAT_DESTAJO };
+  const ex = invDanadosLibro_('dan').exceso, deMas = [];
+  Object.keys(ex).forEach(c => ex[c].forEach(e => deMas.push({ clave: c, material: e.material, fecha: e.fecha, documento: e.documento, cantidad: e.cantidad, devuelto: e.devuelto })));
+  deMas.sort((a, b) => (a.fecha < b.fecha ? 1 : -1));
+  return { danados: mapa, historial: hist, categorias: INV.CAT_DANO, catDestajo: INV.CAT_DESTAJO, devueltosDeMas: deMas };
 }
 /* Registro manual de la bodega: DANADO (equipo que ya estaba en bodega y está dañado) o REPARADO (se quita, vuelve a estar disponible) */
 function registrarDanadoInvWeb(token, d) {
