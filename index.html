@@ -1222,6 +1222,7 @@
           </div>
           <div class="toolbar ingEd" style="gap:8px">
             <button class="btn primary" onclick="danForm()">➕ Registrar dañados de bodega</button>
+            <button class="btn secondary" onclick="danBuenosForm()" title="Equipos dañados que se revisaron y funcionan: vuelven a estar disponibles">✔ Pasar dañados a buenos</button>
             <span style="flex:1"></span>
             <button class="btn secondary" onclick="ingDevolverDanados()">↩️ Devolver equipos dañados</button>
             <button class="btn secondary" onclick="ingDevolverDestajo()">✂️ Devolver destajo al proveedor</button>
@@ -12620,6 +12621,30 @@ async function danGuardar() {
     devCerrar(); bodSucio = true; toast('Registrado: ya no cuenta como disponible.', 4000); await cargarDanados();
   } catch (e) { mostrarError(e, 'No se pudo guardar.'); btn.disabled = false; }
 }
+/* Dañados que se revisaron en bodega y funcionan: se quitan de «dañados» y vuelven a estar disponibles para entregar (movimiento «Reparado») */
+function danBuenosForm() {
+  if (!bodDatos) return;
+  const B = c => bodDatos.bodega[c] || {};
+  const mats = (bodDatos.materiales || []).map(m => ({ m: m, p: Math.round(((B(m.clave).danado || 0) - (B(m.clave).destajo || 0)) * 1000) / 1000 })).filter(x => x.p > 0);
+  if (!mats.length) { toast('No hay equipos dañados pendientes.'); return; }
+  devModal('<h3>✔ Pasar dañados a buenos</h3>' +
+    '<div style="font-size:12.5px;color:#666;margin-bottom:8px">Equipos que estaban dañados, se revisaron en bodega y funcionan. Vuelven a estar <b>disponibles</b> para entregar a las móviles. Quedan anotados en el registro como «Reparado» y puede deshacerlo eliminando esa fila.</div>' +
+    '<div style="display:grid;grid-template-columns:150px 1fr;gap:8px;margin-bottom:8px"><label>Fecha<input id="dbFecha" type="date" value="' + hoyISO() + '"></label><label>Detalle (opcional)<input id="dbMot" maxlength="200" placeholder="Ej. revisados en bodega, funcionan bien" autocomplete="off"></label></div>' +
+    '<div style="max-height:46vh;overflow:auto;border:1px solid #d5d9e2;border-radius:8px"><table class="table" style="font-size:13px"><thead><tr><th class="left">Material</th><th>Dañados</th><th>Pasan a buenos</th></tr></thead><tbody>' +
+    mats.map(x => '<tr><td class="left"><b>' + esc(x.m.material) + '</b><div style="font-size:11px;color:#777">' + esc(codP(x.m.codigo)) + '</div></td><td style="color:#b26a00;font-weight:700">' + fmtN(x.p) + '</td><td><input type="number" class="dbCant" data-c="' + esc(x.m.clave) + '" data-max="' + x.p + '" min="0" max="' + x.p + '" step="any" placeholder="0" style="width:90px"></td></tr>').join('') + '</tbody></table></div>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn primary" id="dbGuardar" onclick="danBuenosGuardar()">Guardar</button><button class="btn secondary" onclick="devCerrar()">Cancelar</button></div>');
+}
+async function danBuenosGuardar() {
+  const lineas = Array.from(document.querySelectorAll('.dbCant')).map(i => ({ clave: i.dataset.c, cantidad: Number(i.value) || 0, max: Number(i.dataset.max) })).filter(l => l.cantidad > 0);
+  if (!lineas.length) { toast('Escribe cuántos pasan a buenos en al menos un material.'); return; }
+  const mas = lineas.find(l => l.cantidad > l.max + 1e-9);
+  if (mas) { toast('No puedes pasar más de los que hay dañados (' + mas.max + ').'); return; }
+  const btn = $('dbGuardar'); btn.disabled = true;
+  try {
+    await api('registrarDanadoInvWeb', { tipo: 'REPARADO', fecha: $('dbFecha').value, motivo: $('dbMot').value, lineas: lineas.map(l => ({ clave: l.clave, cantidad: l.cantidad })) });
+    devCerrar(); bodSucio = true; toast('Listo: vuelven a estar disponibles.', 4000); await cargarDanados();
+  } catch (e) { mostrarError(e, 'No se pudo guardar.'); btn.disabled = false; }
+}
 function danEditar(id) {
   const h = (danDatos.historial || []).find(x => x.id === id); if (!h) return;
   devModal('<h3>✏️ Corregir ' + (h.tipo === 'BAJA' ? 'devolución al proveedor' : 'registro de dañados') + '</h3><div style="font-size:13px;margin-bottom:8px"><b>' + esc(h.material) + '</b> · ' + esc(fmtFechaSeg(h.fecha)) + (h.fuente === 'MOVIL' ? ' · móvil M' + esc(h.movil) + ' (' + esc(h.documento) + ')' : '') + '</div>' +
@@ -18426,6 +18451,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 224 · 11-nov 11:02</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 225 · 16-nov 14:25</div>
 </body>
 </html>
