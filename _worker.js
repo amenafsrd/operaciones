@@ -6444,10 +6444,12 @@ function registrarDanadoInvWeb(token, d) {
   const motivo = txt_(d.motivo).replace(/\s+/g, ' ').slice(0, 200);
   const cat = txt_(d.categoria);
   if (tipo === 'DANADO' && INV.CAT_DANO.indexOf(cat) < 0) throw new Error('Elige la categoría del daño.');
+  if (tipo === 'REPARADO' && motivo.length < 5) throw new Error('Escribe la nota: por qué estos equipos pasan de dañados a buenos.');
   return conBloqueo_(() => {
     const porClave = {}; invMateriales_().forEach(m => { porClave[m.clave] = m; });
-    const suma = {};
-    (d.lineas || []).forEach(l => { const c = txt_(l.clave), q = invNum_(l.cantidad); if (!c || !(q > 0)) return; if (!porClave[c]) throw new Error('Material no válido: ' + c); suma[c] = invRedondear_((suma[c] || 0) + q); });
+    const suma = {}, cuales = {};
+    (d.lineas || []).forEach(l => { const c = txt_(l.clave), q = invNum_(l.cantidad); if (!c || !(q > 0)) return; if (!porClave[c]) throw new Error('Material no válido: ' + c); suma[c] = invRedondear_((suma[c] || 0) + q);
+      const det = txt_(l.detalle).replace(/\s+/g, ' ').slice(0, 200); if (det) cuales[c] = (cuales[c] ? cuales[c] + ', ' : '') + det; });
     const claves = Object.keys(suma);
     if (!claves.length) throw new Error('Indica el material y la cantidad.');
     const sal = invSaldos_(leerObjetos_(invHoja_('MOV')), []), dan = invDanadosMapa_(), danSolo = invDanadosMapa_('dan');
@@ -6457,7 +6459,7 @@ function registrarDanadoInvWeb(token, d) {
       if (tipo === 'REPARADO' && suma[c] > (danSolo[c] || 0) + 1e-9) throw new Error(nom + ': solo hay ' + (danSolo[c] || 0) + ' dañado(s) registrado(s) (el sobrante de destajo se devuelve al proveedor).');
     });
     const ahora = segAhora_();
-    const filas = claves.map(c => ({ ID: 'D' + Date.now() + '_' + c.slice(0, 12), Fecha: fecha, Tipo: tipo, Clave: c, Material: porClave[c].material, Cantidad: suma[c], Motivo: motivo, Usuario: ses.usuario, Creado: ahora,
+    const filas = claves.map(c => ({ ID: 'D' + Date.now() + '_' + c.slice(0, 12), Fecha: fecha, Tipo: tipo, Clave: c, Material: porClave[c].material, Cantidad: suma[c], Motivo: (motivo + (cuales[c] ? (motivo ? ' · ' : '') + 'Equipos: ' + cuales[c] : '')).slice(0, 420), Usuario: ses.usuario, Creado: ahora,
       Origen: '', Categoria: tipo === 'DANADO' ? cat : '', Fuente: tipo === 'DANADO' ? 'BODEGA' : '', ID_Movil: '', Movil: '', Documento: '' }));
     invAgregar_(invHoja_('DAN'), 'DAN', filas);
     invLog_(ses, tipo === 'DANADO' ? 'Equipos dañados registrados en bodega' : 'Dañados quitados (reparados / disponibles)', claves.map(c => porClave[c].material + ' ×' + suma[c]).join(', ') + (cat ? ' · ' + cat : '') + (motivo ? ' · ' + motivo : ''), 'DAN');
