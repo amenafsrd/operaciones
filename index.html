@@ -1842,7 +1842,9 @@
       <div style="font-size:12px;color:#777;margin:8px 0 4px">Firma con el dedo o el mouse en el recuadro:</div>
       <canvas id="firCanvas" width="400" height="170" style="width:100%;max-width:520px;border:2px solid #999;border-radius:8px;background:#fff;touch-action:none;cursor:crosshair"></canvas>
       <div style="margin-top:10px;padding:8px 10px;background:#f1f8e9;border:1px solid #c5e1a5;border-radius:8px;font-size:13px">📲 <b>¿La móvil no tiene dispositivo?</b> Envíale un enlace: lo abre en su celular, revisa el documento, firma con el dedo y lo puede descargar.
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"><button class="btn secondary" type="button" onclick="firEnlace('wa')">💬 Enviar por WhatsApp</button><button class="btn secondary" type="button" onclick="firEnlace('copiar')">🔗 Copiar enlace</button></div></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"><button class="btn secondary" type="button" onclick="firEnlace('wa')">💬 Enviar por WhatsApp</button><button class="btn secondary" type="button" onclick="firEnlace('copiar')">🔗 Copiar enlace</button></div>
+        <div style="margin-top:8px;font-size:12.5px;color:#33691e"><span id="firEnlEstado">El enlace vale 48 horas desde que se genera.</span></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px"><select id="firExtHoras" style="padding:5px"><option value="24">24 horas</option><option value="48" selected>48 horas</option><option value="72">72 horas</option><option value="168">7 días</option></select><button class="btn secondary" type="button" onclick="firExtender()" title="El enlace ya enviado vuelve a valer desde ahora por el tiempo elegido">⏱ Extender enlace</button></div></div>
       <div class="modalActions">
         <button class="btn secondary" onclick="firBorrar()">🧹 Borrar</button>
         <button class="btn secondary" onclick="$('modalFirma').classList.remove('show')">Cancelar</button>
@@ -13655,8 +13657,23 @@ function abrirFirmaDoc() {
   abrirFirma(x.grupo, x.consecutivo, mv ? mv.tecnico : '');
 }
 
+function firEstadoPintar(r) {
+  const e = $('firEnlEstado'); if (!e) return;
+  if (!r || !r.existe) { e.textContent = 'El enlace vale 48 horas desde que se genera.'; e.style.color = '#33691e'; return; }
+  e.innerHTML = r.vigente ? '✅ Enlace vigente hasta <b>' + esc(rcFechaHora(r.vence)) + '</b>' : '⛔ El enlace <b>venció</b> el ' + esc(rcFechaHora(r.vence)) + ' · pulsa «Extender enlace» para reactivarlo (es el mismo enlace) o genera uno nuevo';
+  e.style.color = r.vigente ? '#33691e' : '#b71c1c';
+}
+async function firExtender() {
+  if (!firGrupo) return;
+  try {
+    const r = await api('extenderEnlaceFirmaInvWeb', firGrupo, $('firExtHoras').value);
+    firEstadoPintar({ existe: true, vigente: true, vence: r.vence });
+    toast('Enlace extendido hasta ' + rcFechaHora(r.vence) + '. Es el mismo enlace que ya envió.', 5000);
+  } catch (e) { mostrarError(e, 'No se pudo extender el enlace.'); }
+}
 function abrirFirma(grupo, consecutivo, nombre) {
   firGrupo = grupo; firCons = consecutivo || '';
+  firEstadoPintar(null); api('estadoEnlaceFirmaInvWeb', grupo).then(r => { if (firGrupo === grupo) firEstadoPintar(r); }).catch(() => { });
   $('firTitulo').textContent = '✍️ Firma de recibido ' + (consecutivo ? '· ' + consecutivo : '');
   $('firNombre').value = nombre || '';
   const dx = docPorGrupo(grupo);
@@ -13681,6 +13698,7 @@ async function firEnlace(modo) {
   if (!firGrupo) return;
   try {
     const r = await api('crearEnlaceFirmaInvWeb', firGrupo);
+    firEstadoPintar({ existe: true, vigente: true, vence: r.vence });
     const url = location.origin + '/?firma=' + r.enlace;
     const msg = 'Hola, este es el documento ' + (r.consecutivo || '') + ' de Soluciones Red Dorada para que lo revises y lo firmes de recibido (se firma con el dedo en el celular): ' + url;
     if (modo === 'wa') { window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank'); toast('Elige el contacto en WhatsApp para enviarle el enlace.', 4000); return; }
@@ -18455,6 +18473,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 227 · 16-nov 14:47</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 228 · 18-nov 08:54</div>
 </body>
 </html>
