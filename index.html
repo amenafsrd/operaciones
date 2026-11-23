@@ -1385,6 +1385,7 @@
           <button id="ctS_cot" class="active" onclick="ctSub('cot')">💼 Cotizaciones</button>
           <button id="ctS_cli" onclick="ctSub('cli')">👥 Clientes</button>
           <button id="ctS_mat" onclick="ctSub('mat')">🧱 Materiales</button>
+          <button id="ctS_srv" onclick="ctSub('srv')">🏗️ Servicios y rentas</button>
         </div>
 
         <div id="ctPanelCot">
@@ -1434,6 +1435,17 @@
           <div class="panel"><div class="panelHead"><div><h2>Catálogo de materiales</h2>
             <div style="font-size:12px;color:#777;margin-top:3px">Costo por unidad. Si el costo no incluye IVA y está marcado «+IVA», al cotizar se le suma el 13 %. En la cotización los materiales se pasan a la moneda de la cotización con el tipo de cambio.</div></div></div>
             <div id="mtTabla" class="tableWrap"></div></div>
+        </div>
+      
+        <div id="ctPanelSrv" style="display:none">
+          <div class="toolbar">
+            <div class="field" style="min-width:240px"><label>Buscar servicio</label><input id="svBuscar" placeholder="Nombre o código..." oninput="svRender()"></div>
+            <div class="field" style="min-width:200px"><label>Tipo</label><select id="svTipo" onchange="svRender()"><option value="">Todos</option></select></div>
+            <button class="btn primary ctEd" onclick="svAbrir()">➕ Nuevo servicio</button>
+          </div>
+          <div class="panel"><div class="panelHead"><div><h2>Servicios y rentas</h2>
+            <div style="font-size:12px;color:#777;margin-top:3px">Renta de equipos, andamios, grúa y fletes con su tarifa por unidad (día, hora, viaje…). Al cotizar se agregan con el botón «🏗️ Servicios y rentas»: cada uno sale en su propia línea y se puede cambiar el precio en esa cotización. Las tarifas se escriben sin IVA; el IVA se suma al total de la cotización.</div></div></div>
+            <div id="svTabla" class="tableWrap"></div></div>
         </div>
       </section>
 
@@ -2641,7 +2653,7 @@
       <div class="tableWrap" style="margin-top:12px"><table class="table ceTbl" style="min-width:820px"><thead><tr>
         <th style="width:120px">Código</th><th class="left">Descripción</th><th style="width:70px">Cant.</th><th style="width:120px">Precio unit.</th><th style="width:100px">Desc.</th><th style="width:120px">Precio</th><th style="width:34px"></th></tr></thead>
         <tbody id="ceLineas"></tbody></table></div>
-      <div style="margin-top:8px"><button class="btn secondary" onclick="ceAddLinea()">➕ Agregar línea</button></div>
+      <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn secondary" onclick="ceAddLinea()">➕ Agregar línea</button><button class="btn secondary" onclick="spAbrir()" title="Renta de equipos, andamios, grúa y fletes">🏗️ Servicios y rentas</button></div>
       <div class="ceGrid" style="margin-top:12px;align-items:start">
         <div style="grid-column:span 2"><div class="field"><label>Notas (salen en la cotización)</label><textarea id="ceNotas" rows="4" style="width:100%;padding:9px 10px;border:1px solid #ccc;border-radius:7px;font-family:inherit"></textarea></div></div>
         <div class="ceTot" id="ceTotales"></div>
@@ -2714,6 +2726,43 @@
         <button id="mtBtnDel" class="btn secondary" style="margin-right:auto" onclick="mtEliminar()">🗑️ Eliminar</button>
         <button class="btn secondary" onclick="$('modalCotMat').classList.remove('show')">Cancelar</button>
         <button class="btn primary" onclick="mtGuardar()">💾 Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modalCotSrv" class="modalBg">
+    <div class="modal" style="width:min(560px,100%)">
+      <h3 id="svTitulo">Servicio</h3>
+      <div class="field"><label>Servicio *</label><input id="svNombre" placeholder="Ej. Renta de andamio tubular, Flete a Guanacaste…"></div>
+      <div class="grid2" style="margin-top:10px">
+        <div class="field"><label>Tipo</label><select id="svTip"></select></div>
+        <div class="field"><label>Código (opcional)</label><input id="svCod" placeholder="001-200-015"></div>
+        <div class="field"><label>Unidad de cobro</label><input id="svUnd" list="svUndDl" value="día"><datalist id="svUndDl"><option value="hora"><option value="día"><option value="semana"><option value="mes"><option value="viaje"><option value="km"><option value="u"></datalist></div>
+        <div class="field"><label>Moneda de la tarifa</label><select id="svMon"><option value="USD">Dólares ($)</option><option value="CRC">Colones (₡)</option></select></div>
+        <div class="field"><label>Tarifa por unidad (sin IVA)</label><input type="number" step="any" min="0" id="svTarifa"></div>
+      </div>
+      <label style="font-weight:400;margin-top:10px"><input type="checkbox" id="svAct" checked> Activo (aparece al cotizar)</label>
+      <div class="modalActions">
+        <button id="svBtnDel" class="btn secondary" style="margin-right:auto" onclick="svEliminar()">🗑️ Eliminar</button>
+        <button class="btn secondary" onclick="$('modalCotSrv').classList.remove('show')">Cancelar</button>
+        <button class="btn primary" onclick="svGuardar()">💾 Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modalCotSrvPick" class="modalBg">
+    <div class="modal" style="width:min(900px,100%)">
+      <h3>🏗️ Servicios y rentas</h3>
+      <div style="font-size:12.5px;color:#666;margin-bottom:8px">Escribe la cantidad (días, horas, viajes…) de cada servicio que lleva el trabajo. Cada uno se agrega como su propia línea; después puedes cambiar el precio o la descripción en la cotización.</div>
+      <div class="toolbar" style="box-shadow:none;padding:0;margin-bottom:8px">
+        <div class="field" style="min-width:220px"><label>Buscar</label><input id="spBuscar" oninput="spRender()"></div>
+        <div class="field" style="min-width:180px"><label>Tipo</label><select id="spTipo" onchange="spRender()"><option value="">Todos</option></select></div>
+        <div id="spTotal" style="font-size:13px;margin-left:auto"></div>
+      </div>
+      <div id="spTabla" class="tableWrap" style="max-height:52vh"></div>
+      <div class="modalActions">
+        <button class="btn secondary" onclick="$('modalCotSrvPick').classList.remove('show')">Cancelar</button>
+        <button class="btn primary" onclick="spAplicar()">✅ Agregar a la cotización</button>
       </div>
     </div>
   </div>
@@ -16791,7 +16840,7 @@ async function abrirCotizaciones() {
 
 function ctSub(s) {
   ctSubActual = s;
-  ['cot', 'cli', 'mat'].forEach(x => {
+  ['cot', 'cli', 'mat', 'srv'].forEach(x => {
     $('ctS_' + x).classList.toggle('active', x === s);
     $('ctPanel' + x.charAt(0).toUpperCase() + x.slice(1)).style.display = x === s ? '' : 'none';
   });
@@ -16816,7 +16865,7 @@ async function ctCargar() {
   const gs = $('mtGrupo'), gv = gs.value;
   gs.innerHTML = '<option value="">Todos</option>' + grupos.map(g => '<option>' + esc(g) + '</option>').join('');
   gs.value = gv;
-  ctRender(); clRender(); mtRender();
+  ctRender(); clRender(); mtRender(); svRender();
   if (ctActual && $('modalCot').classList.contains('show')) ctAbrir(ctActual.cotizacion, true);
 }
 
@@ -16934,6 +16983,78 @@ function mtRender() {
     l.map(m => '<tr style="' + (m.activo ? '' : 'opacity:.5') + '"><td class="left">' + esc(m.grupo) + '</td><td class="left"><b>' + esc(m.material) + '</b>' + (m.activo ? '' : ' <span class="segBadge e">inactivo</span>') + '</td><td>' + esc(m.unidad) + '</td><td>' + ctMoney(m.costo, m.moneda) + '</td><td>' + (m.conIva ? '13 %' : '—') + '</td><td><b>' + ctMoney(m.costo * (m.conIva ? 1.13 : 1), m.moneda) + '</b></td>' +
       (ed ? '<td><button class="btnMini" onclick="mtAbrir(\'' + escJs(m.id) + '\')">✏️</button></td>' : '') + '</tr>').join('') + '</tbody></table>'
     : '<div class="empty">No hay materiales que coincidan.</div>';
+}
+
+/* ---------- Catálogo de servicios y rentas (andamios, grúa, fletes, equipos) ---------- */
+let svEditando = '', spCant = {};
+function svTarifaEn(sv, moneda, tc) {
+  let c = sv.tarifa;
+  if (sv.moneda !== moneda) c = moneda === 'USD' ? c / tc : c * tc;
+  return ctRed(c);
+}
+function svLlenarTipos(id) {
+  const el = $(id), v = el.value;
+  el.innerHTML = '<option value="">Todos</option>' + ((ctDatos && ctDatos.tiposServicio) || []).map(t => '<option>' + esc(t) + '</option>').join('');
+  el.value = v;
+}
+function svRender() {
+  if (!ctDatos) return;
+  svLlenarTipos('svTipo');
+  const q = ctNorm($('svBuscar').value).trim(), t = $('svTipo').value, ed = puedeEditar();
+  const l = (ctDatos.servicios || []).filter(m => (!t || m.tipo === t) && (!q || q.split(/\s+/).every(w => ctNorm(m.servicio + ' ' + m.codigo + ' ' + m.tipo).indexOf(w) !== -1)));
+  $('svTabla').innerHTML = l.length ? '<table class="table" style="min-width:720px"><thead><tr><th class="left">Tipo</th><th class="left">Servicio</th><th>Código</th><th>Se cobra por</th><th>Tarifa (sin IVA)</th>' + (ed ? '<th></th>' : '') + '</tr></thead><tbody>' +
+    l.map(m => '<tr style="' + (m.activo ? '' : 'opacity:.5') + '"><td class="left">' + esc(m.tipo) + '</td><td class="left"><b>' + esc(m.servicio) + '</b>' + (m.activo ? '' : ' <span class="segBadge e">inactivo</span>') + '</td><td>' + esc(m.codigo || '—') + '</td><td>' + esc(m.unidad) + '</td><td>' + (m.tarifa > 0 ? '<b>' + ctMoney(m.tarifa, m.moneda) + '</b>' : '<span style="color:#b26a00">sin tarifa</span>') + '</td>' +
+      (ed ? '<td><button class="btnMini" onclick="svAbrir(\'' + escJs(m.id) + '\')">✏️</button></td>' : '') + '</tr>').join('') + '</tbody></table>'
+    : '<div class="empty">No hay servicios que coincidan.</div>';
+}
+function svAbrir(id) {
+  const m = id ? (ctDatos.servicios || []).find(x => x.id === id) : null;
+  svEditando = id || '';
+  $('svTip').innerHTML = (ctDatos.tiposServicio || []).map(t => '<option>' + esc(t) + '</option>').join('');
+  $('svTitulo').textContent = m ? 'Editar servicio' : 'Nuevo servicio';
+  $('svNombre').value = m ? m.servicio : ''; $('svTip').value = m ? m.tipo : ($('svTipo').value || (ctDatos.tiposServicio || [])[0]); $('svCod').value = m ? m.codigo : '';
+  $('svUnd').value = m ? m.unidad : 'día'; $('svMon').value = m ? m.moneda : 'USD'; $('svTarifa').value = m ? m.tarifa : ''; $('svAct').checked = m ? m.activo : true;
+  $('svBtnDel').style.display = m ? '' : 'none';
+  $('modalCotSrv').classList.add('show');
+}
+async function svGuardar() {
+  const m = { id: svEditando, servicio: $('svNombre').value.trim(), tipo: $('svTip').value, codigo: $('svCod').value.trim(), unidad: $('svUnd').value.trim() || 'día', moneda: $('svMon').value, tarifa: $('svTarifa').value, activo: $('svAct').checked };
+  try { await api('guardarServicioCotWeb', m); $('modalCotSrv').classList.remove('show'); toast('Servicio guardado.'); await ctCargar(); } catch (e) { mostrarError(e, 'No se pudo guardar el servicio.'); }
+}
+async function svEliminar() {
+  if (!confirm('¿Eliminar este servicio del catálogo? Las cotizaciones hechas no cambian.')) return;
+  try { await api('eliminarServicioCotWeb', svEditando); $('modalCotSrv').classList.remove('show'); await ctCargar(); } catch (e) { mostrarError(e, 'No se pudo eliminar.'); }
+}
+/* Selector dentro de la cotización: cada servicio con cantidad se agrega como su propia línea */
+function spAbrir() {
+  spCant = {};
+  svLlenarTipos('spTipo');
+  $('spBuscar').value = '';
+  spRender();
+  $('modalCotSrvPick').classList.add('show');
+}
+function spRender() {
+  const q = ctNorm($('spBuscar').value).trim(), t = $('spTipo').value, mon = ceMoneda(), tc = ceTcVal();
+  const l = (ctDatos.servicios || []).filter(m => m.activo && (!t || m.tipo === t) && (!q || q.split(/\s+/).every(w => ctNorm(m.servicio + ' ' + m.codigo + ' ' + m.tipo).indexOf(w) !== -1)));
+  $('spTabla').innerHTML = l.length ? '<table class="table" style="font-size:13px"><thead><tr><th class="left">Tipo</th><th class="left">Servicio</th><th>Se cobra por</th><th>Tarifa</th><th style="width:100px">Cantidad</th></tr></thead><tbody>' +
+    l.map(m => '<tr><td class="left" style="color:#888">' + esc(m.tipo) + '</td><td class="left"><b>' + esc(m.servicio) + '</b></td><td>' + esc(m.unidad) + '</td><td>' + (m.tarifa > 0 ? ctMoney(svTarifaEn(m, mon, tc), mon) : '<span style="color:#b26a00">sin tarifa</span>') + '</td>' +
+      '<td><input type="number" step="any" min="0" style="width:84px;padding:5px;border:1px solid #ccc;border-radius:6px" value="' + (spCant[m.id] || '') + '" oninput="spCambio(\'' + escJs(m.id) + '\',this.value)"></td></tr>').join('') + '</tbody></table>'
+    : '<div class="empty">No hay servicios. Créalos en la pestaña «Servicios y rentas» del módulo de Cotizaciones.</div>';
+  spTotal();
+}
+function spCambio(id, v) { const n = Number(v) || 0; if (n > 0) spCant[id] = n; else delete spCant[id]; spTotal(); }
+function spTotal() {
+  const mon = ceMoneda(), tc = ceTcVal();
+  let t = 0, n = 0;
+  (ctDatos.servicios || []).forEach(m => { if (spCant[m.id]) { n++; t += spCant[m.id] * svTarifaEn(m, mon, tc); } });
+  $('spTotal').innerHTML = n ? '<b>' + n + '</b> servicio(s) · <b>' + ctMoney(ctRed(t), mon) + '</b> sin IVA' : '';
+}
+function spAplicar() {
+  const mon = ceMoneda(), tc = ceTcVal(), sel = (ctDatos.servicios || []).filter(m => spCant[m.id]);
+  if (!sel.length) { toast('Escribe la cantidad de al menos un servicio.'); return; }
+  sel.forEach(m => ceAddLinea({ codigo: m.codigo, descripcion: m.servicio + ' · por ' + m.unidad, cantidad: spCant[m.id], precio: svTarifaEn(m, mon, tc), origen: 'SRV' }));
+  $('modalCotSrvPick').classList.remove('show');
+  toast(sel.length + ' línea(s) de servicios agregada(s). Puedes cambiar el precio o la descripción.', 4000);
 }
 
 function mtAbrir(id) {
@@ -17074,9 +17195,9 @@ function ceTcVal() { return Number($('ceTc').value) || ctDatos.tcDefecto; }
 function ceAddLinea(l) {
   l = l || {};
   const tr = document.createElement('tr');
-  if (l.origen === 'MAT' || l.origen === 'VIA') tr.dataset.origen = l.origen;
+  if (l.origen === 'MAT' || l.origen === 'VIA' || l.origen === 'SRV') tr.dataset.origen = l.origen;
   tr.innerHTML = '<td><input class="lc" list="ctDlCod" value="' + esc(l.codigo || '') + '" onchange="ceAuto(this,\'c\')"></td>' +
-    '<td><input class="ld" list="ctDlDesc" value="' + esc(l.descripcion || '') + '" onchange="ceAuto(this,\'d\')">' + (l.origen === 'MAT' ? '<div style="font-size:11px;color:#1e4fa3">🧱 se actualiza con los materiales</div>' : (l.origen === 'VIA' ? '<div style="font-size:11px;color:#1e4fa3">🚐 se actualiza con los viáticos</div>' : '')) + '</td>' +
+    '<td><input class="ld" list="ctDlDesc" value="' + esc(l.descripcion || '') + '" onchange="ceAuto(this,\'d\')">' + (l.origen === 'MAT' ? '<div style="font-size:11px;color:#1e4fa3">🧱 se actualiza con los materiales</div>' : (l.origen === 'VIA' ? '<div style="font-size:11px;color:#1e4fa3">🚐 se actualiza con los viáticos</div>' : (l.origen === 'SRV' ? '<div style="font-size:11px;color:#1e4fa3">🏗️ del catálogo de servicios</div>' : ''))) + '</td>' +
     '<td><input class="lq" type="number" step="any" value="' + (l.cantidad == null ? 1 : l.cantidad) + '" oninput="ceCalc()"></td>' +
     '<td><input class="lp" type="number" step="any" value="' + (l.precio || '') + '" oninput="ceCalc()"></td>' +
     '<td><input class="lx" type="number" step="any" value="' + (l.descuento || '') + '" oninput="ceCalc()"></td>' +
@@ -18473,6 +18594,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 228 · 18-nov 08:54</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 229 · 23-nov 09:53</div>
 </body>
 </html>
