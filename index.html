@@ -15521,11 +15521,13 @@ function renderConteo() {
           '<div style="color:#888">sist. ' + fmtN(t) + '</div><div id="invD_' + esc(u.id) + '_' + esc(m.clave) + '">' + (cont ? invDifTxt(f - t) : '') + '</div></td>';
       }).join('') + '</tr>';
   });
+  if (invVista !== 'lista') h += '<tr style="background:#f3f4f6;border-top:2px solid #999"><td class="left" style="white-space:nowrap"><b>TOTAL GENERAL</b><div style="color:#888;font-weight:400">todas las ubicaciones</div></td>' +
+    mats.map(m => '<td id="invT_' + esc(m.clave) + '"></td>').join('') + '</tr>';
   if (invVista !== 'lista') h += '</tbody></table></div>';
   h += '</div></div><div id="invResumenDif" style="margin-top:15px;' + (invMin ? 'display:none' : '') + '"></div><div id="cobPorMovil" style="' + (invMin ? 'display:none' : '') + '"></div>';
 
   $('invDetalle').innerHTML = h;
-  if (invVista === 'lista') invRenderLista();
+  if (invVista === 'lista') invRenderLista(); else invTotalesPintar();
   renderResumenDif();
   if (!abierto && esAdmin()) cobroRenderPorMovil();
 }
@@ -15575,7 +15577,24 @@ function invCambio(inp) {
   const e1 = $('invD_' + u + '_' + c); if (e1) e1.innerHTML = dif === null ? '' : invDifTxt(dif);
   const e2 = $('invLD_' + u + '_' + c); if (e2) e2.innerHTML = dif === null ? '' : invDifTxt(dif);
   const e3 = $('invLV_' + u + '_' + c); if (e3) { const co = costoDe(c); e3.innerHTML = dif !== null && co && Math.abs(dif) > 1e-9 ? '<b class="' + (dif < 0 ? 'segNeg' : '') + '">' + colones(dif * co) + '</b>' : ''; }
+  invTotalesPintar();
   renderResumenDif();
+}
+
+/* Total general por material (suma de todas las ubicaciones) */
+function invTotalesPintar() {
+  const d = invActual; if (!d) return;
+  d.materiales.forEach(m => {
+    const e = $('invT_' + m.clave); if (!e) return;
+    let sist = 0, fis = 0, dif = 0, n = 0;
+    d.ubicaciones.forEach(u => {
+      const t = ((d.teorico[u.id] || {})[m.clave]) || 0, f = (invFis[u.id] || {})[m.clave];
+      sist += t;
+      if (f !== undefined) { fis += f; dif += f - t; n++; }
+    });
+    sist = Math.round(sist * 1000) / 1000; fis = Math.round(fis * 1000) / 1000; dif = Math.round(dif * 1000) / 1000;
+    e.innerHTML = (n ? '<b>' + fmtN(fis) + '</b>' : '<span class="segSinCarga">—</span>') + '<div style="color:#888">sist. ' + fmtN(sist) + '</div><div>' + (n ? invDifTxt(dif) : '') + '</div>';
+  });
 }
 
 /* Llena con lo que dice el sistema todo lo que no se ha contado (no genera ajuste) */
@@ -18594,6 +18613,6 @@ async function cpCompartir() {
   </div>
 </div>
 
-<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 229 · 23-nov 09:53</div>
+<div id="verSello" style="position:fixed;right:8px;bottom:4px;font:11px Arial;color:#8896a8;z-index:5;pointer-events:none">Versión estándar 230 · 25-nov 08:53</div>
 </body>
 </html>
